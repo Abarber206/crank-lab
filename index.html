@@ -333,6 +333,7 @@ const wallMat=new THREE.MeshLambertMaterial({map:wallTex}), floorMat=new THREE.M
 const treadMat=new THREE.MeshLambertMaterial({map:treadTex}), beamMat=new THREE.MeshLambertMaterial({map:beamTex});
 const chunkMat=new THREE.MeshLambertMaterial({color:0xc9995a});
 const ghostMat=new THREE.MeshBasicMaterial({color:0x62bdff, transparent:true, opacity:.34, depthWrite:false});
+const ghostBad=new THREE.MeshBasicMaterial({color:0xff5a4a, transparent:true, opacity:.22, depthWrite:false});
 const ghostDim=new THREE.MeshBasicMaterial({color:0x62bdff, transparent:true, opacity:.1, depthWrite:false});
 const editPieceMat=new THREE.MeshBasicMaterial({color:0xbfe2ff, transparent:true, opacity:.16, depthWrite:false});
 const tileMat=new THREE.MeshBasicMaterial({color:0x8fd3ff, transparent:true, opacity:.42, side:THREE.DoubleSide, depthWrite:false});
@@ -485,7 +486,7 @@ function buildPiece(p){
   if(p.anim){ finishAnim(p); anims.delete(p); }
   if(p.group) scene.remove(p.group);
   p.group=makeGroup(p,null,true); scene.add(p.group);
-  p.boxes=makeBoxes(p); p.slab=(p.type==='ramp'||p.type==='cone');
+  p.boxes=makeBoxes(p); p.slab=(p.type==='ramp'||p.type==='cone'); p.bb=null; p.bb=pbox(p);
 }
 function addPiece(t){
   const p=Object.assign({},t,{mask:t.type==='wall'?511:t.type==='floor'?15:0, born:performance.now()});
@@ -503,6 +504,36 @@ function removePiece(p){
   for(const [a,b] of cellsOf(p)){ const s=cellIndex.get(a+','+b); if(s) s.delete(p); }
   scene.remove(p.group);
   const i=order.indexOf(p); if(i>=0) order.splice(i,1);
+}
+/* Structural support: a piece needs the ground or a touching piece. Breaking one drops anything left floating. */
+function pbox(p){
+  if(p.bb) return p.bb;
+  const y=p.l*LVL;
+  if(p.type==='wall') return p.axis==='x'?[p.i*CELL,y,p.j*CELL,p.i*CELL,y+LVL,p.j*CELL+CELL]:[p.i*CELL,y,p.j*CELL,p.i*CELL+CELL,y+LVL,p.j*CELL];
+  if(p.type==='floor') return [p.i*CELL,y,p.j*CELL,p.i*CELL+CELL,y,p.j*CELL+CELL];
+  return [p.i*CELL,y,p.j*CELL,p.i*CELL+CELL,y+(p.type==='ramp'?LVL:CONE_H),p.j*CELL+CELL];
+}
+function touches(a,b){ const e=0.02; return a[0]<=b[3]+e&&b[0]<=a[3]+e&&a[1]<=b[4]+e&&b[1]<=a[4]+e&&a[2]<=b[5]+e&&b[2]<=a[5]+e; }
+function grounded(p){ return p.l===0; }
+function neighbors(p){
+  const a=pbox(p), cx=(a[0]+a[3])/2, cz=(a[2]+a[5])/2, out=[];
+  near(cx,cz,1).forEach(q=>{ if(q!==p&&q.key!==p.key&&touches(a,pbox(q))) out.push(q); });
+  return out;
+}
+function supported(t){ return grounded(t)||neighbors(t).length>0; }
+function collapseFrom(nbrs){
+  const safe=new Set(), doomed=[];
+  for(const n of nbrs){
+    if(safe.has(n)||doomed.includes(n)||!pieces.has(n.key)) continue;
+    const seen=new Set([n]), stack=[n]; let ok=false;
+    while(stack.length){ const q=stack.pop(); if(grounded(q)||safe.has(q)){ ok=true; break; }
+      for(const r of neighbors(q)) if(!seen.has(r)){ seen.add(r); stack.push(r); }
+      if(seen.size>4000){ ok=true; break; } }
+    if(ok) seen.forEach(q=>safe.add(q)); else doomed.push(...seen);
+  }
+  if(!doomed.length) return;
+  doomed.sort((a,b)=>a.l-b.l);
+  doomed.forEach((q,i)=>setTimeout(()=>{ if(!pieces.has(q.key)) return; if(i<40) burst(pieceCenter(q),6,5,0.28); removePiece(q); if(i%6===0) sfx('break'); },70+i*22));
 }
 function clearBuilds(){ if(edit) exitEdit(false); [...order].forEach(removePiece); }
 function near(x,z,rad=1){
@@ -655,7 +686,7 @@ function computeTarget(type){
 }
 function tryPlace(type){
   const t=computeTarget(type);
-  if(!t||pieces.has(t.key)) return false;
+  if(!t||pieces.has(t.key)||!supported(t)) return false;
   const np=addPiece(t); burst(pieceCenter(np),4,3,0.07); sfx('place'); netOp({op:'place',t:pick(t)}); return true;
 }
 
@@ -665,10 +696,10 @@ function updateGhost(){
   const show=playing&&mode==='build'&&!edit;
   if(!show){ if(ghost){scene.remove(ghost);ghost=null;ghostKey='';} return; }
   const t=computeTarget(heldPiece||piece);
-  const occ=pieces.has(t.key), k=t.key+(t.dir||0)+occ;
+  const occ=pieces.has(t.key), bad=!occ&&!supported(t), k=t.key+(t.dir||0)+occ+bad;
   if(k===ghostKey) return;
   if(ghost) scene.remove(ghost);
-  ghost=makeGroup(Object.assign({mask:t.type==='wall'?511:t.type==='floor'?15:0},t), occ?ghostDim:ghostMat, false);
+  ghost=makeGroup(Object.assign({mask:t.type==='wall'?511:t.type==='floor'?15:0},t), occ?ghostDim:bad?ghostBad:ghostMat, false);
   ghost.renderOrder=2; scene.add(ghost); ghostKey=k;
 }
 
@@ -776,7 +807,7 @@ function fireUp(src){
 function swing(){
   swingT=0.22; net.lastSwing=(net.lastSwing%1e6)+1;
   const hit=aimHit(3.4);
-  if(hit){ const hp_=hit.object.userData.piece; burst(pieceCenter(hp_).add(new THREE.Vector3(0,hp_.type==='cone'?0.8:0,0)),18,7,0.32); burst(hit.point,8,4,0.12); removePiece(hp_); sfx('break'); netOp({op:'break',key:hp_.key}); } else sfx('whiff');
+  if(hit){ const hp_=hit.object.userData.piece; burst(pieceCenter(hp_).add(new THREE.Vector3(0,hp_.type==='cone'?0.8:0,0)),18,7,0.32); burst(hit.point,8,4,0.12); const nb_=neighbors(hp_); removePiece(hp_); collapseFrom(nb_); sfx('break'); netOp({op:'break',key:hp_.key}); } else sfx('whiff');
 }
 function toggleEdit(){ if(edit) exitEdit(true); else enterEdit(); }
 function respawn(){ P.pos.set(...SPAWN); P.vel.set(0,0,0); P.onGround=true; }
@@ -1195,7 +1226,7 @@ function stepPlayers(dt){
 }
 function applyOp(o,quiet){
   if(o.op==='place'){ if(!pieces.has(o.t.key)){ const np=addPiece(o.t); if(!quiet&&pieceCenter(np).distanceTo(P.pos)<30) sfx('place'); } }
-  else if(o.op==='break'){ const p=pieces.get(o.key); if(p){ burst(pieceCenter(p),14,6,0.3); removePiece(p); if(pieceCenter(p).distanceTo(P.pos)<30) sfx('break'); } }
+  else if(o.op==='break'){ const p=pieces.get(o.key); if(p){ burst(pieceCenter(p),14,6,0.3); const nb_=neighbors(p); removePiece(p); collapseFrom(nb_); if(pieceCenter(p).distanceTo(P.pos)<30) sfx('break'); } }
   else if(o.op==='shape'){ const p=pieces.get(o.key); if(p){ if(edit&&edit.piece===p) exitEdit(false); p.mask=o.mask; p.dir=o.dir; buildPiece(p); startAnim(p,140); popPlayerOut(); } }
   else if(o.op==='clear') clearBuilds();
 }
