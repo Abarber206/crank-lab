@@ -1066,7 +1066,15 @@ addEventListener('keydown',e=>{
 },true);
 addEventListener('keyup',e=>{ inputUp(e.code); });
 // Side buttons (3,4) would trigger browser back/forward: always swallow them.
-['mousedown','mouseup','auxclick'].forEach(t=>addEventListener(t,e=>{ if(e.button===3||e.button===4||(e.button===1&&playing)) e.preventDefault(); },true));
+// Side buttons (3,4) would trigger browser back/forward: swallow them on every event type the browser might act on.
+['pointerdown','pointerup','mousedown','mouseup','auxclick','click'].forEach(t=>addEventListener(t,e=>{ if(e.button===3||e.button===4||(e.button===1&&playing)){ e.preventDefault(); e.stopImmediatePropagation&&t==='auxclick'&&e.stopImmediatePropagation(); } },{capture:true,passive:false}));
+['pointerdown','pointerup'].forEach(t=>addEventListener(t,e=>{ if(e.pointerType!=='mouse'||!(e.button===3||e.button===4)) return; if(capturing){ endCapture('Mouse'+e.button); return; } if(!playing||isTouch) return; t==='pointerdown'?inputDown('Mouse'+e.button):inputUp('Mouse'+e.button); },true));
+// Mouse software that sends browser keys (Back/Forward/Refresh, F5) instead of buttons: block them while playing so they can be bound.
+const NAV_KEYS=['BrowserBack','BrowserForward','BrowserRefresh','F5'];
+addEventListener('keydown',e=>{ if(playing&&(NAV_KEYS.includes(e.code)||(e.code==='KeyR'&&(e.ctrlKey||e.metaKey)))) e.preventDefault(); },true);
+// Last line of defence: if the browser still tries to leave or reload mid-game, ask first.
+addEventListener('beforeunload',e=>{ if(playing||order.length>20){ e.preventDefault(); e.returnValue=''; } });
+try{ history.pushState({crank:1},''); addEventListener('popstate',()=>{ if(playing||order.length) try{ history.pushState({crank:1},''); }catch(_){} }); }catch(_){}
 addEventListener('mousedown',e=>{
   if(capturing){ e.preventDefault(); e.stopPropagation(); endCapture('Mouse'+e.button); return; }
   if(isTouch||!playing||e.pointerType==='touch') return;
