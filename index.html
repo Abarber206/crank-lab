@@ -292,7 +292,7 @@ kbd{font-family:var(--font-ui);background:#1c2a40;border-radius:3px;padding:1px 
           <dt>Fire</dt><dd>Shoot, place the current piece, or swing the pickaxe</dd>
         </dl>
         <p class="sub" style="margin-top:10px;font-size:12px"><b>Controller:</b> A jump, R3 crouch, RT fire, RB/LB switch weapon, X reload, B build mode, Y edit. In build mode RT wall, RB floor, LT stairs, LB cone (hold to turbo), X rotate. In edit, RT selects tiles, Y confirms, B resets. D-pad right switches material.</p>
-        <p class="sub" style="margin-top:10px;font-size:12px">Ramp edits: select the two tiles on the side you want the ramp to rise toward. Cone edits: each selected tile raises that corner to the full height of the wall, so two side tiles make a ramp that reaches the top, one tile makes a corner roof, and two diagonal tiles make a ridge.</p>
+        <p class="sub" style="margin-top:10px;font-size:12px">Stair edits: drag across two side-by-side tiles for a half stair that rises from the first tile you touched, or all four to re-aim the full stair. Cone edits: each selected tile raises that corner to the full height of the wall, so two side tiles make a ramp that reaches the top, one tile makes a corner roof, and two diagonal tiles make a ridge.</p>
       </div>
       <div>
         <h2>Settings</h2>
@@ -527,15 +527,20 @@ function mergeGeos(list){
   const out=new THREE.BufferGeometry(); out.setAttribute('position',new THREE.Float32BufferAttribute(pos,3)); out.setAttribute('normal',new THREE.Float32BufferAttribute(nor,3)); out.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2)); return out;
 }
 const STEPS=7;
-const stairGeo=[0,1,2,3].map(dir=>{
+// half: -1 = full width; 0/1 = the low/high half of the cell across the stair's direction (a half stair)
+const stairCache=new Map();
+function stairGeoFor(dir,half){
+  const key=dir+':'+half; let g=stairCache.get(key); if(g) return g;
   const treads=[], strs=[], d=CELL/STEPS, rise=LVL/STEPS;
-  for(let k=0;k<STEPS;k++){ const b=new THREE.BoxGeometry(d+0.06,0.14,CELL-0.5); b.translate(-CELL/2+(k+.5)*d,-LVL/2+(k+1)*rise-0.07,0); treads.push(b);
-    const rs=new THREE.BoxGeometry(0.06,rise,CELL-0.5); rs.translate(-CELL/2+k*d+0.03,-LVL/2+(k+.5)*rise,0); treads.push(rs); }
-  [-1,1].forEach(side=>{ const b=new THREE.BoxGeometry(RAMP_LEN,0.5,0.24); b.rotateZ(RAMP_ANG); b.translate(0,-0.22,side*(CELL/2-0.12)); strs.push(b); });
+  const width=half<0?CELL-0.5:CELL/2-0.3, worldOff=half<0?0:(half?1:-1)*CELL/4;
+  const o=(dir===0||dir===3)?worldOff:-worldOff; // local z offset that lands on the right world half after rotation
+  for(let k=0;k<STEPS;k++){ const b=new THREE.BoxGeometry(d+0.06,0.14,width); b.translate(-CELL/2+(k+.5)*d,-LVL/2+(k+1)*rise-0.07,o); treads.push(b);
+    const rs=new THREE.BoxGeometry(0.06,rise,width); rs.translate(-CELL/2+k*d+0.03,-LVL/2+(k+.5)*rise,o); treads.push(rs); }
+  [-1,1].forEach(side=>{ const b=new THREE.BoxGeometry(RAMP_LEN,0.5,0.24); b.rotateZ(RAMP_ANG); b.translate(0,-0.22,o+side*(width/2+0.13)); strs.push(b); });
   const rot=[0,-Math.PI/2,Math.PI,Math.PI/2][dir];
   const t=mergeGeos(treads), s=mergeGeos(strs); t.rotateY(rot); s.rotateY(rot); t.computeVertexNormals(); s.computeVertexNormals();
-  return {t,s};
-});
+  g={t,s}; stairCache.set(key,g); return g;
+}
 
 /* ---------- pieces ---------- */
 const pieces=new Map(), cellIndex=new Map(), order=[];
@@ -566,7 +571,7 @@ function makeGroup(p,mat,real){
     if(p.mask===15) add(G.floor,0,0,0);
     else for(let r=0;r<2;r++)for(let c=0;c<2;c++) if(p.mask>>(r*2+c)&1) add(G.ftile,-CELL/2+(c+.5)*CELL/2,0,-CELL/2+(r+.5)*CELL/2);
   } else if(p.type==='ramp'){
-    add(stairGeo[p.dir].t,0,0,0,0,0,M.tread); add(stairGeo[p.dir].s,0,0,0,0,0,M.beam);
+    const sg=stairGeoFor(p.dir,p.half==null?-1:p.half); add(sg.t,0,0,0,0,0,M.tread); add(sg.s,0,0,0,0,0,M.beam);
   } else { const m=new THREE.Mesh(coneGeo(p.mask||0),mat||M.cone); if(real){m.castShadow=m.receiveShadow=true;m.userData.piece=p;} g.add(m); }
   return g;
 }
@@ -719,7 +724,9 @@ function nearMeshes(x,z,rad){ const out=[]; near(x,z,rad).forEach(p=>{ for(const
 function slabTop(p,x,z){
   const lx=x-p.i*CELL, lz=z-p.j*CELL;
   if(lx<0||lx>CELL||lz<0||lz>CELL) return null;
-  if(p.type==='ramp'){ const u=p.dir===0?lx/CELL:p.dir===1?lz/CELL:p.dir===2?1-lx/CELL:1-lz/CELL; return p.l*LVL+LVL*u; }
+  if(p.type==='ramp'){
+    if(p.half!=null&&p.half>=0){ const v=(p.dir===0||p.dir===2)?lz:lx; if(p.half?v<CELL/2:v>CELL/2) return null; }
+    const u=p.dir===0?lx/CELL:p.dir===1?lz/CELL:p.dir===2?1-lx/CELL:1-lz/CELL; return p.l*LVL+LVL*u; }
   return p.l*LVL+coneHeight(p.mask||0,lx,lz);
 }
 
@@ -957,9 +964,8 @@ function enterEdit(){
     const xa=new THREE.Vector3().crossVectors(u,n), basis=new THREE.Matrix4().makeBasis(xa,u,n), q=new THREE.Quaternion().setFromRotationMatrix(basis);
     for(let r=0;r<2;r++)for(let c=0;c<2;c++){
       const idx=r*2+c, cx=p.i*CELL+(c+.5)*CELL/2, cz=p.j*CELL+(r+.5)*CELL/2;
-      mk(G.tRamp,idx,new THREE.Vector3(cx,slabTop(p,cx,cz)+0.07,cz),m=>{m.quaternion.copy(q);});
+      mk(G.tRamp,idx,new THREE.Vector3(cx,slabTop({...p,half:-1},cx,cz)+0.07,cz),m=>{m.quaternion.copy(q);});
     }
-    [[1,3],[2,3],[0,2],[0,1]][p.dir].forEach(i=>sel.add(i));
   }
   if(p.anim){ finishAnim(p); anims.delete(p); }
   p.group.children.forEach(m=>{m.material=editPieceMat; m.castShadow=false;});
@@ -973,18 +979,22 @@ const WALL_SHAPES={'':'No change','4':'Window','3,4,5':'Wide window','1,4':'Door
   '0,1,2,4':'Arch','6,7,8':'Half wall','3,4,5,6,7,8':'Low wall','0,1,2':'Raised wall','0,1,2,3,4,5':'Top strip','1,4,7':'Center slot','0,3,6':'Side gap','2,5,8':'Side gap','7':'Peephole','4,7':'Tall window'};
 function editShapeName(){
   const p=edit.piece, key=[...edit.sel].sort((a,b)=>a-b).join(','), n=edit.sel.size;
-  if(!editValid()) return p.type==='ramp'?'Pick two tiles on one side':'Keep at least one tile';
+  if(!editValid()) return p.type==='ramp'?'Pick 2 side-by-side tiles or all 4':'Keep at least one tile';
   if(p.type==='wall') return WALL_SHAPES[key]||'Custom wall';
   if(p.type==='floor') return n===0?'No change':n===1?'Corner cut':n===3?'Single tile':(key==='0,3'||key==='1,2')?'Diagonal':'Half floor';
   if(p.type==='cone') return n===0?'Pyramid':n===1?'Corner roof':n===3?'Pocket':(key==='0,3'||key==='1,2')?'Ridge':'Ramp roof';
-  return 'Stairs';
+  return n===0?'No change':n===2?'Half stairs':'Full stairs';
 }
 function updateEditLabel(){ if(!edit) return; const wn=$('wname'); wn.textContent='Edit · '+editShapeName(); wn.className='wname edit'; }
+// Stair edit tiles: idx = row*2 + col, row runs along +z, col along +x. Returns the direction from tile a to an adjacent tile b.
+function stairStep(a,b){ const ra=a>>1, ca=a&1, rb=b>>1, cb=b&1;
+  if(ra===rb&&ca!==cb) return {dir:cb>ca?0:2,half:ra}; if(ca===cb&&ra!==rb) return {dir:rb>ra?1:3,half:ca}; return null; }
 function editValid(){
   const p=edit.piece;
   if(p.type==='wall'||p.type==='floor') return edit.sel.size<(p.type==='wall'?9:4);
   if(p.type==='cone') return edit.sel.size<4;
-  return [...edit.sel].sort().join(',') in {'1,3':1,'2,3':1,'0,2':1,'0,1':1};
+  const n=edit.sel.size; if(n===0||n===4) return true;
+  if(n!==2) return false; const [a,b]=[...edit.sel]; return stairStep(a,b)!==null;
 }
 // Edit on release: a valid pattern applies right away; a wrong one stays up in red until it's fixed.
 function releaseEdit(){
@@ -997,8 +1007,9 @@ function paintTile(idx){
   if(idx<0||!edit) return;
   if(edit.painting===null){ edit.painting=!edit.sel.has(idx); if(edit.bad){ edit.bad=false; refreshTiles(); } }
   const had=edit.sel.has(idx);
-  if(edit.painting&&!had){ edit.sel.add(idx); sfx('tick'); }
-  if(!edit.painting&&had){ edit.sel.delete(idx); sfx('tick'); }
+  if(!edit.order) edit.order=[];
+  if(edit.painting&&!had){ edit.sel.add(idx); edit.order.push(idx); sfx('tick'); }
+  if(!edit.painting&&had){ edit.sel.delete(idx); edit.order=edit.order.filter(i=>i!==idx); sfx('tick'); }
   refreshTiles();
 }
 function tileAtNDC(nx,ny){
@@ -1016,19 +1027,22 @@ function exitEdit(apply){
       let m=0; edit.sel.forEach(i=>{m|=1<<i;});
       if(m===15) toast('Keep at least one corner down'); else p.mask=m;
     } else {
-      const s=[...edit.sel].sort().join(','), map={'1,3':0,'2,3':1,'0,2':2,'0,1':3};
-      if(s in map) p.dir=map[s]; else toast('Pick two tiles on one side');
+      // 2 side-by-side tiles: half stair over those tiles, rising from the first one you touched.
+      // All 4: full stair aimed from your first tile toward your second.
+      const ord=(edit.order||[]).filter(i=>edit.sel.has(i)), n=edit.sel.size;
+      if(n===2){ const st=stairStep(ord[0]??[...edit.sel][0],ord[1]??[...edit.sel][1]); if(st){ p.dir=st.dir; p.half=st.half; } }
+      else if(n===4){ const st=ord.length>=2?stairStep(ord[0],ord[1]):null; if(st) p.dir=st.dir; p.half=-1; }
     }
   }
   if(apply) stat('e');
   edit.tiles.forEach(m=>scene.remove(m));
   mode=edit.prevMode; edit=null;
-  if(pieces.has(p.key)){ buildPiece(p); startAnim(p,140); popPlayerOut(); netOp({op:'shape',key:p.key,mask:p.mask,dir:p.dir}); }
+  if(pieces.has(p.key)){ buildPiece(p); startAnim(p,140); popPlayerOut(); netOp({op:'shape',key:p.key,mask:p.mask,dir:p.dir,half:p.half}); }
   sfx(apply?'confirm':'edit'); syncMode();
 }
 function resetEdit(){
   if(!edit) return; const p=edit.piece;
-  if(p.type==='wall') p.mask=511; else if(p.type==='floor') p.mask=15; else if(p.type==='cone') p.mask=0;
+  if(p.type==='wall') p.mask=511; else if(p.type==='floor') p.mask=15; else if(p.type==='cone') p.mask=0; else p.half=-1;
   edit.sel.clear(); exitEdit(false);
 }
 
@@ -1828,10 +1842,10 @@ function stepPlayers(dt){
 function applyOp(o,quiet){
   if(o.op==='place'){ if(!pieces.has(o.t.key)){ const np=addPiece(o.t); if(!quiet&&pieceCenter(np).distanceTo(P.pos)<30) sfx('place'); } }
   else if(o.op==='break'){ const p=pieces.get(o.key); if(p){ burst(pieceCenter(p),14,6,0.3); const nb_=neighbors(p); removePiece(p); collapseFrom(nb_); if(pieceCenter(p).distanceTo(P.pos)<30) sfx('break'); } }
-  else if(o.op==='shape'){ const p=pieces.get(o.key); if(p){ if(edit&&edit.piece===p) exitEdit(false); p.mask=o.mask; p.dir=o.dir; buildPiece(p); startAnim(p,140); popPlayerOut(); } }
+  else if(o.op==='shape'){ const p=pieces.get(o.key); if(p){ if(edit&&edit.piece===p) exitEdit(false); p.mask=o.mask; p.dir=o.dir; p.half=o.half; buildPiece(p); startAnim(p,140); popPlayerOut(); } }
   else if(o.op==='clear') clearBuilds();
 }
-function snapshot(){ return order.map(p=>Object.assign(pick(p),{mask:p.mask})); }
+function snapshot(){ return order.map(p=>Object.assign(pick(p),{mask:p.mask,half:p.half})); }
 function netSend(m,except){
   if(net.role==='host') net.conns.forEach((c,id)=>{ if(id!==except&&c.open) try{c.send(m);}catch(e){} });
   else if(net.role==='client'&&net.host&&net.host.open) try{ net.host.send(m); }catch(e){}
@@ -1844,7 +1858,7 @@ function hostData(from,m){
 }
 function clientData(m){
   if(!m||typeof m!=='object') return;
-  if(m.type==='welcome'){ net.id=m.you; clearBuilds(); m.pieces.forEach(t=>{ const p=addPiece(t); if(t.mask!==p.mask||t.dir!==p.dir){ p.mask=t.mask; buildPiece(p);} }); toast('Joined room '+net.code); updateRoomUI(); }
+  if(m.type==='welcome'){ net.id=m.you; clearBuilds(); m.pieces.forEach(t=>{ const p=addPiece(t); if(t.mask!==p.mask||t.half!=null){ p.mask=t.mask; p.half=t.half; buildPiece(p);} }); toast('Joined room '+net.code); updateRoomUI(); }
   else if(m.type==='st') onState(m);
   else if(m.type==='op'){ if(m.id!==net.id) applyOp(m.o); }
   else if(m.type==='leave') dropPlayer(m.id);
