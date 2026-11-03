@@ -24,7 +24,8 @@ Multiplayer is peer-to-peer (WebRTC via [PeerJS](https://peerjs.com)). The host'
 | Reset edit | Right mouse |
 | Rotate ramp | R |
 | Pickaxe | 1 |
-| Gun | 2 |
+| Assault rifle | 2 |
+| Pump shotgun | 3 |
 | Reload | T |
 
 Every bind can be changed in the menu.
