@@ -774,7 +774,7 @@ function tryPlace(type,E=P){
   const t=computeTarget(type,E);
   if(!t||pieces.has(t.key)||!supported(t)) return false;
   const np=addPiece(t); burst(pieceCenter(np),4,3,0.07);
-  if(E===P){ sfx('place'); stat('b'); netOp({op:'place',t:pick(t)}); } else sfxAt('place',E.pos);
+  if(E===P){ sfx('place'); stat('b'); animEvent(localHero,'build'); netOp({op:'place',t:pick(t)}); } else { sfxAt('place',E.pos); if(B&&E===B) animEvent(B.h,'build'); }
   return true;
 }
 
@@ -900,7 +900,7 @@ function selectPick(){ if(edit) exitEdit(true); mode='pick'; P.lastWeapon='pick'
 function selectGun(w){
   if(edit) exitEdit(true);
   w=w||P.wpn;
-  if(mode!=='gun'||P.wpn!==w){ P.reloadT=0; P.equipT=WEAPONS[w].equip; }
+  if(mode!=='gun'||P.wpn!==w){ P.reloadT=0; P.equipT=WEAPONS[w].equip; animEvent(localHero,'equip'); }
   P.wpn=w; P.lastWeapon=w; mode='gun'; syncMode();
 }
 function toggleBuild(){
@@ -925,7 +925,7 @@ function swing(){
   if(hit){ const hp_=hit.object.userData.piece; burst(pieceCenter(hp_).add(new THREE.Vector3(0,hp_.type==='cone'?0.8:0,0)),18,7,0.32); burst(hit.point,8,4,0.12); const nb_=neighbors(hp_); removePiece(hp_); collapseFrom(nb_); sfx('break'); netOp({op:'break',key:hp_.key}); } else sfx('whiff');
 }
 function toggleEdit(){ if(edit) exitEdit(true); else enterEdit(); }
-function respawn(){ P.pos.set(...SPAWN); P.vel.set(0,0,0); P.onGround=true; P.hp=100; P.sh=100; P.ammo={ar:WEAPONS.ar.mag,pump:WEAPONS.pump.mag}; P.reloadT=0; }
+function respawn(){ animEvent(localHero,'revive'); P.pos.set(...SPAWN); P.vel.set(0,0,0); P.onGround=true; P.hp=100; P.sh=100; P.ammo={ar:WEAPONS.ar.mag,pump:WEAPONS.pump.mag}; P.reloadT=0; }
 
 /* ---------- audio ---------- */
 let AC=null, noiseBuf=null, sfxGain=1;
@@ -966,111 +966,389 @@ function sfx(k){
   else if(k==='lose'){ tone('triangle',420,260,0.25,0.09); }
 }
 
-/* ---------- player model: slim jointed rig. Model faces -z; +rotation.x swings a hanging limb forward. ---------- */
-function createHero(jacketHex){
-  const hero=new THREE.Group(); const rig={};
-  const L=c=>new THREE.MeshLambertMaterial({color:c});
-  const skin=L(0xf0c49c), jacket=L(jacketHex), jacketD=new THREE.MeshLambertMaterial({color:new THREE.Color(jacketHex).multiplyScalar(.72)}), pants=L(0x2c3554), boot=L(0x1b1b22), hair=L(0x3b2416), pack=L(0xe5a52b), eye=L(0x15151a), metal=L(0xb8c0c8), handle=L(0x6b4421), blue=L(0x5fb8ff);
-  const mesh=(geo,m,parent,x=0,y=0,z=0)=>{ const o=new THREE.Mesh(geo,m); o.position.set(x,y,z); o.castShadow=true; parent.add(o); return o; };
-  const grp=(parent,x,y,z)=>{ const g=new THREE.Group(); g.position.set(x,y,z); parent.add(g); return g; };
-  const limb=(r,len,m)=>{ const g=new THREE.CylinderGeometry(r*0.92,r,len,8); g.translate(0,-len/2,0); return [g,m]; };
-  rig.hips=grp(hero,0,0.96,0);
-  mesh(new THREE.BoxGeometry(.32,.16,.2),pants,rig.hips,0,0,0);
-  rig.spine=grp(rig.hips,0,.06,0);
-  mesh(new THREE.BoxGeometry(.36,.3,.21),jacket,rig.spine,0,.18,0);
-  mesh(new THREE.BoxGeometry(.42,.24,.23),jacket,rig.spine,0,.42,0);
-  mesh(new THREE.BoxGeometry(.43,.05,.24),jacketD,rig.spine,0,.31,0);
-  mesh(new THREE.BoxGeometry(.3,.34,.13),pack,rig.spine,0,.33,.18);
-  rig.neck=grp(rig.spine,0,.56,0);
-  mesh(new THREE.CylinderGeometry(.06,.07,.08,8),skin,rig.neck,0,.02,0);
-  mesh(new THREE.BoxGeometry(.26,.29,.26),skin,rig.neck,0,.2,0);
-  mesh(new THREE.BoxGeometry(.28,.1,.28),hair,rig.neck,0,.35,.01);
-  mesh(new THREE.BoxGeometry(.28,.16,.06),hair,rig.neck,0,.26,.12);
-  mesh(new THREE.BoxGeometry(.05,.05,.02),eye,rig.neck,-.06,.22,-.131); mesh(new THREE.BoxGeometry(.05,.05,.02),eye,rig.neck,.06,.22,-.131);
-  const arm=side=>{ const sh=grp(rig.spine,side*.25,.5,0); const [ug,um]=limb(.055,.27,jacket); mesh(ug,um,sh);
-    const el=grp(sh,0,-.27,0); const [fg,fm]=limb(.05,.25,skin); mesh(fg,fm,el); mesh(new THREE.BoxGeometry(.08,.09,.09),skin,el,0,-.28,0);
-    const hand=grp(el,0,-.29,0); return {sh,el,hand}; };
+/* ---------- characters: an original toon-shaded builder with ink outlines and a jointed rig ----------
+   Conventions: the model faces -z. Limbs hang along -y; +rotation.x swings a hanging limb forward.
+   In hand space -y runs along the forearm (forward when aiming) and -z is up. */
+const toonGrad=(()=>{ const d=new Uint8Array([95,95,95,170,170,170,255,255,255]); const t=new THREE.DataTexture(d,3,1,THREE.RGBFormat); t.minFilter=t.magFilter=THREE.NearestFilter; t.generateMipmaps=false; t.needsUpdate=true; return t; })();
+const toonCache=new Map();
+function toon(c){ let m=toonCache.get(c); if(!m){ m=new THREE.MeshToonMaterial({color:c,gradientMap:toonGrad}); toonCache.set(c,m); } return m; }
+const inkMat=new THREE.MeshBasicMaterial({color:0x151a22,side:THREE.BackSide});
+const inkCache=new Map();
+function inkGeo(g,w){
+  const key=g.uuid+':'+w; let o=inkCache.get(key); if(o) return o;
+  o=g.clone(); const p=o.attributes.position, n=o.attributes.normal;
+  for(let i=0;i<p.count;i++) p.setXYZ(i,p.getX(i)+n.getX(i)*w,p.getY(i)+n.getY(i)*w,p.getZ(i)+n.getZ(i)*w);
+  inkCache.set(key,o); return o;
+}
+// rounded box: segmented box whose vertices are pushed onto a radius around an inner box (normals are exact)
+const rboxCache=new Map();
+function rbox(w,h,d,r,seg=3){
+  const key=[w,h,d,r,seg].join(); let g=rboxCache.get(key); if(g) return g;
+  r=Math.min(r,w/2,h/2,d/2)*0.999;
+  g=new THREE.BoxGeometry(w,h,d,seg,seg,seg);
+  const p=g.attributes.position, n=g.attributes.normal, iw=w/2-r, ih=h/2-r, id=d/2-r, v=new THREE.Vector3(), c=new THREE.Vector3();
+  for(let i=0;i<p.count;i++){ v.set(p.getX(i),p.getY(i),p.getZ(i)); c.set(Math.max(-iw,Math.min(iw,v.x)),Math.max(-ih,Math.min(ih,v.y)),Math.max(-id,Math.min(id,v.z)));
+    v.sub(c); if(v.lengthSq()<1e-9) v.set(0,1,0); v.normalize(); n.setXYZ(i,v.x,v.y,v.z); p.setXYZ(i,c.x+v.x*r,c.y+v.y*r,c.z+v.z*r); }
+  rboxCache.set(key,g); return g;
+}
+const limbCache=new Map();
+function limbGeo(rt,rb,len){ const key=[rt,rb,len].join(); let g=limbCache.get(key); if(!g){ g=new THREE.CylinderGeometry(rt,rb,len,12,1); g.translate(0,-len/2,0); limbCache.set(key,g); } return g; }
+const sphCache=new Map();
+function sph(r){ let g=sphCache.get(r); if(!g){ g=new THREE.SphereGeometry(r,14,10); sphCache.set(r,g); } return g; }
+const dustMat=new THREE.MeshLambertMaterial({color:0xe2dccb});
+const _ikS=new THREE.Vector3(), _ikD=new THREE.Vector3(), _ikP=new THREE.Vector3(), _ikN=new THREE.Vector3(), _ikU=new THREE.Vector3(), _ikF=new THREE.Vector3(), _ikE=new THREE.Vector3(),
+      _ikX=new THREE.Vector3(), _ikY=new THREE.Vector3(), _ikZ=new THREE.Vector3(), _ikM=new THREE.Matrix4(), _ikQ=new THREE.Quaternion(), _ikQ2=new THREE.Quaternion(), _ikT=new THREE.Vector3();
+const angDiff=(a,b)=>((a-b+Math.PI*3)%(Math.PI*2))-Math.PI;
+
+function createHero(jacketHex,opts){
+  opts=opts||{};
+  const hero=new THREE.Group(); hero.rotation.order='YXZ';
+  const rig={}, ink=[];
+  const jC=new THREE.Color(jacketHex), jD=jC.clone().multiplyScalar(.68).getHex(), jL=jC.clone().lerp(new THREE.Color(0xffffff),.25).getHex();
+  const C={jacket:jacketHex, jacketD:jD, jacketL:jL, pants:0x2b3350, pantsD:0x1f253b, boot:0x4a3426, sole:0x1c1c22, glove:0x2b2d34, skin:opts.skin||0xf1c7a0,
+           hair:opts.hair||0x3a2418, pack:opts.pack||0xe8a62c, packD:0xb07a16, roll:0xd8c9a3, accent:opts.accent||0xff6a3d, lens:0x8fd6ff, metal:0x2a2f38, metalL:0x434b57, wood:0x8a5a2e, steel:0xc9d2dc};
+  // part(geometry, color, parent, x,y,z, rotation, scale, inkWidth)
+  const part=(geo,col,parent,x=0,y=0,z=0,rot,scl,w=0.011)=>{
+    const m=new THREE.Mesh(geo,toon(col)); m.position.set(x,y,z); if(rot) m.rotation.set(rot[0]||0,rot[1]||0,rot[2]||0); if(scl) m.scale.set(scl[0],scl[1],scl[2]);
+    m.castShadow=true; parent.add(m);
+    if(w>0){ const o=new THREE.Mesh(inkGeo(geo,w/(scl?Math.min(scl[0],scl[1],scl[2]):1)),inkMat); m.add(o); ink.push(o); }
+    return m; };
+  const grp=(parent,x=0,y=0,z=0)=>{ const g=new THREE.Group(); g.position.set(x,y,z); parent.add(g); return g; };
+
+  // pelvis
+  rig.hips=grp(hero,0,0.94,0);
+  part(rbox(.3,.17,.2,.07),C.pants,rig.hips,0,0,0);
+  part(rbox(.31,.045,.21,.02),C.sole,rig.hips,0,.07,0,null,null,0.006);
+  part(rbox(.06,.045,.02,.01),C.steel,rig.hips,0,.07,-.11,null,null,0);
+  part(rbox(.07,.09,.05,.02),C.packD,rig.hips,.15,.0,.02,null,null,0.006); // hip pouch (shells/mags come from here)
+  rig.pouch=grp(rig.hips,.16,.0,-.02);
+  // torso
+  rig.spine=grp(rig.hips,0,.09,0);
+  part(rbox(.28,.19,.19,.08),C.jacket,rig.spine,0,.07,0);
+  rig.chest=grp(rig.spine,0,.16,0);
+  part(rbox(.37,.27,.22,.1),C.jacket,rig.chest,0,.12,0);
+  part(rbox(.38,.06,.225,.03),C.jacketD,rig.chest,0,.04,0,null,null,0.006);
+  part(rbox(.016,.34,.01,.004),C.jacketD,rig.chest,0,.07,-.112,null,null,0);
+  part(rbox(.08,.06,.02,.015),C.jacketL,rig.chest,.09,.14,-.112,null,null,0.005);
+  part(new THREE.CylinderGeometry(.115,.135,.07,14,1,true),C.jacketD,rig.chest,0,.27,0,null,null,0.008);
+  part(sph(.12),C.jacketD,rig.chest,0,.24,.1,null,[1.15,.6,.7]);
+  // straps and pack
+  part(rbox(.045,.27,.02,.01),C.packD,rig.chest,-.1,.13,-.115,null,null,0.005);
+  part(rbox(.045,.27,.02,.01),C.packD,rig.chest,.1,.13,-.115,null,null,0.005);
+  rig.pack=grp(rig.chest,0,.2,.13);
+  part(rbox(.28,.33,.14,.06),C.pack,rig.pack,0,-.08,.04);
+  part(rbox(.29,.11,.15,.04),C.packD,rig.pack,0,.03,.045);
+  part(rbox(.16,.1,.04,.02),C.packD,rig.pack,0,-.15,.12,null,null,0.006);
+  const roll=new THREE.CylinderGeometry(.055,.055,.32,14); roll.rotateZ(Math.PI/2);
+  part(roll,C.roll,rig.pack,0,.12,.05);
+  part(new THREE.CylinderGeometry(.012,.012,.36,6),C.wood,rig.pack,.16,-.02,.06,[0,0,.25],null,0.005);
+  part(rbox(.05,.09,.04,.01),C.steel,rig.pack,.205,.15,.06,[0,0,.25],null,0.005);
+  // head
+  rig.neck=grp(rig.chest,0,.27,0);
+  part(limbGeo(.055,.06,.09),C.skin,rig.neck,0,.08,0,null,null,0.006);
+  rig.head=grp(rig.neck,0,.06,0);
+  part(rbox(.25,.27,.25,.1,4),C.skin,rig.head,0,.12,0);
+  part(sph(.03),C.skin,rig.head,-.126,.11,.01,null,[.5,.95,.8],0.006); part(sph(.03),C.skin,rig.head,.126,.11,.01,null,[.5,.95,.8],0.006);
+  part(rbox(.045,.055,.04,.018),C.skin,rig.head,0,.1,-.13,null,null,0.006);
+  rig.eyes=[-1,1].map(sx=>{ const e=grp(rig.head,sx*.055,.145,-.122); part(sph(.029),0xffffff,e,0,0,0,null,[1,1.25,.5],0.004); part(sph(.019),0x1a1f29,e,0,-.003,-.011,null,[1,1.25,.6],0); return e; });
+  rig.brows=[-1,1].map(sx=>part(rbox(.065,.018,.02,.008),C.hair,rig.head,sx*.056,.198,-.127,null,null,0));
+  rig.mouth=part(rbox(.065,.014,.012,.006),0x6b2f2a,rig.head,0,.055,-.126,null,null,0);
+  // hair: cap + spikes + fringe
+  part(rbox(.27,.11,.27,.06),C.hair,rig.head,0,.245,.005);
+  rig.tuft=grp(rig.head,0,.28,.02);
+  [[0,.06,.0,-.3,0],[-.07,.04,.04,-.5,.4],[.07,.04,.04,-.5,-.4],[0,.03,.09,-1,0],[-.09,.0,-.06,.2,.5],[.08,.01,-.07,.2,-.45]].forEach(([x,y,z,rx,rz])=>part(rbox(.07,.12,.06,.025),C.hair,rig.tuft,x,y,z,[rx,0,rz]));
+  part(rbox(.24,.05,.06,.02),C.hair,rig.head,0,.215,-.115,[.25,0,0]);
+  // headband with goggles pushed up
+  part(new THREE.CylinderGeometry(.134,.134,.035,18,1,true),C.accent,rig.head,0,.205,.0,null,null,0.006);
+  [-1,1].forEach(sx=>{ const gg=new THREE.CylinderGeometry(.038,.038,.03,14); gg.rotateX(Math.PI/2);
+    part(gg,C.sole,rig.head,sx*.05,.235,-.13,[-.35,0,0],null,0.006);
+    const lens=new THREE.CircleGeometry(.03,14); const lm=new THREE.Mesh(lens,toon(C.lens)); lm.position.set(sx*.05,.24,-.147); lm.rotation.x=-.35+Math.PI; lm.rotation.y=Math.PI; rig.head.add(lm); });
+  // arms
+  const arm=sx=>{
+    const sh=grp(rig.chest,sx*.205,.21,0); sh.rotation.order='XZY';
+    part(sph(.07),C.jacket,sh,0,-.01,0);
+    part(limbGeo(.058,.052,.25),C.jacket,sh);
+    const el=grp(sh,0,-.25,0);
+    part(sph(.052),C.jacket,el,0,0,0,null,null,0.008);
+    part(limbGeo(.052,.044,.21),C.jacket,el);
+    part(limbGeo(.05,.05,.04),C.jacketD,el,0,-.18,0,null,null,0.006);
+    const wr=grp(el,0,-.23,0);
+    part(rbox(.075,.085,.06,.025),C.glove,wr,0,-.035,0,null,null,0.007);
+    const fing=grp(wr,0,-.075,0); part(rbox(.07,.06,.055,.022),C.glove,fing,0,-.025,-.004,null,null,0.007);
+    part(rbox(.025,.055,.03,.012),C.glove,wr,-sx*.04,-.05,-.02,[0,0,sx*.4],null,0.006);
+    const hand=grp(wr,0,-.06,0);
+    return {sh,el,wr,fing,hand,side:sx};
+  };
   rig.armL=arm(-1); rig.armR=arm(1);
-  const leg=side=>{ const hp=grp(rig.hips,side*.095,-.04,0); const [tg,tm]=limb(.07,.43,pants); mesh(tg,tm,hp);
-    const kn=grp(hp,0,-.43,0); const [sg,sm]=limb(.06,.42,pants); mesh(sg,sm,kn); mesh(new THREE.BoxGeometry(.12,.1,.22),boot,kn,0,-.45,-.04); return {hp,kn}; };
+  // legs
+  const leg=sx=>{
+    const hp=grp(rig.hips,sx*.088,-.05,0); hp.rotation.order='XZY';
+    part(limbGeo(.09,.074,.4),C.pants,hp);
+    const kn=grp(hp,0,-.4,0);
+    part(sph(.072),C.pants,kn,0,0,0,null,null,0.008);
+    part(rbox(.1,.11,.05,.025),C.pantsD,kn,0,-.02,-.055,null,null,0.006);
+    part(limbGeo(.071,.058,.36),C.pants,kn);
+    const an=grp(kn,0,-.37,0);
+    part(rbox(.12,.13,.13,.045),C.boot,an,0,-.035,0);
+    part(rbox(.115,.085,.11,.04),C.boot,an,0,-.075,-.09);
+    part(rbox(.128,.03,.26,.012),C.sole,an,0,-.12,-.045,null,null,0.006);
+    part(limbGeo(.068,.068,.035),C.packD,an,0,.04,0,null,null,0.005);
+    const foot=grp(an,0,-.13,-.06);
+    return {hp,kn,an,foot,side:sx};
+  };
   rig.legL=leg(-1); rig.legR=leg(1);
-  // tools in the right hand: handle runs down the arm line, head points forward
+
+  // tools: pickaxe (resting on the shoulder in pickaxe mode)
   rig.pick=grp(rig.armR.hand,0,0,0);
-  mesh(new THREE.CylinderGeometry(.025,.025,.62,6),handle,rig.pick,0,-.2,0);
-  const ph=mesh(new THREE.BoxGeometry(.05,.07,.46),metal,rig.pick,0,-.48,-.08); ph.rotation.x=.25;
-  mesh(new THREE.BoxGeometry(.06,.08,.08),blue,rig.pick,0,-.48,.12);
+  part(limbGeo(.019,.021,.72),C.wood,rig.pick,0,.12,0,null,null,0.006);
+  part(limbGeo(.024,.024,.1),C.accent,rig.pick,0,.02,0,null,null,0.005);
+  const ph=grp(rig.pick,0,-.56,0);
+  part(rbox(.05,.08,.1,.02),C.metalL,ph,0,0,0);
+  part(rbox(.035,.05,.3,.012),C.steel,ph,0,.015,-.17,[-.25,0,0]);
+  part(rbox(.03,.045,.18,.01),C.steel,ph,0,.01,.12,[.35,0,0]);
+  // hammer + blueprint (build mode)
   rig.hammer=grp(rig.armR.hand,0,0,0);
-  mesh(new THREE.CylinderGeometry(.022,.022,.4,6),handle,rig.hammer,0,-.12,0);
-  mesh(new THREE.BoxGeometry(.09,.1,.24),metal,rig.hammer,0,-.32,-.04);
-  rig.plan=grp(rig.armL.hand,0,0,0);
-  const bp=mesh(new THREE.BoxGeometry(.26,.01,.2),blue,rig.plan,0,-.04,-.08); bp.rotation.x=.4;
-  // rifle in the right hand: in hand space -y runs along the arm (forward when aiming), -z is up
+  part(limbGeo(.017,.019,.42),C.wood,rig.hammer,0,.06,0,null,null,0.005);
+  part(rbox(.06,.07,.2,.015),C.metalL,rig.hammer,0,-.34,-.03);
+  rig.plan=grp(rig.armL.hand,0,-.02,-.06);
+  part(rbox(.3,.006,.22,.003),0x3d8fe0,rig.plan,0,0,0,[.45,0,0],null,0.005);
+  part(rbox(.26,.008,.02,.003),0xd7ecff,rig.plan,0,.004,-.04,[.45,0,0],null,0);
+  part(rbox(.02,.008,.18,.003),0xd7ecff,rig.plan,.05,.004,0,[.45,0,0],null,0);
+  // assault rifle (uncommon: green accents)
   rig.gun=grp(rig.armR.hand,0,0,0);
-  const gm=L(0x2a2e36), ga=L(0x5fb8ff);
-  mesh(new THREE.BoxGeometry(.07,.46,.11),gm,rig.gun,0,-.18,-.02);
-  mesh(new THREE.BoxGeometry(.035,.24,.035),gm,rig.gun,0,-.52,-.03);
-  mesh(new THREE.BoxGeometry(.05,.16,.05),ga,rig.gun,0,-.22,-.1);
-  mesh(new THREE.BoxGeometry(.05,.07,.15),gm,rig.gun,0,-.26,.1);
-  mesh(new THREE.BoxGeometry(.06,.16,.1),gm,rig.gun,0,.08,-.01);
-  rig.muzzleAR=grp(rig.gun,0,-.66,-.03);
+  part(rbox(.034,.07,.1,.012),C.metal,rig.gun,0,.01,.055,[.25,0,0],null,0.006);
+  part(rbox(.06,.36,.1,.018),C.metal,rig.gun,0,-.1,-.035);
+  part(rbox(.066,.22,.085,.02),C.metalL,rig.gun,0,-.33,-.035);
+  part(rbox(.07,.14,.02,.006),0x4fc142,rig.gun,0,-.36,-.081,null,null,0);
+  part(limbGeo(.016,.016,.2),C.metal,rig.gun,0,-.45,-.045,null,null,0.005);
+  part(limbGeo(.025,.025,.055),C.metal,rig.gun,0,-.63,-.045,null,null,0.005);
+  rig.arMag=part(rbox(.04,.075,.17,.014),0x23272e,rig.gun,0,-.2,.085,[-.28,0,0],null,0.006);
+  part(rbox(.052,.22,.09,.02),C.metal,rig.gun,0,.17,-.01);
+  part(rbox(.03,.08,.04,.01),C.metal,rig.gun,0,-.12,-.1,null,null,0.005);
+  part(rbox(.012,.012,.012,.004),0x4fc142,rig.gun,0,-.15,-.125,null,null,0);
+  rig.muzzleAR=grp(rig.gun,0,-.68,-.045);
+  rig.gripAR=grp(rig.gun,0,-.31,.045);
+  rig.magAR=grp(rig.gun,0,-.2,.17);
+  // pump shotgun (rare: blue accents), with a sliding fore-end
   rig.pump=grp(rig.armR.hand,0,0,0);
-  const wood=L(0x8a5a2e);
-  mesh(new THREE.BoxGeometry(.08,.3,.12),gm,rig.pump,0,-.12,-.02);
-  mesh(new THREE.BoxGeometry(.055,.36,.055),gm,rig.pump,0,-.42,-.04);
-  mesh(new THREE.BoxGeometry(.07,.14,.08),wood,rig.pump,0,-.38,.01);
-  mesh(new THREE.BoxGeometry(.03,.12,.03),L(0x2b86e0),rig.pump,0,-.18,-.09);
-  mesh(new THREE.BoxGeometry(.07,.18,.1),wood,rig.pump,0,.1,-.01);
-  rig.muzzlePump=grp(rig.pump,0,-.62,-.04);
+  part(rbox(.034,.07,.1,.012),C.metal,rig.pump,0,.01,.055,[.25,0,0],null,0.006);
+  part(rbox(.065,.28,.1,.02),C.metal,rig.pump,0,-.09,-.035);
+  part(rbox(.07,.12,.02,.006),0x2b86e0,rig.pump,0,-.09,-.086,null,null,0);
+  part(limbGeo(.021,.021,.44),C.metal,rig.pump,0,-.22,-.065,null,null,0.005);
+  part(limbGeo(.017,.017,.34),C.metalL,rig.pump,0,-.22,-.025,null,null,0.005);
+  rig.slide=grp(rig.pump,0,-.33,-.025);
+  part(rbox(.078,.16,.075,.025),C.wood,rig.slide,0,0,.005);
+  rig.gripPump=grp(rig.slide,0,0,.05);
+  part(rbox(.06,.25,.1,.025),C.wood,rig.pump,0,.17,.0,[-.1,0,0]);
+  rig.muzzlePump=grp(rig.pump,0,-.67,-.065);
+  rig.portPump=grp(rig.pump,0,-.1,.04);
   rig.muzzle=rig.muzzleAR;
-  return {group:hero,rig,anim:{phase:0,land:0,breath:0,wasGround:true,vy:0}};
+  rig.gun.visible=rig.pump.visible=rig.hammer.visible=rig.plan.visible=false;
+
+  return {group:hero,rig,ink,anim:{t:Math.random()*10,phase:0,prevYaw:null,lag:0,stepT:0,sq:0,sqV:0,wasGround:true,vy:0,recoil:0,pumpT:0,hurt:0,hurtSide:1,strike:0,equip:0,
+    dead:false,deadT:0,blinkT:2,idleT:0,pack:0,packV:0,tuft:0,tuftV:0,prevHipY:0.94,lastStep:[0,0],dustCd:0}};
 }
 const localHero=createHero(0x2a8f88), hero=localHero.group; scene.add(hero);
 const lerp=(a,b,k)=>a+(b-a)*k;
+
+function animEvent(H,ev,arg){
+  if(!H) return; const A=H.anim;
+  if(ev==='fire'){ A.recoil=1; if(arg==='pump') A.pumpT=0.5; }
+  else if(ev==='hurt'){ A.hurt=1; A.hurtSide=Math.random()<.5?-1:1; }
+  else if(ev==='build') A.strike=1;
+  else if(ev==='equip') A.equip=1;
+  else if(ev==='die'){ A.dead=true; A.deadT=0; }
+  else if(ev==='revive'){ A.dead=false; A.deadT=0; H.group.rotation.x=0; H.group.rotation.z=0; }
+}
+
+// Two-bone IK: put the wrist of `arm` at targetW (world), elbow toward poleW, optional world hand orientation
+function ikArm(arm,targetW,poleW,handQ){
+  const sh=arm.sh, a=0.25, b=0.23;
+  sh.getWorldPosition(_ikS);
+  _ikD.subVectors(targetW,_ikS); let L=_ikD.length(); const maxL=(a+b)*0.998; if(L>maxL){ _ikD.multiplyScalar(maxL/L); L=maxL; } if(L<0.08){ _ikD.setLength(0.08); L=0.08; }
+  const dn=_ikT.copy(_ikD).normalize();
+  _ikP.subVectors(poleW,_ikS); _ikN.crossVectors(dn,_ikP); if(_ikN.lengthSq()<1e-8) _ikN.set(1,0,0); _ikN.normalize();
+  const alpha=Math.acos(Math.max(-1,Math.min(1,(a*a+L*L-b*b)/(2*a*L))));
+  _ikU.copy(dn).applyAxisAngle(_ikN,alpha); if(_ikU.dot(_ikP)<dn.dot(_ikP)) _ikU.copy(dn).applyAxisAngle(_ikN,-alpha);
+  _ikE.copy(_ikS).addScaledVector(_ikU,a);
+  _ikF.copy(_ikS).add(_ikD).sub(_ikE).normalize();
+  _ikY.copy(_ikU).negate(); _ikX.crossVectors(_ikU,_ikF); if(_ikX.lengthSq()<1e-8) _ikX.copy(_ikN); _ikX.normalize(); _ikZ.crossVectors(_ikX,_ikY).normalize();
+  _ikM.makeBasis(_ikX,_ikY,_ikZ); _ikQ.setFromRotationMatrix(_ikM);
+  sh.parent.getWorldQuaternion(_ikQ2); sh.quaternion.copy(_ikQ2.invert().multiply(_ikQ));
+  const th=Math.acos(Math.max(-1,Math.min(1,_ikU.dot(_ikF))));
+  arm.el.rotation.set(th,0,0);
+  if(handQ){ arm.el.updateMatrixWorld(true); arm.el.getWorldQuaternion(_ikQ2); arm.wr.quaternion.copy(_ikQ2.invert().multiply(handQ)); }
+  else arm.wr.rotation.set(0,0,0);
+}
+const _aim=new THREE.Vector3(), _up=new THREE.Vector3(), _rt=new THREE.Vector3(), _hq=new THREE.Quaternion(), _hq2=new THREE.Quaternion(), _tw=new THREE.Vector3(), _tw2=new THREE.Vector3(), _pole=new THREE.Vector3(), _fp=new THREE.Vector3();
+function handQuat(out,fwd,up){ _ikY.copy(fwd).negate(); _ikZ.copy(up).addScaledVector(fwd,-up.dot(fwd)).normalize().negate(); _ikX.crossVectors(_ikY,_ikZ).normalize(); _ikM.makeBasis(_ikX,_ikY,_ikZ); return out.setFromRotationMatrix(_ikM); }
+
 function animateRig(H,S,dt){
-  const hero=H.group, rig=H.rig, anim=H.anim;
-  hero.position.copy(S.pos); hero.rotation.y=S.yaw;
+  const G=H.group, r=H.rig, A=H.anim; A.t+=dt;
+  G.position.copy(S.pos);
+  if(A.prevYaw===null) A.prevYaw=S.yaw;
+  const dYaw=angDiff(S.yaw,A.prevYaw); A.prevYaw=S.yaw; G.rotation.y=S.yaw;
   const fx=-Math.sin(S.yaw), fz=-Math.cos(S.yaw), rx=Math.cos(S.yaw), rz=-Math.sin(S.yaw);
   const vf=S.vel.x*fx+S.vel.z*fz, vs=S.vel.x*rx+S.vel.z*rz, sp=Math.hypot(S.vel.x,S.vel.z), k=Math.min(1,sp/RUN);
-  if(!anim.wasGround&&S.onGround&&anim.vy<-7) anim.land=Math.min(1,-anim.vy/16);
-  anim.wasGround=S.onGround; anim.vy=S.vel.y;
-  anim.land=Math.max(0,anim.land-dt*5);
-  const sm=Math.min(1,dt*14);
-  const T={hips:0,spineX:0,spineY:0,spineZ:0,neck:0,shL:0,shR:0,elL:.25,elR:.25,shLz:.08,shRz:-.08,hpL:0,hpR:0,knL:-.08,knR:-.08,hipY:0.96};
-  anim.breath+=dt*2.2;
-  if(S.onGround){
-    const dirSign=vf<-0.5&&Math.abs(vf)>Math.abs(vs)?-1:1;
-    anim.phase+=sp*dt*(S.crouch?2.6:1.85)*dirSign;
-    const s=Math.sin(anim.phase), c=Math.cos(anim.phase);
-    T.hpL=s*0.85*k; T.hpR=-s*0.85*k;
-    T.knL=-(0.15+Math.max(0,Math.sin(anim.phase+1.4))*1.25)*k-0.06; T.knR=-(0.15+Math.max(0,Math.sin(anim.phase+1.4+Math.PI))*1.25)*k-0.06;
-    T.shL=-s*0.75*k; T.shR=s*0.75*k; T.elL=0.25+0.9*k; T.elR=0.25+0.9*k;
-    T.hipY=0.96+Math.abs(c)*0.05*k-0.03*k;
-    T.spineX=-0.16*k*Math.sign(vf||1)*Math.min(1,Math.abs(vf)/RUN+.2); T.spineY=s*0.14*k; T.spineZ=-vs/RUN*0.12;
-    if(sp<0.3){ const b=Math.sin(anim.breath); T.spineX=b*0.015; T.shL=b*0.04; T.shR=-b*0.04; T.hipY=0.96+b*0.006; }
-  } else {
-    const rising=S.vel.y>0;
-    T.hpL=rising?0.9:0.35; T.hpR=rising?-0.1:0.15; T.knL=rising?-1.3:-0.5; T.knR=rising?-0.5:-0.25;
-    T.shL=0.4; T.shR=0.2; T.shLz=0.5; T.shRz=-0.5; T.elL=0.6; T.elR=0.6; T.spineX=rising?-0.08:0.05;
+  const mv=sp>0.2?Math.atan2(vs,vf):0, cm=Math.cos(mv), sm_=Math.sin(mv);
+  const sm=1-Math.exp(-dt*18), smF=1-Math.exp(-dt*30);
+  const gun=!S.building&&S.gun?S.gun:false, building=!!S.building;
+  // ----- death -----
+  if(A.dead){
+    A.deadT+=dt; const f=Math.min(1,A.deadT/0.6), e=f*f*(3-2*f);
+    G.rotation.x=lerp(0,1.5,e); G.position.y=S.pos.y+0.05*e;
+    const set=(o,ax,v)=>{ o.rotation[ax]=lerp(o.rotation[ax],v,sm); };
+    set(r.legL.kn,'x',-0.9); set(r.legR.kn,'x',-0.4); set(r.legL.hp,'x',0.5); set(r.legR.hp,'x',0.2);
+    set(r.armL.sh,'x',-0.3); set(r.armR.sh,'x',-0.5); set(r.armL.sh,'z',-1.1); set(r.armR.sh,'z',1.0); set(r.armL.el,'x',0.4); set(r.armR.el,'x',0.6);
+    set(r.neck,'x',0.5); r.eyes.forEach(e=>e.scale.y=0.15); r.mouth.scale.y=2.5;
+    r.gun.visible=r.pump.visible=r.hammer.visible=r.plan.visible=false; r.pick.visible=false;
+    return;
   }
-  if(S.crouch){ T.hipY-=0.34; T.hpL+=0.9; T.hpR+=0.9; T.knL-=1.35; T.knR-=1.35; T.spineX-=0.28; }
-  T.hipY-=anim.land*0.22; T.knL-=anim.land*0.7; T.knR-=anim.land*0.7; T.hpL+=anim.land*0.35; T.hpR+=anim.land*0.35;
-  // upper body follows the aim
-  T.neck=S.pitch*0.55; T.spineX+=S.pitch*0.22;
-  const building=S.building, gun=!building&&S.gun;
-  if(gun){ T.shR=1.45+S.pitch*0.95; T.elR=0.08; T.shL=1.3+S.pitch*0.95; T.elL=0.55; T.shRz=0.05; T.shLz=-0.42; T.spineY-=0.18; }
-  else if(building){ T.shR=1.25+S.pitch*0.6; T.elR=0.35; T.shL=1.0+S.pitch*0.6; T.elL=0.55; T.shRz=0.1; T.shLz=-0.15; }
-  else if(S.swingT>0){ const t=1-S.swingT/0.22, e=t<0.25?t/0.25:1-(t-0.25)/0.75; T.shR=lerp(-0.2,2.9,t<0.25?e:Math.max(0,e))+S.pitch*.4; T.elR=0.3; T.spineY=-0.35*(1-t)+0.2*t; T.spineX+=0.12*t; }
-  else { T.shR=Math.max(T.shR,0.5)+S.pitch*0.4; T.elR=Math.max(T.elR,0.9); }
-  rig.pick.visible=!building&&!gun; rig.hammer.visible=!!building; rig.plan.visible=!!building; rig.gun.visible=!!gun&&gun!=='pump'; rig.pump.visible=gun==='pump'; rig.muzzle=gun==='pump'?rig.muzzlePump:rig.muzzleAR;
-  const r=rig, set=(o,ax,v)=>{ o.rotation[ax]=lerp(o.rotation[ax],v,sm); };
-  r.hips.position.y=lerp(r.hips.position.y,T.hipY,sm);
-  set(r.spine,'x',T.spineX); set(r.spine,'y',T.spineY); set(r.spine,'z',T.spineZ); set(r.neck,'x',T.neck);
-  set(r.armL.sh,'x',T.shL); set(r.armR.sh,'x',T.shR); set(r.armL.sh,'z',T.shLz); set(r.armR.sh,'z',T.shRz);
-  set(r.armL.el,'x',T.elL); set(r.armR.el,'x',T.elR);
-  set(r.legL.hp,'x',T.hpL); set(r.legR.hp,'x',T.hpR); set(r.legL.kn,'x',T.knL); set(r.legR.kn,'x',T.knR);
-  if(S.swingT>0){ r.armR.sh.rotation.x=T.shR; }
+  // ----- events decay -----
+  A.recoil=Math.max(0,A.recoil-dt*(gun==='pump'?4:12)); A.hurt=Math.max(0,A.hurt-dt*3.5); A.strike=Math.max(0,A.strike-dt*6); A.equip=Math.max(0,A.equip-dt*3.2); A.pumpT=Math.max(0,A.pumpT-dt);
+  // ----- landing spring -----
+  if(!A.wasGround&&S.onGround){ const imp=Math.min(1,Math.max(0,-A.vy-3)/15); A.sqV-=imp*3.2; if(imp>0.35&&A.dustCd<=0){ burst(_fp.copy(S.pos).setY(S.pos.y+0.05),6,2.2,0.07,dustMat); A.dustCd=0.2; } }
+  A.wasGround=S.onGround; A.vy=S.vel.y; A.dustCd-=dt;
+  A.sqV+=(-130*A.sq-15*A.sqV)*dt; A.sq=Math.max(-0.28,Math.min(0.08,A.sq+A.sqV*dt));
+  // ----- turn in place: feet stay planted, then step -----
+  if(S.onGround&&sp<0.5&&!S.crouch){ A.lag-=dYaw; if(Math.abs(A.lag)>0.6&&A.stepT<=0){ A.stepT=0.3; A.stepSide=A.lag>0?1:-1; } }
+  else A.lag*=Math.exp(-dt*14);
+  if(A.stepT>0){ A.stepT-=dt; A.lag*=Math.exp(-dt*12); }
+  A.lag=Math.max(-1,Math.min(1,A.lag));
+  // ----- target pose -----
+  const T={hipY:0.94,hipsX:0,hipsY:0,hipsZ:0,spX:0,spY:0,chX:0,chY:0,chZ:0,nkX:0,nkY:0,
+    shL:0,shR:0,shLz:-0.1,shRz:0.1,elL:0.25,elR:0.25,hpL:0,hpR:0,hpLz:0,hpRz:0,knL:-0.06,knR:-0.06,anL:0,anR:0};
+  const bounceArms=!gun&&!building;
+  if(S.onGround){
+    const stride=S.crouch?0.95:1.45;
+    A.phase+=sp*dt/stride*Math.PI;
+    const s1=Math.sin(A.phase), c1=Math.cos(A.phase), amp=(S.crouch?0.55:0.78)*k;
+    // legs follow the travel direction (forward, back and side-steps all blend)
+    const legX=s=>amp*s*cm, legZ=s=>amp*0.55*s*sm_;
+    T.hpL=legX(s1); T.hpR=legX(-s1); T.hpLz=legZ(s1); T.hpRz=legZ(-s1);
+    const bendL=Math.max(0,Math.cos(A.phase-0.35)), bendR=Math.max(0,Math.cos(A.phase+Math.PI-0.35));
+    T.knL=-(0.1+1.35*bendL)*k-0.05; T.knR=-(0.1+1.35*bendR)*k-0.05;
+    T.anL=0.35*k*Math.max(0,-Math.sin(A.phase-0.7)); T.anR=0.35*k*Math.max(0,-Math.sin(A.phase+Math.PI-0.7));
+    T.hipY=0.94-0.035*k+0.045*k*Math.abs(c1);
+    T.hipsY=0.2*k*s1*cm; T.hipsZ=0.05*k*c1;
+    T.spX=-0.2*k*Math.max(0,cm)*(S.crouch?0.5:1)+0.06*k*Math.max(0,-cm); T.chY=-T.hipsY*1.25;
+    if(bounceArms){ T.shL=-0.85*k*s1*cm; T.shR=0.85*k*s1*cm; T.elL=T.elR=0.35+0.95*k; T.shLz=-0.1-0.08*k; T.shRz=0.1+0.08*k; }
+    // footstep dust
+    if(k>0.65&&A.dustCd<=0){ const st=Math.sign(s1); if(st!==A.lastSign){ A.lastSign=st; const ft=(st>0?r.legR:r.legL).foot; ft.getWorldPosition(_fp); if(_fp.distanceTo(P.pos)<40){ burst(_fp,2,1.1,0.05,dustMat); A.dustCd=0.12; } } }
+    // idle: breathing, weight shift, look around
+    if(sp<0.3){
+      A.idleT+=dt; const b=Math.sin(A.t*1.9);
+      T.chX+=b*0.022; T.shL+=b*0.03; T.shR-=b*0.03; T.hipsZ+=0.035*Math.sin(A.t*0.55); T.hipY+=0.004*b;
+      T.knL+=-0.06*Math.max(0,Math.sin(A.t*0.55)); T.knR+=-0.06*Math.max(0,-Math.sin(A.t*0.55));
+      if(A.idleT>5&&!gun&&!building) T.nkY=0.55*Math.sin((A.idleT-5)*0.7)*Math.min(1,(A.idleT-5));
+    } else A.idleT=0;
+    // stepping in place while turning
+    if(A.stepT>0){ const p=1-A.stepT/0.3, lift=Math.sin(p*Math.PI); if(A.stepSide>0){ T.knL-=0.9*lift; T.hpL+=0.35*lift; } else { T.knR-=0.9*lift; T.hpR+=0.35*lift; } }
+  } else {
+    const rising=S.vel.y>0, fall=Math.min(1,Math.max(0,-S.vel.y/16));
+    if(rising){ T.hpL=0.95; T.knL=-1.55; T.anL=0.5; T.hpR=-0.2; T.knR=-0.75; T.anR=0.3; }
+    else { T.hpL=lerp(0.6,0.25,fall); T.knL=lerp(-1.0,-0.35,fall); T.hpR=lerp(0.05,-0.1,fall); T.knR=lerp(-0.55,-0.2,fall); T.anL=0.3; T.anR=0.2; }
+    T.spX=rising?-0.12:0.04;
+    if(bounceArms){ const fl=Math.sin(A.t*9)*0.12*fall; T.shL=0.5+fall*0.5+fl; T.shR=0.35+fall*0.5-fl; T.shLz=-0.55-fall*0.5; T.shRz=0.55+fall*0.5; T.elL=T.elR=0.6; }
+    T.hipY=0.94+(rising?0.04:0);
+  }
+  if(S.crouch){ T.hipY-=0.31; T.hpL+=0.95; T.hpR+=0.95; T.knL-=1.55; T.knR-=1.55; T.anL+=0.6; T.anR+=0.6; T.spX-=0.32; }
+  // landing compression
+  T.hipY+=A.sq; T.knL+=A.sq*3.6; T.knR+=A.sq*3.6; T.hpL-=A.sq*1.8; T.hpR-=A.sq*1.8; T.anL-=A.sq*1.8; T.anR-=A.sq*1.8; T.spX+=A.sq*1.3;
+  // keep feet flat: ankles undo hip + knee pitch
+  T.anL+=-(T.hpL+T.knL)*0.9; T.anR+=-(T.hpR+T.knR)*0.9;
+  // aim: chest and head follow the pitch
+  T.chX+=S.pitch*0.32; T.nkX=S.pitch*0.42-T.spX*0.6;
+  // hurt flinch
+  T.spX+=0.25*A.hurt; T.nkX+=0.3*A.hurt; T.chZ+=0.12*A.hurt*A.hurtSide;
+  // ----- upper body by activity -----
+  if(gun){ T.chY+=-0.42; T.nkY+=0.32; T.spY+=-0.05; }
+  else if(building){
+    const st=A.strike, swing=st>0.5?(1-st)*2:st*2; // up fast, down fast
+    T.shR=1.15+0.95*swing+S.pitch*0.5; T.elR=0.5+0.6*swing; T.shRz=0.12;
+    T.shL=0.95+S.pitch*0.6; T.elL=0.85; T.shLz=0.15; T.chY+=0.1;
+  } else if(S.editing){ T.shR=1.35+S.pitch*0.7; T.elR=0.3; T.shL=0.95; T.elL=0.85; T.shLz=0.15; }
+  else if(S.swingT>0){
+    const t=1-S.swingT/0.22, wind=t<0.3, e=wind?t/0.3:(t-0.3)/0.7;
+    if(wind){ T.shR=lerp(0.5,2.9,e); T.elR=lerp(1.6,0.9,e); T.chY+=0.4*e; T.spX+=0.08*e; }
+    else { const ee=1-Math.pow(1-e,3); T.shR=lerp(2.9,-0.15,ee)+S.pitch*0.4; T.elR=lerp(0.9,0.2,ee); T.chY+=lerp(0.4,-0.5,ee); T.spX-=0.18*Math.sin(e*Math.PI); }
+    T.shL=0.4; T.elL=0.8;
+  } else if(S.gun===false&&!building){
+    // pickaxe carried low at the side
+    T.shR=T.shR*0.6+0.12; T.elR=Math.max(0.3,T.elR*0.6); T.shRz=0.16;
+  }
+  // ----- apply (smoothed) -----
+  const set=(o,ax,v,f)=>{ o.rotation[ax]=lerp(o.rotation[ax],v,f||sm); };
+  r.hips.position.y=lerp(r.hips.position.y,T.hipY,smF);
+  set(r.hips,'x',T.hipsX); set(r.hips,'y',T.hipsY+A.lag); set(r.hips,'z',T.hipsZ);
+  set(r.spine,'x',T.spX); set(r.spine,'y',T.spY);
+  set(r.chest,'x',T.chX); set(r.chest,'y',T.chY-A.lag); set(r.chest,'z',T.chZ);
+  set(r.neck,'x',T.nkX); set(r.neck,'y',T.nkY);
+  for(const [L,h,hz,kn,an] of [[r.legL,T.hpL,T.hpLz,T.knL,T.anL],[r.legR,T.hpR,T.hpRz,T.knR,T.anR]]){
+    set(L.hp,'x',h,smF); set(L.hp,'z',hz,smF); set(L.kn,'x',kn,smF); set(L.an,'x',an,smF); }
+  if(!gun){
+    set(r.armL.sh,'x',T.shL); set(r.armR.sh,'x',T.shR); set(r.armL.sh,'z',T.shLz); set(r.armR.sh,'z',T.shRz);
+    set(r.armL.sh,'y',0); set(r.armR.sh,'y',0);
+    set(r.armL.el,'x',T.elL); set(r.armR.el,'x',T.elR); r.armL.el.rotation.y=r.armL.el.rotation.z=r.armR.el.rotation.y=r.armR.el.rotation.z=0;
+    set(r.armL.wr,'x',building?-0.5:0); set(r.armR.wr,'x',S.gun===false&&!building&&!(S.swingT>0)?0.75:0); r.armL.wr.rotation.y=r.armL.wr.rotation.z=r.armR.wr.rotation.y=r.armR.wr.rotation.z=0;
+  }
+  // ----- weapons: two-handed IK -----
+  r.gun.visible=gun==='ar'||gun===true; r.pump.visible=gun==='pump'; r.hammer.visible=building; r.plan.visible=building||!!S.editing; r.pick.visible=!gun&&!building&&!S.editing;
+  r.muzzle=gun==='pump'?r.muzzlePump:r.muzzleAR;
+  [r.armL,r.armR].forEach(a=>a.fing.rotation.x=lerp(a.fing.rotation.x,S.editing?0.25:0.95,sm));
+  r.slide.position.y=-0.33+0.12*(A.pumpT>0?Math.sin(Math.min(1,(0.5-A.pumpT)/0.42)*Math.PI):0);
+  if(gun){
+    G.updateMatrixWorld(true);
+    const cp=Math.cos(S.pitch);
+    _aim.set(fx*cp,Math.sin(S.pitch),fz*cp).normalize();
+    _rt.set(rx,0,rz); _up.crossVectors(_rt,_aim).normalize();
+    // recoil and equip swing
+    const rec=A.recoil*(gun==='pump'?1.6:1);
+    const aimR=_tw2.copy(_aim).applyAxisAngle(_rt,0.16*rec+0.9*A.equip*A.equip);
+    // reload tilts the gun
+    const rl=S.reload, tilt=rl?Math.sin(Math.min(1,rl.p)*Math.PI)*(rl.w==='pump'?0.35:0.7):0;
+    const upR=_fp.copy(_up).applyAxisAngle(aimR,-tilt);
+    handQuat(_hq,aimR,upR);
+    r.armR.sh.getWorldPosition(_tw);
+    _tw.addScaledVector(_aim,0.2-0.07*rec).addScaledVector(_up,-0.07-0.25*A.equip-(rl?0.06:0)).addScaledVector(_rt,-0.09);
+    _pole.copy(_tw).addScaledVector(_up,-1).addScaledVector(_rt,0.8);
+    ikArm(r.armR,_tw,_pole,_hq);
+    // left hand: fore-grip, or the reload path (gun -> hip pouch -> gun)
+    G.updateMatrixWorld(true);
+    const grip=gun==='pump'?r.gripPump:r.gripAR;
+    grip.getWorldPosition(_ikT); const gripW=_ikT.clone();
+    let tgt=gripW;
+    if(rl){
+      const port=(gun==='pump'?r.portPump:r.magAR).getWorldPosition(new THREE.Vector3()), pouch=r.pouch.getWorldPosition(new THREE.Vector3());
+      const p=rl.p;
+      if(gun==='pump'){ const q=p<0.5?p/0.5:1-(p-0.5)/0.5; tgt=port.clone().lerp(pouch,Math.sin(q*Math.PI/2)); }
+      else { tgt=p<0.25?gripW.clone().lerp(port,p/0.25):p<0.55?port.clone().lerp(pouch,(p-0.25)/0.3):p<0.8?pouch.clone().lerp(port,(p-0.55)/0.25):port.clone().lerp(gripW,(p-0.8)/0.2); }
+      if(r.arMag) r.arMag.visible=!(gun!=='pump'&&p>0.3&&p<0.62);
+    } else if(r.arMag) r.arMag.visible=true;
+    if(A.equip>0.4) tgt=tgt.clone().lerp(r.pouch.getWorldPosition(new THREE.Vector3()),Math.min(1,(A.equip-0.4)*2));
+    r.armL.sh.getWorldPosition(_pole); _pole.addScaledVector(_up,-1).addScaledVector(_rt,-0.6);
+    _hq2.copy(_hq).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),-0.6));
+    ikArm(r.armL,tgt,_pole,_hq2);
+  } else if(r.arMag) r.arMag.visible=true;
+  // ----- secondary motion: backpack and hair bounce on springs -----
+  const hy=r.hips.position.y, hv=(hy-A.prevHipY)/Math.max(dt,1e-3); A.prevHipY=hy;
+  A.packV+=(-hv*0.9-vf*0.0-160*A.pack-11*A.packV)*dt; A.pack+=A.packV*dt; A.pack=Math.max(-0.35,Math.min(0.35,A.pack));
+  r.pack.rotation.x=A.pack+0.06*k;
+  A.tuftV+=(-hv*1.4-120*A.tuft-9*A.tuftV+(S.onGround?0:S.vel.y*0.05))*dt; A.tuft+=A.tuftV*dt; A.tuft=Math.max(-0.4,Math.min(0.4,A.tuft));
+  r.tuft.rotation.x=-A.tuft*0.6;
+  // ----- face -----
+  A.blinkT-=dt; if(A.blinkT<-0.12) A.blinkT=1.8+Math.random()*3.5;
+  const squint=A.hurt>0.3?0.35:1, blink=A.blinkT<0?0.1:squint;
+  r.eyes.forEach(e=>e.scale.y=lerp(e.scale.y,blink,0.6));
+  const browY=0.198+(S.onGround?0:0.012)-(gun?0.006:0)-0.012*A.hurt;
+  r.brows.forEach((b,i)=>{ b.position.y=lerp(b.position.y,browY,sm); b.rotation.z=lerp(b.rotation.z,(gun||A.hurt>0.2)?(i?-0.25:0.25):0,sm); });
+  const mouthOpen=Math.max(A.hurt*3,!S.onGround&&S.vel.y<-10?1.8:0,1);
+  r.mouth.scale.y=lerp(r.mouth.scale.y,mouthOpen,sm); r.mouth.scale.x=lerp(r.mouth.scale.x,A.hurt>0.2?0.7:1,sm);
 }
-function animateHero(dt){ animateRig(localHero,{pos:P.pos,vel:P.vel,yaw:P.yaw,pitch:P.pitch,onGround:P.onGround,crouch:P.crouch,building:mode==='build'||!!edit,gun:mode==='gun'?P.wpn:false,swingT},dt); }
+function animateHero(dt){
+  animateRig(localHero,{pos:P.pos,vel:P.vel,yaw:P.yaw,pitch:P.pitch,onGround:P.onGround,crouch:P.crouch,building:mode==='build'&&!edit,editing:!!edit,
+    gun:mode==='gun'&&!edit?P.wpn:false,swingT,reload:(mode==='gun'&&P.reloadT>0)?{w:P.wpn,p:1-P.reloadT/P.reloadDur}:null},dt);
+}
 
 /* ---------- camera ---------- */
 const tmpA=new THREE.Vector3(), tmpB=new THREE.Vector3();
@@ -1570,7 +1848,7 @@ function playerShoot(){
   camera.updateMatrixWorld();
   const tgt=(B&&B.active&&B.alive)?B:null, shBefore=tgt?tgt.sh:0;
   const r=fireWeapon(P,localHero,camera.position.clone(),aimDir(),P.wpn,camDist+0.4,tgt,spread);
-  sfx(P.wpn==='pump'?'pump':'shot'); stat('s'); P.kick=P.wpn==='pump'?0.05:0.012;
+  sfx(P.wpn==='pump'?'pump':'shot'); animEvent(localHero,'fire',P.wpn); stat('s'); P.kick=P.wpn==='pump'?0.05:0.012;
   if(r.hit){ stat('h',r.dmg); hitMarker(r.dmg,r.head); dmgNum(B.pos.clone().setY(B.pos.y+(r.head?2.05:1.6)),r.dmg,r.head?'head':shBefore>0?'shield':'hp'); botHurt(r.dmg); }
   if(P.ammo[P.wpn]<=0) startReload();
 }
@@ -1609,7 +1887,7 @@ function stepDmgNums(dt){
 }
 function playerHurt(dmg){
   if(round.state!=='fight') return;
-  const f=$('hurtfx'); f.classList.add('on'); void f.offsetWidth; f.classList.remove('on'); sfx('hurt');
+  const f=$('hurtfx'); f.classList.add('on'); void f.offsetWidth; f.classList.remove('on'); sfx('hurt'); animEvent(localHero,'hurt');
   if(hurt(P,dmg)) endRound(false);
 }
 
@@ -1632,7 +1910,7 @@ const round={state:'fight',t:0,you:0,bot:0};
 const snapYaw=y=>Math.round(y/(Math.PI/2))*(Math.PI/2);
 function botOn(){ return settings.bot!=='off'&&!net.role; }
 function makeBot(){
-  const h=createHero(0xc8463c); scene.add(h.group);
+  const h=createHero(0xc8463c,{hair:0x1b1b22,skin:0xc68a5e,accent:0x62bdff,pack:0x5d7186}); scene.add(h.group);
   B={pos:new THREE.Vector3(),vel:new THREE.Vector3(),onGround:true,groundSlab:null,crouch:false,yaw:0,pitch:0,rot:0,
      hp:100,sh:100,alive:true,active:false,h,skill:0.35,bias:0,
      state:'fight',stateT:0,react:1,los:false,losT:0,blockPiece:null,fireT:0,burst:0,ammo:GUN.mag,reloadT:0,
@@ -1642,7 +1920,7 @@ function botSpawn(){
   const a=Math.random()*Math.PI*2;
   B.pos.set(SPAWN[0]+Math.cos(a)*32,0,SPAWN[2]+Math.sin(a)*32); B.vel.set(0,0,0);
   B.hp=100; B.sh=100; B.alive=true; B.ammo=GUN.mag; B.reloadT=0; B.state='fight'; B.queue.length=0; B.peek=null;
-  B.react=1.6-0.8*B.skill; B.h.group.visible=true;
+  B.react=1.6-0.8*B.skill; B.h.group.visible=true; animEvent(B.h,'revive');
 }
 function syncBot(){
   const on=botOn();
@@ -1662,7 +1940,8 @@ function endRound(won){
   round.state='over'; round.t=3.2;
   if(won) round.you++; else round.bot++;
   if(settings.bot==='adaptive') B.bias=Math.max(-0.3,Math.min(0.3,B.bias+(won?0.07:-0.07)));
-  if(won){ burst(B.pos.clone().setY(B.pos.y+1),26,7,0.16); B.h.group.visible=false; B.alive=false; }
+  if(won){ B.alive=false; animEvent(B.h,'die'); setTimeout(()=>{ if(B&&!B.alive&&round.state==='over'){ burst(B.pos.clone().setY(B.pos.y+0.5),26,7,0.16); B.h.group.visible=false; } },850); }
+  else animEvent(localHero,'die');
   sfx(won?'win':'lose');
   banner(won?'Round won':'Round lost','You '+round.you+' – '+round.bot+' Bot',2.8);
 }
@@ -1672,6 +1951,7 @@ function banner(t,sub,dur){ $('banTitle').textContent=t; $('banSub').textContent
 function botHurt(dmg){
   if(round.state!=='fight'||!B.alive) return;
   if(hurt(B,dmg)){ endRound(true); return; }
+  animEvent(B.h,'hurt');
   const s=B.skill;
   B.react=Math.min(B.react,0.12+0.3*(1-s));
   // Taking damage: throw up cover (and a ramp to take height) if skilled enough
@@ -1690,7 +1970,7 @@ function botFire(eye,dist,s){
   const d=aim.sub(eye).normalize();
   const err=(0.07*(1-s)+0.006)*(B.onGround?1:1.6)*(1+Math.min(1,dist/60))*(w==='pump'?0.5:1);
   const r=fireWeapon(B,B.h,eye,d,w,0.5,P,W.spread+err,0xff9f80);
-  sfxAt(w==='pump'?'pump':'shot',B.pos);
+  sfxAt(w==='pump'?'pump':'shot',B.pos); animEvent(B.h,'fire',w);
   if(w==='ar'){ B.ammo--; B.burst++; B.fireT=W.rate*(1.75-0.75*s);
     if(B.burst>=3+Math.round(9*s)){ B.burst=0; B.fireT+=0.2+0.7*(1-s)*Math.random(); }
     if(B.ammo<=0) B.reloadT=W.reload*(1.35-0.35*s); }
@@ -1762,7 +2042,7 @@ function botUpdate(dt){
 }
 function animateBot(dt){
   if(!B.h.group.visible) return;
-  animateRig(B.h,{pos:B.pos,vel:B.vel,yaw:B.yaw,pitch:B.pitch,onGround:B.onGround,crouch:false,building:B.buildPose>0||B.state==='rush',gun:B.wpn,swingT:0},dt);
+  animateRig(B.h,{pos:B.pos,vel:B.vel,yaw:B.yaw,pitch:B.pitch,onGround:B.onGround,crouch:false,building:B.buildPose>0||B.state==='rush',gun:B.wpn,swingT:0,reload:B.reloadT>0?{w:'ar',p:Math.min(1,1-B.reloadT/2.4)}:null},dt);
 }
 function updateCombatHUD(){
   stepDmgNums(lastDt);
