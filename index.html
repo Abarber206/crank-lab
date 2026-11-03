@@ -883,7 +883,7 @@ function highEdge(s){
 /* Targeting snaps to the NEAREST grid spot in front of you, at the level you're standing on.
    Walls: the edge of your own cell you're facing. Floors/cones: the cell ahead, or your own cell when looking
    up (one level above) or down (your level). Stairs: the cell ahead. Looking up/down shifts one level at most. */
-function computeTarget(type,E=P){
+function computeTargetRaw(type,E=P){
   const x=E.pos.x, z=E.pos.z, fy=E.pos.y, fx=-Math.sin(E.yaw), fz=-Math.cos(E.yaw), dy=Math.sin(E.pitch);
   const cellOf=v=>Math.floor(v/CELL);
   const dirIdx=Math.abs(fx)>=Math.abs(fz)?(fx>0?0:2):(fz>0?1:3);
@@ -915,6 +915,20 @@ function computeTarget(type,E=P){
   l=Math.max(0,l);
   if(type==='floor') return {type,i,j,l,key:`f${i}_${j}_${l}`};
   return {type,i,j,l,dir:type==='ramp'?(dirIdx+(E.rot||0))%4:0,key:`m${i}_${j}_${l}`};
+}
+// If the nearest spot is already built, use the same spot one level up (e.g. a fresh wall at the top of a rush)
+function retarget(t,l){ const n={...t,l}; n.key=t.type==='wall'?`w${t.axis}${t.i}_${t.j}_${l}`:t.type==='floor'?`f${t.i}_${t.j}_${l}`:`m${t.i}_${t.j}_${l}`; return n; }
+function computeTarget(type,E=P){
+  const t=computeTargetRaw(type,E);
+  if(!pieces.has(t.key)) return t;
+  const r=E.onGround&&E.groundSlab&&E.groundSlab.type==='ramp'?E.groundSlab:null;
+  const fx=-Math.sin(E.yaw), fz=-Math.cos(E.yaw), dirIdx=Math.abs(fx)>=Math.abs(fz)?(fx>0?0:2):(fz>0?1:3);
+  if(r&&r.dir===dirIdx){
+    // climbing: never stack a wall in your own path; put it at the next rush step instead
+    if(type==='wall'){ const d=DIRS[dirIdx], n=retarget({...t,i:t.i+(t.axis==='x'?d[0]:0),j:t.j+(t.axis==='z'?d[1]:0)},t.l+1); return pieces.has(n.key)?t:n; }
+    return t;
+  }
+  const up=retarget(t,t.l+1); return pieces.has(up.key)?t:up;
 }
 /* Every placement (yours, the bot's, preview) goes through this. Rules marked "approx" are best guesses at the
    real game's behaviour. */
