@@ -126,6 +126,12 @@ body.touch .slot .k{display:none}
 #menuBtn{top:calc(env(safe-area-inset-top,0px) + 10px);right:calc(env(safe-area-inset-right,0px) + 152px);width:42px;height:42px;border-radius:9px}
 body.touch #bottom{left:calc(50% - 60px)}
 @media (max-height:430px){ body.touch .slot{width:50px;height:50px} body.touch .slot svg{width:34px;height:34px} body.touch #vitals{width:210px} .mapwrap{width:110px;height:110px} body.touch #menuBtn{right:calc(env(safe-area-inset-right,0px) + 130px)} }
+@media (orientation:portrait){
+  body.touch #bottom{left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 250px)}
+  body.touch .slot{width:48px;height:48px} body.touch .slot svg{width:32px;height:32px}
+  body.touch #vitals{width:200px} body.touch .mats{padding:5px 8px}
+  body.touch #tFireL{top:46%}
+}
 #toast{left:50%;top:62%;transform:translateX(-50%);background:var(--hud-glass);padding:7px 14px;border-radius:5px;font-weight:600;font-size:14px;opacity:0;transition:opacity .2s}
 #toast.show{opacity:1}
 
@@ -187,7 +193,13 @@ kbd{font-family:var(--font-ui);background:#1c2a40;border-radius:3px;padding:1px 
 /* Touch controls */
 #stick{position:absolute;width:120px;height:120px;margin:-60px 0 0 -60px;border-radius:50%;border:2px solid rgba(255,255,255,.4);background:rgba(13,23,38,.25);display:none}
 #knob{position:absolute;left:50%;top:50%;width:50px;height:50px;margin:-25px 0 0 -25px;border-radius:50%;background:rgba(242,245,249,.7)}
-@media (prefers-reduced-motion:reduce){#toast{transition:none}}
+@media (prefers-reduced-motion:reduce){@media (orientation:portrait){
+  body.touch #bottom{left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 250px)}
+  body.touch .slot{width:48px;height:48px} body.touch .slot svg{width:32px;height:32px}
+  body.touch #vitals{width:200px} body.touch .mats{padding:5px 8px}
+  body.touch #tFireL{top:46%}
+}
+#toast{transition:none}}
 </style>
 </head>
 <body>
@@ -453,9 +465,9 @@ const treadMat=new THREE.MeshLambertMaterial({map:treadTex}), beamMat=new THREE.
 /* Material stats. Max health values are the commonly cited classic ones; start health and build-up times are
    estimates (Epic doesn't publish exact figures), so they live here to tune. */
 const MATERIALS={
-  wood: {name:'Wood', maxHp:{wall:150,other:140}, start:0.3, buildTime:4,  fill:260, chip:0xc9995a},
-  brick:{name:'Brick',maxHp:{wall:300,other:280}, start:0.2, buildTime:9,  fill:450, chip:0x9c978f},
-  metal:{name:'Metal',maxHp:{wall:500,other:460}, start:0.15,buildTime:16, fill:620, chip:0x9aa5b0}
+  wood: {name:'Wood', maxHp:{wall:150,other:140}, start:0.3, buildTime:4,  fill:300, chip:0xc9995a},
+  brick:{name:'Brick',maxHp:{wall:300,other:280}, start:0.2, buildTime:9,  fill:420, chip:0x9c978f},
+  metal:{name:'Metal',maxHp:{wall:500,other:460}, start:0.15,buildTime:16, fill:520, chip:0x9aa5b0}
 };
 const MAT_ORDER=['wood','brick','metal'];
 const matFor={};
@@ -576,8 +588,11 @@ function makeBoxes(p){
   }
   return out;
 }
+const buildGlowMat=new THREE.MeshBasicMaterial({color:0xbfe8ff,transparent:true,opacity:.85,blending:THREE.AdditiveBlending,depthWrite:false});
+const sparkMat=new THREE.MeshBasicMaterial({color:0x9fdcff});
 function finishAnim(p){
   if(!p.anim) return;
+  if(p.group) p.group.scale.setScalar(1);
   scene.remove(p.anim.ghost);
   p.group.children.forEach(m=>{ m.material=m.userData.baseMat; });
   p.anim.mats.forEach(m=>m.dispose());
@@ -589,16 +604,29 @@ function startAnim(p,dur){
   const mats=new Map();
   p.group.children.forEach(m=>{ m.userData.baseMat=m.material; let c=mats.get(m.material); if(!c){ c=m.material.clone(); c.clippingPlanes=[plane]; c.emissive=new THREE.Color(0x2a6aa0); mats.set(m.material,c);} m.material=c; });
   const ghost=makeGroup(p,ghostMat,false); scene.add(ghost);
-  p.anim={t0:performance.now(),dur,plane,vertical,lo:vertical?box.min.y:box.min.x,hi:(vertical?box.max.y:box.max.x)+0.05,mats:[...mats.values()],ghost};
+  // glowing line at the build front
+  const sz=box.getSize(new THREE.Vector3()), ctr=box.getCenter(new THREE.Vector3());
+  const front=new THREE.Mesh(new THREE.BoxGeometry(vertical?sz.x+0.08:0.06,vertical?0.06:sz.y+0.08,vertical?sz.z+0.08:sz.z+0.08),buildGlowMat);
+  front.position.copy(ctr); ghost.add(front); front.position.sub(ghost.position);
+  p.group.scale.setScalar(0.94);
+  p.anim={t0:performance.now(),dur,plane,vertical,lo:vertical?box.min.y:box.min.x,hi:(vertical?box.max.y:box.max.x)+0.05,mats:[...mats.values()],ghost,front,ctr,sz,sparkT:0};
   anims.add(p);
 }
 function stepAnims(now){
   anims.forEach(p=>{
     const a=p.anim; if(!a){ anims.delete(p); return; }
     const k=Math.min(1,(now-a.t0)/a.dur), e=1-Math.pow(1-k,2);
-    a.plane.constant=a.lo+(a.hi-a.lo)*e;
-    a.mats.forEach(m=>m.emissive.setRGB(.16*(1-k),.42*(1-k),.63*(1-k)));
-    if(k>=1){ finishAnim(p); anims.delete(p); }
+    const at=a.lo+(a.hi-a.lo)*e;
+    a.plane.constant=at;
+    a.mats.forEach(m=>m.emissive.setRGB(.2*(1-k),.5*(1-k),.75*(1-k)));
+    if(a.vertical) a.front.position.y=at-a.ghost.position.y; else a.front.position.x=at-a.ghost.position.x;
+    a.front.visible=k<0.97;
+    // pop: slightly small, overshoot, settle
+    const pop=k<0.7?0.94+0.1*(k/0.7):1.04-0.04*((k-0.7)/0.3); p.group.scale.setScalar(pop);
+    if(now-a.sparkT>55&&k<0.95&&pieceCenter(p).distanceTo(P.pos)<35){ a.sparkT=now;
+      const sp=a.ctr.clone(); if(a.vertical){ sp.y=at; sp.x+=(Math.random()-.5)*a.sz.x; sp.z+=(Math.random()-.5)*a.sz.z; } else { sp.x=at; sp.z+=(Math.random()-.5)*a.sz.z; }
+      burst(sp,2,2.2,0.045,sparkMat); }
+    if(k>=1){ p.group.scale.setScalar(1); finishAnim(p); anims.delete(p); }
   });
 }
 const anims=new Set();
@@ -807,31 +835,37 @@ function aimDir(){ const cp=Math.cos(P.pitch); return new THREE.Vector3(-Math.si
 function highEdge(s){
   return s.dir===0?{axis:'x',i:s.i+1,j:s.j}: s.dir===2?{axis:'x',i:s.i,j:s.j}: s.dir===1?{axis:'z',i:s.i,j:s.j+1}:{axis:'z',i:s.i,j:s.j};
 }
+/* Targeting snaps to the NEAREST grid spot in front of you, at the level you're standing on.
+   Walls: the edge of your own cell you're facing. Floors/cones: the cell ahead, or your own cell when looking
+   up (one level above) or down (your level). Stairs: the cell ahead. Looking up/down shifts one level at most. */
 function computeTarget(type,E=P){
   const x=E.pos.x, z=E.pos.z, fy=E.pos.y, fx=-Math.sin(E.yaw), fz=-Math.cos(E.yaw), dy=Math.sin(E.pitch);
-  const cellOf=v=>Math.floor(v/CELL), fl=o=>Math.max(0,Math.floor((fy+o)/LVL));
+  const cellOf=v=>Math.floor(v/CELL);
   const dirIdx=Math.abs(fx)>=Math.abs(fz)?(fx>0?0:2):(fz>0?1:3);
-  const gs=(E.onGround&&E.groundSlab&&E.groundSlab.type==='ramp'&&fy>E.groundSlab.l*LVL+1.0)?E.groundSlab:null;
+  const onRamp=E.onGround&&E.groundSlab&&E.groundSlab.type==='ramp'?E.groundSlab:null;
+  const feetL=onRamp?onRamp.l:Math.max(0,Math.floor((fy+0.5)/LVL));
+  const climbing=onRamp&&fy>onRamp.l*LVL+1.0&&onRamp.dir===dirIdx?onRamp:null; // facing up the ramp you're on
   if(type==='wall'){
     let axis,i,j;
-    if(Math.abs(fx)>=Math.abs(fz)){ axis='x'; i=fx>0?cellOf(x)+1:cellOf(x); const t=(i*CELL-x)/fx; j=cellOf(z+fz*t); }
-    else { axis='z'; j=fz>0?cellOf(z)+1:cellOf(z); const t=(j*CELL-z)/fz; i=cellOf(x+fx*t); }
-    let l=fl(2.0);
-    if(gs){ const he=highEdge(gs); if(he.axis===axis&&he.i===i&&he.j===j){ l=gs.l+1; const dd=DIRS[gs.dir]; i+=dd[0]; j+=dd[1]; } }
-    if(dy>0.6) l++; else if(dy<-0.8) l--;
+    // on a ramp, you count as standing in the ramp's cell (even with one foot still behind it)
+    const ci=onRamp?onRamp.i:cellOf(x), cj=onRamp?onRamp.j:cellOf(z);
+    if(Math.abs(fx)>=Math.abs(fz)){ axis='x'; i=fx>0?ci+1:ci; j=onRamp?cj:cellOf(z+fz*((i*CELL-x)/fx)); }
+    else { axis='z'; j=fz>0?cj+1:cj; i=onRamp?ci:cellOf(x+fx*((j*CELL-z)/fz)); }
+    let l=feetL;
+    if(dy>0.7) l++; else if(dy<-0.85) l--;
     l=Math.max(0,l);
     return {type,axis,i,j,l,key:`w${axis}${i}_${j}_${l}`};
   }
   let i,j,l,own=false;
   const upT=type==='cone'?0.45:0.55;
-  if(dy<-0.6){ own=true; l=fl(0.3); }
-  else if(dy>upT&&type!=='ramp'){ own=true; l=fl(0.3)+1; }
-  if(own){ i=cellOf(x); j=cellOf(z); }
+  if(dy<-0.6&&type!=='ramp'){ own=true; l=feetL; }
+  else if(dy>upT&&type!=='ramp'){ own=true; l=feetL+1; }
+  if(own){ i=onRamp?onRamp.i:cellOf(x); j=onRamp?onRamp.j:cellOf(z); }
   else {
     const reach=type==='ramp'?2.6:3.0;
-    i=cellOf(x+fx*reach); j=cellOf(z+fz*reach); l=fl(2.0);
-    if(gs){ const d=DIRS[gs.dir]; if(i===gs.i+d[0]&&j===gs.j+d[1]) l=gs.l+1; }
-    if(type==='ramp'&&dy>0.6) l++;
+    i=cellOf(x+fx*reach); j=cellOf(z+fz*reach); l=feetL;
+    if(onRamp&&i===onRamp.i&&j===onRamp.j){ const d=DIRS[dirIdx]; i+=d[0]; j+=d[1]; }
+    if(climbing){ const d=DIRS[climbing.dir]; if(i===climbing.i+d[0]&&j===climbing.j+d[1]) l=climbing.l+1; }
   }
   l=Math.max(0,l);
   if(type==='floor') return {type,i,j,l,key:`f${i}_${j}_${l}`};
@@ -1535,7 +1569,7 @@ function bindSettings(){
   const show=()=>{ $('sensV').textContent=(+settings.sens).toFixed(2)+'×'; $('fovV').textContent=settings.fov+'°'; };
   show();
   sens.addEventListener('input',()=>{ settings.sens=+sens.value; show(); saveSettings(); });
-  fov.addEventListener('input',()=>{ settings.fov=+fov.value; camera.fov=settings.fov; camera.updateProjectionMatrix(); show(); saveSettings(); });
+  fov.addEventListener('input',()=>{ settings.fov=+fov.value; applyFov(); show(); saveSettings(); });
   ts.addEventListener('change',()=>{ settings.turbo=+ts.value; saveSettings(); });
   er.addEventListener('change',()=>{ settings.editRelease=er.checked; saveSettings(); });
   sh.addEventListener('change',()=>{ settings.shadows=sh.checked; sun.castShadow=sh.checked; saveSettings(); });
@@ -1733,10 +1767,16 @@ document.querySelectorAll('.slot[data-s]').forEach(b=>{
 });
 // Size to the canvas's real on-screen box (the artifact frame can differ from window.inner* and resize without events)
 let lastW=0,lastH=0;
+function applyFov(){
+  const a=camera.aspect||1;
+  if(a>=1) camera.fov=settings.fov;
+  else { const hf=Math.min(settings.fov,74)*Math.PI/180; camera.fov=Math.min(105,2*Math.atan(Math.tan(hf/2)/a)*180/Math.PI); }
+  camera.updateProjectionMatrix();
+}
 function fitView(){
   const w=Math.max(1,Math.round(canvas.clientWidth)), h=Math.max(1,Math.round(canvas.clientHeight));
   if(w===lastW&&h===lastH) return;
-  lastW=w; lastH=h; renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix();
+  lastW=w; lastH=h; renderer.setSize(w,h,false); camera.aspect=w/h; applyFov();
 }
 addEventListener('resize',fitView);
 if(window.ResizeObserver) new ResizeObserver(fitView).observe(canvas);
