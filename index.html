@@ -889,6 +889,7 @@ function highEdge(s){
    Walls: the edge of your own cell you're facing. Floors/cones: the cell ahead, or your own cell when looking
    up (one level above) or down (your level). Stairs: the cell ahead. Looking up/down shifts one level at most. */
 function computeTargetRaw(type,E=P){
+  if(E===P&&camera){ const lt=lookTarget(type); if(lt) return lt; }
   const x=E.pos.x, z=E.pos.z, fy=E.pos.y, fx=-Math.sin(E.yaw), fz=-Math.cos(E.yaw), dy=Math.sin(E.pitch);
   const cellOf=v=>Math.floor(v/CELL);
   const dirIdx=Math.abs(fx)>=Math.abs(fz)?(fx>0?0:2):(fz>0?1:3);
@@ -917,6 +918,46 @@ function computeTargetRaw(type,E=P){
     if(onRamp&&i===onRamp.i&&j===onRamp.j){ const d=DIRS[dirIdx]; i+=d[0]; j+=d[1]; }
     if(climbing){ const d=DIRS[climbing.dir]; if(i===climbing.i+d[0]&&j===climbing.j+d[1]) l=climbing.l+1; }
   }
+  l=Math.max(0,l);
+  if(type==='floor') return {type,i,j,l,key:`f${i}_${j}_${l}`};
+  return {type,i,j,l,dir:type==='ramp'?(dirIdx+(E.rot||0))%4:0,key:`m${i}_${j}_${l}`};
+}
+/* Your own builds follow the crosshair: a ray from the camera finds where you're looking
+   (a build, the ground, or a point ~5 m out), and the piece snaps to the grid spot there.
+   Walls: the edge of your cell the look ray crosses, at the height it crosses it.
+   Floors/cones: the cell you're looking at, at the nearest floor height. Stairs: the cell you're looking at.
+   Standing on a stair and facing up it still continues the stair. */
+const _lo=new THREE.Vector3(), _ld=new THREE.Vector3();
+function lookTarget(type){
+  const E=P, x=E.pos.x, z=E.pos.z, fy=E.pos.y, cellOf=v=>Math.floor(v/CELL);
+  const fx=-Math.sin(E.yaw), fz=-Math.cos(E.yaw), dirIdx=Math.abs(fx)>=Math.abs(fz)?(fx>0?0:2):(fz>0?1:3);
+  const onRamp=E.onGround&&E.groundSlab&&E.groundSlab.type==='ramp'?E.groundSlab:null;
+  if(onRamp&&onRamp.dir===dirIdx) return null; // climbing rules handle rushing
+  const feetL=onRamp?onRamp.l:Math.max(0,Math.floor((fy+0.5)/LVL));
+  camera.updateMatrixWorld(); _lo.copy(camera.position); _ld.copy(aimDir());
+  const ci=cellOf(x), cj=cellOf(z);
+  if(type==='wall'){
+    // first cell edge the horizontal look ray crosses, measured from you
+    const hx=_ld.x, hz=_ld.z, hl=Math.hypot(hx,hz); if(hl<0.15) return null;
+    const tx=hx>0?((ci+1)*CELL-x)/hx:hx<0?(ci*CELL-x)/hx:1e9, tz=hz>0?((cj+1)*CELL-z)/hz:hz<0?(cj*CELL-z)/hz:1e9;
+    let axis,i,j,t;
+    if(tx<=tz){ axis='x'; i=hx>0?ci+1:ci; j=cj; t=tx; } else { axis='z'; j=hz>0?cj+1:cj; i=ci; t=tz; }
+    const eyeY=fy+1.6, yAt=eyeY+_ld.y*t;
+    let l=Math.floor(yAt/LVL); l=Math.max(Math.max(0,feetL-1),Math.min(feetL+1,l));
+    return {type,axis,i,j,l,key:`w${axis}${i}_${j}_${l}`};
+  }
+  // where the crosshair lands: builds, ground, or ~5 m out
+  ray.set(_lo,_ld); ray.near=camDist+0.2; ray.far=camDist+6;
+  const hits=ray.intersectObjects(nearMeshes(x,z,2),false); ray.near=0;
+  let pt=hits.length?hits[0].point.clone():null;
+  if(!pt&&_ld.y<-0.01){ const tg=-_lo.y/_ld.y; if(tg>0&&tg<camDist+6) pt=_lo.clone().addScaledVector(_ld,tg); }
+  if(!pt) pt=_lo.clone().addScaledVector(_ld,camDist+5);
+  let i=cellOf(pt.x+_ld.x*0.01), j=cellOf(pt.z+_ld.z*0.01);
+  i=Math.max(ci-1,Math.min(ci+1,i)); j=Math.max(cj-1,Math.min(cj+1,j));
+  if(type!=='ramp'&&_ld.y>0.6){ i=onRamp?onRamp.i:ci; j=onRamp?onRamp.j:cj; pt.y=Math.max(pt.y,(feetL+1)*LVL); } // looking steeply up: over your head
+  let l;
+  if(type==='ramp'){ if(onRamp&&i===onRamp.i&&j===onRamp.j){ const d=DIRS[dirIdx]; i+=d[0]; j+=d[1]; } l=feetL; }
+  else { l=Math.round(pt.y/LVL); if(i===ci&&j===cj&&_ld.y>0.45) l=Math.max(l,feetL+1); l=Math.max(Math.max(0,feetL-1),Math.min(feetL+1,l)); }
   l=Math.max(0,l);
   if(type==='floor') return {type,i,j,l,key:`f${i}_${j}_${l}`};
   return {type,i,j,l,dir:type==='ramp'?(dirIdx+(E.rot||0))%4:0,key:`m${i}_${j}_${l}`};
