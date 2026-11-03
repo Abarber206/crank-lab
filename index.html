@@ -1084,10 +1084,14 @@ function refreshTiles(){ edit.tiles.forEach(m=>{ m.material=edit.sel.has(m.userD
 // Is the current tile pattern a real edit? (walls/floors need one tile left, cones one corner down, ramps two tiles on one side)
 const WALL_SHAPES={'':'No change','4':'Window','3,4,5':'Wide window','1,4':'Door','0,1,3,4':'Wide door','1,2,4,5':'Wide door','0,3':'Side door','2,5':'Side door',
   '0,1,2,4':'Arch','6,7,8':'Half wall','3,4,5,6,7,8':'Low wall','0,1,2':'Raised wall','0,1,2,3,4,5':'Top strip','1,4,7':'Center slot','0,3,6':'Side gap','2,5,8':'Side gap','7':'Peephole','4,7':'Tall window'};
+// Only real wall edits are allowed: the named shapes, their mirror images, and the diagonal corner cuts
+const WALL_OK=(()=>{ const set=new Set(), mir=k=>k.split(',').map(Number).map(i=>(i/3|0)*3+(2-i%3)).sort((a,b)=>a-b).join(',');
+  const add=k=>{ if(!k) return; set.add(k); set.add(mir(k)); };
+  Object.keys(WALL_SHAPES).forEach(add); ['0','2','6','8','1,2,5','0,1,3','3,6,7','5,7,8'].forEach(add); return set; })();
 function editShapeName(){
   const p=edit.piece, key=[...edit.sel].sort((a,b)=>a-b).join(','), n=edit.sel.size;
-  if(!editValid()) return p.type==='ramp'?'Pick 2 side-by-side tiles or all 4':'Keep at least one tile';
-  if(p.type==='wall') return WALL_SHAPES[key]||'Custom wall';
+  if(!editValid()) return p.type==='ramp'?'Pick 2 side-by-side tiles or all 4':p.type==='wall'?'Not a valid edit':'Keep at least one tile';
+  if(p.type==='wall') return WALL_SHAPES[key]||WALL_SHAPES[key.split(',').map(Number).map(i=>(i/3|0)*3+(2-i%3)).sort((a,b)=>a-b).join(',')]||(edit.sel.size<=1?'Corner cut':'Slant');
   if(p.type==='floor') return n===0?'No change':n===1?'Corner cut':n===3?'Single tile':(key==='0,3'||key==='1,2')?'Diagonal':'Half floor';
   if(p.type==='cone') return n===0?'Pyramid':n===1?'Corner roof':n===3?'Pocket':(key==='0,3'||key==='1,2')?'Ridge':'Ramp roof';
   return n===0?'No change':n===2?'Half stairs':'Full stairs';
@@ -1098,7 +1102,8 @@ function stairStep(a,b){ const ra=a>>1, ca=a&1, rb=b>>1, cb=b&1;
   if(ra===rb&&ca!==cb) return {dir:cb>ca?0:2,half:ra}; if(ca===cb&&ra!==rb) return {dir:rb>ra?1:3,half:ca}; return null; }
 function editValid(){
   const p=edit.piece;
-  if(p.type==='wall'||p.type==='floor') return edit.sel.size<(p.type==='wall'?9:4);
+  if(p.type==='floor') return edit.sel.size<4;
+  if(p.type==='wall') return edit.sel.size===0||WALL_OK.has([...edit.sel].sort((a,b)=>a-b).join(','));
   if(p.type==='cone') return edit.sel.size<4;
   const n=edit.sel.size; if(n===0||n===4) return true;
   if(n!==2) return false; const [a,b]=[...edit.sel]; return stairStep(a,b)!==null;
