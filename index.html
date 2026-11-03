@@ -189,7 +189,7 @@ kbd{font-family:var(--font-ui);background:#1c2a40;border-radius:3px;padding:1px 
           <dt>Left side</dt><dd>Drag to move</dd>
           <dt>Right side</dt><dd>Drag to look</dd>
           <dt>Wall / Floor / Ramp / Cone</dt><dd>Tap to place, hold to turbo build</dd>
-          <dt>Edit</dt><dd>Aim at a build, tap Edit, tap or drag over tiles, then Confirm</dd>
+          <dt>Edit</dt><dd>Aim at a build, tap Edit, then drag over tiles and lift your finger. A wrong pattern turns red until you fix it</dd>
           <dt>Fire</dt><dd>Place the current piece, or swing the pickaxe</dd>
         </dl>
         <p class="sub" style="margin-top:10px;font-size:12px">Ramp edits: select the two tiles on the side you want the ramp to rise toward. Cone edits: each selected tile raises that corner to the full height of the wall, so two side tiles make a ramp that reaches the top, one tile makes a corner roof, and two diagonal tiles make a ridge.</p>
@@ -200,7 +200,7 @@ kbd{font-family:var(--font-ui);background:#1c2a40;border-radius:3px;padding:1px 
           <label for="sens">Look sensitivity <span class="v" id="sensV"></span><input type="range" id="sens" min="0.3" max="3" step="0.05"></label>
           <label for="fov">Field of view <span class="v" id="fovV"></span><input type="range" id="fov" min="60" max="100" step="1"></label>
           <label for="turboSel">Turbo build delay <select id="turboSel"><option value="0.05">0.05 s (fast)</option><option value="0.15">0.15 s (classic)</option></select></label>
-          <label for="editRel">Edit on release <input type="checkbox" id="editRel"></label>
+          <label for="editRel">Edit on release (mouse and touch) <input type="checkbox" id="editRel"></label>
           <label for="instantBuild">Instant build on piece bind (hold to turbo) <input type="checkbox" id="instantBuild"></label>
           <label for="shadows">Shadows <input type="checkbox" id="shadows"></label>
         </div>
@@ -338,6 +338,7 @@ const ghostBad=new THREE.MeshBasicMaterial({color:0xff5a4a, transparent:true, op
 const ghostDim=new THREE.MeshBasicMaterial({color:0x62bdff, transparent:true, opacity:.1, depthWrite:false});
 const editPieceMat=new THREE.MeshBasicMaterial({color:0xbfe2ff, transparent:true, opacity:.16, depthWrite:false});
 const tileMat=new THREE.MeshBasicMaterial({color:0x8fd3ff, transparent:true, opacity:.42, side:THREE.DoubleSide, depthWrite:false});
+const tileBadMat=new THREE.MeshBasicMaterial({color:0xd81e3c, transparent:true, opacity:.8, side:THREE.DoubleSide, depthWrite:false});
 const tileSelMat=new THREE.MeshBasicMaterial({color:0xff6a3d, transparent:true, opacity:.72, side:THREE.DoubleSide, depthWrite:false});
 const G={
   wallX:new THREE.BoxGeometry(WT,LVL-0.02,CELL-0.02), wallZ:new THREE.BoxGeometry(CELL-0.02,LVL-0.02,WT),
@@ -755,10 +756,24 @@ function enterEdit(){
   fireHeld=false; heldPiece=null;
   refreshTiles(); sfx('edit'); syncMode();
 }
-function refreshTiles(){ edit.tiles.forEach(m=>{ m.material=edit.sel.has(m.userData.idx)?tileSelMat:tileMat; }); }
+function refreshTiles(){ edit.tiles.forEach(m=>{ m.material=edit.sel.has(m.userData.idx)?(edit.bad?tileBadMat:tileSelMat):tileMat; }); }
+// Is the current tile pattern a real edit? (walls/floors need one tile left, cones one corner down, ramps two tiles on one side)
+function editValid(){
+  const p=edit.piece;
+  if(p.type==='wall'||p.type==='floor') return edit.sel.size<(p.type==='wall'?9:4);
+  if(p.type==='cone') return edit.sel.size<4;
+  return [...edit.sel].sort().join(',') in {'1,3':1,'2,3':1,'0,2':1,'0,1':1};
+}
+// Edit on release: a valid pattern applies right away; a wrong one stays up in red until it's fixed.
+function releaseEdit(){
+  if(!edit) return;
+  edit.painting=null;
+  if(editValid()){ exitEdit(true); return; }
+  edit.bad=true; refreshTiles(); sfx('whiff');
+}
 function paintTile(idx){
   if(idx<0||!edit) return;
-  if(edit.painting===null) edit.painting=!edit.sel.has(idx);
+  if(edit.painting===null){ edit.painting=!edit.sel.has(idx); if(edit.bad){ edit.bad=false; refreshTiles(); } }
   const had=edit.sel.has(idx);
   if(edit.painting&&!had){ edit.sel.add(idx); sfx('tick'); }
   if(!edit.painting&&had){ edit.sel.delete(idx); sfx('tick'); }
@@ -805,7 +820,7 @@ function fireDown(src){
 }
 function fireUp(src){
   fireHeld=false;
-  if(edit&&src==='desk'&&edit.mouse){ edit.mouse=false; edit.painting=null; if(settings.editRelease) exitEdit(true); }
+  if(edit&&src==='desk'&&edit.mouse){ edit.mouse=false; edit.painting=null; if(settings.editRelease) releaseEdit(); }
 }
 function swing(){
   swingT=0.22; net.lastSwing=(net.lastSwing%1e6)+1;
@@ -1158,6 +1173,7 @@ canvas.addEventListener('pointermove',e=>{
   } else if(t.role==='edit'&&edit){ paintTile(tileAtNDC(e.clientX/innerWidth*2-1,-(e.clientY/innerHeight)*2+1)); }
 });
 function endTouch(e){ const t=tps.get(e.pointerId); if(!t) return; tps.delete(e.pointerId);
+  if(t.role==='edit'&&edit&&settings.editRelease&&![...tps.values()].some(o=>o.role==='edit')){ releaseEdit(); return; }
   if(t.role==='stick'){ stick.x=stick.y=0; stickEl.style.display='none'; }
   if(t.role==='edit'&&edit) edit.painting=null; }
 canvas.addEventListener('pointerup',endTouch); canvas.addEventListener('pointercancel',endTouch);
