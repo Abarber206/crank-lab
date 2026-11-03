@@ -723,18 +723,23 @@ function removePiece(p){
   const i=order.indexOf(p); if(i>=0) order.splice(i,1);
 }
 /* Structural support: a piece needs the ground or a touching piece. Breaking one drops anything left floating. */
+/* Contact shapes used for support. Stairs only connect through their two ends: the bottom edge (must rest on
+   ground, a floor, a wall top or another stair's top) and the top edge. So stairs can't hang off the side of other
+   stairs or stack in mid-air. Cones connect through their base. */
 function pbox(p){
   if(p.bb) return p.bb;
-  const y=p.l*LVL;
-  if(p.type==='wall') return p.axis==='x'?[p.i*CELL,y,p.j*CELL,p.i*CELL,y+LVL,p.j*CELL+CELL]:[p.i*CELL,y,p.j*CELL,p.i*CELL+CELL,y+LVL,p.j*CELL];
-  if(p.type==='floor') return [p.i*CELL,y,p.j*CELL,p.i*CELL+CELL,y,p.j*CELL+CELL];
-  return [p.i*CELL,y,p.j*CELL,p.i*CELL+CELL,y+(p.type==='ramp'||(p.type==='cone'&&p.mask)?LVL:CONE_H),p.j*CELL+CELL];
+  const y=p.l*LVL, x0=p.i*CELL, z0=p.j*CELL, x1=x0+CELL, z1=z0+CELL;
+  if(p.type==='wall') return [p.axis==='x'?[x0,y,z0,x0,y+LVL,z1]:[x0,y,z0,x1,y+LVL,z0]];
+  if(p.type==='floor'||p.type==='cone') return [[x0,y,z0,x1,y,z1]];
+  const lo=[[x0,y,z0,x0,y,z1],[x0,y,z0,x1,y,z0],[x1,y,z0,x1,y,z1],[x0,y,z1,x1,y,z1]][p.dir];
+  const hi=[[x1,y+LVL,z0,x1,y+LVL,z1],[x0,y+LVL,z1,x1,y+LVL,z1],[x0,y+LVL,z0,x0,y+LVL,z1],[x0,y+LVL,z0,x1,y+LVL,z0]][p.dir];
+  return [lo,hi];
 }
-function touches(a,b){ const e=0.02; return a[0]<=b[3]+e&&b[0]<=a[3]+e&&a[1]<=b[4]+e&&b[1]<=a[4]+e&&a[2]<=b[5]+e&&b[2]<=a[5]+e; }
+function touches(A,B){ const e=0.02; for(const a of A) for(const b of B) if(a[0]<=b[3]+e&&b[0]<=a[3]+e&&a[1]<=b[4]+e&&b[1]<=a[4]+e&&a[2]<=b[5]+e&&b[2]<=a[5]+e) return true; return false; }
 function grounded(p){ return p.l===0; }
 function neighbors(p){
-  const a=pbox(p), cx=(a[0]+a[3])/2, cz=(a[2]+a[5])/2, out=[];
-  near(cx,cz,1).forEach(q=>{ if(q!==p&&q.key!==p.key&&touches(a,pbox(q))) out.push(q); });
+  const A=pbox(p), out=[], cx=p.i*CELL+CELL/2, cz=p.j*CELL+CELL/2;
+  near(cx,cz,1).forEach(q=>{ if(q!==p&&q.key!==p.key&&touches(A,pbox(q))) out.push(q); });
   return out;
 }
 function supported(t){ return grounded(t)||neighbors(t).length>0; }
@@ -929,6 +934,7 @@ function computeTarget(type,E=P){
     if(type==='wall'){ const up=retarget(t,t.l+1); return pieces.has(up.key)?t:up; }
     return t;
   }
+  if(type!=='wall') return t;
   const up=retarget(t,t.l+1); return pieces.has(up.key)?t:up;
 }
 /* Every placement (yours, the bot's, preview) goes through this. Rules marked "approx" are best guesses at the
