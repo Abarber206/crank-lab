@@ -925,7 +925,9 @@ function computeTarget(type,E=P){
   const fx=-Math.sin(E.yaw), fz=-Math.cos(E.yaw), dirIdx=Math.abs(fx)>=Math.abs(fz)?(fx>0?0:2):(fz>0?1:3);
   if(r&&r.dir===dirIdx){
     // climbing: never stack a wall in your own path; put it at the next rush step instead
-    if(type==='wall'){ const d=DIRS[dirIdx], n=retarget({...t,i:t.i+(t.axis==='x'?d[0]:0),j:t.j+(t.axis==='z'?d[1]:0)},t.l+1); return pieces.has(n.key)?t:n; }
+    // climbing: prefer the next rush step (doesn't block you); if nothing holds it up yet, a wall on top of the taken one
+    if(type==='wall'){ const d=DIRS[dirIdx], n=retarget({...t,i:t.i+(t.axis==='x'?d[0]:0),j:t.j+(t.axis==='z'?d[1]:0)},t.l+1);
+      if(!pieces.has(n.key)&&supported(n)) return n; const up=retarget(t,t.l+1); return pieces.has(up.key)?t:up; }
     return t;
   }
   const up=retarget(t,t.l+1); return pieces.has(up.key)?t:up;
