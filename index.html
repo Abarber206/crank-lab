@@ -631,7 +631,7 @@ function makeBoxes(p){
   }
   return out;
 }
-const buildGlowMat=new THREE.MeshBasicMaterial({color:0xbfe8ff,transparent:true,opacity:.85,blending:THREE.AdditiveBlending,depthWrite:false});
+const buildGlowMat=new THREE.MeshBasicMaterial({color:0xbfe8ff,transparent:true,opacity:.55,blending:THREE.AdditiveBlending,depthWrite:false});
 const sparkMat=new THREE.MeshBasicMaterial({color:0x9fdcff});
 function finishAnim(p){
   if(!p.anim) return;
@@ -663,7 +663,7 @@ function stepAnims(now){
     a.plane.constant=at;
     a.mats.forEach(m=>m.emissive.setRGB(.2*(1-k),.5*(1-k),.75*(1-k)));
     if(a.vertical) a.front.position.y=at-a.ghost.position.y; else a.front.position.x=at-a.ghost.position.x;
-    a.front.visible=k<0.97;
+    a.front.visible=k<0.97&&(p.type==='wall'||p.type==='floor'); // stairs/cones: a flat sweep plate would show as a big white sheet
     // pop: slightly small, overshoot, settle
     const pop=k<0.7?0.94+0.1*(k/0.7):1.04-0.04*((k-0.7)/0.3); p.group.scale.setScalar(pop);
     if(now-a.sparkT>55&&k<0.95&&pieceCenter(p).distanceTo(P.pos)<35){ a.sparkT=now;
