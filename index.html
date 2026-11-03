@@ -21,6 +21,7 @@
   --font-ui:'Chakra Petch','Segoe UI',system-ui,sans-serif;
   color-scheme:light;
 }
+[hidden]{display:none!important}
 html,body{margin:0;height:100%;overflow:hidden;background:var(--sky);color:var(--ink);font-family:var(--font-ui);touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 canvas#c{position:fixed;top:0;left:0;width:100vw;height:100vh;height:100dvh;display:block;touch-action:none}
 .hud{position:fixed;pointer-events:none;z-index:5}
@@ -977,6 +978,8 @@ function startPlay(){
   if(isTouch){ menu.hidden=true; playing=true; return; }
   try{ const r=canvas.requestPointerLock(); if(r&&r.catch) r.catch(()=>{ lockFailed=true; menu.hidden=true; playing=true; toast('Mouse lock is blocked here. Move the mouse to look'); }); }
   catch(e){ lockFailed=true; menu.hidden=true; playing=true; }
+  // If the browser never answers the lock request, start anyway.
+  setTimeout(()=>{ if(!playing){ lockFailed=!locked; menu.hidden=true; playing=true; } },700);
 }
 $('play').addEventListener('click',startPlay);
 $('respawn').addEventListener('click',()=>{ respawn(); toast('Respawned'); });
