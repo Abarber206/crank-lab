@@ -67,6 +67,7 @@ body.m-edit #cross i{background:var(--edit)}
 .dn{position:absolute;left:0;top:0;font:800 italic 26px/1 var(--font-hud);color:#fff;-webkit-text-stroke:1.5px rgba(10,18,30,.85);paint-order:stroke fill;will-change:transform}
 .dn.shield{color:#7fd0ff}
 .dn.head{color:#ffd23f;font-size:32px}
+.dn.build{color:#efe6d2;font-size:19px}
 #botTag{left:0;top:0;display:grid;justify-items:center;gap:2px;will-change:transform}
 #botTag .nm{font:800 italic 14px/1 var(--font-hud);color:#fff;text-shadow:0 1px 2px #000;letter-spacing:.04em}
 #botTag .bars{display:grid;gap:2px;width:74px}
@@ -93,8 +94,16 @@ body.m-edit #cross i{background:var(--edit)}
 .slot.on{border-color:#fff;border-width:3px;transform:translateY(-6px);box-shadow:0 0 0 2px rgba(10,18,30,.6),0 6px 12px rgba(0,0,0,.4)}
 .slot .k{position:absolute;top:2px;left:4px;font:800 12px/1 var(--font-hud);text-shadow:0 1px 2px #000}
 .slot .am{position:absolute;bottom:2px;right:4px;font:800 italic 15px/1 var(--font-hud);text-shadow:0 1px 2px #000;font-variant-numeric:tabular-nums}
-.mats{align-self:center;display:flex;align-items:center;gap:4px;margin-left:6px;background:var(--slot-dark);border-radius:4px;padding:4px 8px;font:800 italic 17px/1 var(--font-hud)}
-.mats svg{width:18px;height:18px}
+.mats{pointer-events:auto;position:relative;align-self:center;display:flex;align-items:center;gap:6px;margin-left:6px;background:var(--slot-dark);border:2px solid rgba(255,255,255,.28);border-radius:5px;padding:7px 10px 7px 8px;font:800 italic 16px/1 var(--font-hud);color:#fff;text-transform:uppercase;-webkit-tap-highlight-color:transparent;touch-action:none}
+.mats .sw{width:18px;height:18px;border-radius:3px;box-shadow:inset 0 0 0 2px rgba(0,0,0,.35)}
+.mats small{font-size:13px;opacity:.8}
+.mats .k{position:absolute;top:-8px;left:-4px;font:800 11px/1 var(--font-hud);background:var(--slot-dark);padding:2px 4px;border-radius:3px}
+body.touch .mats .k{display:none}
+#buildReason{left:50%;top:calc(50% + 26px);transform:translateX(-50%);font:800 italic 15px/1 var(--font-hud);text-transform:uppercase;letter-spacing:.04em;color:#ff8a78;text-shadow:0 1px 3px #000;white-space:nowrap}
+#pieceHp{left:50%;top:calc(50% + 28px);transform:translateX(-50%);display:grid;justify-items:center;gap:3px;font:800 italic 14px/1 var(--font-hud);text-shadow:0 1px 3px #000}
+#pieceHp .pb{width:96px;height:6px;background:rgba(10,18,30,.6);border:1px solid rgba(255,255,255,.4)}
+#pieceHp .pb i{display:block;height:100%;background:#fff}
+#pieceHp.growing .pb i{background:var(--ghost)}
 body.touch .slot .k{display:none}
 #banner{left:50%;top:30%;transform:translate(-50%,-50%);text-align:center;opacity:0;transition:opacity .25s;width:90%}
 #banner.show{opacity:1}
@@ -198,6 +207,8 @@ kbd{font-family:var(--font-ui);background:#1c2a40;border-radius:3px;padding:1px 
 <div class="hud" id="dmgLayer"></div>
 <div class="hud" id="botTag" hidden><span class="nm">BOT</span><span class="bars"><i class="sh" id="bSh"></i><i class="hp" id="bHp"></i></span></div>
 <div class="hud" id="toast"></div>
+<div class="hud" id="buildReason" hidden></div>
+<div class="hud" id="pieceHp" hidden><span id="pieceHpT"></span><span class="pb"><i id="pieceHpB"></i></span></div>
 <div class="hud" id="banner"><div class="big" id="banTitle"></div><div class="small" id="banSub"></div></div>
 <div id="hurtfx"></div>
 <div class="hud" id="bottom">
@@ -217,7 +228,7 @@ kbd{font-family:var(--font-ui);background:#1c2a40;border-radius:3px;padding:1px 
     <button class="slot b" data-s="floor" aria-label="Floor"><span class="k">F</span><svg viewBox="0 0 48 48"><path d="M14 16h28l-8 16H6z" fill="none" stroke="#fff" stroke-width="4" stroke-linejoin="round"/></svg></button>
     <button class="slot b" data-s="ramp" aria-label="Ramp"><span class="k">E</span><svg viewBox="0 0 48 48"><path d="M6 40h8v-7h7v-7h7v-7h7v-7h7" fill="none" stroke="#fff" stroke-width="4" stroke-linejoin="round"/></svg></button>
     <button class="slot b" data-s="cone" aria-label="Cone"><span class="k">C</span><svg viewBox="0 0 48 48"><path d="M24 9L42 34H6z" fill="none" stroke="#fff" stroke-width="4" stroke-linejoin="round"/><path d="M24 9v25" stroke="#fff" stroke-width="2.5"/></svg></button>
-    <span class="mats"><svg viewBox="0 0 20 20"><rect x="2" y="5" width="16" height="10" rx="2" fill="#c99a5b"/><path d="M2 10h16" stroke="#7a5328" stroke-width="1.5"/></svg>∞</span>
+    <button class="mats" id="matBtn" type="button" aria-label="Switch material"><span class="k" id="matKey">X</span><i class="sw" id="matSw"></i><b id="matName">Wood</b><small>∞</small></button>
   </div>
 </div>
 
@@ -268,6 +279,7 @@ kbd{font-family:var(--font-ui);background:#1c2a40;border-radius:3px;padding:1px 
           <dt>Hammer</dt><dd>Switch between weapons and build mode</dd>
           <dt>Fire</dt><dd>Shoot, place the current piece, or swing the pickaxe</dd>
         </dl>
+        <p class="sub" style="margin-top:10px;font-size:12px"><b>Controller:</b> A jump, R3 crouch, RT fire, RB/LB switch weapon, X reload, B build mode, Y edit. In build mode RT wall, RB floor, LT stairs, LB cone (hold to turbo), X rotate. In edit, RT selects tiles, Y confirms, B resets. D-pad right switches material.</p>
         <p class="sub" style="margin-top:10px;font-size:12px">Ramp edits: select the two tiles on the side you want the ramp to rise toward. Cone edits: each selected tile raises that corner to the full height of the wall, so two side tiles make a ramp that reaches the top, one tile makes a corner roof, and two diagonal tiles make a ridge.</p>
       </div>
       <div>
@@ -305,9 +317,9 @@ const SPAWN=[2.5,0,2.5];
 
 /* ---------- settings ---------- */
 const DEFAULT_BINDS={forward:'KeyW',back:'KeyS',left:'KeyA',right:'KeyD',jump:'Space',crouch:'ShiftLeft',fire:'Mouse0',
-  wall:'KeyQ',floor:'KeyF',ramp:'KeyE',cone:'KeyC',edit:'KeyG',reset:'Mouse2',rotate:'KeyR',pick:'Digit1',gun:'Digit2',pump:'Digit3',reload:'KeyT'};
+  wall:'KeyQ',floor:'KeyF',ramp:'KeyE',cone:'KeyC',edit:'KeyG',reset:'Mouse2',rotate:'KeyR',pick:'Digit1',gun:'Digit2',pump:'Digit3',reload:'KeyT',material:'KeyX'};
 const BIND_LABELS={forward:'Move forward',back:'Move back',left:'Move left',right:'Move right',jump:'Jump',crouch:'Crouch (hold)',
-  fire:'Place / select tiles',wall:'Wall',floor:'Floor',ramp:'Ramp',cone:'Cone',edit:'Edit / confirm',reset:'Reset edit',rotate:'Rotate ramp',pick:'Pickaxe',gun:'Assault rifle',pump:'Pump shotgun',reload:'Reload'};
+  fire:'Place / select tiles',wall:'Wall',floor:'Floor',ramp:'Ramp',cone:'Cone',edit:'Edit / confirm',reset:'Reset edit',rotate:'Rotate ramp',pick:'Pickaxe',gun:'Assault rifle',pump:'Pump shotgun',reload:'Reload',material:'Switch material'};
 const settings={bot:'adaptive', sens:1, fov:78, turbo:0.05, editRelease:true, instantBuild:false, shadows:!isTouch, binds:{}};
 try{ Object.assign(settings, JSON.parse(localStorage.getItem('cranklab.settings')||'{}')); }catch(e){}
 settings.binds=Object.assign({},DEFAULT_BINDS,settings.binds||{});
@@ -377,6 +389,35 @@ const floorTex=woodCanvas((g,S)=>{
 // Stair tread and stringer
 const treadTex=woodCanvas((g,S)=>{ for(let i=0;i<3;i++){ g.fillStyle=PLANK[i*2]; g.fillRect(0,i*S/3,S,S/3); grain(g,0,i*S/3,S,S/3,false); g.fillStyle='rgba(60,30,10,.7)'; g.fillRect(0,i*S/3,S,4);} g.fillStyle='rgba(255,225,170,.25)'; g.fillRect(0,0,S,10); nail(g,30,S/2); nail(g,S-30,S/2); });
 const beamTex=woodCanvas((g,S)=>{ beam(g,0,0,S,S); });
+// Brick: stone blocks in mortar inside a dark frame. Metal: ribbed steel panels with rivets.
+function stoneBlocks(g,S,rows,cols,tones){
+  g.fillStyle='#5d5a57'; g.fillRect(0,0,S,S);
+  const h=S/rows;
+  for(let r=0;r<rows;r++){ const off=r%2?S/cols/2:0;
+    for(let c=-1;c<=cols;c++){ const x=c*S/cols+off, w=S/cols; g.fillStyle=tones[(r*7+c*3+99)%tones.length];
+      g.fillRect(x+4,r*h+4,w-8,h-8);
+      g.fillStyle='rgba(255,255,255,.12)'; g.fillRect(x+4,r*h+4,w-8,4); g.fillStyle='rgba(0,0,0,.18)'; g.fillRect(x+4,r*h+h-8,w-8,4);
+      for(let k=0;k<6;k++){ g.fillStyle=`rgba(${Math.random()<.5?'0,0,0':'255,255,255'},${.05+Math.random()*.06})`; g.fillRect(x+8+Math.random()*(w-20),r*h+8+Math.random()*(h-20),3+Math.random()*6,2+Math.random()*4); } } }
+}
+const STONE=['#a9a49c','#9c978f','#b3aea5','#948f87','#a29d94'];
+const brickWallTex=woodCanvas((g,S)=>{ stoneBlocks(g,S,6,3,STONE); g.strokeStyle='#3e3b38'; g.lineWidth=28; g.strokeRect(14,14,S-28,S-28); g.strokeStyle='rgba(0,0,0,.6)'; g.lineWidth=4; g.strokeRect(2,2,S-4,S-4); });
+const brickFloorTex=woodCanvas((g,S)=>{ stoneBlocks(g,S,4,4,STONE); g.strokeStyle='#3e3b38'; g.lineWidth=22; g.strokeRect(11,11,S-22,S-22); });
+const brickBeamTex=woodCanvas((g,S)=>{ g.fillStyle='#7a766f'; g.fillRect(0,0,S,S); for(let k=0;k<400;k++){ g.fillStyle=`rgba(0,0,0,${Math.random()*.12})`; g.fillRect(Math.random()*S,Math.random()*S,4,4); } });
+function rivet(g,x,y){ g.fillStyle='#5b636e'; g.beginPath(); g.arc(x,y,6,0,7); g.fill(); g.fillStyle='rgba(255,255,255,.55)'; g.beginPath(); g.arc(x-2,y-2,2.2,0,7); g.fill(); }
+const metalWallTex=woodCanvas((g,S)=>{
+  const n=10, w=S/n; for(let i=0;i<n;i++){ const gr=g.createLinearGradient(i*w,0,i*w+w,0); gr.addColorStop(0,'#7d8894'); gr.addColorStop(.5,'#b5c0cb'); gr.addColorStop(1,'#6a747f'); g.fillStyle=gr; g.fillRect(i*w,0,w,S); }
+  g.fillStyle='rgba(120,70,30,.18)'; for(let k=0;k<9;k++){ g.beginPath(); g.arc(Math.random()*S,Math.random()*S,6+Math.random()*16,0,7); g.fill(); }
+  g.fillStyle='#4a525c'; [[0,0,S,30],[0,S-30,S,30],[0,0,30,S],[S-30,0,30,S],[0,S/2-12,S,24]].forEach(r=>g.fillRect(...r));
+  for(let x=15;x<S;x+=S/8){ rivet(g,x,15); rivet(g,x,S-15); rivet(g,x,S/2); }
+});
+const metalFloorTex=woodCanvas((g,S)=>{
+  g.fillStyle='#8e98a3'; g.fillRect(0,0,S,S);
+  for(let y=0;y<S;y+=32) for(let x=(y/32%2)*16;x<S;x+=32){ g.save(); g.translate(x+8,y+8); g.rotate(.7); g.fillStyle='#b9c3cd'; g.fillRect(-9,-2.5,18,5); g.fillStyle='rgba(0,0,0,.25)'; g.fillRect(-9,2.5,18,1.5); g.restore(); }
+  g.strokeStyle='#4a525c'; g.lineWidth=24; g.strokeRect(12,12,S-24,S-24);
+  [[24,24],[S-24,24],[24,S-24],[S-24,S-24]].forEach(([x,y])=>rivet(g,x,y));
+});
+const metalBeamTex=woodCanvas((g,S)=>{ g.fillStyle='#59626d'; g.fillRect(0,0,S,S); g.fillStyle='rgba(255,255,255,.15)'; g.fillRect(0,0,S,18); for(let x=30;x<S;x+=90) rivet(g,x,S/2); });
+
 function groundTexture(size){
   const c=document.createElement('canvas'); c.width=c.height=256; const g=c.getContext('2d');
   g.fillStyle='#6c9c46'; g.fillRect(0,0,256,256);
@@ -409,6 +450,15 @@ ground.rotation.x=-Math.PI/2; ground.position.y=-0.03; ground.receiveShadow=true
 /* ---------- build materials & geometry ---------- */
 const wallMat=new THREE.MeshLambertMaterial({map:wallTex}), floorMat=new THREE.MeshLambertMaterial({map:floorTex});
 const treadMat=new THREE.MeshLambertMaterial({map:treadTex}), beamMat=new THREE.MeshLambertMaterial({map:beamTex});
+/* Material stats. Max health values are the commonly cited classic ones; start health and build-up times are
+   estimates (Epic doesn't publish exact figures), so they live here to tune. */
+const MATERIALS={
+  wood: {name:'Wood', maxHp:{wall:150,other:140}, start:0.3, buildTime:4,  fill:260, chip:0xc9995a},
+  brick:{name:'Brick',maxHp:{wall:300,other:280}, start:0.2, buildTime:9,  fill:450, chip:0x9c978f},
+  metal:{name:'Metal',maxHp:{wall:500,other:460}, start:0.15,buildTime:16, fill:620, chip:0x9aa5b0}
+};
+const MAT_ORDER=['wood','brick','metal'];
+const matFor={};
 const chunkMat=new THREE.MeshLambertMaterial({color:0xc9995a});
 const ghostMat=new THREE.MeshBasicMaterial({color:0x62bdff, transparent:true, opacity:.34, depthWrite:false});
 const ghostBad=new THREE.MeshBasicMaterial({color:0xff5a4a, transparent:true, opacity:.22, depthWrite:false});
@@ -427,6 +477,15 @@ const G={
 
 /* Cones: 4 corners (bit = raised to peak height), center always at peak. Bits: 0=(-x,-z) 1=(+x,-z) 2=(-x,+z) 3=(+x,+z) */
 const coneMat=new THREE.MeshLambertMaterial({map:floorTex, side:THREE.DoubleSide, polygonOffset:true, polygonOffsetFactor:1, polygonOffsetUnits:1});
+(function(){
+  const off={polygonOffset:true,polygonOffsetFactor:1,polygonOffsetUnits:1};
+  const mk=(wall,floor,tread,beam)=>({wall:new THREE.MeshLambertMaterial({map:wall}),floor:Object.assign(new THREE.MeshLambertMaterial({map:floor}),off),
+    tread:new THREE.MeshLambertMaterial({map:tread}),beam:new THREE.MeshLambertMaterial({map:beam}),cone:Object.assign(new THREE.MeshLambertMaterial({map:floor,side:THREE.DoubleSide}),off)});
+  matFor.wood={wall:wallMat,floor:floorMat,tread:treadMat,beam:beamMat,cone:coneMat};
+  matFor.brick=mk(brickWallTex,brickFloorTex,brickFloorTex,brickBeamTex);
+  matFor.metal=mk(metalWallTex,metalFloorTex,metalFloorTex,metalBeamTex);
+  MAT_ORDER.forEach(m=>matFor[m].chip=new THREE.MeshLambertMaterial({color:MATERIALS[m].chip}));
+})();
 floorMat.polygonOffset=true; floorMat.polygonOffsetFactor=1; floorMat.polygonOffsetUnits=1;
 const coneGeos={};
 function coneCorners(mask){ const h=b=>(mask>>b&1)?LVL:0; const n=(mask&1)+(mask>>1&1)+(mask>>2&1)+(mask>>3&1);
@@ -481,7 +540,7 @@ function pieceCenter(p){
 }
 function makeGroup(p,mat,real){
   const g=new THREE.Group(); g.position.copy(pieceCenter(p));
-  const base=mat||(p.type==='wall'?wallMat:floorMat);
+  const M=matFor[p.mat||'wood'], base=mat||(p.type==='wall'?M.wall:M.floor);
   const add=(geo,x,y,z,rx,rz,mm)=>{ const m=new THREE.Mesh(geo,mat||mm||base); m.position.set(x,y,z); if(rx)m.rotation.x=rx; if(rz)m.rotation.z=rz;
     if(real){ m.castShadow=true; m.receiveShadow=true; m.userData.piece=p; } g.add(m); };
   if(p.type==='wall'){
@@ -495,8 +554,8 @@ function makeGroup(p,mat,real){
     if(p.mask===15) add(G.floor,0,0,0);
     else for(let r=0;r<2;r++)for(let c=0;c<2;c++) if(p.mask>>(r*2+c)&1) add(G.ftile,-CELL/2+(c+.5)*CELL/2,0,-CELL/2+(r+.5)*CELL/2);
   } else if(p.type==='ramp'){
-    add(stairGeo[p.dir].t,0,0,0,0,0,treadMat); add(stairGeo[p.dir].s,0,0,0,0,0,beamMat);
-  } else { const m=new THREE.Mesh(coneGeo(p.mask||0),mat||coneMat); if(real){m.castShadow=m.receiveShadow=true;m.userData.piece=p;} g.add(m); }
+    add(stairGeo[p.dir].t,0,0,0,0,0,M.tread); add(stairGeo[p.dir].s,0,0,0,0,0,M.beam);
+  } else { const m=new THREE.Mesh(coneGeo(p.mask||0),mat||M.cone); if(real){m.castShadow=m.receiveShadow=true;m.userData.piece=p;} g.add(m); }
   return g;
 }
 function makeBoxes(p){
@@ -570,16 +629,22 @@ function buildPiece(p){
   p.boxes=makeBoxes(p); p.slab=(p.type==='ramp'||p.type==='cone'); p.bb=null; p.bb=pbox(p);
 }
 function addPiece(t){
-  const p=Object.assign({},t,{mask:t.type==='wall'?511:t.type==='floor'?15:0, born:performance.now(), hp:t.type==='wall'?150:140});
-  pieces.set(p.key,p); order.push(p);
+  const mat=MATERIALS[t.mat]?t.mat:'wood', M=MATERIALS[mat], maxHp=M.maxHp[t.type==='wall'?'wall':'other'];
+  const p=Object.assign({},t,{mat,owner:t.owner||'me',mask:t.type==='wall'?511:t.type==='floor'?15:0, born:performance.now(), maxHp, hp:maxHp*M.start});
+  pieces.set(p.key,p); order.push(p); growing.add(p);
   for(const [a,b] of cellsOf(p)){ const k=a+','+b; let s=cellIndex.get(k); if(!s){s=new Set(); cellIndex.set(k,s);} s.add(p); }
-  buildPiece(p); startAnim(p,260);
+  buildPiece(p); startAnim(p,M.fill);
   if(order.length>MAX_BUILDS) removePiece(order[0]);
   popPlayerOut(p);
   return p;
 }
+// Builds gain health while they finish constructing (Fortnite-style build-up)
+const growing=new Set();
+function stepBuildHp(dt){ growing.forEach(p=>{ if(!pieces.has(p.key)){ growing.delete(p); return; } const M=MATERIALS[p.mat];
+  p.hp=Math.min(p.maxHp,p.hp+p.maxHp*(1-M.start)/M.buildTime*dt); if(p.hp>=p.maxHp) growing.delete(p); }); }
 function removePiece(p){
   if(edit && edit.piece===p) exitEdit(false);
+  growing.delete(p);
   if(p.anim){ finishAnim(p); anims.delete(p); }
   pieces.delete(p.key);
   for(const [a,b] of cellsOf(p)){ const s=cellIndex.get(a+','+b); if(s) s.delete(p); }
@@ -708,14 +773,16 @@ function physStep(dt,E=P){
 }
 
 /* ---------- input state ---------- */
+const pad={lx:0,ly:0,prev:[],connected:false};
 let stick={x:0,y:0}, touchJump=false, playing=false, locked=false, lockFailed=false;
 let mode='pick', piece='wall', fireHeld=false, turboT=0, pickT=0, swingT=0, heldPiece=null;
-let edit=null;
+let edit=null, buildMat='wood';
+function cycleMaterial(){ buildMat=MAT_ORDER[(MAT_ORDER.indexOf(buildMat)+1)%3]; ghostKey=''; syncMode(); toast(MATERIALS[buildMat].name); }
 
 function wishInput(){
   let fw=0, st=0;
   if(isHeld('forward'))fw+=1; if(isHeld('back'))fw-=1; if(isHeld('right'))st+=1; if(isHeld('left'))st-=1;
-  fw+=-stick.y; st+=stick.x;
+  fw+=-stick.y-pad.ly; st+=stick.x+pad.lx;
   return [fw,st];
 }
 function moveInput(dt){
@@ -770,9 +837,33 @@ function computeTarget(type,E=P){
   if(type==='floor') return {type,i,j,l,key:`f${i}_${j}_${l}`};
   return {type,i,j,l,dir:type==='ramp'?(dirIdx+(E.rot||0))%4:0,key:`m${i}_${j}_${l}`};
 }
+/* Every placement (yours, the bot's, preview) goes through this. Rules marked "approx" are best guesses at the
+   real game's behaviour. */
+const BUILD_RULES={reach:10, maxLevel:40, mapHalf:280};
+function bodyBlocks(t,E){
+  // approx: another player's body blocks a piece that would pass through them; pieces that only lift them (low ramp/cone/floor under feet) are allowed
+  const f=E.pos.y, h=eh(E)-0.1, x=E.pos.x, z=E.pos.z, rr=R*0.8;
+  if(t.type==='ramp'||t.type==='cone'){ const tmp={...t,mask:0}; const top=slabTop(tmp,x,z); return top!==null&&top>f+0.7&&top-ST<f+h; }
+  const tmp={...t,mask:t.type==='wall'?511:15};
+  for(const b of makeBoxes(tmp)) if(x+rr>b[0]&&x-rr<b[3]&&z+rr>b[2]&&z-rr<b[5]&&b[4]>f+0.7&&b[1]<f+h) return true;
+  return false;
+}
+function validatePlacement(t,E=P){
+  if(!t) return {ok:false,reason:'No spot to build'};
+  if(pieces.has(t.key)) return {ok:false,reason:'Already built',occupied:true};
+  const c=pieceCenter(t);
+  if(Math.abs(c.x)>BUILD_RULES.mapHalf||Math.abs(c.z)>BUILD_RULES.mapHalf) return {ok:false,reason:'Edge of the map'};
+  if(t.l>BUILD_RULES.maxLevel) return {ok:false,reason:'Build height limit'};
+  if(c.distanceTo(_c.set(E.pos.x,E.pos.y+1.2,E.pos.z))>BUILD_RULES.reach) return {ok:false,reason:'Out of reach'};
+  if(!supported(t)) return {ok:false,reason:'Nothing to attach to'};
+  const others=[]; if(E!==P) others.push(P); if(B&&B.active&&B.alive&&E!==B) others.push(B); net.players.forEach(pl=>others.push({pos:pl.pos,crouch:!!(pl.flags&2)}));
+  for(const o of others) if(bodyBlocks(t,o)) return {ok:false,reason:'Player in the way'};
+  return {ok:true};
+}
 function tryPlace(type,E=P){
   const t=computeTarget(type,E);
-  if(!t||pieces.has(t.key)||!supported(t)) return false;
+  if(!validatePlacement(t,E).ok) return false;
+  t.mat=E===P?buildMat:(B&&E===B?(B.skill>0.65?'brick':'wood'):'wood'); t.owner=E===P?net.id:'bot';
   const np=addPiece(t); burst(pieceCenter(np),4,3,0.07);
   if(E===P){ sfx('place'); stat('b'); animEvent(localHero,'build'); netOp({op:'place',t:pick(t)}); } else { sfxAt('place',E.pos); if(B&&E===B) animEvent(B.h,'build'); }
   return true;
@@ -782,12 +873,13 @@ function tryPlace(type,E=P){
 let ghost=null, ghostKey='';
 function updateGhost(){
   const show=playing&&mode==='build'&&!edit;
-  if(!show){ if(ghost){scene.remove(ghost);ghost=null;ghostKey='';} return; }
-  const t=computeTarget(heldPiece||piece);
-  const occ=pieces.has(t.key), bad=!occ&&!supported(t), k=t.key+(t.dir||0)+occ+bad;
+  if(!show){ $('buildReason').hidden=true; if(ghost){scene.remove(ghost);ghost=null;ghostKey='';} return; }
+  const t=computeTarget(heldPiece||piece), v=validatePlacement(t);
+  const occ=!!v.occupied, bad=!v.ok&&!occ, k=t.key+(t.dir||0)+occ+bad+buildMat+(v.reason||'');
+  const br=$('buildReason'); br.hidden=!bad; if(bad) br.textContent=v.reason;
   if(k===ghostKey) return;
   if(ghost) scene.remove(ghost);
-  ghost=makeGroup(Object.assign({mask:t.type==='wall'?511:t.type==='floor'?15:0},t), occ?ghostDim:bad?ghostBad:ghostMat, false);
+  ghost=makeGroup(Object.assign({mask:t.type==='wall'?511:t.type==='floor'?15:0,mat:buildMat},t), occ?ghostDim:bad?ghostBad:ghostMat, false);
   ghost.renderOrder=2; scene.add(ghost); ghostKey=k;
 }
 
@@ -804,6 +896,7 @@ function enterEdit(){
   const hit=aimHit(5.5);
   if(!hit){ toast('Aim at a build to edit it'); return; }
   const p=hit.object.userData.piece;
+  if(p.owner&&p.owner!==net.id){ toast(p.owner==='bot'?"That's the bot's build":"You can only edit your own builds"); return; }
   const tiles=[], sel=new Set();
   const mk=(geo,idx,pos,setRot)=>{ const m=new THREE.Mesh(geo,tileMat); m.position.copy(pos); setRot(m); m.userData.idx=idx; m.renderOrder=3; m.updateMatrixWorld(); scene.add(m); tiles.push(m); };
   if(p.type==='wall'){
@@ -840,8 +933,19 @@ function enterEdit(){
   fireHeld=false; heldPiece=null;
   refreshTiles(); sfx('edit'); syncMode();
 }
-function refreshTiles(){ edit.tiles.forEach(m=>{ m.material=edit.sel.has(m.userData.idx)?(edit.bad?tileBadMat:tileSelMat):tileMat; }); }
+function refreshTiles(){ edit.tiles.forEach(m=>{ m.material=edit.sel.has(m.userData.idx)?(edit.bad?tileBadMat:tileSelMat):tileMat; }); updateEditLabel(); }
 // Is the current tile pattern a real edit? (walls/floors need one tile left, cones one corner down, ramps two tiles on one side)
+const WALL_SHAPES={'':'No change','4':'Window','3,4,5':'Wide window','1,4':'Door','0,1,3,4':'Wide door','1,2,4,5':'Wide door','0,3':'Side door','2,5':'Side door',
+  '0,1,2,4':'Arch','6,7,8':'Half wall','3,4,5,6,7,8':'Low wall','0,1,2':'Raised wall','0,1,2,3,4,5':'Top strip','1,4,7':'Center slot','0,3,6':'Side gap','2,5,8':'Side gap','7':'Peephole','4,7':'Tall window'};
+function editShapeName(){
+  const p=edit.piece, key=[...edit.sel].sort((a,b)=>a-b).join(','), n=edit.sel.size;
+  if(!editValid()) return p.type==='ramp'?'Pick two tiles on one side':'Keep at least one tile';
+  if(p.type==='wall') return WALL_SHAPES[key]||'Custom wall';
+  if(p.type==='floor') return n===0?'No change':n===1?'Corner cut':n===3?'Single tile':(key==='0,3'||key==='1,2')?'Diagonal':'Half floor';
+  if(p.type==='cone') return n===0?'Pyramid':n===1?'Corner roof':n===3?'Pocket':(key==='0,3'||key==='1,2')?'Ridge':'Ramp roof';
+  return 'Stairs';
+}
+function updateEditLabel(){ if(!edit) return; const wn=$('wname'); wn.textContent='Edit · '+editShapeName(); wn.className='wname edit'; }
 function editValid(){
   const p=edit.piece;
   if(p.type==='wall'||p.type==='floor') return edit.sel.size<(p.type==='wall'?9:4);
@@ -1387,6 +1491,8 @@ function syncMode(){
   const rl=$('tReload'); rl.dataset.act=edit?'reset':'reload'; rl.classList.toggle('active',!!edit);
   rl.innerHTML=edit?'Reset':'<svg viewBox="0 0 24 24"><path d="M19 12a7 7 0 1 1-2-5" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><path d="M18 3v5h-5" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   $('tBuild').classList.toggle('on',inBuild);
+  $('matName').textContent=MATERIALS[buildMat].name; $('matSw').style.background='#'+MATERIALS[buildMat].chip.toString(16).padStart(6,'0');
+  if(edit) updateEditLabel();
 }
 function updateHUD(){
   if(P.pos.y>P.best) P.best=P.pos.y;
@@ -1464,6 +1570,7 @@ function pressAction(a){
   else if(a==='gun') selectGun('ar');
   else if(a==='pump') selectGun('pump');
   else if(a==='reload') startReload();
+  else if(a==='material') cycleMaterial();
   else if(a==='edit') toggleEdit();
   else if(a==='reset'){ if(edit) resetEdit(); }
   else if(a==='rotate'){ P.rot=(P.rot+1)%4; ghostKey=''; }
@@ -1553,6 +1660,7 @@ function endCapture(code){
 }
 $('resetBinds').addEventListener('click',()=>{ settings.binds=Object.assign({},DEFAULT_BINDS); saveSettings(); renderBinds(); toast('Binds reset'); });
 function syncHotbarKeys(){
+  $('matKey').textContent=codeName(settings.binds.material);
   document.querySelectorAll('.slot[data-s]').forEach(s=>{ const a=s.dataset.s; if(s.querySelector('.k')) s.querySelector('.k').textContent=codeName(settings.binds[a]).replace(' mouse','').replace(/ \((back|fwd)\)/,''); });
 }
 renderBinds();
@@ -1609,6 +1717,7 @@ document.querySelectorAll('.tb').forEach(b=>{
   b.addEventListener('pointerup',up); b.addEventListener('pointercancel',up);
 });
 
+$('matBtn').addEventListener('pointerdown',e=>{ e.preventDefault(); e.stopPropagation(); if(playing) cycleMaterial(); });
 // Slot bar: tap a weapon to equip it; tap a piece to select and place it (hold to turbo)
 document.querySelectorAll('.slot[data-s]').forEach(b=>{
   b.addEventListener('pointerdown',e=>{
@@ -1637,7 +1746,7 @@ fitView();
 const PREFIX='cranklab-v1-';
 const COLORS=[0x2a8f88,0xc8463c,0x6a4fc2,0xd88a1e,0x3f7fd0,0x4f9a3a,0xc54b8f,0x8a6a3e];
 const net={peer:null,role:null,host:null,conns:new Map(),code:null,id:'me',players:new Map(),sendT:0,name:'',lastSwing:0};
-const pick=t=>({type:t.type,axis:t.axis,i:t.i,j:t.j,l:t.l,dir:t.dir,key:t.key});
+const pick=t=>({type:t.type,axis:t.axis,i:t.i,j:t.j,l:t.l,dir:t.dir,key:t.key,mat:t.mat,owner:t.owner});
 function colorFor(id){ let h=0; for(const ch of String(id)) h=(h*31+ch.charCodeAt(0))>>>0; return COLORS[h%COLORS.length]; }
 function nameSprite(text){
   const c=document.createElement('canvas'); c.width=256; c.height=64; const g=c.getContext('2d');
@@ -1816,8 +1925,8 @@ function castShot(o,d,range,nearT,target){
 }
 function damagePiece(p,dmg,point){
   if(!pieces.has(p.key)) return;
-  p.hp-=dmg; burst(point,3,3,0.07);
-  if(p.hp<=0){ burst(pieceCenter(p),16,6,0.3); const nb=neighbors(p); removePiece(p); collapseFrom(nb); sfxAt('break',point); netOp({op:'break',key:p.key}); }
+  p.hp-=dmg; burst(point,3,3,0.07,matFor[p.mat].chip);
+  if(p.hp<=0){ burst(pieceCenter(p),16,6,0.3,matFor[p.mat].chip); const nb=neighbors(p); removePiece(p); collapseFrom(nb); sfxAt('break',point); netOp({op:'break',key:p.key}); }
 }
 function hurt(E,dmg){ const s=Math.min(E.sh,dmg); E.sh-=s; E.hp=Math.max(0,E.hp-(dmg-s)); return E.hp<=0; }
 
@@ -1833,7 +1942,7 @@ function fireWeapon(E,H,o,base,w,nearT,target,spread,tracerCol){
     if(r.kind==='body'){ total+=dmg*(r.head?W.head:1); head=head||r.head; hit=true; hitPt=r.point; }
     else if(r.kind==='piece'){ const e=per.get(r.piece)||{d:0,pt:r.point}; e.d+=dmg; per.set(r.piece,e); }
   }
-  per.forEach((e,p)=>damagePiece(p,e.d,e.pt));
+  per.forEach((e,p)=>{ if(E===P) dmgNum(e.pt,Math.round(e.d),'build'); damagePiece(p,e.d,e.pt); });
   muzzleFlash(H);
   return {hit,dmg:Math.round(total),head,point:hitPt};
 }
@@ -1857,7 +1966,19 @@ function startReload(){
   if(mode!=='gun'||P.reloadT>0||P.ammo[P.wpn]>=W.mag) return;
   P.reloadDur=W.shell||W.reload; P.reloadT=P.reloadDur; sfx('reload');
 }
+let phT=0;
+function pieceHpTick(dt){
+  phT-=dt; if(phT>0) return; phT=0.08;
+  const el=$('pieceHp'), show=playing&&(mode==='pick'||mode==='build')&&!edit;
+  if(!show){ el.hidden=true; return; }
+  const h=aimHit(6); const p=h&&h.object.userData.piece;
+  if(!p||!$('buildReason').hidden){ el.hidden=true; return; }
+  el.hidden=false; el.classList.toggle('growing',growing.has(p));
+  $('pieceHpT').textContent=MATERIALS[p.mat].name+' '+Math.ceil(p.hp)+' / '+p.maxHp;
+  $('pieceHpB').style.width=(100*p.hp/p.maxHp).toFixed(1)+'%';
+}
 function combatTick(dt){
+  stepBuildHp(dt); pieceHpTick(dt);
   P.gunT-=dt; P.equipT-=dt; P.bloom=Math.max(0,P.bloom-dt*0.07);
   if(P.kick>0){ const k=Math.min(P.kick,dt*0.5); P.pitch=Math.min(1.45,P.pitch+k); P.kick-=k; }
   if(P.reloadT>0){ P.reloadT-=dt; if(P.reloadT<=0){ const W=WEAPONS[P.wpn];
@@ -1961,7 +2082,7 @@ function botHurt(dmg){
 }
 function botBuild(q){ const oy=B.yaw, op=B.pitch; B.yaw=q.yaw; B.pitch=q.pitch; if(tryPlace(q.type,B)) B.buildPose=0.35; B.yaw=oy; B.pitch=op; }
 function botFacingWall(){ const t=computeTarget('wall',{pos:B.pos,yaw:snapYaw(Math.atan2(-(P.pos.x-B.pos.x),-(P.pos.z-B.pos.z))),pitch:0,onGround:B.onGround,groundSlab:B.groundSlab,rot:0}); return pieces.get(t.key); }
-function botEditWall(p,mask){ if(!p||!pieces.has(p.key)) return; p.mask=mask; buildPiece(p); startAnim(p,120); popPlayerOut(); }
+function botEditWall(p,mask){ if(!p||!pieces.has(p.key)||p.owner!=='bot') return; p.mask=mask; buildPiece(p); startAnim(p,120); popPlayerOut(); }
 function botFire(eye,dist,s){
   const w=B.wpn, W=WEAPONS[w];
   const head=Math.random()<0.08+0.32*s;
@@ -2100,11 +2221,51 @@ function drawMini(){
 })();
 syncBot();
 
+/* ---------- controller (standard gamepad mapping) ----------
+   Combat: RT fire, RB/LB next/prev weapon, X reload, Y edit, B build mode.
+   Build:  RT wall, RB floor, LT stairs, LB cone (hold any to turbo), X rotate, Y edit, B back to weapons.
+   Edit:   RT select tiles (release to confirm), Y confirm, B reset. Always: A jump, R3 crouch, D-pad right material, Start menu. */
+const dz=v=>Math.abs(v)<0.15?0:(v-Math.sign(v)*0.15)/0.85;
+function pollPad(dt){
+  const list=navigator.getGamepads?navigator.getGamepads():[]; let gp=null; for(const g of list) if(g&&g.connected){ gp=g; break; }
+  if(!gp){ if(pad.connected){ pad.connected=false; pad.lx=pad.ly=0; } return; }
+  if(!pad.connected){ pad.connected=true; toast('Controller connected'); }
+  const btn=i=>!!(gp.buttons[i]&&(gp.buttons[i].pressed||gp.buttons[i].value>0.5));
+  const down=i=>btn(i)&&!pad.prev[i], up=i=>!btn(i)&&pad.prev[i];
+  if(down(9)){ if(playing) openMenu(); else startPlay(); }
+  if(playing){
+    pad.lx=dz(gp.axes[0]||0); pad.ly=dz(gp.axes[1]||0);
+    const rx=dz(gp.axes[2]||0), ry=dz(gp.axes[3]||0), curve=v=>v*Math.abs(v);
+    P.yaw-=curve(rx)*dt*3.6*settings.sens; P.pitch=Math.max(-1.45,Math.min(1.45,P.pitch-curve(ry)*dt*2.6*settings.sens));
+    touchJump=btn(0)||(touchJump&&!up(0)&&false);
+    if(down(10)||down(11)) P.crouch=!P.crouch;
+    if(down(15)) cycleMaterial();
+    const inBuild=mode==='build';
+    if(edit){
+      if(down(7)) fireDown('desk'); if(up(7)) fireUp('desk');
+      if(down(3)) exitEdit(true); if(down(1)) resetEdit();
+    } else if(inBuild){
+      [[7,'wall'],[5,'floor'],[6,'ramp'],[4,'cone']].forEach(([i,t])=>{ if(down(i)){ selectPiece(t); heldPiece=t; fireDown('desk'); } if(up(i)&&heldPiece===t){ heldPiece=null; fireUp('desk'); } });
+      if(down(2)){ P.rot=(P.rot+1)%4; ghostKey=''; }
+      if(down(3)) toggleEdit(); if(down(1)) toggleBuild();
+    } else {
+      if(down(7)) fireDown('desk'); if(up(7)) fireUp('desk');
+      const slots=['pick','ar','pump'], cur=mode==='pick'?0:slots.indexOf(P.wpn);
+      const go=i=>{ const w=slots[(i+3)%3]; if(w==='pick') selectPick(); else selectGun(w); };
+      if(down(5)) go(cur+1); if(down(4)) go(cur-1);
+      if(down(2)) startReload(); if(down(3)) toggleEdit(); if(down(1)) toggleBuild();
+    }
+  }
+  pad.prev=gp.buttons.map((b,i)=>btn(i));
+}
+addEventListener('gamepadconnected',()=>toast('Controller connected'));
+
 /* ---------- loop ---------- */
 let last=performance.now();
 syncMode();
 function frame(now){
   const dt=Math.min(0.05,(now-last)/1000); last=now; lastDt=dt;
+  pollPad(dt);
   if(playing){
     moveInput(dt);
     if(B&&B.active) botUpdate(dt);

@@ -27,5 +27,12 @@ Multiplayer is peer-to-peer (WebRTC via [PeerJS](https://peerjs.com)). The host'
 | Assault rifle | 2 |
 | Pump shotgun | 3 |
 | Reload | T |
+| Switch material | X |
 
 Every bind can be changed in the menu.
+
+## Building rules
+- Every placement goes through one validator, and the red preview shows the reason it fails: *Already built*, *Nothing to attach to*, *Out of reach*, *Player in the way*, *Build height limit* or *Edge of the map*.
+- Materials: wood 150/140, brick 300/280, metal 500/460 max health (wall / other pieces). Builds start weaker and gain health while they finish. Start health and build-up times are estimates and can be tuned in `MATERIALS`.
+- Edits are named live (Window, Door, Wide window, Arch, Half wall, Ridge, Ramp roof…). You can only edit your own builds.
+- Controller supported (standard gamepad mapping); see the in-game menu for the layout.
