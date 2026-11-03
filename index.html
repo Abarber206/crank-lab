@@ -923,9 +923,11 @@ function computeTargetRaw(type,E=P){
 }
 // If the nearest spot is already built, use the same spot one level up (e.g. a fresh wall at the top of a rush)
 function retarget(t,l){ const n={...t,l}; n.key=t.type==='wall'?`w${t.axis}${t.i}_${t.j}_${l}`:t.type==='floor'?`f${t.i}_${t.j}_${l}`:`m${t.i}_${t.j}_${l}`; return n; }
+// Holding to turbo never stacks: the stack-up fallback only happens on a fresh press
+let noStack=false;
 function computeTarget(type,E=P){
   const t=computeTargetRaw(type,E);
-  if(!pieces.has(t.key)) return t;
+  if(!pieces.has(t.key)||(noStack&&E===P)) return t;
   const r=E.onGround&&E.groundSlab&&E.groundSlab.type==='ramp'?E.groundSlab:null;
   const fx=-Math.sin(E.yaw), fz=-Math.cos(E.yaw), dirIdx=Math.abs(fx)>=Math.abs(fz)?(fx>0?0:2):(fz>0?1:3);
   if(r&&r.dir===dirIdx){
@@ -2394,7 +2396,7 @@ function frame(now){
       if(edit.mouse) paintTile(tileAtNDC(0,0));
       if(pieceCenter(edit.piece).distanceTo(P.pos)>11) exitEdit(true);
     } else if(fireHeld){
-      if(mode==='build'){ turboT-=dt; if(turboT<=0){ tryPlace(heldPiece||piece); turboT=settings.turbo; } }
+      if(mode==='build'){ turboT-=dt; if(turboT<=0){ noStack=true; tryPlace(heldPiece||piece); noStack=false; turboT=settings.turbo; } }
       else if(mode==='gun'){ if(P.gunT<=0) playerShoot(); }
       else { pickT-=dt; if(pickT<=0){ swing(); pickT=0.32; } }
     }
