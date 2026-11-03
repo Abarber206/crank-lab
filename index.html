@@ -192,7 +192,7 @@ kbd{font-family:var(--font-ui);background:#1c2a40;border-radius:3px;padding:1px 
           <dt>Edit</dt><dd>Aim at a build, tap Edit, tap or drag over tiles, then Confirm</dd>
           <dt>Fire</dt><dd>Place the current piece, or swing the pickaxe</dd>
         </dl>
-        <p class="sub" style="margin-top:10px;font-size:12px">Ramp edits: select the two tiles on the side you want the ramp to rise toward. Cone edits: each selected tile raises that corner up to the peak, so one tile makes a corner roof, two side tiles make a half-ramp, two diagonal tiles make a ridge.</p>
+        <p class="sub" style="margin-top:10px;font-size:12px">Ramp edits: select the two tiles on the side you want the ramp to rise toward. Cone edits: each selected tile raises that corner to the full height of the wall, so two side tiles make a ramp that reaches the top, one tile makes a corner roof, and two diagonal tiles make a ridge.</p>
       </div>
       <div>
         <h2>Settings</h2>
@@ -312,7 +312,7 @@ function groundTexture(size){
 /* ---------- world ---------- */
 const GROUND=600;
 const ground=new THREE.Mesh(new THREE.PlaneGeometry(GROUND,GROUND), new THREE.MeshLambertMaterial({map:groundTexture(GROUND)}));
-ground.rotation.x=-Math.PI/2; ground.receiveShadow=true; scene.add(ground);
+ground.rotation.x=-Math.PI/2; ground.position.y=-0.03; ground.receiveShadow=true; scene.add(ground);
 (function decor(){
   const mm=new THREE.MeshLambertMaterial({color:0x86a39b, flatShading:true});
   for(let k=0;k<22;k++){
@@ -340,17 +340,19 @@ const editPieceMat=new THREE.MeshBasicMaterial({color:0xbfe2ff, transparent:true
 const tileMat=new THREE.MeshBasicMaterial({color:0x8fd3ff, transparent:true, opacity:.42, side:THREE.DoubleSide, depthWrite:false});
 const tileSelMat=new THREE.MeshBasicMaterial({color:0xff6a3d, transparent:true, opacity:.72, side:THREE.DoubleSide, depthWrite:false});
 const G={
-  wallX:new THREE.BoxGeometry(WT,LVL,CELL), wallZ:new THREE.BoxGeometry(CELL,LVL,WT),
-  wtX:new THREE.BoxGeometry(WT,LVL/3,CELL/3), wtZ:new THREE.BoxGeometry(CELL/3,LVL/3,WT),
+  wallX:new THREE.BoxGeometry(WT,LVL-0.02,CELL-0.02), wallZ:new THREE.BoxGeometry(CELL-0.02,LVL-0.02,WT),
+  wtX:new THREE.BoxGeometry(WT,LVL/3-0.01,CELL/3-0.01), wtZ:new THREE.BoxGeometry(CELL/3-0.01,LVL/3-0.01,WT),
   floor:new THREE.BoxGeometry(CELL,FT,CELL), ftile:new THREE.BoxGeometry(CELL/2,FT,CELL/2),
 
   tWall:new THREE.PlaneGeometry(CELL/3*.92,LVL/3*.92), tFloor:new THREE.PlaneGeometry(CELL/2*.92,CELL/2*.92), tRamp:new THREE.PlaneGeometry(2.3,2.95)
 };
 
 /* Cones: 4 corners (bit = raised to peak height), center always at peak. Bits: 0=(-x,-z) 1=(+x,-z) 2=(-x,+z) 3=(+x,+z) */
-const coneMat=new THREE.MeshLambertMaterial({map:floorTex, side:THREE.DoubleSide});
+const coneMat=new THREE.MeshLambertMaterial({map:floorTex, side:THREE.DoubleSide, polygonOffset:true, polygonOffsetFactor:1, polygonOffsetUnits:1});
+floorMat.polygonOffset=true; floorMat.polygonOffsetFactor=1; floorMat.polygonOffsetUnits=1;
 const coneGeos={};
-function coneCorners(mask){ const h=b=>(mask>>b&1)?CONE_H:0; return {A:[0,0,h(0)],B:[CELL,0,h(1)],C:[CELL,CELL,h(3)],D:[0,CELL,h(2)],E:[CELL/2,CELL/2,CONE_H]}; }
+function coneCorners(mask){ const h=b=>(mask>>b&1)?LVL:0; const n=(mask&1)+(mask>>1&1)+(mask>>2&1)+(mask>>3&1);
+  return {A:[0,0,h(0)],B:[CELL,0,h(1)],C:[CELL,CELL,h(3)],D:[0,CELL,h(2)],E:[CELL/2,CELL/2,mask?LVL*n/4:CONE_H]}; }
 function coneGeo(mask){
   if(coneGeos[mask]) return coneGeos[mask];
   const k=coneCorners(mask), tris=[[k.A,k.E,k.B],[k.B,k.E,k.C],[k.C,k.E,k.D],[k.D,k.E,k.A]], pos=[], uv=[];
@@ -512,7 +514,7 @@ function pbox(p){
   const y=p.l*LVL;
   if(p.type==='wall') return p.axis==='x'?[p.i*CELL,y,p.j*CELL,p.i*CELL,y+LVL,p.j*CELL+CELL]:[p.i*CELL,y,p.j*CELL,p.i*CELL+CELL,y+LVL,p.j*CELL];
   if(p.type==='floor') return [p.i*CELL,y,p.j*CELL,p.i*CELL+CELL,y,p.j*CELL+CELL];
-  return [p.i*CELL,y,p.j*CELL,p.i*CELL+CELL,y+(p.type==='ramp'?LVL:CONE_H),p.j*CELL+CELL];
+  return [p.i*CELL,y,p.j*CELL,p.i*CELL+CELL,y+(p.type==='ramp'||(p.type==='cone'&&p.mask)?LVL:CONE_H),p.j*CELL+CELL];
 }
 function touches(a,b){ const e=0.02; return a[0]<=b[3]+e&&b[0]<=a[3]+e&&a[1]<=b[4]+e&&b[1]<=a[4]+e&&a[2]<=b[5]+e&&b[2]<=a[5]+e; }
 function grounded(p){ return p.l===0; }
