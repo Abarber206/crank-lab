@@ -931,7 +931,12 @@ function computeTarget(type,E=P){
   if(r&&r.dir===dirIdx){
     // climbing: never stack a wall in your own path; put it at the next rush step instead
     // climbing: the wall goes right in front of you, on top of the one that's already there
-    if(type==='wall'){ const up=retarget(t,t.l+1); return pieces.has(up.key)?t:up; }
+    if(type==='wall'){
+      // stair ahead already built (rushing): the wall goes under that stair's top so it never blocks you
+      const d=DIRS[dirIdx];
+      for(const dl of [1,0]){ const ahead=pieces.get(`m${r.i+d[0]}_${r.j+d[1]}_${r.l+dl}`);
+        if(ahead&&ahead.type==='ramp'){ const n=retarget({...t,i:t.i+(t.axis==='x'?d[0]:0),j:t.j+(t.axis==='z'?d[1]:0)},ahead.l); return pieces.has(n.key)?t:n; } }
+      const up=retarget(t,t.l+1); return pieces.has(up.key)?t:up; }
     return t;
   }
   if(type!=='wall') return t;
@@ -1023,7 +1028,7 @@ function enterEdit(){
     const xa=new THREE.Vector3().crossVectors(u,n), basis=new THREE.Matrix4().makeBasis(xa,u,n), q=new THREE.Quaternion().setFromRotationMatrix(basis);
     for(let r=0;r<2;r++)for(let c=0;c<2;c++){
       const idx=r*2+c, cx=p.i*CELL+(c+.5)*CELL/2, cz=p.j*CELL+(r+.5)*CELL/2;
-      mk(G.tRamp,idx,new THREE.Vector3(cx,slabTop({...p,half:-1},cx,cz)+0.07,cz),m=>{m.quaternion.copy(q);});
+      mk(G.tFloor,idx,new THREE.Vector3(cx,p.l*LVL+LVL/2+0.05,cz),m=>{m.rotation.x=-Math.PI/2;});
     }
   }
   if(p.anim){ finishAnim(p); anims.delete(p); }
