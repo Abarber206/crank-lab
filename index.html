@@ -470,9 +470,9 @@ const treadMat=new THREE.MeshLambertMaterial({map:treadTex}), beamMat=new THREE.
 /* Material stats. Max health values are the commonly cited classic ones; start health and build-up times are
    estimates (Epic doesn't publish exact figures), so they live here to tune. */
 const MATERIALS={
-  wood: {name:'Wood', maxHp:{wall:150,other:140}, start:0.3, buildTime:4,  fill:300, chip:0xc9995a},
-  brick:{name:'Brick',maxHp:{wall:300,other:280}, start:0.2, buildTime:9,  fill:420, chip:0x9c978f},
-  metal:{name:'Metal',maxHp:{wall:500,other:460}, start:0.15,buildTime:16, fill:520, chip:0x9aa5b0}
+  wood: {name:'Wood', maxHp:{wall:150,other:140}, start:0.55, buildTime:4,  fill:300, chip:0xc9995a},
+  brick:{name:'Brick',maxHp:{wall:300,other:280}, start:0.4, buildTime:9,  fill:420, chip:0x9c978f},
+  metal:{name:'Metal',maxHp:{wall:500,other:460}, start:0.3,buildTime:16, fill:520, chip:0x9aa5b0}
 };
 const MAT_ORDER=['wood','brick','metal'];
 const matFor={};
@@ -2066,8 +2066,8 @@ addEventListener('beforeunload',()=>{ if(net.peer) try{net.peer.destroy();}catch
 /* ---------- combat: health, rifle, build damage ---------- */
 // f0..f1 = damage falloff range (m), fmin = damage left at f1
 const WEAPONS={
-  ar:  {name:'Assault Rifle',rarity:'uncommon',dmg:30,head:1.5,rate:0.15,mag:30,reload:2.0,spread:0.003,pellets:1,range:180,f0:999,f1:1000,fmin:1,equip:0.25,auto:true},
-  pump:{name:'Pump Shotgun', rarity:'rare',    dmg:9, head:2,  rate:0.75,mag:5, shell:0.55,spread:0.017,pellets:10,range:50,f0:7,f1:30,fmin:0.35,equip:0.45,auto:false}
+  ar:  {name:'Assault Rifle',rarity:'uncommon',dmg:30,head:1.5,rate:0.15,mag:30,reload:2.0,spread:0.003,pellets:1,range:180,f0:999,f1:1000,fmin:1,equip:0.25,auto:true,build:0.7},
+  pump:{name:'Pump Shotgun', rarity:'rare',    dmg:9, head:2,  rate:0.75,mag:5, shell:0.55,spread:0.017,pellets:10,range:50,f0:7,f1:30,fmin:0.35,equip:0.45,auto:false,build:0.5}
 };
 const GUN=WEAPONS.ar;
 Object.assign(P,{hp:100, sh:100, wpn:'ar', ammo:{ar:30,pump:5}, reloadT:0, reloadDur:0, bloom:0, gunT:0, equipT:0, lastWeapon:'ar'});
@@ -2133,7 +2133,7 @@ function fireWeapon(E,H,o,base,w,nearT,target,spread,tracerCol){
     if(r.kind==='body'){ total+=dmg*(r.head?W.head:1); head=head||r.head; hit=true; hitPt=r.point; }
     else if(r.kind==='piece'){ const e=per.get(r.piece)||{d:0,pt:r.point}; e.d+=dmg; per.set(r.piece,e); }
   }
-  per.forEach((e,p)=>{ if(E===P) dmgNum(e.pt,Math.round(e.d),'build'); damagePiece(p,e.d,e.pt); });
+  per.forEach((e,p)=>damagePiece(p,e.d*(W.build||1),e.pt)); // no damage numbers on builds; guns hit builds softer
   muzzleFlash(H);
   return {hit,dmg:Math.round(total),head,point:hitPt};
 }
