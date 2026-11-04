@@ -476,9 +476,9 @@ const ghostMat=new THREE.MeshBasicMaterial({color:0x62bdff, transparent:true, op
 const ghostBad=new THREE.MeshBasicMaterial({color:0xff5a4a, transparent:true, opacity:.22, depthWrite:false});
 const ghostDim=new THREE.MeshBasicMaterial({color:0x62bdff, transparent:true, opacity:.1, depthWrite:false});
 const editPieceMat=new THREE.MeshBasicMaterial({color:0xbfe2ff, transparent:true, opacity:.16, depthWrite:false});
-const tileMat=new THREE.MeshBasicMaterial({color:0x8fd3ff, transparent:true, opacity:.42, side:THREE.DoubleSide, depthWrite:false});
-const tileBadMat=new THREE.MeshBasicMaterial({color:0xd81e3c, transparent:true, opacity:.8, side:THREE.DoubleSide, depthWrite:false});
-const tileSelMat=new THREE.MeshBasicMaterial({color:0xff6a3d, transparent:true, opacity:.72, side:THREE.DoubleSide, depthWrite:false});
+const tileMat=new THREE.MeshBasicMaterial({depthTest:false,color:0x8fd3ff, transparent:true, opacity:.42, side:THREE.DoubleSide, depthWrite:false});
+const tileBadMat=new THREE.MeshBasicMaterial({depthTest:false,color:0xd81e3c, transparent:true, opacity:.8, side:THREE.DoubleSide, depthWrite:false});
+const tileSelMat=new THREE.MeshBasicMaterial({depthTest:false,color:0xff6a3d, transparent:true, opacity:.72, side:THREE.DoubleSide, depthWrite:false});
 const G={
   wallX:new THREE.BoxGeometry(WT,LVL-0.02,CELL-0.02), wallZ:new THREE.BoxGeometry(CELL-0.02,LVL-0.02,WT),
   wtX:new THREE.BoxGeometry(WT,LVL/3-0.01,CELL/3-0.01), wtZ:new THREE.BoxGeometry(CELL/3-0.01,LVL/3-0.01,WT),
@@ -1071,7 +1071,7 @@ function enterEdit(){
     const xa=new THREE.Vector3().crossVectors(u,n), basis=new THREE.Matrix4().makeBasis(xa,u,n), q=new THREE.Quaternion().setFromRotationMatrix(basis);
     for(let r=0;r<2;r++)for(let c=0;c<2;c++){
       const idx=r*2+c, cx=p.i*CELL+(c+.5)*CELL/2, cz=p.j*CELL+(r+.5)*CELL/2;
-      mk(G.tFloor,idx,new THREE.Vector3(cx,p.l*LVL+LVL/2+0.05,cz),m=>{m.rotation.x=-Math.PI/2;});
+      mk(G.tFloor,idx,new THREE.Vector3(cx,p.l*LVL+0.06,cz),m=>{m.rotation.x=-Math.PI/2;}); // flat at the stair's base, same as a floor edit
     }
   }
   if(p.anim){ finishAnim(p); anims.delete(p); }
