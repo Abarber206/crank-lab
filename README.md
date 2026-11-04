@@ -10,7 +10,7 @@ A bot that strafes, shoots, walls up when hit, ramp rushes when you take height,
 ## Multiplayer
 Open the menu, type a name, and press **Host a room**. Share the 5-letter code; friends press **Join** with it. Up to 8 players.
 
-Multiplayer is peer-to-peer (WebRTC via [PeerJS](https://peerjs.com)). The host's game relays movement and every build, edit and break, so the room closes when the host leaves. No server to run.
+Multiplayer is peer-to-peer (WebRTC via [PeerJS](https://peerjs.com)), no server to run. The host is the source of truth for builds: it checks every placement and edit and corrects conflicts. Players can shoot each other; each player applies the damage they take, eliminations show in the feed, and you respawn after 3 seconds. Build damage, health, materials, edits and half stairs stay in sync, and late joiners get the whole map. The room closes when the host leaves.
 
 ## Default PC binds
 | Action | Bind |

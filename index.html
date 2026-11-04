@@ -1760,7 +1760,7 @@ function startPlay(){
 }
 $('play').addEventListener('click',startPlay);
 $('respawn').addEventListener('click',()=>{ respawn(); toast('Respawned'); });
-$('clear').addEventListener('click',()=>{ clearBuilds(); netOp({op:'clear'}); toast('Builds cleared'); });
+$('clear').addEventListener('click',()=>{ if(net.role==='client'){ toast('Only the host can clear builds'); return; } clearBuilds(); netOp({op:'clear'}); toast('Builds cleared'); });
 $('fs').addEventListener('click',()=>{
   const el=document.documentElement;
   if(document.fullscreenElement){ document.exitFullscreen().catch(()=>{}); return; }
@@ -2001,8 +2001,10 @@ fitView();
 /* ---------- multiplayer (PeerJS / WebRTC, host relays everything) ---------- */
 const PREFIX='cranklab-v1-';
 const COLORS=[0x2a8f88,0xc8463c,0x6a4fc2,0xd88a1e,0x3f7fd0,0x4f9a3a,0xc54b8f,0x8a6a3e];
-const net={peer:null,role:null,host:null,conns:new Map(),code:null,id:'me',players:new Map(),sendT:0,name:'',lastSwing:0};
+const net={peer:null,role:null,host:null,conns:new Map(),code:null,id:'me',players:new Map(),sendT:0,name:'',lastSwing:0,kills:0,deaths:0,dead:false};
+const PEER_OPTS=Object.assign({debug:0},window.CRANK_PEER_OPTS||{}); // tests can point this at a local signalling server
 const pick=t=>({type:t.type,axis:t.axis,i:t.i,j:t.j,l:t.l,dir:t.dir,key:t.key,mat:t.mat,owner:t.owner});
+const WCODE={ar:1,pump:2}, WNAME=['pick','ar','pump'];
 function colorFor(id){ let h=0; for(const ch of String(id)) h=(h*31+ch.charCodeAt(0))>>>0; return COLORS[h%COLORS.length]; }
 function nameSprite(text){
   const c=document.createElement('canvas'); c.width=256; c.height=64; const g=c.getContext('2d');
@@ -2015,39 +2017,46 @@ function getPlayer(id,name){
   let pl=net.players.get(id);
   if(!pl){
     const h=createHero(colorFor(id)); scene.add(h.group);
-    pl={id,h,name:'',tag:null,pos:new THREE.Vector3(),vel:new THREE.Vector3(),tgt:new THREE.Vector3(),yaw:0,pitch:0,flags:0,swingT:0,fresh:true};
+    pl={id,h,name:'',tag:null,pos:new THREE.Vector3(),vel:new THREE.Vector3(),tgt:new THREE.Vector3(),yaw:0,pitch:0,flags:0,swingT:0,fresh:true,alive:true,crouch:false,sh:100,wpn:'pick'};
     net.players.set(id,pl); updateRoomUI();
   }
   if(name&&name!==pl.name){ pl.name=name; if(pl.tag) pl.h.group.remove(pl.tag); pl.tag=nameSprite(name); pl.h.group.add(pl.tag); }
   return pl;
 }
 function dropPlayer(id){ const pl=net.players.get(id); if(!pl) return; scene.remove(pl.h.group); net.players.delete(id); updateRoomUI(); }
+// flags: 1 ground, 2 crouch, 4 building, 8 dead, 16 editing, 32 aiming; weapon in s[10]; shield in s[11]
 function myState(){
-  const f=(P.onGround?1:0)|(P.crouch?2:0)|((mode==='build'||edit)?4:0);
-  return {type:'st',id:net.id,n:net.name,s:[P.pos.x,P.pos.y,P.pos.z,P.vel.x,P.vel.y,P.vel.z,P.yaw,P.pitch,f,net.lastSwing]};
+  const f=(P.onGround?1:0)|(P.crouch?2:0)|(mode==='build'&&!edit?4:0)|(net.dead?8:0)|(edit?16:0)|(adsK>0.5?32:0);
+  return {type:'st',id:net.id,n:net.name,s:[+P.pos.x.toFixed(3),+P.pos.y.toFixed(3),+P.pos.z.toFixed(3),+P.vel.x.toFixed(2),+P.vel.y.toFixed(2),+P.vel.z.toFixed(2),+P.yaw.toFixed(3),+P.pitch.toFixed(3),f,net.lastSwing,mode==='gun'&&!edit?WCODE[P.wpn]:0,Math.round(P.sh)]};
 }
 function onState(m){
   if(m.id===net.id) return;
   const pl=getPlayer(m.id,m.n), s=m.s;
   pl.tgt.set(s[0],s[1],s[2]); pl.vel.set(s[3],s[4],s[5]); pl.yaw=s[6]; pl.pitch=s[7]; pl.flags=s[8];
+  pl.crouch=!!(s[8]&2); pl.wpn=WNAME[s[10]||0]; pl.sh=s[11]??100;
+  const alive=!(s[8]&8); if(alive!==pl.alive){ pl.alive=alive; pl.h.group.visible=alive; if(alive){ pl.pos.copy(pl.tgt); animEvent(pl.h,'revive'); } }
   if(s[9]&&s[9]!==pl.swingId){ pl.swingId=s[9]; if(!pl.fresh) pl.swingT=0.22; }
   if(pl.fresh){ pl.pos.copy(pl.tgt); pl.fresh=false; }
 }
 function stepPlayers(dt){
   const k=1-Math.exp(-dt*14);
   net.players.forEach(pl=>{
-    pl.tgt.addScaledVector(pl.vel,dt*0.6);
-    pl.pos.lerp(pl.tgt,k); if(pl.swingT>0) pl.swingT-=dt;
-    animateRig(pl.h,{pos:pl.pos,vel:pl.vel,yaw:pl.yaw,pitch:pl.pitch,onGround:!!(pl.flags&1),crouch:!!(pl.flags&2),building:!!(pl.flags&4),swingT:pl.swingT},dt);
+    pl.tgt.addScaledVector(pl.vel,Math.min(dt,0.05)*0.6);
+    if(pl.pos.distanceTo(pl.tgt)>6) pl.pos.copy(pl.tgt); else pl.pos.lerp(pl.tgt,k); if(pl.swingT>0) pl.swingT-=dt;
+    // smooth yaw (shortest way round) so turning never snaps
+    pl.dyaw=pl.dyaw===undefined?pl.yaw:pl.dyaw+angDiff(pl.yaw,pl.dyaw)*Math.min(1,dt*18);
+    if(pl.h.group.visible) animateRig(pl.h,{pos:pl.pos,vel:pl.vel,yaw:pl.dyaw,pitch:pl.pitch,onGround:!!(pl.flags&1),crouch:pl.crouch,building:!!(pl.flags&4),editing:!!(pl.flags&16),
+      gun:pl.wpn==='pick'?false:pl.wpn,ads:(pl.flags&32)?1:0,swingT:pl.swingT},dt);
   });
 }
 function applyOp(o,quiet){
-  if(o.op==='place'){ if(!pieces.has(o.t.key)){ const np=addPiece(o.t); if(!quiet&&pieceCenter(np).distanceTo(P.pos)<30) sfx('place'); } }
+  if(o.op==='place'){ if(!pieces.has(o.t.key)){ const np=addPiece(o.t); if(o.t.hp!=null) np.hp=o.t.hp; if(!quiet&&pieceCenter(np).distanceTo(P.pos)<30) sfx('place'); } }
+  else if(o.op==='hp'){ const p=pieces.get(o.key); if(p){ p.hp=Math.min(p.hp,o.hp); growing.delete(p); } }
   else if(o.op==='break'){ const p=pieces.get(o.key); if(p){ burst(pieceCenter(p),14,6,0.3); const nb_=neighbors(p); removePiece(p); collapseFrom(nb_); if(pieceCenter(p).distanceTo(P.pos)<30) sfx('break'); } }
   else if(o.op==='shape'){ const p=pieces.get(o.key); if(p){ if(edit&&edit.piece===p) exitEdit(false); p.mask=o.mask; p.dir=o.dir; p.half=o.half; buildPiece(p); startAnim(p,140); popPlayerOut(); } }
   else if(o.op==='clear') clearBuilds();
 }
-function snapshot(){ return order.map(p=>Object.assign(pick(p),{mask:p.mask,half:p.half})); }
+function snapshot(){ return order.map(p=>Object.assign(pick(p),{mask:p.mask,half:p.half,hp:Math.round(p.hp)})); }
 function netSend(m,except){
   if(net.role==='host') net.conns.forEach((c,id)=>{ if(id!==except&&c.open) try{c.send(m);}catch(e){} });
   else if(net.role==='client'&&net.host&&net.host.open) try{ net.host.send(m); }catch(e){}
@@ -2056,13 +2065,54 @@ function netOp(o){ if(net.role) netSend({type:'op',id:net.id,o}); }
 function hostData(from,m){
   if(!m||typeof m!=='object') return;
   if(m.type==='st'){ m.id=from; onState(m); netSend(m,from); }
-  else if(m.type==='op'){ m.id=from; applyOp(m.o); netSend(m,from); }
+  else if(m.type==='op'){
+    m.id=from; const o=m.o, c=net.conns.get(from);
+    if(o.op==='place'){
+      // already built here, or nothing to attach to: tell that player to undo, and send the real piece if there is one
+      const have=pieces.get(o.t.key);
+      if(have||!supported(o.t)){ if(c&&c.open) c.send({type:'undo',key:o.t.key,real:have?Object.assign(pick(have),{mask:have.mask,half:have.half,hp:Math.round(have.hp)}):null}); return; }
+      o.t.owner=from;
+    } else if(o.op==='shape'){
+      const p=pieces.get(o.key); if(!p||p.owner!==from){ if(p&&c&&c.open) c.send({type:'fix',key:p.key,mask:p.mask,dir:p.dir,half:p.half}); return; }
+    } else if(o.op==='clear') return; // only the host clears
+    applyOp(o); netSend(m,from);
+  }
+  else if(m.type==='shot'){ m.id=from; onShot(m); netSend(m,from); }
+  else if(m.type==='hit'){ m.id=from; if(m.to===net.id) onHit(m); else { const c=net.conns.get(m.to); if(c&&c.open) c.send(m); } }
+  else if(m.type==='elim'){ m.id=from; onElim(m); netSend(m,from); }
+}
+// someone else fired: tracers, muzzle flash and sound from their character
+function onShot(m){
+  const pl=net.players.get(m.id); if(!pl||!pl.alive) return;
+  animEvent(pl.h,'fire',m.w); pl.h.rig.muzzle.getWorldPosition(muzzleV);
+  (m.e||[]).forEach(e=>tracer(muzzleV,new THREE.Vector3(e[0],e[1],e[2]),0xffb070));
+  muzzleFlash(pl.h); sfxAt(m.w==='pump'?'pump':'shot',pl.pos);
+}
+// you got hit: you apply your own damage (no disagreements about your health)
+function onHit(m){
+  if(net.dead) return; const from=net.players.get(m.id);
+  const f=$('hurtfx'); f.classList.add('on'); void f.offsetWidth; f.classList.remove('on'); sfx('hurt'); animEvent(localHero,'hurt');
+  if(from) dmgDirFrom(from.pos);
+  if(hurt(P,m.dmg)){ net.dead=true; net.deaths++; animEvent(localHero,'die'); const e={type:'elim',id:net.id,by:m.id,w:m.w}; onElim(e); netSend(e);
+    setTimeout(()=>{ net.dead=false; const a=Math.random()*Math.PI*2, r=8+Math.random()*20; respawn(); P.pos.set(SPAWN[0]+Math.cos(a)*r,0,SPAWN[2]+Math.sin(a)*r); banner('Back in','',1); },3000); }
+}
+function onElim(m){
+  const nm=id=>id===net.id?'You':(net.players.get(id)||{}).name||'Player', w=(WEAPONS[m.w]||{name:'Pickaxe'}).name;
+  if(m.by===net.id){ net.kills++; feed(`You eliminated <b>${nm(m.id)}</b> · ${w}`); banner('Eliminated',nm(m.id),1.6); sfx('win'); }
+  else if(m.id===net.id){ feed(`<b>${nm(m.by)}</b> eliminated you · ${w}`,true); banner('Eliminated','by '+nm(m.by),2.6); sfx('lose'); }
+  else feed(`<b>${nm(m.by)}</b> eliminated ${nm(m.id)} · ${w}`);
+  const pl=net.players.get(m.id); if(pl){ pl.alive=false; animEvent(pl.h,'die'); setTimeout(()=>{ if(!pl.alive) pl.h.group.visible=false; },900); }
 }
 function clientData(m){
   if(!m||typeof m!=='object') return;
-  if(m.type==='welcome'){ net.id=m.you; clearBuilds(); m.pieces.forEach(t=>{ const p=addPiece(t); if(t.mask!==p.mask||t.half!=null){ p.mask=t.mask; p.half=t.half; buildPiece(p);} }); toast('Joined room '+net.code); updateRoomUI(); }
+  if(m.type==='welcome'){ net.id=m.you; clearBuilds(); m.pieces.forEach(t=>{ const p=addPiece(t); p.mask=t.mask??p.mask; p.half=t.half; if(t.hp!=null){ p.hp=t.hp; if(p.hp>=p.maxHp) growing.delete(p); } buildPiece(p); }); respawn(); syncBot(); toast('Joined room '+net.code); updateRoomUI(); }
   else if(m.type==='st') onState(m);
   else if(m.type==='op'){ if(m.id!==net.id) applyOp(m.o); }
+  else if(m.type==='undo'){ const p=pieces.get(m.key); if(p&&p.owner===net.id){ removePiece(p); } if(m.real&&!pieces.has(m.real.key)){ const q=addPiece(m.real); q.mask=m.real.mask; q.half=m.real.half; if(m.real.hp!=null) q.hp=m.real.hp; buildPiece(q); } }
+  else if(m.type==='fix'){ const p=pieces.get(m.key); if(p){ if(edit&&edit.piece===p) exitEdit(false); p.mask=m.mask; p.dir=m.dir; p.half=m.half; buildPiece(p); } }
+  else if(m.type==='shot'){ if(m.id!==net.id) onShot(m); }
+  else if(m.type==='hit'){ if(m.to===net.id) onHit(m); }
+  else if(m.type==='elim'){ if(m.id!==net.id||m.by===net.id) onElim(m); }
   else if(m.type==='leave') dropPlayer(m.id);
 }
 function roomCode(){ const A='ABCDEFGHJKMNPQRSTUVWXYZ23456789'; let c=''; for(let i=0;i<5;i++) c+=A[Math.floor(Math.random()*A.length)]; return c; }
@@ -2071,8 +2121,8 @@ function readName(){ const v=$('pname').value.trim(); net.name=v||'Player'; try{
 function hostGame(){
   if(!netReady()) return; leaveGame(true); readName();
   const code=roomCode(); setRoomStatus('Creating room…');
-  const peer=new Peer(PREFIX+code,{debug:0}); net.peer=peer;
-  peer.on('open',()=>{ net.role='host'; net.code=code; net.id='h'; updateRoomUI(); toast('Room '+code+' is open'); });
+  const peer=new Peer(PREFIX+code,PEER_OPTS); net.peer=peer;
+  peer.on('open',()=>{ net.role='host'; net.code=code; net.id='h'; net.dead=false; updateRoomUI(); toast('Room '+code+' is open'); });
   peer.on('connection',conn=>{
     conn.on('open',()=>{
       if(net.conns.size>=7){ try{conn.send({type:'full'});}catch(e){} setTimeout(()=>conn.close(),300); return; }
@@ -2096,10 +2146,10 @@ function joinGame(){
   const code=$('jcode').value.trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
   if(code.length<4){ setRoomStatus('Type the room code your friend sees.'); return; }
   leaveGame(true); readName(); setRoomStatus('Joining '+code+'…');
-  const peer=new Peer({debug:0}); net.peer=peer;
+  const peer=new Peer(PEER_OPTS); net.peer=peer;
   peer.on('open',()=>{
     const conn=peer.connect(PREFIX+code,{reliable:true}); net.host=conn;
-    conn.on('open',()=>{ net.role='client'; net.code=code; updateRoomUI(); });
+    conn.on('open',()=>{ net.role='client'; net.code=code; net.dead=false; updateRoomUI(); $('clear').disabled=true; });
     conn.on('data',m=>{ if(m&&m.type==='full'){ setRoomStatus('That room is full (8 players).'); leaveGame(true); return; } clientData(m); });
     conn.on('close',()=>{ if(net.role==='client'){ toast('The host closed the room'); leaveGame(); } });
   });
@@ -2107,7 +2157,7 @@ function joinGame(){
 }
 function leaveGame(silent){
   if(net.peer){ try{ net.peer.destroy(); }catch(e){} }
-  net.peer=null; net.role=null; net.host=null; net.conns.clear(); net.code=null; net.id='me';
+  net.peer=null; net.role=null; net.host=null; net.conns.clear(); net.code=null; net.id='me'; net.dead=false; $('clear').disabled=false;
   [...net.players.keys()].forEach(dropPlayer);
   if(!silent) setRoomStatus('');
   updateRoomUI();
@@ -2174,21 +2224,24 @@ function castShot(o,d,range,nearT,target){
   ray.set(o,d); ray.near=nearT; ray.far=range;
   const hits=ray.intersectObjects(piecesNearRay(o,d,range),false);
   ray.near=0;
-  const ph=hits.length?hits[0]:null, bh=target?rayBody(o,d,target):null;
-  if(bh&&bh.t>=nearT&&bh.t<=range&&(!ph||bh.t<ph.distance)) return {kind:'body',t:bh.t,head:bh.head,point:o.clone().addScaledVector(d,bh.t)};
+  const ph=hits.length?hits[0]:null;
+  let bh=null, who=null;
+  for(const tg of (Array.isArray(target)?target:target?[target]:[])){ const h=rayBody(o,d,tg); if(h&&h.t>=nearT&&(!bh||h.t<bh.t)){ bh=h; who=tg; } }
+  if(bh&&bh.t<=range&&(!ph||bh.t<ph.distance)) return {kind:'body',t:bh.t,head:bh.head,who,point:o.clone().addScaledVector(d,bh.t)};
   if(ph) return {kind:'piece',t:ph.distance,piece:ph.object.userData.piece,point:ph.point.clone()};
   return {kind:'none',t:range,point:o.clone().addScaledVector(d,range)};
 }
 function damagePiece(p,dmg,point){
   if(!pieces.has(p.key)) return;
   p.hp-=dmg; burst(point,3,3,0.07,matFor[p.mat].chip);
+  if(p.hp>0&&net.role){ const now=performance.now(); if(!p.hpSent||now-p.hpSent>120){ p.hpSent=now; netOp({op:'hp',key:p.key,hp:Math.round(p.hp)}); } }
   if(p.hp<=0){ burst(pieceCenter(p),16,6,0.3,matFor[p.mat].chip); const nb=neighbors(p); removePiece(p); collapseFrom(nb); sfxAt('break',point); netOp({op:'break',key:p.key}); }
 }
 function hurt(E,dmg){ const s=Math.min(E.sh,dmg); E.sh-=s; E.hp=Math.max(0,E.hp-(dmg-s)); return E.hp<=0; }
 
 // One trigger pull: every pellet is its own ray; build damage is pooled per piece; falloff by distance
 function fireWeapon(E,H,o,base,w,nearT,target,spread,tracerCol){
-  const W=WEAPONS[w], per=new Map(); let total=0, head=false, hit=false, hitPt=null;
+  const W=WEAPONS[w], per=new Map(), bodies=new Map(), ends=[]; let total=0, head=false, hit=false, hitPt=null;
   H.rig.muzzle.getWorldPosition(muzzleV);
   for(let k=0;k<W.pellets;k++){
     const d=base.clone(); d.x+=gauss()*spread; d.y+=gauss()*spread; d.z+=gauss()*spread; d.normalize();
@@ -2196,20 +2249,22 @@ function fireWeapon(E,H,o,base,w,nearT,target,spread,tracerCol){
     // your shots aim from the camera, but must also be clear from your own eyes to the aim point
     if(E===P){ const eye=new THREE.Vector3(P.pos.x,P.pos.y+(P.crouch?1.12:1.6),P.pos.z), d2=r.point.clone().sub(eye), len=d2.length();
       if(len>0.05){ d2.multiplyScalar(1/len); const r2=castShot(eye,d2,len+0.05,0.05,target); if(r2.kind==='piece'&&r2.t<len-0.05) r={...r2,t:r.t-len+r2.t}; } }
-    if(W.pellets===1||k<4) tracer(muzzleV,r.point,tracerCol);
+    if(W.pellets===1||k<4){ tracer(muzzleV,r.point,tracerCol); ends.push([+r.point.x.toFixed(2),+r.point.y.toFixed(2),+r.point.z.toFixed(2)]); }
     const fall=r.t<=W.f0?1:r.t>=W.f1?W.fmin:1-(1-W.fmin)*(r.t-W.f0)/(W.f1-W.f0), dmg=W.dmg*fall;
-    if(r.kind==='body'){ total+=dmg*(r.head?W.head:1); head=head||r.head; hit=true; hitPt=r.point; }
+    if(r.kind==='body'){ const dd=dmg*(r.head?W.head:1); total+=dd; head=head||r.head; hit=true; hitPt=r.point;
+      const e=bodies.get(r.who)||{dmg:0,head:false,pt:r.point}; e.dmg+=dd; e.head=e.head||r.head; bodies.set(r.who,e); }
     else if(r.kind==='piece'){ const e=per.get(r.piece)||{d:0,pt:r.point}; e.d+=dmg; per.set(r.piece,e); }
   }
   per.forEach((e,p)=>damagePiece(p,e.d*(W.build||1),e.pt)); // no damage numbers on builds; guns hit builds softer
   muzzleFlash(H);
-  return {hit,dmg:Math.round(total),head,point:hitPt};
+  return {hit,dmg:Math.round(total),head,point:hitPt,bodies,ends};
 }
 function shotSpread(W){
   const adsMul=W.pellets===1?1-0.7*adsK:1-0.2*adsK;
   return (W.spread+(W.pellets===1?P.bloom:0))*(P.crouch?0.7:1)*(P.onGround?1:1.6)*adsMul*(1+Math.min(1,Math.hypot(P.vel.x,P.vel.z)/RUN)*0.5*(1-adsK));
 }
 function playerShoot(){
+  if(net.dead) return;
   const W=WEAPONS[P.wpn];
   if(P.equipT>0) return;
   if(P.ammo[P.wpn]<=0){ startReload(); return; }
@@ -2220,10 +2275,14 @@ function playerShoot(){
   if(W.pellets===1) P.bloom=Math.min(0.045,P.bloom+0.007*(1-0.5*adsK));
   sinceShot=0;
   camera.updateMatrixWorld();
-  const tgt=(B&&B.active&&B.alive)?B:null, shBefore=tgt?tgt.sh:0;
-  const r=fireWeapon(P,localHero,camera.position.clone(),aimDir(),P.wpn,camDist+0.4,tgt,spread);
+  const tgts=[]; if(B&&B.active&&B.alive) tgts.push(B); net.players.forEach(pl=>{ if(pl.alive) tgts.push(pl); });
+  const shBefore=B?B.sh:0;
+  const r=fireWeapon(P,localHero,camera.position.clone(),aimDir(),P.wpn,camDist+0.4,tgts,spread);
+  if(net.role) netSend({type:'shot',id:net.id,w:P.wpn,e:r.ends});
   sfx(P.wpn==='pump'?'pump':'shot'); animEvent(localHero,'fire',P.wpn); stat('s'); P.kick=(P.wpn==='pump'?0.05:0.014)*(1-0.55*adsK); P.yaw+=(Math.random()-.5)*(P.wpn==='pump'?0.01:0.007)*(1-0.6*adsK);
-  if(r.hit){ stat('h',r.dmg); hitMarker(r.dmg,r.head); dmgNum(B.pos.clone().setY(B.pos.y+(r.head?2.05:1.6)),r.dmg,r.head?'head':shBefore>0?'shield':'hp'); botHurt(r.dmg); }
+  r.bodies.forEach((e,who)=>{ const dmg=Math.round(e.dmg); stat('h',dmg); hitMarker(dmg,e.head);
+    if(who===B){ dmgNum(B.pos.clone().setY(B.pos.y+(e.head?2.05:1.6)),dmg,e.head?'head':shBefore>0?'shield':'hp'); botHurt(dmg); }
+    else { dmgNum(who.pos.clone().setY(who.pos.y+(e.head?2.05:1.6)),dmg,e.head?'head':who.sh>0?'shield':'hp'); netSend({type:'hit',id:net.id,to:who.id,dmg,head:e.head,w:P.wpn}); } });
   if(P.ammo[P.wpn]<=0) startReload();
 }
 function startReload(){
@@ -2344,7 +2403,7 @@ function syncBot(){
     if(on&&!B.active){ B.active=true; round.you=0; round.bot=0; newRound(); }
     if(!on){ B.active=false; B.h.group.visible=false; }
   }
-  $('vitals').hidden=!on; $('cScore').hidden=!on; $('cSkill').hidden=!on; if(!on) $('botTag').hidden=true;
+  $('vitals').hidden=!(on||net.role); $('cScore').hidden=!on; $('cSkill').hidden=!on; if(!on) $('botTag').hidden=true;
 }
 function newRound(){
   round.state='fight'; clearBuilds(); respawn(); fightStart=performance.now();
