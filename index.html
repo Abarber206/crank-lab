@@ -927,7 +927,10 @@ function moveBody(E,fw,st,jump,dt){
     const a=(E.onGround?ACC_G:ACC_A)*dt, dx=tx-E.vel.x, dz=tz-E.vel.z, d=Math.hypot(dx,dz);
     if(d<=a){ E.vel.x=tx; E.vel.z=tz; } else { E.vel.x+=dx/d*a; E.vel.z+=dz/d*a; }
   }
-  if(jump&&E.onGround){ E.vel.y=JUMP; E.onGround=false; E.groundSlab=null; }
+  // coyote time: a jump still counts for a moment after running off an edge
+  if(E.onGround) E.coyT=0.12; else E.coyT=(E.coyT||0)-dt;
+  if(jump&&(E.onGround||E.coyT>0)&&E.vel.y<=0.5){ E.vel.y=JUMP; E.onGround=false; E.groundSlab=null; E.coyT=0;
+    if(E===P) animEvent(localHero,'jump'); else if(B&&E===B) animEvent(B.h,'jump'); }
 }
 
 /* ---------- targeting ---------- */
@@ -1279,6 +1282,7 @@ function sfx(k){
   else if(k==='whiff'){ noise(2600,0.08,0.05,2); }
   else if(k==='shot'){ noise(1500,0.11,0.34,0.6); tone('square',150,55,0.09,0.07); }
   else if(k==='pump'){ noise(900,0.18,0.45,0.5); tone('square',110,40,0.14,0.09); tone('square',600,400,0.03,0.04,0.32); }
+  else if(k==='step'){ noise(260+Math.random()*120,0.05,0.05,1.4); }
   else if(k==='shell'){ tone('square',700,500,0.03,0.04); }
   else if(k==='hit'){ tone('sine',1700,1500,0.045,0.08); }
   else if(k==='headhit'){ tone('sine',2300,2000,0.06,0.09); tone('sine',1700,1500,0.04,0.06,0.03); }
@@ -1291,7 +1295,7 @@ function sfx(k){
 /* ---------- characters: an original toon-shaded builder with ink outlines and a jointed rig ----------
    Conventions: the model faces -z. Limbs hang along -y; +rotation.x swings a hanging limb forward.
    In hand space -y runs along the forearm (forward when aiming) and -z is up. */
-const toonGrad=(()=>{ const d=new Uint8Array([95,95,95,170,170,170,255,255,255]); const t=new THREE.DataTexture(d,3,1,THREE.RGBFormat); t.minFilter=t.magFilter=THREE.NearestFilter; t.generateMipmaps=false; t.needsUpdate=true; return t; })();
+const toonGrad=(()=>{ const d=new Uint8Array([85,85,85,140,140,140,200,200,200,255,255,255]); const t=new THREE.DataTexture(d,4,1,THREE.RGBFormat); t.minFilter=t.magFilter=THREE.NearestFilter; t.generateMipmaps=false; t.needsUpdate=true; return t; })();
 const toonCache=new Map();
 function toon(c){ let m=toonCache.get(c); if(!m){ m=new THREE.MeshToonMaterial({color:c,gradientMap:toonGrad}); toonCache.set(c,m); } return m; }
 const inkMat=new THREE.MeshBasicMaterial({color:0x151a22,side:THREE.BackSide});
@@ -1314,9 +1318,9 @@ function rbox(w,h,d,r,seg=3){
   rboxCache.set(key,g); return g;
 }
 const limbCache=new Map();
-function limbGeo(rt,rb,len){ const key=[rt,rb,len].join(); let g=limbCache.get(key); if(!g){ g=new THREE.CylinderGeometry(rt,rb,len,12,1); g.translate(0,-len/2,0); limbCache.set(key,g); } return g; }
+function limbGeo(rt,rb,len){ const key=[rt,rb,len].join(); let g=limbCache.get(key); if(!g){ g=new THREE.CylinderGeometry(rt,rb,len,18,2); g.translate(0,-len/2,0); limbCache.set(key,g); } return g; }
 const sphCache=new Map();
-function sph(r){ let g=sphCache.get(r); if(!g){ g=new THREE.SphereGeometry(r,14,10); sphCache.set(r,g); } return g; }
+function sph(r){ let g=sphCache.get(r); if(!g){ g=new THREE.SphereGeometry(r,20,14); sphCache.set(r,g); } return g; }
 const dustMat=new THREE.MeshLambertMaterial({color:0xe2dccb});
 const _ikS=new THREE.Vector3(), _ikD=new THREE.Vector3(), _ikP=new THREE.Vector3(), _ikN=new THREE.Vector3(), _ikU=new THREE.Vector3(), _ikF=new THREE.Vector3(), _ikE=new THREE.Vector3(),
       _ikX=new THREE.Vector3(), _ikY=new THREE.Vector3(), _ikZ=new THREE.Vector3(), _ikM=new THREE.Matrix4(), _ikQ=new THREE.Quaternion(), _ikQ2=new THREE.Quaternion(), _ikT=new THREE.Vector3();
@@ -1349,6 +1353,7 @@ function createHero(jacketHex,opts){
   part(rbox(.28,.19,.19,.08),C.jacket,rig.spine,0,.07,0);
   rig.chest=grp(rig.spine,0,.16,0);
   part(rbox(.37,.27,.22,.1),C.jacket,rig.chest,0,.12,0);
+  [-1,1].forEach(sx=>{ part(rbox(.075,.07,.02,.012),C.jacketL,rig.chest,sx*.11,.07,-.11,null,null,0.004); part(rbox(.012,.012,.012,.004),C.steel,rig.chest,sx*.1,.17,-.124,null,null,0); });
   part(rbox(.38,.06,.225,.03),C.jacketD,rig.chest,0,.04,0,null,null,0.006);
   part(rbox(.016,.34,.01,.004),C.jacketD,rig.chest,0,.07,-.112,null,null,0);
   part(rbox(.08,.06,.02,.015),C.jacketL,rig.chest,.09,.14,-.112,null,null,0.005);
@@ -1372,6 +1377,8 @@ function createHero(jacketHex,opts){
   part(rbox(.25,.27,.25,.1,4),C.skin,rig.head,0,.12,0);
   part(sph(.03),C.skin,rig.head,-.126,.11,.01,null,[.5,.95,.8],0.006); part(sph(.03),C.skin,rig.head,.126,.11,.01,null,[.5,.95,.8],0.006);
   part(rbox(.045,.055,.04,.018),C.skin,rig.head,0,.1,-.13,null,null,0.006);
+  [-1,1].forEach(sx=>part(sph(.024),0xf2a08f,rig.head,sx*.085,.085,-.112,null,[1,.6,.4],0));
+  rig.lids=[-1,1].map(sx=>{ const l=part(sph(.031),C.skin,rig.head,sx*.055,.168,-.121,null,[1.05,.2,.55],0); return l; });
   rig.eyes=[-1,1].map(sx=>{ const e=grp(rig.head,sx*.055,.145,-.122); part(sph(.029),0xffffff,e,0,0,0,null,[1,1.25,.5],0.004); part(sph(.019),0x1a1f29,e,0,-.003,-.011,null,[1,1.25,.6],0); return e; });
   rig.brows=[-1,1].map(sx=>part(rbox(.065,.018,.02,.008),C.hair,rig.head,sx*.056,.198,-.127,null,null,0));
   rig.mouth=part(rbox(.065,.014,.012,.006),0x6b2f2a,rig.head,0,.055,-.126,null,null,0);
@@ -1380,6 +1387,7 @@ function createHero(jacketHex,opts){
   rig.tuft=grp(rig.head,0,.28,.02);
   [[0,.06,.0,-.3,0],[-.07,.04,.04,-.5,.4],[.07,.04,.04,-.5,-.4],[0,.03,.09,-1,0],[-.09,.0,-.06,.2,.5],[.08,.01,-.07,.2,-.45]].forEach(([x,y,z,rx,rz])=>part(rbox(.07,.12,.06,.025),C.hair,rig.tuft,x,y,z,[rx,0,rz]));
   part(rbox(.24,.05,.06,.02),C.hair,rig.head,0,.215,-.115,[.25,0,0]);
+  [[-.04,.07,-.05,-.6,.2],[.05,.075,-.03,-.7,-.3],[0,.09,.05,-1.2,0]].forEach(([x,y,z,rx,rz])=>part(rbox(.05,.1,.05,.02),C.hair,rig.tuft,x,y,z,[rx,0,rz]));
   // headband with goggles pushed up
   part(new THREE.CylinderGeometry(.134,.134,.035,18,1,true),C.accent,rig.head,0,.205,.0,null,null,0.006);
   [-1,1].forEach(sx=>{ const gg=new THREE.CylinderGeometry(.038,.038,.03,14); gg.rotateX(Math.PI/2);
@@ -1393,10 +1401,13 @@ function createHero(jacketHex,opts){
     const el=grp(sh,0,-.25,0);
     part(sph(.052),C.jacket,el,0,0,0,null,null,0.008);
     part(limbGeo(.052,.044,.21),C.jacket,el);
+    part(new THREE.TorusGeometry(.053,.012,8,18),C.jacketD,el,0,-.02,0,[Math.PI/2,0,0],null,0);
     part(limbGeo(.05,.05,.04),C.jacketD,el,0,-.18,0,null,null,0.006);
     const wr=grp(el,0,-.23,0);
     part(rbox(.075,.085,.06,.025),C.glove,wr,0,-.035,0,null,null,0.007);
-    const fing=grp(wr,0,-.075,0); part(rbox(.07,.06,.055,.022),C.glove,fing,0,-.025,-.004,null,null,0.007);
+    const fing=grp(wr,0,-.075,0);
+    for(let f=0;f<4;f++) part(rbox(.017,.06,.022,.008),C.glove,fing,-.026+f*.0175,-.028+(f===0||f===3?.006:0),-.004,null,null,0.004);
+    part(rbox(.074,.014,.05,.006),C.packD,wr,0,-.072,-.004,null,null,0);
     part(rbox(.025,.055,.03,.012),C.glove,wr,-sx*.04,-.05,-.02,[0,0,sx*.4],null,0.006);
     const hand=grp(wr,0,-.06,0);
     return {sh,el,wr,fing,hand,side:sx};
@@ -1406,12 +1417,15 @@ function createHero(jacketHex,opts){
   const leg=sx=>{
     const hp=grp(rig.hips,sx*.088,-.05,0); hp.rotation.order='XZY';
     part(limbGeo(.09,.074,.4),C.pants,hp);
+    part(rbox(.03,.1,.09,.012),C.pantsD,hp,sx*.085,-.2,0,null,null,0.005);
     const kn=grp(hp,0,-.4,0);
     part(sph(.072),C.pants,kn,0,0,0,null,null,0.008);
     part(rbox(.1,.11,.05,.025),C.pantsD,kn,0,-.02,-.055,null,null,0.006);
     part(limbGeo(.071,.058,.36),C.pants,kn);
     const an=grp(kn,0,-.37,0);
     part(rbox(.12,.13,.13,.045),C.boot,an,0,-.035,0);
+    for(let q=0;q<3;q++) part(rbox(.07,.008,.01,.003),0xe9e2d0,an,0,-.005-q*.025,-.068-q*.006,null,null,0);
+    part(rbox(.03,.02,.012,.004),C.steel,an,sx*.062,.0,0,null,null,0);
     part(rbox(.115,.085,.11,.04),C.boot,an,0,-.075,-.09);
     part(rbox(.128,.03,.26,.012),C.sole,an,0,-.12,-.045,null,null,0.006);
     part(limbGeo(.068,.068,.035),C.packD,an,0,.04,0,null,null,0.005);
@@ -1479,6 +1493,7 @@ function animEvent(H,ev,arg){
   else if(ev==='hurt'){ A.hurt=1; A.hurtSide=Math.random()<.5?-1:1; }
   else if(ev==='build') A.strike=1;
   else if(ev==='equip') A.equip=1;
+  else if(ev==='jump'){ A.sq=Math.min(A.sq,-0.07); A.sqV=1.6; }
   else if(ev==='die'){ A.dead=true; A.deadT=0; }
   else if(ev==='revive'){ A.dead=false; A.deadT=0; H.group.rotation.x=0; H.group.rotation.z=0; }
 }
@@ -1529,7 +1544,7 @@ function animateRig(H,S,dt){
   // ----- events decay -----
   A.recoil=Math.max(0,A.recoil-dt*(gun==='pump'?4:12)); A.hurt=Math.max(0,A.hurt-dt*3.5); A.strike=Math.max(0,A.strike-dt*6); A.equip=Math.max(0,A.equip-dt*3.2); A.pumpT=Math.max(0,A.pumpT-dt);
   // ----- landing spring -----
-  if(!A.wasGround&&S.onGround){ const imp=Math.min(1,Math.max(0,-A.vy-3)/15); A.sqV-=imp*3.2; if(imp>0.35&&A.dustCd<=0){ burst(_fp.copy(S.pos).setY(S.pos.y+0.05),6,2.2,0.07,dustMat); A.dustCd=0.2; } }
+  if(!A.wasGround&&S.onGround){ const imp=Math.min(1,Math.max(0,-A.vy-3)/15); A.sqV-=imp*3.2; if(H===localHero) camDip=Math.min(camDip,-0.16*imp); if(imp>0.35&&A.dustCd<=0){ burst(_fp.copy(S.pos).setY(S.pos.y+0.05),6,2.2,0.07,dustMat); A.dustCd=0.2; } }
   A.wasGround=S.onGround; A.vy=S.vel.y; A.dustCd-=dt;
   A.sqV+=(-130*A.sq-15*A.sqV)*dt; A.sq=Math.max(-0.28,Math.min(0.08,A.sq+A.sqV*dt));
   // ----- turn in place: feet stay planted, then step -----
@@ -1556,6 +1571,7 @@ function animateRig(H,S,dt){
     T.spX=-0.2*k*Math.max(0,cm)*(S.crouch?0.5:1)+0.06*k*Math.max(0,-cm); T.chY=-T.hipsY*1.25;
     if(bounceArms){ T.shL=-0.85*k*s1*cm; T.shR=0.85*k*s1*cm; T.elL=T.elR=0.35+0.95*k; T.shLz=-0.1-0.08*k; T.shRz=0.1+0.08*k; }
     // footstep dust
+    { const st0=Math.sign(s1); if(k>0.3&&st0!==A.stepSign){ A.stepSign=st0; if(H===localHero) sfx('step'); else if(H.group.visible&&H.group.position.distanceTo(P.pos)<30) sfxAt('step',H.group.position); } }
     if(k>0.65&&A.dustCd<=0){ const st=Math.sign(s1); if(st!==A.lastSign){ A.lastSign=st; const ft=(st>0?r.legR:r.legL).foot; ft.getWorldPosition(_fp); if(_fp.distanceTo(P.pos)<40){ burst(_fp,2,1.1,0.05,dustMat); A.dustCd=0.12; } } }
     // idle: breathing, weight shift, look around
     if(sp<0.3){
@@ -1579,6 +1595,8 @@ function animateRig(H,S,dt){
   T.hipY+=A.sq; T.knL+=A.sq*3.6; T.knR+=A.sq*3.6; T.hpL-=A.sq*1.8; T.hpR-=A.sq*1.8; T.anL-=A.sq*1.8; T.anR-=A.sq*1.8; T.spX+=A.sq*1.3;
   // keep feet flat: ankles undo hip + knee pitch
   T.anL+=-(T.hpL+T.knL)*0.9; T.anR+=-(T.hpR+T.knR)*0.9;
+  // on stairs: toes follow the slope and the body leans into the climb
+  const sl=S.slope||0; T.anL+=sl; T.anR+=sl; T.spX-=sl*0.35; T.hipY-=Math.abs(sl)*0.05;
   // aim: chest and head follow the pitch
   T.chX+=S.pitch*0.32; T.nkX=S.pitch*0.42-T.spX*0.6;
   // hurt flinch
@@ -1662,21 +1680,30 @@ function animateRig(H,S,dt){
   A.blinkT-=dt; if(A.blinkT<-0.12) A.blinkT=1.8+Math.random()*3.5;
   const squint=A.hurt>0.3?0.35:1, blink=A.blinkT<0?0.1:squint;
   r.eyes.forEach(e=>e.scale.y=lerp(e.scale.y,blink,0.6));
+  r.lids.forEach(l=>{ l.position.y=lerp(l.position.y,.168-(1-blink)*.022,0.6); l.scale.y=lerp(l.scale.y,.2+(1-blink)*.9,0.6); });
   const browY=0.198+(S.onGround?0:0.012)-(gun?0.006:0)-0.012*A.hurt;
   r.brows.forEach((b,i)=>{ b.position.y=lerp(b.position.y,browY,sm); b.rotation.z=lerp(b.rotation.z,(gun||A.hurt>0.2)?(i?-0.25:0.25):0,sm); });
   const mouthOpen=Math.max(A.hurt*3,!S.onGround&&S.vel.y<-10?1.8:0,1);
   r.mouth.scale.y=lerp(r.mouth.scale.y,mouthOpen,sm); r.mouth.scale.x=lerp(r.mouth.scale.x,A.hurt>0.2?0.7:1,sm);
 }
+function slopeFor(E){
+  const r=E.onGround&&E.groundSlab&&E.groundSlab.type==='ramp'?E.groundSlab:null; if(!r) return 0;
+  const upYaw=[-Math.PI/2,Math.PI,Math.PI/2,0][r.dir]; return RAMP_ANG*Math.cos(angDiff(upYaw,E.yaw));
+}
 function animateHero(dt){
-  animateRig(localHero,{pos:P.pos,vel:P.vel,yaw:P.yaw,pitch:P.pitch,onGround:P.onGround,crouch:P.crouch,building:mode==='build'&&!edit,editing:!!edit,
+  animateRig(localHero,{slope:slopeFor(P),pos:P.pos,vel:P.vel,yaw:P.yaw,pitch:P.pitch,onGround:P.onGround,crouch:P.crouch,building:mode==='build'&&!edit,editing:!!edit,
     gun:mode==='gun'&&!edit?P.wpn:false,ads:adsK,swingT,reload:(mode==='gun'&&P.reloadT>0)?{w:P.wpn,p:1-P.reloadT/P.reloadDur}:null},dt);
 }
 
 /* ---------- camera ---------- */
 const tmpA=new THREE.Vector3(), tmpB=new THREE.Vector3();
+let camY=0, camDip=0;
 function updateCamera(){
   const eye=P.crouch?EYE_CROUCH:EYE_STAND;
-  const pivot=tmpA.set(P.pos.x,P.pos.y+eye,P.pos.z), d=aimDir();
+  // smooth the camera height over stair steps and small bumps; follow fast for real jumps and falls
+  const dyCam=P.pos.y-camY; camY=Math.abs(dyCam)>1.2?P.pos.y-Math.sign(dyCam)*1.2:camY+dyCam*Math.min(1,lastDt*(P.onGround?16:30));
+  camDip+=(0-camDip)*Math.min(1,lastDt*9);
+  const pivot=tmpA.set(P.pos.x,camY+eye+camDip,P.pos.z), d=aimDir();
   const side=0.6-0.05*adsK, back=2.9-1.35*adsK, up=0.18+0.08*adsK;
   const want=tmpB.set(Math.cos(P.yaw)*side,up,-Math.sin(P.yaw)*side).addScaledVector(d,-back);
   let dist=want.length(); want.normalize();
@@ -2447,7 +2474,7 @@ function botUpdate(dt){
 }
 function animateBot(dt){
   if(!B.h.group.visible) return;
-  animateRig(B.h,{pos:B.pos,vel:B.vel,yaw:B.yaw,pitch:B.pitch,onGround:B.onGround,crouch:false,building:B.buildPose>0||B.state==='rush',gun:B.wpn,swingT:0,reload:B.reloadT>0?{w:'ar',p:Math.min(1,1-B.reloadT/2.4)}:null},dt);
+  animateRig(B.h,{slope:slopeFor(B),pos:B.pos,vel:B.vel,yaw:B.yaw,pitch:B.pitch,onGround:B.onGround,crouch:false,building:B.buildPose>0||B.state==='rush',gun:B.wpn,swingT:0,reload:B.reloadT>0?{w:'ar',p:Math.min(1,1-B.reloadT/2.4)}:null},dt);
 }
 function updateCombatHUD(){
   stepDmgNums(lastDt);
