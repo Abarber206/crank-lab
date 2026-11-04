@@ -305,6 +305,7 @@ kbd{font-family:var(--font-ui);background:#1c2a40;border-radius:3px;padding:1px 
           <label for="fov">Field of view <span class="v" id="fovV"></span><input type="range" id="fov" min="60" max="100" step="1"></label>
           <label for="botSel">Opponent <select id="botSel"><option value="off">Off</option><option value="adaptive">Adaptive (matches you)</option><option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option><option value="expert">Expert</option></select></label>
           <label for="turboSel">Turbo build delay <select id="turboSel"><option value="0.05">0.05 s (fast)</option><option value="0.15">0.15 s (classic)</option></select></label>
+          <label for="editSens">Edit sensitivity <span class="v" id="editSensV"></span><input type="range" id="editSens" min="0.3" max="3" step="0.05"></label>
           <label for="editRel">Edit on release (mouse and touch) <input type="checkbox" id="editRel"></label>
           <label for="instantBuild">Instant build on piece bind (hold to turbo) <input type="checkbox" id="instantBuild"></label>
           <label for="shadows">Shadows <input type="checkbox" id="shadows"></label>
@@ -336,7 +337,7 @@ const DEFAULT_BINDS={forward:'KeyW',back:'KeyS',left:'KeyA',right:'KeyD',jump:'S
   wall:'KeyQ',floor:'KeyF',ramp:'KeyE',cone:'KeyC',edit:'KeyG',reset:'Mouse2',rotate:'KeyR',pick:'Digit1',gun:'Digit2',pump:'Digit3',reload:'KeyT',material:'KeyX',aim:'Mouse2'};
 const BIND_LABELS={forward:'Move forward',back:'Move back',left:'Move left',right:'Move right',jump:'Jump',crouch:'Crouch (hold)',
   fire:'Place / select tiles',wall:'Wall',floor:'Floor',ramp:'Ramp',cone:'Cone',edit:'Edit / confirm',reset:'Reset edit',rotate:'Rotate ramp',pick:'Pickaxe',gun:'Assault rifle',pump:'Pump shotgun',reload:'Reload',material:'Switch material',aim:'Aim down sights'};
-const settings={bot:'adaptive', sens:1, fov:78, turbo:0.05, editRelease:true, instantBuild:false, shadows:!isTouch, binds:{}};
+const settings={bot:'adaptive', editSens:1, sens:1, fov:78, turbo:0.05, editRelease:true, instantBuild:false, shadows:!isTouch, binds:{}};
 try{ Object.assign(settings, JSON.parse(localStorage.getItem('cranklab.settings')||'{}')); }catch(e){}
 settings.binds=Object.assign({},DEFAULT_BINDS,settings.binds||{});
 function saveSettings(){ try{ localStorage.setItem('cranklab.settings', JSON.stringify(settings)); }catch(e){} }
@@ -482,6 +483,7 @@ const ghostDim=new THREE.MeshBasicMaterial({color:0x62bdff, transparent:true, op
 const editPieceMat=new THREE.MeshBasicMaterial({color:0xbfe2ff, transparent:true, opacity:.16, depthWrite:false});
 const tileMat=new THREE.MeshBasicMaterial({depthTest:false,color:0x8fd3ff, transparent:true, opacity:.42, side:THREE.DoubleSide, depthWrite:false});
 const tileBadMat=new THREE.MeshBasicMaterial({depthTest:false,color:0xd81e3c, transparent:true, opacity:.8, side:THREE.DoubleSide, depthWrite:false});
+const tileHoverMat=new THREE.MeshBasicMaterial({depthTest:false,color:0xd8f0ff, transparent:true, opacity:.62, side:THREE.DoubleSide, depthWrite:false});
 const tileSelMat=new THREE.MeshBasicMaterial({depthTest:false,color:0xff6a3d, transparent:true, opacity:.72, side:THREE.DoubleSide, depthWrite:false});
 const G={
   wallX:new THREE.BoxGeometry(WT,LVL-0.02,CELL-0.02), wallZ:new THREE.BoxGeometry(CELL-0.02,LVL-0.02,WT),
@@ -1018,7 +1020,7 @@ function validatePlacement(t,E=P){
 function tryPlace(type,E=P){
   const t=computeTarget(type,E);
   if(!validatePlacement(t,E).ok) return false;
-  t.mat=E===P?buildMat:(B&&E===B?(B.skill>0.65?'brick':'wood'):'wood'); t.owner=E===P?net.id:'bot';
+  t.mat=E===P?buildMat:(B&&E===B?(B.boxMat||(B.skill>0.65?'brick':'wood')):'wood'); t.owner=E===P?net.id:'bot';
   const np=addPiece(t); burst(pieceCenter(np),4,3,0.07);
   if(E===P){ sfx('place'); stat('b'); animEvent(localHero,'build'); netOp({op:'place',t:pick(t)}); } else { sfxAt('place',E.pos); if(B&&E===B) animEvent(B.h,'build'); }
   return true;
@@ -1070,7 +1072,7 @@ function enterEdit(){
   } else if(p.type==='cone'){
     for(let r=0;r<2;r++)for(let c=0;c<2;c++){
       const idx=r*2+c, cx=p.i*CELL+(c*.5+.25)*CELL, cz=p.j*CELL+(r*.5+.25)*CELL;
-      mk(G.tFloor,idx,new THREE.Vector3(cx,slabTop(p,cx,cz)+0.12,cz),m=>{m.rotation.x=-Math.PI/2;});
+      mk(G.tFloor,idx,new THREE.Vector3(cx,p.l*LVL+0.06,cz),m=>{m.rotation.x=-Math.PI/2;}); // flat at the base, like floor and stair edits
       if(p.mask>>idx&1) sel.add(idx);
     }
   } else {
@@ -1087,7 +1089,7 @@ function enterEdit(){
   fireHeld=false; heldPiece=null;
   refreshTiles(); sfx('edit'); syncMode();
 }
-function refreshTiles(){ edit.tiles.forEach(m=>{ m.material=edit.sel.has(m.userData.idx)?(edit.bad?tileBadMat:tileSelMat):tileMat; }); updateEditLabel(); }
+function refreshTiles(){ edit.tiles.forEach(m=>{ const i=m.userData.idx; m.material=edit.sel.has(i)?(edit.bad?tileBadMat:tileSelMat):i===edit.hover?tileHoverMat:tileMat; }); updateEditLabel(); }
 // Is the current tile pattern a real edit? (walls/floors need one tile left, cones one corner down, ramps two tiles on one side)
 const WALL_SHAPES={'':'No change','4':'Window','3,4,5':'Wide window','1,4':'Door','0,1,3,4':'Wide door','1,2,4,5':'Wide door','0,3':'Side door','2,5':'Side door',
   '0,1,2,4':'Arch','6,7,8':'Half wall','3,4,5,6,7,8':'Low wall','0,1,2':'Raised wall','0,1,2,3,4,5':'Top strip','1,4,7':'Center slot','0,3,6':'Side gap','2,5,8':'Side gap','7':'Peephole','4,7':'Tall window'};
@@ -1157,7 +1159,7 @@ function exitEdit(apply){
   if(apply) stat('e');
   edit.tiles.forEach(m=>scene.remove(m));
   mode=edit.prevMode; edit=null;
-  if(pieces.has(p.key)){ buildPiece(p); startAnim(p,140); popPlayerOut(); netOp({op:'shape',key:p.key,mask:p.mask,dir:p.dir,half:p.half}); }
+  if(pieces.has(p.key)){ buildPiece(p); startAnim(p,80); popPlayerOut(); netOp({op:'shape',key:p.key,mask:p.mask,dir:p.dir,half:p.half}); }
   sfx(apply?'confirm':'edit'); syncMode();
 }
 function resetEdit(){
@@ -1809,7 +1811,7 @@ addEventListener('wheel',e=>{
 addEventListener('contextmenu',e=>e.preventDefault());
 addEventListener('mousemove',e=>{
   if(isTouch||!playing||(!locked&&!lockFailed)) return;
-  const s=0.0022*settings.sens*(1-0.4*adsK);
+  const s=0.0022*settings.sens*(1-0.4*adsK)*(edit?settings.editSens:1);
   P.yaw-=e.movementX*s; P.pitch=Math.max(-1.45,Math.min(1.45,P.pitch-e.movementY*s));
 });
 addEventListener('blur',releaseAll);
@@ -1861,7 +1863,7 @@ canvas.addEventListener('pointerdown',e=>{
 canvas.addEventListener('pointermove',e=>{
   const t=tps.get(e.pointerId); if(!t) return; e.preventDefault();
   if(t.role==='look'){
-    const s=0.0058*settings.sens*(1-0.4*adsK); P.yaw-=(e.clientX-t.x)*s; P.pitch=Math.max(-1.45,Math.min(1.45,P.pitch-(e.clientY-t.y)*s)); t.x=e.clientX; t.y=e.clientY;
+    const s=0.0058*settings.sens*(1-0.4*adsK)*(edit?settings.editSens:1); P.yaw-=(e.clientX-t.x)*s; P.pitch=Math.max(-1.45,Math.min(1.45,P.pitch-(e.clientY-t.y)*s)); t.x=e.clientX; t.y=e.clientY;
   } else if(t.role==='stick'){
     let dx=e.clientX-t.x0, dy=e.clientY-t.y0; const m=Math.hypot(dx,dy), max=52;
     if(m>max){ dx=dx/m*max; dy=dy/m*max; }
@@ -2122,7 +2124,10 @@ function fireWeapon(E,H,o,base,w,nearT,target,spread,tracerCol){
   H.rig.muzzle.getWorldPosition(muzzleV);
   for(let k=0;k<W.pellets;k++){
     const d=base.clone(); d.x+=gauss()*spread; d.y+=gauss()*spread; d.z+=gauss()*spread; d.normalize();
-    const r=castShot(o,d,W.range,nearT,target);
+    let r=castShot(o,d,W.range,nearT,target);
+    // your shots aim from the camera, but must also be clear from your own eyes to the aim point
+    if(E===P){ const eye=new THREE.Vector3(P.pos.x,P.pos.y+(P.crouch?1.12:1.6),P.pos.z), d2=r.point.clone().sub(eye), len=d2.length();
+      if(len>0.05){ d2.multiplyScalar(1/len); const r2=castShot(eye,d2,len+0.05,0.05,target); if(r2.kind==='piece'&&r2.t<len-0.05) r={...r2,t:r.t-len+r2.t}; } }
     if(W.pellets===1||k<4) tracer(muzzleV,r.point,tracerCol);
     const fall=r.t<=W.f0?1:r.t>=W.f1?W.fmin:1-(1-W.fmin)*(r.t-W.f0)/(W.f1-W.f0), dmg=W.dmg*fall;
     if(r.kind==='body'){ total+=dmg*(r.head?W.head:1); head=head||r.head; hit=true; hitPt=r.point; }
@@ -2269,7 +2274,7 @@ function banner(t,sub,dur){ $('banTitle').textContent=t; $('banSub').textContent
 function botHurt(dmg){
   if(round.state!=='fight'||!B.alive) return;
   if(hurt(B,dmg)){ endRound(true); return; }
-  animEvent(B.h,'hurt');
+  animEvent(B.h,'hurt'); B.lastHurtAt=performance.now();
   const s=B.skill;
   B.react=Math.min(B.react,0.12+0.3*(1-s));
   // Taking damage: throw up cover (and a ramp to take height) if skilled enough
@@ -2287,7 +2292,7 @@ function botFire(eye,dist,s){
   aim.addScaledVector(P.vel,(dist/350)*s);
   const d=aim.sub(eye).normalize();
   const err=(0.07*(1-s)+0.006)*(B.onGround?1:1.6)*(1+Math.min(1,dist/60))*(w==='pump'?0.5:1);
-  const r=fireWeapon(B,B.h,eye,d,w,0.5,P,W.spread+err,0xff9f80);
+  const r=fireWeapon(B,B.h,eye,d,w,0.05,P,W.spread+err,0xff9f80);
   sfxAt(w==='pump'?'pump':'shot',B.pos); animEvent(B.h,'fire',w);
   if(w==='ar'){ B.ammo--; B.burst++; B.fireT=W.rate*(1.75-0.75*s);
     if(B.burst>=3+Math.round(9*s)){ B.burst=0; B.fireT+=0.2+0.7*(1-s)*Math.random(); }
@@ -2305,7 +2310,7 @@ function botUpdate(dt){
   const chest=new THREE.Vector3(P.pos.x,P.pos.y+1.15,P.pos.z), to=chest.clone().sub(eye), dist=to.length(); to.normalize();
   // line of sight, 10 times a second
   B.losT-=dt;
-  if(B.losT<=0){ B.losT=0.1; const r=castShot(eye,to,dist+2,0.5,P), was=B.los; B.los=r.kind==='body'; B.blockPiece=r.kind==='piece'?r.piece:null;
+  if(B.losT<=0){ B.losT=0.1; const r=castShot(eye,to,dist+2,0.05,P), was=B.los; B.los=r.kind==='body'; B.blockPiece=r.kind==='piece'?r.piece:null;
     if(B.los&&!was) B.react=Math.max(B.react,0.6-0.48*s); }
   // turn toward you (or hold the rush line)
   if(B.state==='rush') B.yaw=B.rushYaw;
@@ -2314,10 +2319,15 @@ function botUpdate(dt){
   // think
   B.thinkT-=dt;
   if(B.thinkT<=0&&B.state==='fight'){
-    B.thinkT=0.25;
+    B.thinkT=0.25; B.boxMat=null;
+    const hurtRecently=performance.now()-(B.lastHurtAt||0)<1800;
+    // cover got shot down while under fire: put it back up
+    if(hurtRecently&&s>0.3&&B.queue.length===0&&B.onGround&&!B.blockPiece&&dist<30&&Math.random()<0.4+0.5*s){ const y=snapYaw(B.yaw); B.queue.push({type:'wall',yaw:y,pitch:0}); }
+    // you're above and close: roof over its head
+    else if(P.pos.y>B.pos.y+3&&dist<12&&s>0.4&&B.onGround&&B.queue.length===0&&!pieces.has(computeTarget('cone',{...B,pitch:0.9}).key)) B.queue.push({type:'cone',yaw:B.yaw,pitch:0.9});
     if(P.pos.y>B.pos.y+2.5&&dist<35&&s>0.28&&B.onGround&&B.queue.length===0){ B.state='rush'; B.stateT=3+4*s; B.rushYaw=snapYaw(B.yaw); }
     else if(B.hp+B.sh<120&&s>0.5&&B.onGround&&performance.now()-B.lastBox>9000&&B.queue.length===0){
-      const y=snapYaw(B.yaw); B.state='boxed'; B.stateT=3+3*s; B.lastBox=performance.now(); B.peekT=1;
+      const y=snapYaw(B.yaw); B.state='boxed'; B.stateT=3+3*s; B.lastBox=performance.now(); B.peekT=1; B.boxMat=s>0.85?'metal':s>0.55?'brick':'wood';
       B.queue=[{type:'wall',yaw:y,pitch:0},{type:'wall',yaw:y+Math.PI/2,pitch:0},{type:'wall',yaw:y-Math.PI/2,pitch:0},{type:'wall',yaw:y+Math.PI,pitch:0},{type:'cone',yaw:y,pitch:0.9}];
     }
   }
@@ -2331,6 +2341,7 @@ function botUpdate(dt){
   } else if(B.state==='boxed'){
     B.stateT-=dt;
     if(B.queue.length===0&&!B.peek&&s>0.55){ B.peekT-=dt; if(B.peekT<=0){ const w=botFacingWall(); if(w&&w.mask===511){ botEditWall(w,511&~56); B.peek={p:w,t:0.8+0.6*s}; B.react=0.1; } B.peekT=1.3+Math.random(); } }
+    if(!B.peek&&B.queue.length===0&&!botFacingWall()&&B.buildT<=0&&s>0.45){ B.queue.push({type:'wall',yaw:snapYaw(Math.atan2(-(P.pos.x-B.pos.x),-(P.pos.z-B.pos.z))),pitch:0}); }
     if(B.peek){ B.peek.t-=dt; if(B.peek.t<=0){ if(B.peek.p.mask===(511&~56)) botEditWall(B.peek.p,511); B.peek=null; } }
     if(B.stateT<=0){ if(B.peek){ botEditWall(B.peek.p,511); B.peek=null; } const w=botFacingWall(); if(w&&w.mask===511) botEditWall(w,511&~18); B.state='fight'; }
   } else {
@@ -2413,6 +2424,11 @@ function drawMini(){
   g.beginPath(); g.moveTo(0,-8*dpr); g.lineTo(6*dpr,7*dpr); g.lineTo(0,3.5*dpr); g.lineTo(-6*dpr,7*dpr); g.closePath(); g.fill(); g.stroke(); g.restore();
 }
 (function(){
+  const es=$('editSens'), show=()=>$('editSensV').textContent=(+settings.editSens).toFixed(2)+'×';
+  es.value=settings.editSens; show();
+  es.addEventListener('input',()=>{ settings.editSens=+es.value; show(); saveSettings(); });
+})();
+(function(){
   const sel=$('botSel'); sel.value=settings.bot;
   sel.addEventListener('change',()=>{ settings.bot=sel.value; saveSettings(); if(B) B.active=false; syncBot(); });
 })();
@@ -2433,7 +2449,7 @@ function pollPad(dt){
   if(playing){
     pad.lx=dz(gp.axes[0]||0); pad.ly=dz(gp.axes[1]||0);
     const rx=dz(gp.axes[2]||0), ry=dz(gp.axes[3]||0), curve=v=>v*Math.abs(v);
-    const am=1-0.45*adsK; P.yaw-=curve(rx)*dt*3.6*settings.sens*am; P.pitch=Math.max(-1.45,Math.min(1.45,P.pitch-curve(ry)*dt*2.6*settings.sens*am));
+    const am=(1-0.45*adsK)*(edit?settings.editSens:1); P.yaw-=curve(rx)*dt*3.6*settings.sens*am; P.pitch=Math.max(-1.45,Math.min(1.45,P.pitch-curve(ry)*dt*2.6*settings.sens*am));
     touchJump=btn(0)||(touchJump&&!up(0)&&false);
     if(down(10)||down(11)) P.crouch=!P.crouch;
     if(down(15)) cycleMaterial();
@@ -2471,7 +2487,8 @@ function frame(now){
     combatTick(dt);
     if(P.pos.y<-20) respawn();
     if(edit){
-      if(edit.mouse) paintTile(tileAtNDC(0,0));
+      const hv=tileAtNDC(0,0); if(hv!==edit.hover){ edit.hover=hv; refreshTiles(); }
+      if(edit.mouse) paintTile(hv);
       if(pieceCenter(edit.piece).distanceTo(P.pos)>11) exitEdit(true);
     } else if(fireHeld){
       if(mode==='build'){ turboT-=dt; if(turboT<=0){ noStack=true; tryPlace(heldPiece||piece); noStack=false; turboT=settings.turbo; } }
