@@ -737,7 +737,10 @@ function pbox(p){
   if(p.type==='floor'||p.type==='cone') return [[x0,y,z0,x1,y,z1]];
   const lo=[[x0,y,z0,x0,y,z1],[x0,y,z0,x1,y,z0],[x1,y,z0,x1,y,z1],[x0,y,z1,x1,y,z1]][p.dir];
   const hi=[[x1,y+LVL,z0,x1,y+LVL,z1],[x0,y+LVL,z1,x1,y+LVL,z1],[x0,y+LVL,z0,x0,y+LVL,z1],[x0,y+LVL,z0,x1,y+LVL,z0]][p.dir];
-  return [lo,hi];
+  // sides: stairs side by side at the same level hold each other up (trimmed so stacked stairs still don't count)
+  const yA=y+0.15, yB=y+LVL-0.15;
+  const sides=(p.dir===0||p.dir===2)?[[x0,yA,z0,x1,yB,z0],[x0,yA,z1,x1,yB,z1]]:[[x0,yA,z0,x0,yB,z1],[x1,yA,z0,x1,yB,z1]];
+  return [lo,hi,...sides];
 }
 function touches(A,B){ const e=0.02; for(const a of A) for(const b of B) if(a[0]<=b[3]+e&&b[0]<=a[3]+e&&a[1]<=b[4]+e&&b[1]<=a[4]+e&&a[2]<=b[5]+e&&b[2]<=a[5]+e) return true; return false; }
 function grounded(p){ return p.l===0; }
