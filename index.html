@@ -60,6 +60,8 @@ canvas#c{position:fixed;top:0;left:0;width:100vw;height:100vh;height:100dvh;disp
 #cross.headhit .xm::before,#cross.headhit .xm::after{background:#ffd23f}
 body.w-pump.m-gun #cross i{display:none}
 body.w-pump.m-gun #cross .ring{display:block}
+body.ads #cross i{background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.8)}
+body.ads #cross .dot{display:block}
 body.m-pick #cross i{display:none} body.m-pick #cross .dot{display:block}
 body.m-build #cross i{background:var(--build)}
 body.m-edit #cross i{background:var(--edit)}
@@ -121,6 +123,7 @@ body.touch .slot .k{display:none}
 #tCrouch{right:calc(env(safe-area-inset-right,0px) + 26px);bottom:calc(env(safe-area-inset-bottom,0px) + 108px);width:52px;height:52px}
 #tBuild{right:calc(env(safe-area-inset-right,0px) + 206px);bottom:calc(env(safe-area-inset-bottom,0px) + 26px)}
 #tEdit{right:calc(env(safe-area-inset-right,0px) + 210px);bottom:calc(env(safe-area-inset-bottom,0px) + 98px);width:52px;height:52px}
+#tAim{right:calc(env(safe-area-inset-right,0px) + 214px);bottom:calc(env(safe-area-inset-bottom,0px) + 168px);width:52px;height:52px}
 #tReload{right:calc(env(safe-area-inset-right,0px) + 124px);bottom:calc(env(safe-area-inset-bottom,0px) + 172px);width:50px;height:50px}
 #tFireL{left:calc(env(safe-area-inset-left,0px) + 26px);top:38%;width:60px;height:60px}
 #menuBtn{top:calc(env(safe-area-inset-top,0px) + 10px);right:calc(env(safe-area-inset-right,0px) + 152px);width:42px;height:42px;border-radius:9px}
@@ -253,6 +256,7 @@ kbd{font-family:var(--font-ui);background:#1c2a40;border-radius:3px;padding:1px 
   <button class="tb" id="tCrouch" data-act="crouch" aria-label="Crouch"><svg viewBox="0 0 24 24"><path d="M5 9l7 7 7-7" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
   <button class="tb" id="tBuild" data-act="build" aria-label="Build mode"><svg viewBox="0 0 24 24"><path d="M4 9l6-5 3 3-2 2 9 9-2 2-9-9-2 2z" fill="#fff"/></svg></button>
   <button class="tb" id="tEdit" data-act="edit">Edit</button>
+  <button class="tb" id="tAim" data-act="aim" aria-label="Aim"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="#fff" stroke-width="2"/><circle cx="12" cy="12" r="2.2" fill="#fff"/><path d="M12 1v5M12 18v5M1 12h5M18 12h5" stroke="#fff" stroke-width="2"/></svg></button>
   <button class="tb" id="tReload" data-act="reload" aria-label="Reload"><svg viewBox="0 0 24 24"><path d="M19 12a7 7 0 1 1-2-5" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><path d="M18 3v5h-5" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
 </div>
 
@@ -329,9 +333,9 @@ const SPAWN=[2.5,0,2.5];
 
 /* ---------- settings ---------- */
 const DEFAULT_BINDS={forward:'KeyW',back:'KeyS',left:'KeyA',right:'KeyD',jump:'Space',crouch:'ShiftLeft',fire:'Mouse0',
-  wall:'KeyQ',floor:'KeyF',ramp:'KeyE',cone:'KeyC',edit:'KeyG',reset:'Mouse2',rotate:'KeyR',pick:'Digit1',gun:'Digit2',pump:'Digit3',reload:'KeyT',material:'KeyX'};
+  wall:'KeyQ',floor:'KeyF',ramp:'KeyE',cone:'KeyC',edit:'KeyG',reset:'Mouse2',rotate:'KeyR',pick:'Digit1',gun:'Digit2',pump:'Digit3',reload:'KeyT',material:'KeyX',aim:'Mouse2'};
 const BIND_LABELS={forward:'Move forward',back:'Move back',left:'Move left',right:'Move right',jump:'Jump',crouch:'Crouch (hold)',
-  fire:'Place / select tiles',wall:'Wall',floor:'Floor',ramp:'Ramp',cone:'Cone',edit:'Edit / confirm',reset:'Reset edit',rotate:'Rotate ramp',pick:'Pickaxe',gun:'Assault rifle',pump:'Pump shotgun',reload:'Reload',material:'Switch material'};
+  fire:'Place / select tiles',wall:'Wall',floor:'Floor',ramp:'Ramp',cone:'Cone',edit:'Edit / confirm',reset:'Reset edit',rotate:'Rotate ramp',pick:'Pickaxe',gun:'Assault rifle',pump:'Pump shotgun',reload:'Reload',material:'Switch material',aim:'Aim down sights'};
 const settings={bot:'adaptive', sens:1, fov:78, turbo:0.05, editRelease:true, instantBuild:false, shadows:!isTouch, binds:{}};
 try{ Object.assign(settings, JSON.parse(localStorage.getItem('cranklab.settings')||'{}')); }catch(e){}
 settings.binds=Object.assign({},DEFAULT_BINDS,settings.binds||{});
@@ -865,7 +869,7 @@ function wishInput(){
 }
 function moveInput(dt){
   const [fw,st]=wishInput();
-  moveBody(P,fw,st,isHeld('jump')||touchJump,dt);
+  const ms=1-0.35*adsK; moveBody(P,fw*ms,st*ms,isHeld('jump')||touchJump,dt);
 }
 function moveBody(E,fw,st,jump,dt){
   const fx=-Math.sin(E.yaw), fz=-Math.cos(E.yaw), rx=Math.cos(E.yaw), rz=-Math.sin(E.yaw);
@@ -1131,6 +1135,7 @@ function tileAtNDC(nx,ny){
 function exitEdit(apply){
   if(!edit) return;
   const p=edit.piece;
+  if(apply&&!editValid()){ apply=false; toast('Edit cancelled: not a valid shape'); }
   if(apply){
     if(p.type==='wall'||p.type==='floor'){
       const full=p.type==='wall'?511:15; let m=full; edit.sel.forEach(i=>{m&=~(1<<i);});
@@ -1161,6 +1166,11 @@ function resetEdit(){
 /* ---------- actions ---------- */
 function selectPiece(t){ if(edit) exitEdit(true); piece=t; mode='build'; syncMode(); }
 function selectPick(){ if(edit) exitEdit(true); mode='pick'; P.lastWeapon='pick'; syncMode(); }
+/* Aiming down sights: held (mouse/controller) or toggled (touch). adsK eases 0..1 and drives zoom,
+   camera, sensitivity, move speed and spread. */
+let adsHeld=false, adsK=0, sinceShot=9;
+const canAim=()=>mode==='gun'&&!edit&&P.reloadT<=0;
+const adsOn=()=>adsHeld&&canAim();
 function selectGun(w){
   if(edit) exitEdit(true);
   w=w||P.wpn;
@@ -1183,10 +1193,12 @@ function fireUp(src){
   fireHeld=false;
   if(edit&&src==='desk'&&edit.mouse){ edit.mouse=false; edit.painting=null; if(settings.editRelease) releaseEdit(); }
 }
+const PICK_DMG=50;
 function swing(){
   swingT=0.22; net.lastSwing=(net.lastSwing%1e6)+1;
   const hit=aimHit(3.4);
-  if(hit){ const hp_=hit.object.userData.piece; burst(pieceCenter(hp_).add(new THREE.Vector3(0,hp_.type==='cone'?0.8:0,0)),18,7,0.32); burst(hit.point,8,4,0.12); const nb_=neighbors(hp_); removePiece(hp_); collapseFrom(nb_); sfx('break'); netOp({op:'break',key:hp_.key}); } else sfx('whiff');
+  // the pickaxe chips builds (50 a hit) instead of deleting them
+  if(hit){ const hp_=hit.object.userData.piece; dmgNum(hit.point,PICK_DMG,'build'); sfx('tick'); damagePiece(hp_,PICK_DMG,hit.point); } else sfx('whiff');
 }
 function toggleEdit(){ if(edit) exitEdit(true); else enterEdit(); }
 function respawn(){ animEvent(localHero,'revive'); P.pos.set(...SPAWN); P.vel.set(0,0,0); P.onGround=true; P.hp=100; P.sh=100; P.ammo={ar:WEAPONS.ar.mag,pump:WEAPONS.pump.mag}; P.reloadT=0; }
@@ -1574,7 +1586,7 @@ function animateRig(H,S,dt){
     const upR=_fp.copy(_up).applyAxisAngle(aimR,-tilt);
     handQuat(_hq,aimR,upR);
     r.armR.sh.getWorldPosition(_tw);
-    _tw.addScaledVector(_aim,0.2-0.07*rec).addScaledVector(_up,-0.07-0.25*A.equip-(rl?0.06:0)).addScaledVector(_rt,-0.09);
+    const ad=S.ads||0; _tw.addScaledVector(_aim,0.2-0.07*rec+0.06*ad).addScaledVector(_up,-0.07+0.1*ad-0.25*A.equip-(rl?0.06:0)).addScaledVector(_rt,-0.09-0.07*ad);
     _pole.copy(_tw).addScaledVector(_up,-1).addScaledVector(_rt,0.8);
     ikArm(r.armR,_tw,_pole,_hq);
     // left hand: fore-grip, or the reload path (gun -> hip pouch -> gun)
@@ -1611,7 +1623,7 @@ function animateRig(H,S,dt){
 }
 function animateHero(dt){
   animateRig(localHero,{pos:P.pos,vel:P.vel,yaw:P.yaw,pitch:P.pitch,onGround:P.onGround,crouch:P.crouch,building:mode==='build'&&!edit,editing:!!edit,
-    gun:mode==='gun'&&!edit?P.wpn:false,swingT,reload:(mode==='gun'&&P.reloadT>0)?{w:P.wpn,p:1-P.reloadT/P.reloadDur}:null},dt);
+    gun:mode==='gun'&&!edit?P.wpn:false,ads:adsK,swingT,reload:(mode==='gun'&&P.reloadT>0)?{w:P.wpn,p:1-P.reloadT/P.reloadDur}:null},dt);
 }
 
 /* ---------- camera ---------- */
@@ -1619,7 +1631,8 @@ const tmpA=new THREE.Vector3(), tmpB=new THREE.Vector3();
 function updateCamera(){
   const eye=P.crouch?EYE_CROUCH:EYE_STAND;
   const pivot=tmpA.set(P.pos.x,P.pos.y+eye,P.pos.z), d=aimDir();
-  const want=tmpB.set(Math.cos(P.yaw)*0.6,0.18,-Math.sin(P.yaw)*0.6).addScaledVector(d,-2.9);
+  const side=0.6-0.05*adsK, back=2.9-1.35*adsK, up=0.18+0.08*adsK;
+  const want=tmpB.set(Math.cos(P.yaw)*side,up,-Math.sin(P.yaw)*side).addScaledVector(d,-back);
   let dist=want.length(); want.normalize();
   ray.set(pivot,want); ray.far=dist+0.3;
   const hits=ray.intersectObjects(nearMeshes(P.pos.x,P.pos.z,1),false);
@@ -1637,6 +1650,7 @@ let toastTimer=0;
 function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),1400); }
 const pieceNames={wall:'Wall',floor:'Floor',ramp:'Ramp',cone:'Cone'};
 function syncMode(){
+  if(mode!=='gun'||edit) adsHeld=false;
   const b=document.body, inBuild=mode==='build'||!!edit;
   b.classList.toggle('m-build',mode==='build'&&!edit); b.classList.toggle('m-edit',!!edit);
   b.classList.toggle('m-gun',mode==='gun'&&!edit); b.classList.toggle('m-pick',mode==='pick'&&!edit);
@@ -1729,6 +1743,7 @@ function pressAction(a){
   else if(a==='pick') selectPick();
   else if(a==='gun') selectGun('ar');
   else if(a==='pump') selectGun('pump');
+  else if(a==='aim') adsHeld=true;
   else if(a==='reload') startReload();
   else if(a==='material') cycleMaterial();
   else if(a==='edit') toggleEdit();
@@ -1737,6 +1752,7 @@ function pressAction(a){
   else if(a==='crouch') P.crouch=true;
 }
 function releaseAction(a){
+  if(a==='aim') adsHeld=false;
   if(a==='fire') fireUp('desk');
   else if(a==='crouch') P.crouch=false;
   else if(pieceNames[a]&&heldPiece===a){ heldPiece=null; if(!isHeld('fire')) fireUp('desk'); }
@@ -1790,7 +1806,7 @@ addEventListener('wheel',e=>{
 addEventListener('contextmenu',e=>e.preventDefault());
 addEventListener('mousemove',e=>{
   if(isTouch||!playing||(!locked&&!lockFailed)) return;
-  const s=0.0022*settings.sens;
+  const s=0.0022*settings.sens*(1-0.4*adsK);
   P.yaw-=e.movementX*s; P.pitch=Math.max(-1.45,Math.min(1.45,P.pitch-e.movementY*s));
 });
 addEventListener('blur',releaseAll);
@@ -1842,7 +1858,7 @@ canvas.addEventListener('pointerdown',e=>{
 canvas.addEventListener('pointermove',e=>{
   const t=tps.get(e.pointerId); if(!t) return; e.preventDefault();
   if(t.role==='look'){
-    const s=0.0058*settings.sens; P.yaw-=(e.clientX-t.x)*s; P.pitch=Math.max(-1.45,Math.min(1.45,P.pitch-(e.clientY-t.y)*s)); t.x=e.clientX; t.y=e.clientY;
+    const s=0.0058*settings.sens*(1-0.4*adsK); P.yaw-=(e.clientX-t.x)*s; P.pitch=Math.max(-1.45,Math.min(1.45,P.pitch-(e.clientY-t.y)*s)); t.x=e.clientX; t.y=e.clientY;
   } else if(t.role==='stick'){
     let dx=e.clientX-t.x0, dy=e.clientY-t.y0; const m=Math.hypot(dx,dy), max=52;
     if(m>max){ dx=dx/m*max; dy=dy/m*max; }
@@ -1867,6 +1883,7 @@ document.querySelectorAll('.tb').forEach(b=>{
     else if(act==='crouch'){ P.crouch=!P.crouch; $('tCrouch').classList.toggle('on',P.crouch); }
     else if(act==='edit') toggleEdit();
     else if(act==='reset') resetEdit();
+    else if(act==='aim') adsHeld=!adsHeld;
     else if(act==='reload') startReload();
     else if(act==='build') toggleBuild();
     else if(act==='fire') fireDown('touch');
@@ -1894,9 +1911,9 @@ document.querySelectorAll('.slot[data-s]').forEach(b=>{
 // Size to the canvas's real on-screen box (the artifact frame can differ from window.inner* and resize without events)
 let lastW=0,lastH=0;
 function applyFov(){
-  const a=camera.aspect||1;
-  if(a>=1) camera.fov=settings.fov;
-  else { const hf=Math.min(settings.fov,74)*Math.PI/180; camera.fov=Math.min(105,2*Math.atan(Math.tan(hf/2)/a)*180/Math.PI); }
+  const a=camera.aspect||1, zoom=1-adsK*(P.wpn==='pump'?0.15:0.3);
+  if(a>=1) camera.fov=settings.fov*zoom;
+  else { const hf=Math.min(settings.fov,74)*Math.PI/180; camera.fov=Math.min(105,2*Math.atan(Math.tan(hf/2)/a)*180/Math.PI)*zoom; }
   camera.updateProjectionMatrix();
 }
 function fitView(){
@@ -2112,18 +2129,24 @@ function fireWeapon(E,H,o,base,w,nearT,target,spread,tracerCol){
   muzzleFlash(H);
   return {hit,dmg:Math.round(total),head,point:hitPt};
 }
+function shotSpread(W){
+  const adsMul=W.pellets===1?1-0.7*adsK:1-0.2*adsK;
+  return (W.spread+(W.pellets===1?P.bloom:0))*(P.crouch?0.7:1)*(P.onGround?1:1.6)*adsMul*(1+Math.min(1,Math.hypot(P.vel.x,P.vel.z)/RUN)*0.5*(1-adsK));
+}
 function playerShoot(){
   const W=WEAPONS[P.wpn];
   if(P.equipT>0) return;
   if(P.ammo[P.wpn]<=0){ startReload(); return; }
   if(P.reloadT>0){ if(P.wpn==='pump') P.reloadT=0; else return; } // pump can cancel its shell reload
   P.ammo[P.wpn]--; P.gunT=W.rate;
-  const spread=(W.spread+(W.pellets===1?P.bloom:0))*(P.crouch?0.7:1)*(P.onGround?1:1.6);
-  if(W.pellets===1) P.bloom=Math.min(0.045,P.bloom+0.007);
+  const first=W.pellets===1&&sinceShot>0.35; if(first) P.bloom=0;
+  const spread=shotSpread(W)*(first?0.15:1);
+  if(W.pellets===1) P.bloom=Math.min(0.045,P.bloom+0.007*(1-0.5*adsK));
+  sinceShot=0;
   camera.updateMatrixWorld();
   const tgt=(B&&B.active&&B.alive)?B:null, shBefore=tgt?tgt.sh:0;
   const r=fireWeapon(P,localHero,camera.position.clone(),aimDir(),P.wpn,camDist+0.4,tgt,spread);
-  sfx(P.wpn==='pump'?'pump':'shot'); animEvent(localHero,'fire',P.wpn); stat('s'); P.kick=P.wpn==='pump'?0.05:0.012;
+  sfx(P.wpn==='pump'?'pump':'shot'); animEvent(localHero,'fire',P.wpn); stat('s'); P.kick=(P.wpn==='pump'?0.05:0.014)*(1-0.55*adsK); P.yaw+=(Math.random()-.5)*(P.wpn==='pump'?0.01:0.007)*(1-0.6*adsK);
   if(r.hit){ stat('h',r.dmg); hitMarker(r.dmg,r.head); dmgNum(B.pos.clone().setY(B.pos.y+(r.head?2.05:1.6)),r.dmg,r.head?'head':shBefore>0?'shield':'hp'); botHurt(r.dmg); }
   if(P.ammo[P.wpn]<=0) startReload();
 }
@@ -2145,6 +2168,11 @@ function pieceHpTick(dt){
 }
 function combatTick(dt){
   stepBuildHp(dt); pieceHpTick(dt);
+  sinceShot+=dt;
+  const tgt=adsOn()?1:0, prevK=adsK; adsK+=(tgt-adsK)*Math.min(1,dt*14); if(Math.abs(adsK-tgt)<0.002) adsK=tgt;
+  if(adsK!==prevK) applyFov();
+  document.body.classList.toggle('ads',adsK>0.5);
+  const ta=$('tAim'); if(ta) ta.classList.toggle('on',adsHeld&&canAim());
   P.gunT-=dt; P.equipT-=dt; P.bloom=Math.max(0,P.bloom-dt*0.07);
   if(P.kick>0){ const k=Math.min(P.kick,dt*0.5); P.pitch=Math.min(1.45,P.pitch+k); P.kick-=k; }
   if(P.reloadT>0){ P.reloadT-=dt; if(P.reloadT<=0){ const W=WEAPONS[P.wpn];
@@ -2342,7 +2370,7 @@ function updateCombatHUD(){
   for(const w of ['ar','pump']){ const el=$('am-'+w); if(el) el.textContent=P.ammo[w]; }
   // crosshair spread and reload ring
   const W=WEAPONS[P.wpn], halfH=canvas.clientHeight/2, k=halfH/Math.tan(camera.fov*Math.PI/360);
-  const sp=(W.spread+(W.pellets===1?P.bloom:0))*(P.crouch?0.7:1)*(P.onGround?1:1.6);
+  const sp=shotSpread(W);
   const cr=$('cross'); cr.style.setProperty('--sp',Math.max(4,sp*k*1.6).toFixed(1)+'px');
   cr.style.setProperty('--rp',P.reloadT>0?(1-P.reloadT/P.reloadDur).toFixed(3):'0');
   cr.classList.toggle('reloading',P.reloadT>0&&mode==='gun');
@@ -2402,7 +2430,7 @@ function pollPad(dt){
   if(playing){
     pad.lx=dz(gp.axes[0]||0); pad.ly=dz(gp.axes[1]||0);
     const rx=dz(gp.axes[2]||0), ry=dz(gp.axes[3]||0), curve=v=>v*Math.abs(v);
-    P.yaw-=curve(rx)*dt*3.6*settings.sens; P.pitch=Math.max(-1.45,Math.min(1.45,P.pitch-curve(ry)*dt*2.6*settings.sens));
+    const am=1-0.45*adsK; P.yaw-=curve(rx)*dt*3.6*settings.sens*am; P.pitch=Math.max(-1.45,Math.min(1.45,P.pitch-curve(ry)*dt*2.6*settings.sens*am));
     touchJump=btn(0)||(touchJump&&!up(0)&&false);
     if(down(10)||down(11)) P.crouch=!P.crouch;
     if(down(15)) cycleMaterial();
@@ -2416,6 +2444,7 @@ function pollPad(dt){
       if(down(3)) toggleEdit(); if(down(1)) toggleBuild();
     } else {
       if(down(7)) fireDown('desk'); if(up(7)) fireUp('desk');
+      adsHeld=btn(6);
       const slots=['pick','ar','pump'], cur=mode==='pick'?0:slots.indexOf(P.wpn);
       const go=i=>{ const w=slots[(i+3)%3]; if(w==='pick') selectPick(); else selectGun(w); };
       if(down(5)) go(cur+1); if(down(4)) go(cur-1);
