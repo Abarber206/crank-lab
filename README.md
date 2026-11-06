@@ -4,6 +4,12 @@ A browser build-fight practice range: Chapter 1-style movement, turbo build, wal
 
 **Play:** https://abarber206.github.io/crank-lab/
 
+## Zombie horde
+Pick **Zombie horde** next to Play. You get 20 seconds to build a fort, then waves of zombies walk in from every side. Husks shamble, runners sprint (from wave 2), and brutes (from wave 4) are huge, tanky and smash builds fast. Zombies claw through anything built in their way, and if you're up on a tower they go for the piece holding it up. Clearing a wave gives you a 15-second break, 50 shield, 30 health, 3 bandages and 2 small shields. In a room the host picks the mode and runs the zombies for everyone; zombies get tougher and waves bigger with more players, and anyone who goes down is back in 3 seconds.
+
+## Heals
+Slot 4 is bandages (15 health each, up to 75, 3.5 s) and slot 5 is small shield potions (25 shield each, up to 50, 2 s). Click to use one, hold fire to keep using them. You start with 5 bandages and 3 small shields.
+
 ## Opponent
 A bot that strafes, shoots, walls up when hit, ramp rushes when you take height, and boxes up to peek through window edits. On **Adaptive** it measures your accuracy, build speed, edits and damage over the last 40 seconds and matches it, nudging harder when you win rounds and easier when you lose. Fixed Easy to Expert levels are in the menu. In a multiplayer room the host's game runs the bot for everyone: it goes after the nearest player, its builds and edits show up for everyone, anyone can eliminate it, and it comes back 3 seconds later. The host picks its level in the menu (Off removes it).
 

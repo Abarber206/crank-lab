@@ -116,6 +116,13 @@ body.m-edit #cross i{background:var(--edit)}
 .mats .k{position:absolute;top:-8px;left:-4px;font:800 11px/1 var(--font-hud);background:var(--slot-dark);padding:2px 4px;border-radius:3px}
 body.touch .mats .k{display:none}
 #buildReason{left:50%;top:calc(50% + 26px);transform:translateX(-50%);font:800 italic 15px/1 var(--font-hud);text-transform:uppercase;letter-spacing:.04em;color:#ff8a78;text-shadow:0 1px 3px #000;white-space:nowrap}
+#useBar{left:50%;top:calc(50% + 64px);transform:translateX(-50%);display:grid;justify-items:center;gap:4px;font:800 italic 15px/1 var(--font-hud);text-shadow:0 1px 3px #000}
+#useBar .pb{width:150px;height:8px;background:rgba(10,18,30,.6);border:1px solid rgba(255,255,255,.45)}
+#useBar .pb i{display:block;height:100%;width:0;background:#7be36a}
+#useBar.sh .pb i{background:#5fc0ff}
+.slot.out{opacity:.45}
+.modepick{display:flex;align-items:center;gap:8px;font:700 15px/1 var(--font-ui,inherit);color:var(--ink)}
+.modepick select{font:inherit;background:#1c2a40;color:var(--ink);border:1px solid rgba(255,255,255,.25);border-radius:6px;padding:8px 10px}
 #pieceHp{left:50%;top:calc(50% + 28px);transform:translateX(-50%);display:grid;justify-items:center;gap:3px;font:800 italic 14px/1 var(--font-hud);text-shadow:0 1px 3px #000}
 #pieceHp .pb{width:96px;height:6px;background:rgba(10,18,30,.6);border:1px solid rgba(255,255,255,.4)}
 #pieceHp .pb i{display:block;height:100%;background:#fff}
@@ -264,6 +271,8 @@ body.touch #stickHint{width:100px;height:100px;opacity:.6}
   <div class="chips">
     <span class="chip" id="cScore" hidden><small>YOU</small><b id="score">0 – 0</b><small>BOT</small></span>
     <span class="chip red" id="cSkill" hidden><small>BOT SKILL</small><b id="bSkill">35</b></span>
+    <span class="chip red" id="cWave" hidden><small>WAVE</small><b id="waveN">1</b><small id="waveL"></small></span>
+    <span class="chip" id="cKills" hidden><small>KILLS</small><b id="killN">0</b></span>
     <span class="chip"><b id="sH">0.0</b><small>M</small></span>
     <span class="chip" id="hudRoom" hidden><small>ROOM</small><b id="hudRoomV"></b></span>
   </div>
@@ -277,6 +286,7 @@ body.touch #stickHint{width:100px;height:100px;opacity:.6}
 <div class="hud" id="dmgDir"></div>
 <div class="hud" id="xAmmo"></div>
 <div class="hud" id="buildReason" hidden></div>
+<div class="hud" id="useBar" hidden><span id="useT"></span><span class="pb"><i id="useB"></i></span></div>
 <div class="hud" id="pieceHp" hidden><span id="pieceHpT"></span><span class="pb"><i id="pieceHpB"></i></span></div>
 <div class="hud" id="banner"><div class="big" id="banTitle"></div><div class="small" id="banSub"></div></div>
 <div id="hurtfx"></div>
@@ -290,7 +300,8 @@ body.touch #stickHint{width:100px;height:100px;opacity:.6}
     <button class="slot r-common" data-s="pick" aria-label="Pickaxe"><span class="k">1</span><svg viewBox="0 0 48 48"><path d="M8 14c8-8 22-10 32-4-9-1-17 1-24 7z" fill="#e6edf4"/><path d="M22 15l4 4-15 21-4-4z" fill="#8a5a2e"/></svg></button>
     <button class="slot r-uncommon" data-s="gun" aria-label="Assault rifle"><span class="k">2</span><svg viewBox="0 0 48 48"><path d="M3 21h24l3-3h9v4h6v3h-6v3h-7l-3 3v8h-5v-8l-3-3H9l-6 4z" fill="#1d232c"/><rect x="18" y="16" width="7" height="3" fill="#cfe8ff"/></svg><span class="am" id="am-ar">30</span></button>
     <button class="slot r-rare" data-s="pump" aria-label="Pump shotgun"><span class="k">3</span><svg viewBox="0 0 48 48"><path d="M4 23h28v-3h12v5H32v3H17l-3 2v9H9v-9l-5-3z" fill="#1d232c"/><rect x="21" y="25" width="9" height="4" rx="1" fill="#9a6a3a"/></svg><span class="am" id="am-pump">5</span></button>
-    <div class="slot empty"></div><div class="slot empty"></div>
+    <button class="slot r-common" data-s="bandage" aria-label="Bandages"><span class="k">4</span><svg viewBox="0 0 48 48"><g transform="rotate(-35 24 24)"><rect x="5" y="16" width="38" height="16" rx="8" fill="#f3e3c3" stroke="#1d232c" stroke-width="2"/><rect x="18" y="16" width="12" height="16" fill="#e2bf93"/><circle cx="21.5" cy="21" r="1.3" fill="#a77d50"/><circle cx="26.5" cy="21" r="1.3" fill="#a77d50"/><circle cx="21.5" cy="27" r="1.3" fill="#a77d50"/><circle cx="26.5" cy="27" r="1.3" fill="#a77d50"/></g></svg><span class="am" id="am-bandage">5</span></button>
+    <button class="slot r-rare" data-s="mini" aria-label="Small shield potion"><span class="k">5</span><svg viewBox="0 0 48 48"><path d="M19 9h10v6l7 9v13a4 4 0 0 1-4 4H16a4 4 0 0 1-4-4V24l7-9z" fill="#d9f1ff" stroke="#1d232c" stroke-width="2" stroke-linejoin="round"/><path d="M13 28h22v9a3 3 0 0 1-3 3H16a3 3 0 0 1-3-3z" fill="#3fa9ff"/><path d="M17 31h3" stroke="#bfe6ff" stroke-width="2" stroke-linecap="round"/><rect x="17.5" y="5" width="13" height="5" rx="1.5" fill="#1d232c"/></svg><span class="am" id="am-mini">3</span></button>
   </div>
   <div class="slots" id="bbar" hidden>
     <button class="slot b" data-s="wall" aria-label="Wall"><span class="k">Q</span><svg viewBox="0 0 48 48"><rect x="8" y="8" width="32" height="32" fill="none" stroke="#fff" stroke-width="4"/><path d="M10 38L38 10" stroke="#fff" stroke-width="3"/></svg></button>
@@ -319,7 +330,7 @@ body.touch #stickHint{width:100px;height:100px;opacity:.6}
   <div class="panel">
     <h1>Crank Lab</h1>
     <p class="sub">A build-fight practice range. Snappy Chapter 1-style running and jumping, turbo build on a 5&nbsp;m by 4&nbsp;m grid, and wall, floor, ramp and cone edits. Ramp rush, crank 90s, and chase your best height.</p>
-    <div class="actions"><button class="btn primary" id="play">Play</button><button class="btn" id="respawn">Respawn</button><button class="btn" id="clear">Clear builds</button><button class="btn" id="fs">Fullscreen</button></div>
+    <div class="actions"><label class="modepick" for="modeSel">Mode <select id="modeSel"><option value="fight">Build fight</option><option value="horde">Zombie horde</option></select></label><button class="btn primary" id="play">Play</button><button class="btn" id="respawn">Respawn</button><button class="btn" id="clear">Clear builds</button><button class="btn" id="fs">Fullscreen</button></div>
     <section class="mp">
       <h2>Multiplayer</h2>
       <div id="roomIdle" class="mprow">
@@ -394,10 +405,10 @@ const SPAWN=[2.5,0,2.5];
 
 /* ---------- settings ---------- */
 const DEFAULT_BINDS={forward:'KeyW',back:'KeyS',left:'KeyA',right:'KeyD',jump:'Space',crouch:'ShiftLeft',fire:'Mouse0',
-  wall:'KeyQ',floor:'KeyF',ramp:'KeyE',cone:'KeyC',edit:'KeyG',reset:'Mouse2',rotate:'KeyR',pick:'Digit1',gun:'Digit2',pump:'Digit3',reload:'KeyT',material:'KeyX',aim:'Mouse2'};
+  wall:'KeyQ',floor:'KeyF',ramp:'KeyE',cone:'KeyC',edit:'KeyG',reset:'Mouse2',rotate:'KeyR',pick:'Digit1',gun:'Digit2',pump:'Digit3',bandage:'Digit4',mini:'Digit5',reload:'KeyT',material:'KeyX',aim:'Mouse2'};
 const BIND_LABELS={forward:'Move forward',back:'Move back',left:'Move left',right:'Move right',jump:'Jump',crouch:'Crouch (hold)',
-  fire:'Place / select tiles',wall:'Wall',floor:'Floor',ramp:'Ramp',cone:'Cone',edit:'Edit / confirm',reset:'Reset edit',rotate:'Rotate ramp',pick:'Pickaxe',gun:'Assault rifle',pump:'Pump shotgun',reload:'Reload',material:'Switch material',aim:'Aim down sights'};
-const settings={bot:'adaptive', btnSize:1, btnOpacity:0.7, leftFire:true, autoFire:false, aimAssist:true, editSens:1, sens:1, fov:78, turbo:0.05, editRelease:true, instantBuild:false, shadows:!isTouch, binds:{}};
+  fire:'Place / select tiles',wall:'Wall',floor:'Floor',ramp:'Ramp',cone:'Cone',edit:'Edit / confirm',reset:'Reset edit',rotate:'Rotate ramp',pick:'Pickaxe',gun:'Assault rifle',pump:'Pump shotgun',bandage:'Bandages',mini:'Small shield potion',reload:'Reload',material:'Switch material',aim:'Aim down sights'};
+const settings={mode:'fight', bot:'adaptive', btnSize:1, btnOpacity:0.7, leftFire:true, autoFire:false, aimAssist:true, editSens:1, sens:1, fov:78, turbo:0.05, editRelease:true, instantBuild:false, shadows:!isTouch, binds:{}};
 try{ Object.assign(settings, JSON.parse(localStorage.getItem('cranklab.settings')||'{}')); }catch(e){}
 settings.binds=Object.assign({},DEFAULT_BINDS,settings.binds||{});
 function saveSettings(){ try{ localStorage.setItem('cranklab.settings', JSON.stringify(settings)); }catch(e){} }
@@ -416,7 +427,7 @@ scene.fog=new THREE.Fog(SKY,140,420);
 const camera=new THREE.PerspectiveCamera(settings.fov, innerWidth/innerHeight, 0.08, 700);
 camera.rotation.order='YXZ';
 
-scene.add(new THREE.HemisphereLight(0xe2f1ff, 0x55703a, 0.78));
+const hemi=new THREE.HemisphereLight(0xe2f1ff, 0x55703a, 0.78); scene.add(hemi);
 const sun=new THREE.DirectionalLight(0xfff0d4, 0.95);
 sun.castShadow=settings.shadows;
 sun.shadow.mapSize.set(isTouch?1024:2048, isTouch?1024:2048);
@@ -993,7 +1004,7 @@ function wishInput(){
 }
 function moveInput(dt){
   const [fw,st]=wishInput();
-  const ms=1-0.35*adsK; moveBody(P,fw*ms,st*ms,isHeld('jump')||touchJump,dt);
+  const ms=(1-0.35*adsK)*(P.useT>0?0.55:1); moveBody(P,fw*ms,st*ms,isHeld('jump')||touchJump,dt);
 }
 function moveBody(E,fw,st,jump,dt){
   const fx=-Math.sin(E.yaw), fz=-Math.cos(E.yaw), rx=Math.cos(E.yaw), rz=-Math.sin(E.yaw);
@@ -1340,13 +1351,14 @@ function toggleBuild(){
   else selectPiece(piece);
 }
 // eliminated (in a room, or by the bot) = no moving, shooting, building or editing until you respawn
-function isDead(){ return net.dead||(typeof round!=='undefined'&&round.state==='over'&&P.hp<=0); }
+function isDead(){ return net.dead||(typeof round!=='undefined'&&round.state==='over'&&P.hp<=0)||(horde.on&&!net.role&&P.hp<=0); }
 function fireDown(src){
   if(isDead()) return;
   if(edit){ if(src==='desk'){ edit.painting=null; edit.mouse=true; paintTile(tileAtNDC(0,0)); } return; }
   fireHeld=true;
   if(mode==='build'){ tryPlace(heldPiece||piece); turboT=settings.turbo; }
   else if(mode==='gun'){ if(P.gunT<=0) playerShoot(); }
+  else if(mode==='item') startUse();
   else { swing(); pickT=0.32; }
 }
 function fireUp(src){
@@ -1356,12 +1368,18 @@ function fireUp(src){
 const PICK_DMG=50;
 function swing(){
   swingT=0.22; net.lastSwing=(net.lastSwing%1e6)+1;
+  // pickaxe a zombie in front of you
+  let zb=null, zd=1e9; const fx=-Math.sin(P.yaw), fz=-Math.cos(P.yaw);
+  horde.zs.forEach(z=>{ if(!z.alive) return; const dx=z.pos.x-P.pos.x, dz=z.pos.z-P.pos.z, d=Math.hypot(dx,dz);
+    if(d<2.4+0.4*z.sc&&Math.abs(z.pos.y-P.pos.y)<1.6&&(dx*fx+dz*fz)/Math.max(d,1e-3)>0.6&&d<zd){ zd=d; zb=z; } });
+  if(zb){ const dmg=40, pt=zb.pos.clone().setY(zb.pos.y+1.3*zb.sc); dmgNum(pt,dmg,'hp'); sfx('pick_hit'); hitMarker(dmg,false); burst(pt,4,2.5,0.06,goreMat);
+    if(net.role==='client') netSend({type:'zhit',id:net.id,z:zb.id,dmg}); else zombieHurt(zb,dmg,net.id); return; }
   const hit=aimHit(3.4);
   // the pickaxe chips builds (50 a hit) instead of deleting them
   if(hit){ const hp_=hit.object.userData.piece; dmgNum(hit.point,PICK_DMG,'build'); sfx('pick_hit'); damagePiece(hp_,PICK_DMG,hit.point); } else sfx('whiff');
 }
 function toggleEdit(){ if(edit) exitEdit(true); else enterEdit(); }
-function respawn(){ animEvent(localHero,'revive'); P.pos.set(...SPAWN); P.vel.set(0,0,0); P.onGround=true; P.hp=100; P.sh=100; P.ammo={ar:WEAPONS.ar.mag,pump:WEAPONS.pump.mag}; P.reloadT=0; }
+function respawn(){ animEvent(localHero,'revive'); P.pos.set(...SPAWN); P.vel.set(0,0,0); P.onGround=true; P.hp=100; P.sh=100; P.ammo={ar:WEAPONS.ar.mag,pump:WEAPONS.pump.mag}; P.reloadT=0; P.useT=0; P.items={bandage:ITEMS.bandage.start,mini:ITEMS.mini.start}; syncItems(); }
 
 /* ---------- audio ---------- */
 let AC=null, noiseBuf=null, sfxGain=1, sfxLP=20000, sfxVerb=0, master=null, verb=null, cur=null;
@@ -1429,6 +1447,15 @@ function sfx(k){
     case 'land': tone('sine',95,48,0.11,0.16); noise(420,0.09,0.12,0.7,0,'lowpass'); break;
     case 'win': tone('triangle',520,780,0.12,0.09); tone('triangle',780,1040,0.16,0.09,0.12); break;
     case 'lose': tone('triangle',420,260,0.25,0.09); break;
+    case 'groan': { const f=70+Math.random()*40; tone('sawtooth',f*1.4,f,0.9,0.05); tone('sawtooth',f*2.1,f*1.5,0.8,0.025,0.05); noise(400,0.7,0.05,3,0,'bandpass',260); } break;
+    case 'zhurt': tone('sawtooth',180*r(),90,0.22,0.06); noise(700,0.12,0.12,2); break;
+    case 'zdie': tone('sawtooth',140*r(),45,0.6,0.07); noise(500,0.35,0.16,1,0.05,'lowpass',150); click(900,0.15,0.3); break;
+    case 'claw': noise(2400,0.08,0.22,1.2,0,'bandpass',900); noise(1800,0.07,0.16,1.2,0.07,'bandpass',700); break;
+    case 'wave': tone('sawtooth',98,92,1.1,0.06); tone('sawtooth',147,139,1.1,0.04); tone('sine',49,46,1.2,0.12); break;
+    case 'unwrap': for(let q=0;q<6;q++) noise(3000+q*300,0.06,0.05,1.5,q*0.45,'highpass'); break;
+    case 'uncork': click(1400,0.25); tone('sine',600,900,0.12,0.06,0.05); for(let q=0;q<5;q++) tone('sine',300+q*60,280+q*60,0.12,0.04,0.3+q*0.25); break;
+    case 'heal': tone('triangle',520,700,0.18,0.08); tone('triangle',700,940,0.22,0.07,0.1); break;
+    case 'shield': tone('sine',660,990,0.25,0.08); tone('sine',990,1320,0.3,0.06,0.12); noise(5000,0.2,0.04,1,0.05,'highpass'); break;
   }
 }
 // what you're standing on decides the footstep sound
@@ -1804,7 +1831,7 @@ function animateRig(H,S,dt){
     set(r.armL.wr,'x',building?-0.5:0); set(r.armR.wr,'x',S.gun===false&&!building&&!(S.swingT>0)?0.75:0); r.armL.wr.rotation.y=r.armL.wr.rotation.z=r.armR.wr.rotation.y=r.armR.wr.rotation.z=0;
   }
   // ----- weapons: two-handed IK -----
-  r.gun.visible=gun==='ar'||gun===true; r.pump.visible=gun==='pump'; r.hammer.visible=building; r.plan.visible=building||!!S.editing; r.pick.visible=!gun&&!building&&!S.editing;
+  r.gun.visible=gun==='ar'||gun===true; r.pump.visible=gun==='pump'; r.hammer.visible=building; r.plan.visible=building||!!S.editing; r.pick.visible=!gun&&!building&&!S.editing&&!S.item;
   r.muzzle=gun==='pump'?r.muzzlePump:r.muzzleAR;
   [r.armL,r.armR].forEach(a=>a.fing.rotation.x=lerp(a.fing.rotation.x,S.editing?0.25:0.95,sm));
   r.slide.position.y=-0.33+0.12*(A.pumpT>0?Math.sin(Math.min(1,(0.5-A.pumpT)/0.42)*Math.PI):0);
@@ -1862,7 +1889,7 @@ function slopeFor(E){
   const upYaw=[-Math.PI/2,Math.PI,Math.PI/2,0][r.dir]; return RAMP_ANG*Math.cos(angDiff(upYaw,E.yaw));
 }
 function animateHero(dt){
-  animateRig(localHero,{slope:slopeFor(P),pos:P.pos,vel:P.vel,yaw:P.yaw,pitch:P.pitch,onGround:P.onGround,crouch:P.crouch,building:mode==='build'&&!edit,editing:!!edit,
+  animateRig(localHero,{slope:slopeFor(P),pos:P.pos,vel:P.vel,yaw:P.yaw,pitch:P.pitch,onGround:P.onGround,crouch:P.crouch,building:mode==='build'&&!edit,editing:!!edit,item:mode==='item'&&P.useT>0,
     gun:mode==='gun'&&!edit?P.wpn:false,ads:adsK,swingT,reload:(mode==='gun'&&P.reloadT>0)?{w:P.wpn,p:1-P.reloadT/P.reloadDur}:null},dt);
 }
 
@@ -1900,11 +1927,11 @@ function syncMode(){
   b.classList.toggle('m-gun',mode==='gun'&&!edit); b.classList.toggle('m-pick',mode==='pick'&&!edit);
   b.classList.toggle('w-ar',P.wpn==='ar'); b.classList.toggle('w-pump',P.wpn==='pump');
   $('wbar').hidden=inBuild; $('bbar').hidden=!inBuild;
-  document.querySelectorAll('#wbar .slot[data-s]').forEach(s=>{ const k=s.dataset.s; s.classList.toggle('on', mode==='pick'?k==='pick':mode==='gun'?(k==='gun'&&P.wpn==='ar')||(k==='pump'&&P.wpn==='pump'):false); });
+  document.querySelectorAll('#wbar .slot[data-s]').forEach(s=>{ const k=s.dataset.s; s.classList.toggle('on', mode==='pick'?k==='pick':mode==='item'?k===P.item:mode==='gun'?(k==='gun'&&P.wpn==='ar')||(k==='pump'&&P.wpn==='pump'):false); });
   document.querySelectorAll('#bbar .slot[data-s]').forEach(s=>s.classList.toggle('on',!edit&&s.dataset.s===piece));
   const wn=$('wname');
-  wn.textContent=edit?'Editing':mode==='build'?pieceNames[piece]:mode==='gun'?WEAPONS[P.wpn].name:'Pickaxe';
-  wn.className='wname '+(edit?'edit':mode==='build'?'build':mode==='gun'?WEAPONS[P.wpn].rarity:'');
+  wn.textContent=edit?'Editing':mode==='build'?pieceNames[piece]:mode==='gun'?WEAPONS[P.wpn].name:mode==='item'?ITEMS[P.item].name+' ('+((P.items&&P.items[P.item])|0)+')':'Pickaxe';
+  wn.className='wname '+(edit?'edit':mode==='build'?'build':mode==='gun'?WEAPONS[P.wpn].rarity:mode==='item'?ITEMS[P.item].rarity:'');
   $('tEdit').textContent=edit?'Done':'Edit'; $('tEdit').classList.toggle('active',!!edit);
   const rl=$('tReload'); rl.dataset.act=edit?'reset':'reload'; rl.classList.toggle('active',!!edit);
   rl.innerHTML=edit?'Reset':'<svg viewBox="0 0 24 24"><path d="M19 12a7 7 0 1 1-2-5" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><path d="M18 3v5h-5" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -1987,6 +2014,7 @@ function pressAction(a){
   else if(a==='pick') selectPick();
   else if(a==='gun') selectGun('ar');
   else if(a==='pump') selectGun('pump');
+  else if(ITEMS[a]) selectItem(a);
   else if(a==='aim') adsHeld=true;
   else if(a==='reload') startReload();
   else if(a==='material') cycleMaterial();
@@ -2146,7 +2174,7 @@ document.querySelectorAll('.slot[data-s]').forEach(b=>{
     e.preventDefault(); e.stopPropagation(); audioInit(); if(!playing) return;
     try{ b.setPointerCapture(e.pointerId); }catch(_){}
     const a=b.dataset.s;
-    if(a==='pick') selectPick(); else if(a==='gun') selectGun('ar'); else if(a==='pump') selectGun('pump');
+    if(a==='pick') selectPick(); else if(a==='gun') selectGun('ar'); else if(a==='pump') selectGun('pump'); else if(ITEMS[a]) selectItem(a);
     else if(pieceNames[a]){ selectPiece(a); heldPiece=a; fireDown('touch'); }
   });
   const up=()=>{ const a=b.dataset.s; if(pieceNames[a]&&heldPiece===a){ heldPiece=null; fireUp('touch'); } };
@@ -2262,6 +2290,7 @@ function hostData(from,m){
     } else if(o.op==='clear') return; // only the host clears
     applyOp(o); if(o.op==='place'&&o.ts){ const np=pieces.get(o.t.key); if(np) np.ts=o.ts; delete o.ts; } netSend(m,from);
   }
+  else if(m.type==='zhit'){ const z=horde.zs.get(m.z); if(z) zombieHurt(z,m.dmg,from); }
   else if(m.type==='pong'){ const rtt=performance.now()-m.t; const old=net.lat.get(from); net.lat.set(from,old==null?rtt/2:old*0.7+rtt*0.15); }
   else if(m.type==='shot'){ m.id=from; onShot(m); netSend(m,from); }
   else if(m.type==='hit'){ m.id=from; if(m.to==='bot'){ if(B&&B.active){ botHurt(m.dmg,from,m.w); } } else if(m.to===net.id) onHit(m); else { const c=net.conns.get(m.to); if(c&&c.open) c.send(m); } }
@@ -2283,7 +2312,7 @@ function onHit(m){
     setTimeout(()=>{ net.dead=false; const a=Math.random()*Math.PI*2, r=8+Math.random()*20; respawn(); P.pos.set(SPAWN[0]+Math.cos(a)*r,0,SPAWN[2]+Math.sin(a)*r); banner('Back in','',1); },3000); }
 }
 function onElim(m){
-  const nm=id=>id===net.id?'You':id==='bot'?'Bot':(net.players.get(id)||{}).name||'Player', w=(WEAPONS[m.w]||{name:'Pickaxe'}).name;
+  const nm=id=>id===net.id?'You':id==='bot'?'Bot':id==='zombie'?'A zombie':(net.players.get(id)||{}).name||'Player', w=(WEAPONS[m.w]||{name:m.w==='zombie'?'Claws':'Pickaxe'}).name;
   if(m.by===net.id){ net.kills++; feed(`You eliminated <b>${nm(m.id)}</b> · ${w}`); banner('Eliminated',nm(m.id),1.6); sfx('win'); }
   else if(m.id===net.id){ feed(`<b>${nm(m.by)}</b> eliminated you · ${w}`,true); banner('Eliminated','by '+nm(m.by),2.6); sfx('lose'); }
   else feed(`<b>${nm(m.by)}</b> eliminated ${nm(m.id)} · ${w}`);
@@ -2301,6 +2330,7 @@ function clientData(m){
   else if(m.type==='hit'){ if(m.to===net.id) onHit(m); }
   else if(m.type==='elim'){ if(m.id!==net.id||m.by===net.id) onElim(m); }
   else if(m.type==='leave') dropPlayer(m.id);
+  else if(m.type==='hz') onHordeMsg(m);
 }
 function roomCode(){ const A='ABCDEFGHJKMNPQRSTUVWXYZ23456789'; let c=''; for(let i=0;i<5;i++) c+=A[Math.floor(Math.random()*A.length)]; return c; }
 function netReady(){ if(typeof Peer==='undefined'){ setRoomStatus('Multiplayer could not load. Check your connection and reload.'); return false; } return true; }
@@ -2372,6 +2402,28 @@ addEventListener('beforeunload',()=>{ if(net.peer) try{net.peer.destroy();}catch
 
 /* ---------- combat: health, rifle, build damage ---------- */
 // f0..f1 = damage falloff range (m), fmin = damage left at f1
+// heals: bandages up to 75 health, small shield potions up to 50 shield (Fortnite-style caps and stack sizes)
+const ITEMS={bandage:{name:'Bandages',rarity:'common',use:3.5,max:15,start:5,amt:15,cap:75,stat:'hp',sound:'heal'},
+             mini:{name:'Small Shield Potion',rarity:'rare',use:2.0,max:6,start:3,amt:25,cap:50,stat:'sh',sound:'shield'}};
+const healMat=new THREE.MeshBasicMaterial({color:0x8af07a}), shieldMat=new THREE.MeshBasicMaterial({color:0x6cc8ff});
+function selectItem(k){ if(edit) exitEdit(true); if(mode!=='item'||P.item!==k){ P.useT=0; sfx('equip'); } P.item=k; mode='item'; syncMode(); }
+function startUse(quiet){
+  const I=ITEMS[P.item]; if(!I||P.useT>0||isDead()) return;
+  if((P.items[P.item]|0)<=0){ if(!quiet) toast('Out of '+(P.item==='mini'?'small shields':'bandages')); return; }
+  if(P[I.stat]>=I.cap){ if(!quiet) toast(I.stat==='hp'?'Bandages heal up to 75 health':'Small shields go up to 50 shield'); return; }
+  P.useT=I.use; P.useDur=I.use; sfx(I.stat==='hp'?'unwrap':'uncork');
+}
+function stepUse(dt){
+  if(!P.useT) return; if(mode!=='item'||isDead()){ P.useT=0; return; }
+  P.useT-=dt; if(P.useT>0) return;
+  P.useT=0; const I=ITEMS[P.item]; P.items[P.item]--; P[I.stat]=Math.min(I.cap,P[I.stat]+I.amt);
+  sfx(I.sound); burst(P.pos.clone().setY(P.pos.y+1.1),10,2.2,0.05,I.stat==='hp'?healMat:shieldMat); syncItems();
+  if(fireHeld) startUse(true); // keep holding fire to use the next one
+}
+function syncItems(){ for(const k in ITEMS){ const n=(P.items&&P.items[k])|0, el=$('am-'+k); if(el){ el.textContent=n; el.parentNode.classList.toggle('out',n<=0); } } }
+function giveItems(b,m){ P.items.bandage=Math.min(ITEMS.bandage.max,P.items.bandage+b); P.items.mini=Math.min(ITEMS.mini.max,P.items.mini+m); syncItems(); }
+function updateUseBar(){ const el=$('useBar'), on=P.useT>0&&mode==='item'; el.hidden=!on; if(!on) return; const I=ITEMS[P.item];
+  el.classList.toggle('sh',I.stat==='sh'); $('useT').textContent=I.name+' '+P.useT.toFixed(1)+' s'; $('useB').style.width=(100*(1-P.useT/P.useDur)).toFixed(1)+'%'; }
 const WEAPONS={
   ar:  {name:'Assault Rifle',rarity:'uncommon',dmg:30,head:1.5,rate:0.15,mag:30,reload:2.0,spread:0.003,pellets:1,range:180,f0:999,f1:1000,fmin:1,equip:0.25,auto:true,build:0.7},
   pump:{name:'Pump Shotgun', rarity:'rare',    dmg:9, head:2,  rate:0.75,mag:5, shell:0.55,spread:0.017,pellets:10,range:50,f0:7,f1:30,fmin:0.35,equip:0.45,auto:false,build:0.5}
@@ -2396,11 +2448,13 @@ function gauss(){ let u=0,v=0; while(!u)u=Math.random(); while(!v)v=Math.random(
 function raySphere(o,d,c,r){ _c.subVectors(o,c); const b=_c.dot(d), h=b*b-(_c.lengthSq()-r*r); return h<0?-1:-b-Math.sqrt(h); }
 // A body is a head sphere plus a stack of torso/leg spheres
 function rayBody(o,d,E){
-  const f=E.pos.y, cr=E.crouch; let best=null;
-  const ht=raySphere(o,d,_d.set(E.pos.x,f+(cr?1.2:1.66),E.pos.z),0.19);
+  const f=E.pos.y, cr=E.crouch, k=E.sc||1; let best=null;
+  // zombies hunch: their head sits lower and further forward
+  const hx=E.isZombie?-Math.sin(E.yaw)*0.22*k:0, hz=E.isZombie?-Math.cos(E.yaw)*0.22*k:0, hy=E.isZombie?1.5:(cr?1.2:1.66);
+  const ht=raySphere(o,d,_d.set(E.pos.x+hx,f+hy*k,E.pos.z+hz),0.19*k);
   if(ht>0) best={t:ht,head:true};
-  const top=cr?1.0:1.42;
-  for(let y=0.25;y<=top+0.001;y+=0.19){ const t=raySphere(o,d,_d.set(E.pos.x,f+y,E.pos.z),0.31); if(t>0&&(!best||t<best.t)) best={t,head:false}; }
+  const top=cr?1.0:E.isZombie?1.3:1.42;
+  for(let y=0.25;y<=top+0.001;y+=0.19){ const t=raySphere(o,d,_d.set(E.pos.x,f+y*k,E.pos.z),0.31*k); if(t>0&&(!best||t<best.t)) best={t,head:false}; }
   return best;
 }
 function piecesNearRay(o,d,range){
@@ -2464,13 +2518,14 @@ function playerShoot(){
   if(W.pellets===1) P.bloom=Math.min(0.045,P.bloom+0.007*(1-0.5*adsK));
   sinceShot=0;
   camera.updateMatrixWorld();
-  const tgts=[]; if(B&&B.active&&B.alive) tgts.push(B); net.players.forEach(pl=>{ if(pl.alive) tgts.push(pl); });
+  const tgts=[]; if(B&&B.active&&B.alive) tgts.push(B); net.players.forEach(pl=>{ if(pl.alive) tgts.push(pl); }); horde.zs.forEach(z=>{ if(z.alive) tgts.push(z); });
   const shBefore=B?B.sh:0;
   const r=fireWeapon(P,localHero,camera.position.clone(),aimDir(),P.wpn,camDist+0.4,tgts,spread);
   if(net.role) netSend({type:'shot',id:net.id,w:P.wpn,e:r.ends});
   sfx(P.wpn==='pump'?'pump':'shot'); animEvent(localHero,'fire',P.wpn); stat('s'); P.kick=(P.wpn==='pump'?0.05:0.014)*(1-0.55*adsK); P.yaw+=(Math.random()-.5)*(P.wpn==='pump'?0.01:0.007)*(1-0.6*adsK);
   r.bodies.forEach((e,who)=>{ const dmg=Math.round(e.dmg); stat('h',dmg); hitMarker(dmg,e.head);
-    if(who===B){ dmgNum(B.pos.clone().setY(B.pos.y+(e.head?2.05:1.6)),dmg,e.head?'head':shBefore>0?'shield':'hp'); botHurt(dmg,net.id,P.wpn); }
+    if(who.isZombie){ dmgNum(who.pos.clone().setY(who.pos.y+(e.head?2.05:1.6)*who.sc),dmg,e.head?'head':'hp'); if(net.role==='client') netSend({type:'zhit',id:net.id,z:who.id,dmg}); else zombieHurt(who,dmg,net.id); }
+    else if(who===B){ dmgNum(B.pos.clone().setY(B.pos.y+(e.head?2.05:1.6)),dmg,e.head?'head':shBefore>0?'shield':'hp'); botHurt(dmg,net.id,P.wpn); }
     else { dmgNum(who.pos.clone().setY(who.pos.y+(e.head?2.05:1.6)),dmg,e.head?'head':who.sh>0?'shield':'hp'); netSend({type:'hit',id:net.id,to:who.id,dmg,head:e.head,w:P.wpn}); } });
   if(P.ammo[P.wpn]<=0) startReload();
 }
@@ -2555,6 +2610,220 @@ function playerHurt(dmg,from){
   if(hurt(P,dmg)) endRound(false);
 }
 
+
+/* ---------- zombie horde mode ----------
+   Waves of zombies walk in from the edges toward the nearest player, claw through any build in their way and chew
+   the bottom out of towers. Build a fort between waves. In a room the host's game runs the zombies for everyone. */
+const ZT={
+  husk:  {hp:110,spd:0.56,dmg:12,bld:34,sc:1,   skin:0x7fae5a,shirt:0x5b4a72,pants:0x3b3f52,pts:1},
+  runner:{hp:70, spd:0.98,dmg:8,bld:20,sc:0.92,skin:0xa3c97c,shirt:0x7a3b3b,pants:0x34384a,pts:1},
+  brute: {hp:520,spd:0.42,dmg:30,bld:120,sc:1.45,skin:0x5c8a45,shirt:0x3c3248,pants:0x2a2d3a,pts:3}
+};
+const ZCODE=['husk','runner','brute'];
+var horde={on:false,wave:0,phase:'idle',t:0,toSpawn:0,spawnT:0,kills:0,zs:new Map(),nextId:1,sendT:0,downT:0,best:0};
+const zEye=new THREE.MeshBasicMaterial({color:0xfff36a}), zMouth=toon(0x2a1414), zBone=toon(0xd9d2bd), goreMat=new THREE.MeshLambertMaterial({color:0x6fbf3a});
+function makeZombie(type){
+  const T=ZT[type], g=new THREE.Group(); g.rotation.order='YXZ';
+  const part=(geo,mat,parent,x=0,y=0,z=0,w=0.014)=>{ const m=new THREE.Mesh(geo,typeof mat==='number'?toon(mat):mat); m.position.set(x,y,z); parent.add(m);
+    if(w>0) m.add(new THREE.Mesh(inkGeo(geo,w),inkMat)); return m; };
+  const grp=(parent,x=0,y=0,z=0)=>{ const q=new THREE.Group(); q.position.set(x,y,z); parent.add(q); return q; };
+  const R={};
+  R.hips=grp(g,0,0.9,0);
+  part(rbox(.32,.18,.22,.07),T.pants,R.hips);
+  R.legL=grp(R.hips,-.1,-.04,0); R.legR=grp(R.hips,.1,-.04,0);
+  for(const L of [R.legL,R.legR]){ part(limbGeo(.08,.065,.82),T.pants,L); part(rbox(.12,.08,.22,.03),0x3a2a20,L,0,-.84,-.04); }
+  part(limbGeo(.05,.045,.16),T.skin,R.legR,0,-.5,0,0.01); // a bare shin through ripped pants
+  R.spine=grp(R.hips,0,.08,0); R.spine.rotation.x=-0.32; // hunched forward
+  const torso=part(rbox(.38,.44,.24,.08),T.shirt,R.spine,0,.22,0); torso.castShadow=true;
+  part(rbox(.2,.14,.02,.03),T.skin,R.spine,.06,.12,-.12,0.008); // torn shirt showing skin
+  part(rbox(.05,.18,.02,.02),zBone,R.spine,-.1,.26,-.125,0); // ribs
+  R.head=grp(R.spine,0,.5,-.02);
+  part(rbox(.25,.27,.25,.09),T.skin,R.head,0,.1,0);
+  part(sph(.035),zEye,R.head,-.06,.13,-.125,0); part(sph(.035),zEye,R.head,.06,.13,-.125,0);
+  R.jaw=grp(R.head,0,.0,-.02); part(rbox(.16,.06,.1,.02),zMouth,R.jaw,0,-.01,-.08,0.008);
+  part(rbox(.1,.02,.02,.005),zBone,R.jaw,0,.02,-.135,0);
+  R.armL=grp(R.spine,-.24,.38,0); R.armR=grp(R.spine,.24,.38,0);
+  for(const A of [R.armL,R.armR]){ part(limbGeo(.065,.05,.66),T.skin,A); part(rbox(.1,.1,.08,.03),T.skin,A,0,-.7,0,0.01); }
+  part(rbox(.11,.16,.11,.03),T.shirt,R.armL,0,-.08,0,0.01); // sleeve stub
+  if(type==='brute'){ part(rbox(.2,.1,.2,.05),0x8a8f99,R.spine,-.26,.44,0); part(rbox(.2,.1,.2,.05),0x8a8f99,R.spine,.26,.44,0); }
+  g.scale.setScalar(T.sc); scene.add(g);
+  return {g,R};
+}
+function newZombie(type,x,z,id){
+  const T=ZT[type], hpMul=1+0.12*Math.max(0,horde.wave-1)+0.25*net.players.size;
+  const z0={id:id||horde.nextId++,type,isZombie:true,pos:new THREE.Vector3(x,0,z),vel:new THREE.Vector3(),tgt:new THREE.Vector3(x,0,z),yaw:0,pitch:0,onGround:true,groundSlab:null,crouch:false,
+    hp:Math.round(T.hp*hpMul),maxHp:Math.round(T.hp*hpMul),sc:T.sc,alive:true,atkT:0.5+Math.random(),atk:0,walk:Math.random()*6,target:null,tT:0,chewT:0,stuckT:0,sideT:0,side:0,deadT:0,groanT:2+Math.random()*6,m:makeZombie(type)};
+  z0.m.g.position.copy(z0.pos); horde.zs.set(z0.id,z0); return z0;
+}
+function dropZombie(z){ scene.remove(z.m.g); horde.zs.delete(z.id); }
+function clearZombies(){ [...horde.zs.values()].forEach(dropZombie); }
+// players the zombies can go after
+function hordeTargets(){ const a=[]; if(!(net.dead||P.hp<=0)) a.push(P); net.players.forEach(pl=>{ if(pl.alive&&pl.id!=='bot') a.push(pl); }); return a; }
+function zombieHurt(z,dmg,by){
+  if(!z.alive) return; z.hp-=dmg; z.hitFlash=0.12;
+  if(z.hp<=0){ z.alive=false; z.hp=0; z.deadT=0; horde.kills++; burst(z.pos.clone().setY(z.pos.y+1.1*z.sc),10,4,0.09,goreMat); sfxAt('zdie',z.pos);
+    if(by===net.id||!net.role) stat('h',0); }
+  else if(Math.random()<0.35) sfxAt('zhurt',z.pos);
+}
+function hordeHurtMe(dmg,from){
+  if(net.dead||P.hp<=0) return;
+  if(net.role){ dmgDirFrom(from); onHit({id:'zombie',dmg,w:'zombie'}); return; }
+  dmgDirFrom(from); const f=$('hurtfx'); f.classList.add('on'); void f.offsetWidth; f.classList.remove('on'); sfx('hurt'); animEvent(localHero,'hurt');
+  if(hurt(P,dmg)){ animEvent(localHero,'die'); horde.phase='over'; horde.t=6; horde.best=Math.max(horde.best,horde.wave-1);
+    banner('Overrun!','You survived '+(horde.wave-1)+(horde.wave-1===1?' wave':' waves')+' · '+horde.kills+' zombies',5); sfx('lose'); }
+}
+function zombieAttack(z,who){
+  const T=ZT[z.type]; z.atk=0.45; sfxAt('claw',z.pos);
+  if(who===P) hordeHurtMe(T.dmg,z.pos);
+  else if(net.role==='host'){ const c=net.conns.get(who.id); if(c&&c.open) try{ c.send({type:'hit',id:'zombie',to:who.id,dmg:T.dmg,w:'zombie'}); }catch(e){} }
+}
+const _zo=new THREE.Vector3(), _zd=new THREE.Vector3();
+function zombieThink(z,dt,tg){
+  const T=ZT[z.type];
+  z.tT-=dt; if(z.tT<=0||!z.target||!tg.includes(z.target)){ z.tT=0.5; let bd=Infinity; z.target=null; for(const t of tg){ const d=t.pos.distanceToSquared(z.pos); if(d<bd){ bd=d; z.target=t; } } }
+  z.atkT-=dt; z.atk=Math.max(0,z.atk-dt); z.groanT-=dt; if(z.groanT<=0){ z.groanT=4+Math.random()*7; sfxAt('groan',z.pos); }
+  const t=z.target; let fw=0, st=0;
+  if(t){
+    const dx=t.pos.x-z.pos.x, dz=t.pos.z-z.pos.z, hd=Math.hypot(dx,dz), dy=t.pos.y-z.pos.y;
+    // the player is up on builds it can't reach: pick the piece holding them up (one it can reach from the ground) and go for it
+    if(z.goal&&(!pieces.has(z.goal.key)||dy<=2.2||hd>12)) z.goal=null;
+    z.goalT=(z.goalT||0)-dt;
+    if(!z.goal&&dy>2.2&&hd<9&&z.goalT<=0){ z.goalT=0.5; let best=null, bd=1e9;
+      near(t.pos.x,t.pos.z,2).forEach(p=>{ const bb=pieceAABB(p); if(bb[1]>z.pos.y+2.4) return;
+        const c=pieceCenter(p), d=Math.hypot(c.x-t.pos.x,c.z-t.pos.z)+Math.hypot(c.x-z.pos.x,c.z-z.pos.z)*0.5; if(d<bd){ bd=d; best=p; } });
+      z.goal=best; }
+    let gx=t.pos.x, gz=t.pos.z, goalDist=Infinity;
+    if(z.goal){ const bb=pieceAABB(z.goal), cx=Math.max(bb[0],Math.min(bb[3],z.pos.x)), cz=Math.max(bb[2],Math.min(bb[5],z.pos.z)); goalDist=Math.hypot(cx-z.pos.x,cz-z.pos.z); const c=pieceCenter(z.goal); gx=c.x; gz=c.z; }
+    const want=Math.atan2(-(gx-z.pos.x),-(gz-z.pos.z)); z.yaw+=angDiff(want,z.yaw)*Math.min(1,dt*6);
+    if(!z.goal&&hd<1.25*z.sc+0.3&&Math.abs(dy)<1.8){ if(z.atkT<=0){ z.atkT=1.05; zombieAttack(z,t); } }
+    else {
+      fw=T.spd;
+      z.chewT-=dt;
+      if(z.goal&&goalDist<=1.1*z.sc+0.45) z.chew={p:z.goal,pt:pieceCenter(z.goal)};
+      else if(z.chewT<=0){ z.chewT=0.2; z.chew=null;
+        // something built in the way: claw through it
+        _zo.set(z.pos.x,z.pos.y+0.9,z.pos.z); _zd.set(-Math.sin(z.yaw),0,-Math.cos(z.yaw));
+        let r=castShot(_zo,_zd,1.2*z.sc+0.4,0,null); if(r.kind!=='piece'){ _zo.y=z.pos.y+0.3; r=castShot(_zo,_zd,1.2*z.sc+0.4,0,null); }
+        if(r.kind==='piece') z.chew={p:r.piece,pt:r.point}; }
+      if(z.chew&&pieces.has(z.chew.p.key)){ fw=0; if(z.atkT<=0){ z.atkT=0.95; z.atk=0.45; sfxAt('claw',z.pos); damagePiece(z.chew.p,T.bld,z.chew.pt); } }
+      else z.chew=null;
+      // stuck on something it can't see: side-step for a moment
+      if(fw&&Math.hypot(z.vel.x,z.vel.z)<0.4){ z.stuckT+=dt; if(z.stuckT>0.8){ z.stuckT=0; z.side=Math.random()<0.5?-1:1; z.sideT=0.7; } } else z.stuckT=0;
+      if(z.sideT>0){ z.sideT-=dt; st=z.side*0.8; }
+    }
+  }
+  moveBody(z,fw,st,false,dt);
+}
+function hordeSpawnPoint(){
+  const tg=hordeTargets(); const c=new THREE.Vector3(); if(tg.length){ tg.forEach(t=>c.add(t.pos)); c.multiplyScalar(1/tg.length); } else c.set(SPAWN[0],0,SPAWN[2]);
+  const a=Math.random()*Math.PI*2, r=46+Math.random()*16; return [c.x+Math.cos(a)*r, c.z+Math.sin(a)*r];
+}
+function hordeWaveSize(w){ return Math.round((6+w*3.2)*(1+0.6*net.players.size)); }
+function startWave(){
+  horde.wave++; horde.phase='wave'; horde.toSpawn=hordeWaveSize(horde.wave); horde.spawnT=0;
+  banner('Wave '+horde.wave,horde.toSpawn+' zombies incoming',2.2); sfx('wave');
+}
+function hordeStart(){
+  clearZombies(); horde.on=true; horde.wave=0; horde.kills=0; horde.phase='break'; horde.t=20;
+  if(!net.role){ clearBuilds(); respawn(); }
+  banner('Zombie horde','Build a fort – the first wave comes in 20 s',3); syncBot();
+}
+function hordeStop(){ clearZombies(); horde.on=false; horde.phase='idle'; if(net.role==='host') netSend({type:'hz',off:1}); syncBot(); }
+function hordeMine(){ return settings.mode==='horde'&&net.role!=='client'; } // solo, or hosting a room
+function hordeUpdate(dt){
+  if(hordeMine()&&!horde.on) hordeStart();
+  if(!hordeMine()&&horde.on&&net.role!=='client') hordeStop();
+  if(!horde.on) return;
+  if(net.role==='client'){ hordeClientStep(dt); return; }
+  // waves
+  if(horde.phase==='break'){ horde.t-=dt; if(horde.t<=0) startWave(); }
+  else if(horde.phase==='wave'){
+    horde.spawnT-=dt;
+    let alive=0; horde.zs.forEach(z=>{ if(z.alive) alive++; });
+    if(horde.toSpawn>0&&horde.spawnT<=0&&alive<34){ horde.spawnT=Math.max(0.25,0.9-horde.wave*0.05);
+      const w=horde.wave, r=Math.random(), type=w>=4&&r<Math.min(0.14,0.03*w)?'brute':w>=2&&r<0.3?'runner':'husk';
+      const [x,z]=hordeSpawnPoint(); newZombie(type,x,z); horde.toSpawn--; }
+    if(horde.toSpawn<=0&&alive===0){ horde.phase='break'; horde.t=15; horde.best=Math.max(horde.best,horde.wave);
+      banner('Wave '+horde.wave+' cleared','Next wave in 15 s – patch up your fort',3); sfx('win'); hordeHeal(); if(net.role==='host') netSend({type:'hz',heal:1}); }
+  } else if(horde.phase==='over'){ horde.t-=dt; if(horde.t<=0){ horde.phase='idle'; hordeStart(); } }
+  // everybody down in a room: the horde wins, start over
+  if(net.role==='host'&&horde.phase==='wave'&&hordeTargets().length===0){ horde.downT+=dt; if(horde.downT>2.5){ horde.downT=0; horde.phase='over'; horde.t=6;
+      banner('Overrun!','Your squad survived '+(horde.wave-1)+' waves · '+horde.kills+' zombies',5); netSend({type:'hz',over:1,w:horde.wave-1,k:horde.kills}); } }
+  else horde.downT=0;
+  // zombies
+  const tg=hordeTargets();
+  horde.zs.forEach(z=>{
+    if(!z.alive){ z.deadT+=dt; if(z.deadT>1.6) dropZombie(z); return; }
+    zombieThink(z,dt,tg);
+    const n=Math.max(1,Math.ceil(dt/0.017)); for(let k=0;k<n;k++) physStep(dt/n,z);
+    if(z.pos.y<-20){ const [x,zz]=hordeSpawnPoint(); z.pos.set(x,0,zz); }
+  });
+  // don't stack up inside each other
+  const arr=[...horde.zs.values()].filter(z=>z.alive);
+  for(let i=0;i<arr.length;i++) for(let j=i+1;j<arr.length;j++){ const a=arr[i], b=arr[j], dx=b.pos.x-a.pos.x, dz=b.pos.z-a.pos.z, d=Math.hypot(dx,dz), m=0.55*(a.sc+b.sc);
+    if(d<m&&d>1e-4&&Math.abs(a.pos.y-b.pos.y)<1.5){ const p=(m-d)/2/d; a.pos.x-=dx*p; a.pos.z-=dz*p; b.pos.x+=dx*p; b.pos.z+=dz*p; } }
+  horde.zs.forEach(z=>animateZombie(z,dt));
+  if(net.role==='host'){ horde.sendT-=dt; if(horde.sendT<=0){ horde.sendT=0.1; netSend(hordeState()); } }
+}
+function hordeHeal(){ giveItems(3,2); if(net.dead) return; P.sh=Math.min(100,P.sh+50); P.hp=Math.min(100,P.hp+30); }
+function hordeState(){
+  const zs=[]; horde.zs.forEach(z=>zs.push([z.id,ZCODE.indexOf(z.type),+z.pos.x.toFixed(2),+z.pos.y.toFixed(2),+z.pos.z.toFixed(2),+z.yaw.toFixed(2),+(z.hp/z.maxHp).toFixed(2),z.atk>0?1:0,+z.vel.x.toFixed(1),+z.vel.z.toFixed(1)]));
+  return {type:'hz',w:horde.wave,ph:horde.phase,t:+horde.t.toFixed(1),k:horde.kills,left:horde.toSpawn,zs};
+}
+// a client draws the host's zombies
+function onHordeMsg(m){
+  if(m.off){ horde.on=false; clearZombies(); syncBot(); return; }
+  if(m.heal){ hordeHeal(); banner('Wave '+horde.wave+' cleared','Next wave in 15 s – patch up your fort',3); sfx('win'); return; }
+  if(m.over){ banner('Overrun!','Your squad survived '+m.w+' waves · '+m.k+' zombies',5); sfx('lose'); return; }
+  if(!horde.on){ horde.on=true; clearZombies(); syncBot(); banner('Zombie horde','The host started a horde – build a fort!',3); }
+  if(m.w>horde.wave&&m.ph==='wave'){ banner('Wave '+m.w,'Zombies incoming',2.2); sfx('wave'); }
+  horde.wave=m.w; horde.phase=m.ph; horde.t=m.t; horde.kills=m.k; horde.toSpawn=m.left;
+  const seen=new Set();
+  for(const s of m.zs){ seen.add(s[0]); let z=horde.zs.get(s[0]);
+    if(!z){ z=newZombie(ZCODE[s[1]]||'husk',s[2],s[4],s[0]); z.pos.set(s[2],s[3],s[4]); }
+    z.tgt.set(s[2],s[3],s[4]); z.yawT=s[5]; z.vel.set(s[8]||0,0,s[9]||0);
+    const wasAlive=z.alive; z.alive=s[6]>0; z.hp=s[6]*z.maxHp; if(s[7]&&z.atk<=0.05) z.atk=0.45;
+    if(wasAlive&&!z.alive){ z.deadT=0; burst(z.pos.clone().setY(z.pos.y+1.1*z.sc),10,4,0.09,goreMat); sfxAt('zdie',z.pos); } }
+  horde.zs.forEach(z=>{ if(!seen.has(z.id)) dropZombie(z); });
+}
+function hordeClientStep(dt){
+  const k=1-Math.exp(-dt*12);
+  horde.zs.forEach(z=>{ z.tgt.x+=z.vel.x*Math.min(dt,0.05)*0.5; z.tgt.z+=z.vel.z*Math.min(dt,0.05)*0.5;
+    if(z.pos.distanceTo(z.tgt)>5) z.pos.copy(z.tgt); else z.pos.lerp(z.tgt,k);
+    if(z.yawT!=null) z.yaw+=angDiff(z.yawT,z.yaw)*Math.min(1,dt*12); z.atk=Math.max(0,z.atk-dt); if(!z.alive) z.deadT+=dt;
+    animateZombie(z,dt); });
+}
+function animateZombie(z,dt){
+  const g=z.m.g, R=z.m.R; g.position.copy(z.pos); g.rotation.y=z.yaw;
+  if(!z.alive){ const k=Math.min(1,z.deadT/0.6); g.rotation.x=-k*1.45; g.position.y=z.pos.y-0.1*k; if(z.deadT>1.1) g.scale.setScalar(z.sc*Math.max(0.01,1-(z.deadT-1.1)*2)); return; }
+  const sp=Math.hypot(z.vel.x,z.vel.z); z.walk+=dt*(1.6+sp*1.7);
+  const sw=Math.sin(z.walk)*Math.min(1,sp/1.5)*0.55;
+  R.legL.rotation.x=sw; R.legR.rotation.x=-sw; R.hips.position.y=0.9+Math.abs(Math.cos(z.walk))*0.04*Math.min(1,sp);
+  R.hips.rotation.z=Math.sin(z.walk)*0.08; R.spine.rotation.z=Math.sin(z.walk*0.5)*0.1;
+  // arms reach out; a swipe chops them down
+  const at=z.atk>0?Math.sin((0.45-z.atk)/0.45*Math.PI):0;
+  R.armL.rotation.x=1.35+Math.sin(z.walk*0.9)*0.12-at*1.3; R.armR.rotation.x=1.25+Math.cos(z.walk*0.8)*0.12-at*1.1+at*0.0;
+  R.armL.rotation.z=-0.1; R.armR.rotation.z=0.1;
+  R.jaw.rotation.x=0.15+Math.max(0,Math.sin(z.walk*1.3))*0.25+at*0.4;
+  R.head.rotation.z=Math.sin(z.walk*0.4)*0.18;
+  if(z.hitFlash>0){ z.hitFlash-=dt; g.position.x+=(Math.random()-.5)*0.06; }
+}
+// dusk sky while the horde is on
+const DAY={sky:new THREE.Color(SKY)}, DUSK=new THREE.Color(0x4d4466); let duskK=0;
+function stepDusk(dt){
+  const want=horde.on?1:0; if(Math.abs(duskK-want)<0.001) return;
+  duskK+=Math.sign(want-duskK)*Math.min(Math.abs(want-duskK),dt*0.6);
+  scene.background.copy(DAY.sky).lerp(DUSK,duskK); scene.fog.color.copy(scene.background); scene.fog.near=140-80*duskK; scene.fog.far=420-180*duskK;
+  hemi.intensity=0.78-0.25*duskK; sun.intensity=0.95-0.35*duskK; sun.color.setHex(duskK>0.5?0xffb27a:0xfff0d4);
+}
+function updateHordeHUD(){
+  const on=horde.on; $('cWave').hidden=!on; $('cKills').hidden=!on; if(!on) return;
+  let alive=0; horde.zs.forEach(z=>{ if(z.alive) alive++; });
+  $('waveN').textContent=Math.max(1,horde.wave+(horde.phase==='break'?1:0));
+  $('waveL').textContent=horde.phase==='break'?'IN '+Math.ceil(horde.t)+'S':horde.phase==='wave'?(alive+horde.toSpawn)+' LEFT':'';
+  $('killN').textContent=horde.kills;
+}
+
 /* ---------- skill tracking: how you play over the last 40 s ---------- */
 const stats=[]; let fightStart=performance.now();
 function stat(k,v=1){ stats.push([performance.now(),k,v]); }
@@ -2572,7 +2841,7 @@ function playerSkill(){
 const BOT_LEVELS={easy:0.12,medium:0.42,hard:0.72,expert:0.95};
 const round={state:'fight',t:0,you:0,bot:0};
 const snapYaw=y=>Math.round(y/(Math.PI/2))*(Math.PI/2);
-function botOn(){ return settings.bot!=='off'&&net.role!=='client'; } // in a room, the host's game runs the bot for everyone
+function botOn(){ return settings.bot!=='off'&&net.role!=='client'&&settings.mode!=='horde'&&!horde.on; } // in a room, the host's game runs the bot for everyone
 let BT=P, btT=0;
 function pickBotTarget(dt){
   if(!net.role){ BT=P; return; }
@@ -2607,7 +2876,7 @@ function syncBot(){
     if(!on&&B.active&&net.role==='host') netSend({type:'leave',id:'bot'});
     if(!on){ B.active=false; B.h.group.visible=false; }
   }
-  $('vitals').hidden=!(on||net.role); $('cScore').hidden=!(on&&!net.role); $('cSkill').hidden=!on; if(!on) $('botTag').hidden=true;
+  $('vitals').hidden=!(on||net.role||horde.on); $('cScore').hidden=!(on&&!net.role); $('cSkill').hidden=!on; if(!on) $('botTag').hidden=true;
 }
 function newRound(){
   round.state='fight'; clearBuilds(); respawn(); fightStart=performance.now();
@@ -2818,6 +3087,7 @@ function drawMini(){
     const qx=m>lim?c+dx/m*lim:px, qz=m>lim?c+dz/m*lim:pz; g.fillStyle=col; g.strokeStyle='#fff'; g.lineWidth=1.5*dpr; g.beginPath(); g.arc(qx,qz,r,0,7); g.fill(); g.stroke(); };
   net.players.forEach(pl=>dot(pl.pos.x,pl.pos.z,'#'+colorFor(pl.id).toString(16).padStart(6,'0')));
   if(B&&B.active&&B.h.group.visible) dot(B.pos.x,B.pos.z,'#ff4b3a');
+  horde.zs.forEach(z=>{ if(!z.alive) return; const px=tx(z.pos.x), pz=tz(z.pos.z); if(px<0||pz<0||px>S||pz>S) return; g.fillStyle=z.type==='brute'?'#c6ff5a':'#7fdc4a'; g.strokeStyle='#14240f'; g.lineWidth=dpr; g.beginPath(); g.arc(px,pz,(z.type==='brute'?3.6:2.6)*dpr,0,7); g.fill(); g.stroke(); });
   // you: arrow pointing where you face
   g.save(); g.translate(c,c); g.rotate(-P.yaw); g.fillStyle='#fff'; g.strokeStyle='#0d1726'; g.lineWidth=1.5*dpr;
   g.beginPath(); g.moveTo(0,-8*dpr); g.lineTo(6*dpr,7*dpr); g.lineTo(0,3.5*dpr); g.lineTo(-6*dpr,7*dpr); g.closePath(); g.fill(); g.stroke(); g.restore();
@@ -2837,6 +3107,8 @@ function drawMini(){
 (function(){
   const sel=$('botSel'); sel.value=settings.bot;
   sel.addEventListener('change',()=>{ settings.bot=sel.value; saveSettings(); if(B) B.active=false; syncBot(); });
+  const ms=$('modeSel'); ms.value=settings.mode==='horde'?'horde':'fight';
+  ms.addEventListener('change',()=>{ settings.mode=ms.value; saveSettings(); if(net.role==='client') toast('The host picks the mode in a room'); });
 })();
 syncBot();
 
@@ -2870,8 +3142,8 @@ function pollPad(dt){
     } else {
       if(down(7)) fireDown('desk'); if(up(7)) fireUp('desk');
       adsHeld=btn(6);
-      const slots=['pick','ar','pump'], cur=mode==='pick'?0:slots.indexOf(P.wpn);
-      const go=i=>{ const w=slots[(i+3)%3]; if(w==='pick') selectPick(); else selectGun(w); };
+      const slots=['pick','ar','pump','bandage','mini'], cur=mode==='pick'?0:mode==='item'?slots.indexOf(P.item):slots.indexOf(P.wpn);
+      const go=i=>{ const w=slots[(i+5)%5]; if(w==='pick') selectPick(); else if(ITEMS[w]) selectItem(w); else selectGun(w); };
       if(down(5)) go(cur+1); if(down(4)) go(cur-1);
       if(down(2)) startReload(); if(down(3)) toggleEdit(); if(down(1)) toggleBuild();
     }
@@ -2899,10 +3171,12 @@ function frame(now){
     } else if(fireHeld){
       if(mode==='build'){ turboT-=dt; if(turboT<=0){ noStack=true; tryPlace(heldPiece||piece); noStack=false; turboT=settings.turbo; } }
       else if(mode==='gun'){ if(P.gunT<=0) playerShoot(); }
+      else if(mode==='item'){ if(!P.useT) startUse(true); }
       else { pickT-=dt; if(pickT<=0){ swing(); pickT=0.32; } }
     }
   } else { P.vel.x*=0.8; P.vel.z*=0.8; }
   if(swingT>0) swingT-=dt;
+  if(playing||net.role) hordeUpdate(dt); stepDusk(dt); updateHordeHUD(); stepUse(dt); updateUseBar();
   stepAnims(now); stepChunks(dt); stepPlayers(dt); stepTracers(dt); if(B&&B.active) animateBot(dt);
   if(!playing&&net.role==='host'&&B&&B.active){ botUpdate(dt); const n=Math.max(1,Math.ceil(dt/0.008)); for(let k=0;k<n;k++) physStep(dt/n,B); }
   if(net.role){ net.sendT-=dt; if(net.sendT<=0){ net.sendT=0.05; netSend(myState()); if(net.role==='host'&&B&&B.active) netSend(botState()); }
