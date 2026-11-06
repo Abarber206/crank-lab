@@ -1138,6 +1138,22 @@ function bodyBlocks(t,E){
   for(const b of makeBoxes(tmp)) if(x+rr>b[0]&&x-rr<b[3]&&z+rr>b[2]&&z-rr<b[5]&&b[4]>f+0.7&&b[1]<f+h) return true;
   return false;
 }
+// you can't build through a wall: the spot must be reachable from your eyes (through a window or door is fine)
+const _wo=new THREE.Vector3(), _wd=new THREE.Vector3(), _wq=new THREE.Vector3();
+function pieceAABB(t){ const x=t.i*CELL, z=t.j*CELL, y=t.l*LVL;
+  if(t.type==='wall') return t.axis==='x'?[x,y,z,x,y+LVL,z+CELL]:[x,y,z,x+CELL,y+LVL,z];
+  if(t.type==='floor') return [x,y-FT,z,x+CELL,y,z+CELL];
+  return [x,y,z,x+CELL,y+(t.type==='cone'?CONE_H:LVL),z+CELL]; }
+function wallBetween(t,E){
+  _wo.set(E.pos.x,E.pos.y+(E.crouch?1.12:1.6),E.pos.z);
+  const bb=pieceAABB(t), m=0.3, cl=(v,lo,hi)=>lo+m>hi-m?(lo+hi)/2:Math.max(lo+m,Math.min(hi-m,v));
+  const walls=[]; near(E.pos.x,E.pos.z,3).forEach(p=>{ if(p.type==='wall'&&p.key!==t.key&&!(E.phase&&E.phase.has(p))){ p.group.updateMatrixWorld(true); for(const ms of p.group.children) walls.push(ms); } });
+  if(!walls.length) return false;
+  const pts=[_wq.set(cl(_wo.x,bb[0],bb[3]),cl(_wo.y,bb[1],bb[4]),cl(_wo.z,bb[2],bb[5])).clone(), pieceCenter(t)];
+  for(const q of pts){ _wd.subVectors(q,_wo); const len=_wd.length(); if(len<0.05) return false; _wd.multiplyScalar(1/len);
+    ray.set(_wo,_wd); ray.near=0; ray.far=len-0.2; const h=ray.intersectObjects(walls,false); ray.far=Infinity; if(!h.length) return false; }
+  return true; // every way to the spot goes through a wall
+}
 function validatePlacement(t,E=P){
   if(!t) return {ok:false,reason:'No spot to build'};
   if(pieces.has(t.key)) return {ok:false,reason:'Already built',occupied:true};
@@ -1146,6 +1162,7 @@ function validatePlacement(t,E=P){
   if(t.l>BUILD_RULES.maxLevel) return {ok:false,reason:'Build height limit'};
   if(c.distanceTo(_c.set(E.pos.x,E.pos.y+1.2,E.pos.z))>BUILD_RULES.reach) return {ok:false,reason:'Out of reach'};
   if(!supported(t)) return {ok:false,reason:'Nothing to attach to'};
+  if(wallBetween(t,E)) return {ok:false,reason:'Wall in the way'};
   const others=[]; if(E!==P) others.push(P); if(B&&B.active&&B.alive&&E!==B) others.push(B); net.players.forEach(pl=>others.push({pos:pl.pos,crouch:!!(pl.flags&2)}));
   for(const o of others) if(bodyBlocks(t,o)) return {ok:false,reason:'Player in the way'};
   return {ok:true};
@@ -1156,7 +1173,7 @@ function tryPlace(type,E=P){
   if(!validatePlacement(t,E).ok) return false;
   t.mat=E===P?buildMat:(B&&E===B?(B.boxMat||(B.skill>0.65?'brick':'wood')):'wood'); t.owner=E===P?net.id:'bot';
   const np=addPiece(t); burst(pieceCenter(np),4,3,0.07);
-  if(E===P){ np.ts=performance.now(); sfx('place_'+np.mat); stat('b'); animEvent(localHero,'build'); netOp({op:'place',t:pick(t)}); } else { sfxAt('place_'+np.mat,E.pos); if(B&&E===B) animEvent(B.h,'build'); }
+  if(E===P){ np.ts=performance.now(); sfx('place_'+np.mat); stat('b'); animEvent(localHero,'build'); netOp({op:'place',t:pick(t)}); } else { sfxAt('place_'+np.mat,E.pos); if(B&&E===B){ animEvent(B.h,'build'); if(net.role==='host'){ np.ts=performance.now(); netOp({op:'place',t:pick(t)}); } } }
   return true;
 }
 
@@ -2247,7 +2264,7 @@ function hostData(from,m){
   }
   else if(m.type==='pong'){ const rtt=performance.now()-m.t; const old=net.lat.get(from); net.lat.set(from,old==null?rtt/2:old*0.7+rtt*0.15); }
   else if(m.type==='shot'){ m.id=from; onShot(m); netSend(m,from); }
-  else if(m.type==='hit'){ m.id=from; if(m.to===net.id) onHit(m); else { const c=net.conns.get(m.to); if(c&&c.open) c.send(m); } }
+  else if(m.type==='hit'){ m.id=from; if(m.to==='bot'){ if(B&&B.active){ botHurt(m.dmg,from,m.w); } } else if(m.to===net.id) onHit(m); else { const c=net.conns.get(m.to); if(c&&c.open) c.send(m); } }
   else if(m.type==='elim'){ m.id=from; onElim(m); netSend(m,from); }
 }
 // someone else fired: tracers, muzzle flash and sound from their character
@@ -2266,7 +2283,7 @@ function onHit(m){
     setTimeout(()=>{ net.dead=false; const a=Math.random()*Math.PI*2, r=8+Math.random()*20; respawn(); P.pos.set(SPAWN[0]+Math.cos(a)*r,0,SPAWN[2]+Math.sin(a)*r); banner('Back in','',1); },3000); }
 }
 function onElim(m){
-  const nm=id=>id===net.id?'You':(net.players.get(id)||{}).name||'Player', w=(WEAPONS[m.w]||{name:'Pickaxe'}).name;
+  const nm=id=>id===net.id?'You':id==='bot'?'Bot':(net.players.get(id)||{}).name||'Player', w=(WEAPONS[m.w]||{name:'Pickaxe'}).name;
   if(m.by===net.id){ net.kills++; feed(`You eliminated <b>${nm(m.id)}</b> · ${w}`); banner('Eliminated',nm(m.id),1.6); sfx('win'); }
   else if(m.id===net.id){ feed(`<b>${nm(m.by)}</b> eliminated you · ${w}`,true); banner('Eliminated','by '+nm(m.by),2.6); sfx('lose'); }
   else feed(`<b>${nm(m.by)}</b> eliminated ${nm(m.id)} · ${w}`);
@@ -2453,7 +2470,7 @@ function playerShoot(){
   if(net.role) netSend({type:'shot',id:net.id,w:P.wpn,e:r.ends});
   sfx(P.wpn==='pump'?'pump':'shot'); animEvent(localHero,'fire',P.wpn); stat('s'); P.kick=(P.wpn==='pump'?0.05:0.014)*(1-0.55*adsK); P.yaw+=(Math.random()-.5)*(P.wpn==='pump'?0.01:0.007)*(1-0.6*adsK);
   r.bodies.forEach((e,who)=>{ const dmg=Math.round(e.dmg); stat('h',dmg); hitMarker(dmg,e.head);
-    if(who===B){ dmgNum(B.pos.clone().setY(B.pos.y+(e.head?2.05:1.6)),dmg,e.head?'head':shBefore>0?'shield':'hp'); botHurt(dmg); }
+    if(who===B){ dmgNum(B.pos.clone().setY(B.pos.y+(e.head?2.05:1.6)),dmg,e.head?'head':shBefore>0?'shield':'hp'); botHurt(dmg,net.id,P.wpn); }
     else { dmgNum(who.pos.clone().setY(who.pos.y+(e.head?2.05:1.6)),dmg,e.head?'head':who.sh>0?'shield':'hp'); netSend({type:'hit',id:net.id,to:who.id,dmg,head:e.head,w:P.wpn}); } });
   if(P.ammo[P.wpn]<=0) startReload();
 }
@@ -2531,6 +2548,7 @@ function dmgDirFrom(pos){
 function feed(html,bad){ const f=$('feed'), d=document.createElement('div'); d.innerHTML=html; if(bad) d.className='bad'; f.prepend(d);
   while(f.children.length>4) f.lastChild.remove(); setTimeout(()=>d.classList.add('fade'),4500); setTimeout(()=>d.remove(),5100); }
 function playerHurt(dmg,from){
+  if(net.role){ if(!net.dead){ dmgDirFrom(from); onHit({id:'bot',dmg,w:B?B.wpn:'ar'}); } return; }
   if(round.state!=='fight') return;
   dmgDirFrom(from);
   const f=$('hurtfx'); f.classList.add('on'); void f.offsetWidth; f.classList.remove('on'); sfx('hurt'); animEvent(localHero,'hurt');
@@ -2554,7 +2572,20 @@ function playerSkill(){
 const BOT_LEVELS={easy:0.12,medium:0.42,hard:0.72,expert:0.95};
 const round={state:'fight',t:0,you:0,bot:0};
 const snapYaw=y=>Math.round(y/(Math.PI/2))*(Math.PI/2);
-function botOn(){ return settings.bot!=='off'&&!net.role; }
+function botOn(){ return settings.bot!=='off'&&net.role!=='client'; } // in a room, the host's game runs the bot for everyone
+let BT=P, btT=0;
+function pickBotTarget(dt){
+  if(!net.role){ BT=P; return; }
+  btT-=dt; if(btT>0&&BT&&(BT===P?!net.dead:BT.alive&&net.players.get(BT.id)===BT)) return; btT=0.6;
+  let best=null, bd=Infinity; const cand=[]; if(!net.dead) cand.push(P); net.players.forEach(pl=>{ if(pl.alive) cand.push(pl); });
+  for(const c of cand){ const d=c.pos.distanceTo(B.pos)*(c===BT?0.85:1); if(d<bd){ bd=d; best=c; } }
+  BT=best;
+}
+// in a room the bot is one more player: it shows up for everyone, can be eliminated, and comes back 3 s later
+function botState(){
+  const f=(B.onGround?1:0)|(B.buildPose>0||B.state==='rush'?4:0)|(B.alive?0:8)|(B.editPose>0?16:0);
+  return {type:'st',id:'bot',n:'Bot',s:[+B.pos.x.toFixed(3),+B.pos.y.toFixed(3),+B.pos.z.toFixed(3),+B.vel.x.toFixed(2),+B.vel.y.toFixed(2),+B.vel.z.toFixed(2),+B.yaw.toFixed(3),+B.pitch.toFixed(3),f,0,B.editPose>0?0:WCODE[B.wpn]||1,Math.round(B.sh)]};
+}
 function makeBot(){
   const h=createHero(0xc8463c,{hair:0x1b1b22,skin:0xc68a5e,accent:0x62bdff,pack:0x5d7186}); scene.add(h.group);
   B={pos:new THREE.Vector3(),vel:new THREE.Vector3(),onGround:true,groundSlab:null,crouch:false,yaw:0,pitch:0,rot:0,
@@ -2572,10 +2603,11 @@ function syncBot(){
   const on=botOn();
   if(on&&!B) makeBot();
   if(B){
-    if(on&&!B.active){ B.active=true; round.you=0; round.bot=0; newRound(); }
+    if(on&&!B.active){ B.active=true; round.you=0; round.bot=0; if(net.role){ round.state='fight'; botSpawn(); } else newRound(); }
+    if(!on&&B.active&&net.role==='host') netSend({type:'leave',id:'bot'});
     if(!on){ B.active=false; B.h.group.visible=false; }
   }
-  $('vitals').hidden=!(on||net.role); $('cScore').hidden=!on; $('cSkill').hidden=!on; if(!on) $('botTag').hidden=true;
+  $('vitals').hidden=!(on||net.role); $('cScore').hidden=!(on&&!net.role); $('cSkill').hidden=!on; if(!on) $('botTag').hidden=true;
 }
 function newRound(){
   round.state='fight'; clearBuilds(); respawn(); fightStart=performance.now();
@@ -2596,8 +2628,12 @@ function endRound(won){
 let banT=0;
 function banner(t,sub,dur){ $('banTitle').textContent=t; $('banSub').textContent=sub; const b=$('banner'); b.classList.add('show'); clearTimeout(banT); banT=setTimeout(()=>b.classList.remove('show'),dur*1000); }
 
-function botHurt(dmg){
+function botHurt(dmg,by,w){
   if(round.state!=='fight'||!B.alive) return;
+  if(net.role&&hurt(B,dmg)){
+    B.alive=false; B.queue.length=0; B.peek=null; const e={type:'elim',id:'bot',by:by||net.id,w:w||(mode==='gun'?P.wpn:'pick')}; onElim(e); netSend(e);
+    animEvent(B.h,'die'); setTimeout(()=>{ if(B&&!B.alive) B.h.group.visible=false; },900);
+    setTimeout(()=>{ if(B&&B.active&&!B.alive&&net.role){ botSpawn(); netSend(botState()); } },3000); return; }
   if(hurt(B,dmg)){ endRound(true); return; }
   animEvent(B.h,'hurt'); B.lastHurtAt=performance.now();
   const s=B.skill;
@@ -2608,43 +2644,46 @@ function botHurt(dmg){
   }
 }
 function botBuild(q){ const oy=B.yaw, op=B.pitch; B.yaw=q.yaw; B.pitch=q.pitch; if(tryPlace(q.type,B)) B.buildPose=0.35; B.yaw=oy; B.pitch=op; }
-function botFacingWall(){ const t=computeTarget('wall',{pos:B.pos,yaw:snapYaw(Math.atan2(-(P.pos.x-B.pos.x),-(P.pos.z-B.pos.z))),pitch:0,onGround:B.onGround,groundSlab:B.groundSlab,rot:0}); return pieces.get(t.key); }
+function botFacingWall(){ const t=computeTarget('wall',{pos:B.pos,yaw:snapYaw(Math.atan2(-(BT.pos.x-B.pos.x),-(BT.pos.z-B.pos.z))),pitch:0,onGround:B.onGround,groundSlab:B.groundSlab,rot:0}); return pieces.get(t.key); }
 function botEditWall(p,mask){
   if(!p||!pieces.has(p.key)||p.owner!=='bot'||p.type!=='wall') return;
   const removed=[]; for(let i=0;i<9;i++) if(!(mask>>i&1)) removed.push(i);
   if(mask!==511&&!WALL_OK.has(removed.join(','))) return; // bots only make real edits (window, door, ...)
   p.mask=mask; buildPiece(p); startAnim(p,80); phaseCheck(p); popPlayerOut(); B.editPose=0.35; sfxAt('confirm',B.pos);
+  if(net.role==='host') netOp({op:'shape',key:p.key,mask:p.mask,dir:p.dir,half:p.half});
 }
 function botFire(eye,dist,s){
   const w=B.wpn, W=WEAPONS[w];
   const head=Math.random()<0.08+0.32*s;
-  const aim=new THREE.Vector3(P.pos.x,P.pos.y+(head?(P.crouch?1.2:1.66):(P.crouch?0.8:1.15)),P.pos.z);
-  aim.addScaledVector(P.vel,(dist/350)*s);
+  const aim=new THREE.Vector3(BT.pos.x,BT.pos.y+(head?(BT.crouch?1.2:1.66):(BT.crouch?0.8:1.15)),BT.pos.z);
+  aim.addScaledVector(BT.vel,(dist/350)*s);
   const d=aim.sub(eye).normalize();
   const err=(0.07*(1-s)+0.006)*(B.onGround?1:1.6)*(1+Math.min(1,dist/60))*(w==='pump'?0.5:1);
-  const r=fireWeapon(B,B.h,eye,d,w,0.05,P,W.spread+err,0xff9f80);
+  const r=fireWeapon(B,B.h,eye,d,w,0.05,BT,W.spread+err,0xff9f80);
+  if(net.role==='host') netSend({type:'shot',id:'bot',w,e:r.ends});
   sfxAt(w==='pump'?'pump':'shot',B.pos); animEvent(B.h,'fire',w);
   if(w==='ar'){ B.ammo--; B.burst++; B.fireT=W.rate*(1.75-0.75*s);
     if(B.burst>=3+Math.round(9*s)){ B.burst=0; B.fireT+=0.2+0.7*(1-s)*Math.random(); }
     if(B.ammo<=0) B.reloadT=W.reload*(1.35-0.35*s); }
   else B.fireT=W.rate*(1.6-0.5*s)+0.15*(1-s);
-  if(r.hit) playerHurt(r.dmg,B.pos);
+  if(r.hit){ if(BT===P) playerHurt(r.dmg,B.pos); else if(net.role==='host'){ const c=net.conns.get(BT.id); if(c&&c.open) try{ c.send({type:'hit',id:'bot',to:BT.id,dmg:r.dmg,head:r.head,w}); }catch(e){} } }
 }
 function botUpdate(dt){
   // skill: adaptive follows your measured play (plus a nudge from who's winning); fixed levels stay put
   if(settings.bot==='adaptive'){ const tgt=Math.max(0.05,Math.min(1,playerSkill()+B.bias)); B.skill+=(tgt-B.skill)*Math.min(1,dt*0.07); }
   else B.skill=BOT_LEVELS[settings.bot]||0.42;
   const s=B.skill;
-  if(!B.alive||round.state!=='fight'){ moveBody(B,0,0,false,dt); return; }
+  pickBotTarget(dt);
+  if(!B.alive||round.state!=='fight'||!BT){ moveBody(B,0,0,false,dt); return; }
   const eye=new THREE.Vector3(B.pos.x,B.pos.y+1.6,B.pos.z);
-  const chest=new THREE.Vector3(P.pos.x,P.pos.y+1.15,P.pos.z), to=chest.clone().sub(eye), dist=to.length(); to.normalize();
+  const chest=new THREE.Vector3(BT.pos.x,BT.pos.y+1.15,BT.pos.z), to=chest.clone().sub(eye), dist=to.length(); to.normalize();
   // line of sight, 10 times a second
   B.losT-=dt;
-  if(B.losT<=0){ B.losT=0.1; const r=castShot(eye,to,dist+2,0.05,P), was=B.los; B.los=r.kind==='body'; B.blockPiece=r.kind==='piece'?r.piece:null;
+  if(B.losT<=0){ B.losT=0.1; const r=castShot(eye,to,dist+2,0.05,BT), was=B.los; B.los=r.kind==='body'; B.blockPiece=r.kind==='piece'?r.piece:null;
     if(B.los&&!was) B.react=Math.max(B.react,0.6-0.48*s); }
   // turn toward you (or hold the rush line)
   if(B.state==='rush') B.yaw=B.rushYaw;
-  else { const want=Math.atan2(-(P.pos.x-B.pos.x),-(P.pos.z-B.pos.z)); const dy=((want-B.yaw+Math.PI*3)%(Math.PI*2))-Math.PI, tr=(3+12*s)*dt; B.yaw+=Math.max(-tr,Math.min(tr,dy)); }
+  else { const want=Math.atan2(-(BT.pos.x-B.pos.x),-(BT.pos.z-B.pos.z)); const dy=((want-B.yaw+Math.PI*3)%(Math.PI*2))-Math.PI, tr=(3+12*s)*dt; B.yaw+=Math.max(-tr,Math.min(tr,dy)); }
   B.pitch=Math.asin(Math.max(-1,Math.min(1,to.y)));
   // think
   B.thinkT-=dt;
@@ -2654,8 +2693,8 @@ function botUpdate(dt){
     // cover got shot down while under fire: put it back up
     if(hurtRecently&&s>0.3&&B.queue.length===0&&B.onGround&&!B.blockPiece&&dist<30&&Math.random()<0.4+0.5*s){ const y=snapYaw(B.yaw); B.queue.push({type:'wall',yaw:y,pitch:0}); }
     // you're above and close: roof over its head
-    else if(P.pos.y>B.pos.y+3&&dist<12&&s>0.4&&B.onGround&&B.queue.length===0&&!pieces.has(computeTarget('cone',{...B,pitch:0.9}).key)) B.queue.push({type:'cone',yaw:B.yaw,pitch:0.9});
-    if(P.pos.y>B.pos.y+2.5&&dist<35&&s>0.28&&B.onGround&&B.queue.length===0){ B.state='rush'; B.stateT=3+4*s; B.rushYaw=snapYaw(B.yaw); }
+    else if(BT.pos.y>B.pos.y+3&&dist<12&&s>0.4&&B.onGround&&B.queue.length===0&&!pieces.has(computeTarget('cone',{...B,pitch:0.9}).key)) B.queue.push({type:'cone',yaw:B.yaw,pitch:0.9});
+    if(BT.pos.y>B.pos.y+2.5&&dist<35&&s>0.28&&B.onGround&&B.queue.length===0){ B.state='rush'; B.stateT=3+4*s; B.rushYaw=snapYaw(B.yaw); }
     else if(B.hp+B.sh<120&&s>0.5&&B.onGround&&performance.now()-B.lastBox>9000&&B.queue.length===0){
       const y=snapYaw(B.yaw); B.state='boxed'; B.stateT=3+3*s; B.lastBox=performance.now(); B.peekT=1; B.boxMat=s>0.85?'metal':s>0.55?'brick':'wood';
       B.queue=[{type:'wall',yaw:y,pitch:0},{type:'wall',yaw:y+Math.PI/2,pitch:0},{type:'wall',yaw:y-Math.PI/2,pitch:0},{type:'wall',yaw:y+Math.PI,pitch:0},{type:'cone',yaw:y,pitch:0.9}];
@@ -2668,11 +2707,11 @@ function botUpdate(dt){
     const onRamp=B.groundSlab&&B.groundSlab.type==='ramp'&&B.pos.y>B.groundSlab.l*LVL+1;
     B.boxMat=s>0.8?'brick':null;
     if(B.queue.length===0) B.queue.push({type:'ramp',yaw:B.rushYaw,pitch:0}, ...(onRamp&&s>0.45?[{type:'wall',yaw:B.rushYaw,pitch:0}]:[]), ...(onRamp&&s>0.7?[{type:'wall',yaw:B.rushYaw+Math.PI/2,pitch:0},{type:'wall',yaw:B.rushYaw-Math.PI/2,pitch:0}]:[]));
-    if(B.stateT<=0||B.pos.y>P.pos.y+1.5){ B.state='fight'; B.queue.length=0; }
+    if(B.stateT<=0||B.pos.y>BT.pos.y+1.5){ B.state='fight'; B.queue.length=0; }
   } else if(B.state==='boxed'){
     B.stateT-=dt;
     if(B.queue.length===0&&!B.peek&&s>0.55){ B.peekT-=dt; if(B.peekT<=0){ const w=botFacingWall(); if(w&&w.mask===511){ botEditWall(w,511&~40); B.peek={p:w,t:0.8+0.6*s}; B.react=0.1; } B.peekT=1.3+Math.random(); } }
-    if(!B.peek&&B.queue.length===0&&!botFacingWall()&&B.buildT<=0&&s>0.45){ B.queue.push({type:'wall',yaw:snapYaw(Math.atan2(-(P.pos.x-B.pos.x),-(P.pos.z-B.pos.z))),pitch:0}); }
+    if(!B.peek&&B.queue.length===0&&!botFacingWall()&&B.buildT<=0&&s>0.45){ B.queue.push({type:'wall',yaw:snapYaw(Math.atan2(-(BT.pos.x-B.pos.x),-(BT.pos.z-B.pos.z))),pitch:0}); }
 
     if(B.stateT<=0){ if(B.peek){ botEditWall(B.peek.p,511); B.peek=null; } const w=botFacingWall(); if(w&&w.mask===511) botEditWall(w,511&~18); B.state='fight'; }
   } else {
@@ -2865,7 +2904,8 @@ function frame(now){
   } else { P.vel.x*=0.8; P.vel.z*=0.8; }
   if(swingT>0) swingT-=dt;
   stepAnims(now); stepChunks(dt); stepPlayers(dt); stepTracers(dt); if(B&&B.active) animateBot(dt);
-  if(net.role){ net.sendT-=dt; if(net.sendT<=0){ net.sendT=0.05; netSend(myState()); }
+  if(!playing&&net.role==='host'&&B&&B.active){ botUpdate(dt); const n=Math.max(1,Math.ceil(dt/0.008)); for(let k=0;k<n;k++) physStep(dt/n,B); }
+  if(net.role){ net.sendT-=dt; if(net.sendT<=0){ net.sendT=0.05; netSend(myState()); if(net.role==='host'&&B&&B.active) netSend(botState()); }
     if(net.role==='host'){ net.pingT-=dt; if(net.pingT<=0){ net.pingT=1; const t=performance.now(); net.conns.forEach(c=>{ if(c.open) try{c.send({type:'ping',t});}catch(e){} }); } } }
   fitView(); updateCamera(); animateHero(dt); updateGhost(); updateHUD();
   renderer.render(scene,camera);
