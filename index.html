@@ -135,6 +135,9 @@ body.touch .mats .k{display:none}
 .ofit.rare{background:radial-gradient(circle at 50% 38%,#7cc4ff,#1c5aa8 70%)}
 .ofit.epic{background:radial-gradient(circle at 50% 38%,#d295ff,#6a2fae 70%)}
 .ofit.legendary{background:radial-gradient(circle at 50% 38%,#ffcf7a,#c2621a 70%)}
+.lk{margin:2px 0 8px;font:800 italic 13px/1 var(--font-hud);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.picks .ofit{aspect-ratio:1/1}
+.ofit.common{background:radial-gradient(circle at 50% 38%,#c3ccd6,#5d6772 70%)}
 .ofit.on{border-color:#ffe14d;box-shadow:0 0 0 2px #ffe14d,0 0 18px rgba(255,225,77,.45)}
 #pieceHp{left:50%;top:calc(50% + 28px);transform:translateX(-50%);display:grid;justify-items:center;gap:3px;font:800 italic 14px/1 var(--font-hud);text-shadow:0 1px 3px #000}
 #pieceHp .pb{width:96px;height:6px;background:rgba(10,18,30,.6);border:1px solid rgba(255,255,255,.4)}
@@ -347,6 +350,8 @@ body.touch #stickHint{width:100px;height:100px;opacity:.6}
     <section class="locker">
       <h2>Locker</h2>
       <div id="outfits" class="outfits" role="listbox" aria-label="Outfit"></div>
+      <h3 class="lk">Pickaxe</h3>
+      <div id="picks" class="outfits picks" role="listbox" aria-label="Pickaxe"></div>
     </section>
     <section class="mp">
       <h2>Multiplayer</h2>
@@ -425,7 +430,7 @@ const DEFAULT_BINDS={forward:'KeyW',back:'KeyS',left:'KeyA',right:'KeyD',jump:'S
   wall:'KeyQ',floor:'KeyF',ramp:'KeyE',cone:'KeyC',edit:'KeyG',reset:'Mouse2',rotate:'KeyR',pick:'Digit1',gun:'Digit2',pump:'Digit3',bandage:'Digit4',mini:'Digit5',reload:'KeyT',material:'KeyX',aim:'Mouse2'};
 const BIND_LABELS={forward:'Move forward',back:'Move back',left:'Move left',right:'Move right',jump:'Jump',crouch:'Crouch (hold)',
   fire:'Place / select tiles',wall:'Wall',floor:'Floor',ramp:'Ramp',cone:'Cone',edit:'Edit / confirm',reset:'Reset edit',rotate:'Rotate ramp',pick:'Pickaxe',gun:'Assault rifle',pump:'Pump shotgun',bandage:'Bandages',mini:'Small shield potion',reload:'Reload',material:'Switch material',aim:'Aim down sights'};
-const settings={outfit:'rook', mode:'fight', bot:'adaptive', btnSize:1, btnOpacity:0.7, leftFire:true, autoFire:false, aimAssist:true, editSens:1, sens:1, fov:78, turbo:0.05, editRelease:true, instantBuild:false, shadows:!isTouch, binds:{}};
+const settings={outfit:'rook', pickaxe:'steel', mode:'fight', bot:'adaptive', btnSize:1, btnOpacity:0.7, leftFire:true, autoFire:false, aimAssist:true, editSens:1, sens:1, fov:78, turbo:0.05, editRelease:true, instantBuild:false, shadows:!isTouch, binds:{}};
 try{ Object.assign(settings, JSON.parse(localStorage.getItem('cranklab.settings')||'{}')); }catch(e){}
 settings.binds=Object.assign({},DEFAULT_BINDS,settings.binds||{});
 function saveSettings(){ try{ localStorage.setItem('cranklab.settings', JSON.stringify(settings)); }catch(e){} }
@@ -1529,9 +1534,13 @@ const OUTFITS=[
   {id:'whisk',name:'Whisk',rarity:'rare',jacket:0x7b5cd6,pants:0x2d2a3a,boot:0xf2f2f2,glove:0x2d2a3a,skin:0xf3cfb0,accent:0xff8fc8,top:'hoodie',head:'cathood',back:'none'}
 ];
 const outfitIdx=id=>Math.max(0,OUTFITS.findIndex(o=>o.id===id));
-function heroFor(o){ return createHero(o.jacket,o); }
+const PICKAXES=[
+  {id:'steel',name:'Steel Pick',rarity:'common'},{id:'mallet',name:'Bonk Mallet',rarity:'uncommon'},{id:'glow',name:'Neon Cleaver',rarity:'rare'},
+  {id:'crystal',name:'Geode Pick',rarity:'epic'},{id:'scythe',name:'Frostreap',rarity:'epic'},{id:'gold',name:'Gilded Pick',rarity:'legendary'}];
+const pickIdx=id=>Math.max(0,PICKAXES.findIndex(p=>p.id===id));
+function heroFor(o,pk){ return createHero(o.jacket,Object.assign({},o,{pickaxe:pk||'steel'})); }
 // swap a character's look in place (keeps its animation state and scene placement)
-function reskin(H,o){ if(!o||H.outfit===o.id) return; const nh=heroFor(o), g=H.group;
+function reskin(H,o,pk){ pk=pk||'steel'; if(!o||(H.outfit===o.id&&H.pickaxe===pk)) return; const nh=heroFor(o,pk), g=H.group; H.pickaxe=pk;
   while(g.children.length) g.remove(g.children[0]); while(nh.group.children.length) g.add(nh.group.children[0]);
   H.rig=nh.rig; H.ink=nh.ink; H.outfit=o.id; }
 function createHero(jacketHex,opts){
@@ -1733,12 +1742,51 @@ function createHero(jacketHex,opts){
 
   // tools: pickaxe (resting on the shoulder in pickaxe mode)
   rig.pick=grp(rig.armR.hand,0,0,0);
-  part(limbGeo(.019,.021,.72),C.wood,rig.pick,0,.12,0,null,null,0.006);
-  part(limbGeo(.024,.024,.1),C.accent,rig.pick,0,.02,0,null,null,0.005);
+  const pk=opts.pickaxe||'steel', glow=c=>new THREE.MeshBasicMaterial({color:c});
   const ph=grp(rig.pick,0,-.56,0);
-  part(rbox(.05,.08,.1,.02),C.metalL,ph,0,0,0);
-  part(rbox(.035,.05,.3,.012),C.steel,ph,0,.015,-.17,[-.25,0,0]);
-  part(rbox(.03,.045,.18,.01),C.steel,ph,0,.01,.12,[.35,0,0]);
+  if(pk==='steel'){
+    part(limbGeo(.019,.021,.72),C.wood,rig.pick,0,.12,0,null,null,0.006);
+    part(limbGeo(.024,.024,.1),C.accent,rig.pick,0,.02,0,null,null,0.005);
+    part(rbox(.05,.08,.1,.02),C.metalL,ph,0,0,0);
+    part(rbox(.035,.05,.3,.012),C.steel,ph,0,.015,-.17,[-.25,0,0]);
+    part(rbox(.03,.045,.18,.01),C.steel,ph,0,.01,.12,[.35,0,0]);
+  } else if(pk==='glow'){ // neon axe
+    part(limbGeo(.019,.019,.74),0x23262e,rig.pick,0,.13,0,null,null,0.006);
+    for(let q=0;q<4;q++) part(limbGeo(.023,.023,.03),0x00e5ff,rig.pick,0,.0-q*.05,0,null,null,0);
+    part(rbox(.05,.09,.08,.02),0x2a2f38,ph,0,0,0);
+    part(rbox(.022,.22,.2,.03),0x3a4150,ph,0,.0,-.13,null,null,0.008);
+    part(rbox(.026,.22,.025,.008),glow(0x00e5ff),ph,0,0,-.235,null,null,0);
+    part(rbox(.026,.025,.16,.006),glow(0x00e5ff),ph,0,.105,-.13,null,null,0); part(rbox(.026,.025,.16,.006),glow(0x00e5ff),ph,0,-.105,-.13,null,null,0);
+    part(rbox(.02,.12,.1,.02),0x3a4150,ph,0,0,.09,null,null,0.006); part(rbox(.024,.12,.02,.006),glow(0xff3df2),ph,0,0,.145,null,null,0);
+    part(sph(.025),glow(0x00e5ff),rig.pick,0,.5,0,null,null,0);
+  } else if(pk==='crystal'){
+    part(limbGeo(.02,.022,.72),0x3a2850,rig.pick,0,.12,0,null,null,0.006);
+    part(limbGeo(.026,.026,.05),0xd4af37,rig.pick,0,-.48,0,null,null,0.004);
+    part(sph(.06),0x9a5cff,ph,0,0,0,null,null,0.008);
+    [[-1,.0,.32,0x9a5cff],[-1,.07,.2,0xff7ae0],[-1,-.06,.18,0xc6a3ff],[1,.0,.16,0x9a5cff],[1,.06,.1,0xff7ae0]].forEach(([d,y,len,c])=>{ const g=new THREE.ConeGeometry(.04,len,5); g.rotateX(d<0?-Math.PI/2:Math.PI/2); part(g,c,ph,0,y,d*(len/2+.03),null,null,0.005); });
+    part(sph(.022),glow(0xffe6ff),ph,0,0,-.03,null,null,0);
+  } else if(pk==='mallet'){ // bonk hammer
+    for(let q=0;q<7;q++) part(limbGeo(.021,.021,.105),q%2?0xffffff:0xe63946,rig.pick,0,.12-q*.105,0,null,null,0.005);
+    const hd=new THREE.CylinderGeometry(.085,.085,.26,18); hd.rotateX(Math.PI/2);
+    part(hd,0xe63946,ph,0,-.03,0,null,null,0.01);
+    const cap=new THREE.CylinderGeometry(.09,.09,.04,18); cap.rotateX(Math.PI/2);
+    part(cap,0xffd43b,ph,0,-.03,-.145,null,null,0.006); part(cap,0xffd43b,ph,0,-.03,.145,null,null,0.006);
+    part(sph(.02),0xffffff,ph,.06,.02,-.06,null,[.6,1,1.4],0);
+  } else if(pk==='gold'){
+    part(limbGeo(.02,.022,.72),0x3a2418,rig.pick,0,.12,0,null,null,0.006);
+    for(let q=0;q<6;q++) part(limbGeo(.024,.024,.018),0x22150e,rig.pick,0,.0-q*.04,0,null,null,0);
+    part(sph(.032),0xffc94a,rig.pick,0,.13,0,null,null,0.005);
+    part(rbox(.06,.09,.11,.025),0xffc94a,ph,0,0,0);
+    part(rbox(.04,.055,.32,.014),0xffd970,ph,0,.015,-.18,[-.25,0,0]);
+    part(rbox(.034,.05,.2,.012),0xffd970,ph,0,.01,.13,[.35,0,0]);
+    [-1,1].forEach(sx=>part(sph(.024),0xe0115f,ph,sx*.031,0,0,null,[.5,1,1],0.004));
+  } else if(pk==='scythe'){ // ice scythe
+    part(limbGeo(.018,.02,.8),0xdfeaf2,rig.pick,0,.18,0,null,null,0.006);
+    part(limbGeo(.024,.024,.05),0x2fc7ff,rig.pick,0,-.02,0,null,null,0.004);
+    part(rbox(.05,.07,.07,.02),0x5d8fb8,ph,0,0,0);
+    for(let q=0;q<5;q++){ const a=-.12-q*.2; part(rbox(.02,.07-q*.008,.1,.01),0x9fe3ff,ph,0,.02+.012*q*q,-.07-.085*q,[a,0,0],null,0.005);
+      part(rbox(.022,.012,.1,.004),glow(0xeaffff),ph,0,-.012-q*.006+.012*q*q,-.07-.085*q,[a,0,0],null,0); }
+  }
   // hammer + blueprint (build mode)
   rig.hammer=grp(rig.armR.hand,0,0,0);
   part(limbGeo(.017,.019,.42),C.wood,rig.hammer,0,.06,0,null,null,0.005);
@@ -1805,7 +1853,7 @@ function createHero(jacketHex,opts){
   return {group:hero,rig,ink,anim:{t:Math.random()*10,phase:0,prevYaw:null,lag:0,stepT:0,sq:0,sqV:0,wasGround:true,vy:0,recoil:0,pumpT:0,hurt:0,hurtSide:1,strike:0,equip:0,
     dead:false,deadT:0,blinkT:2,idleT:0,pack:0,packV:0,tuft:0,tuftV:0,prevHipY:0.94,lastStep:[0,0],dustCd:0}};
 }
-const localHero=heroFor(OUTFITS[outfitIdx(settings.outfit)]), hero=localHero.group; localHero.outfit=OUTFITS[outfitIdx(settings.outfit)].id; scene.add(hero);
+const localHero=heroFor(OUTFITS[outfitIdx(settings.outfit)],PICKAXES[pickIdx(settings.pickaxe)].id), hero=localHero.group; localHero.outfit=OUTFITS[outfitIdx(settings.outfit)].id; localHero.pickaxe=PICKAXES[pickIdx(settings.pickaxe)].id; scene.add(hero);
 const lerp=(a,b,k)=>a+(b-a)*k;
 
 function animEvent(H,ev,arg){
@@ -2355,12 +2403,12 @@ function dropPlayer(id){ const pl=net.players.get(id); if(!pl) return; scene.rem
 // flags: 1 ground, 2 crouch, 4 building, 8 dead, 16 editing, 32 aiming; weapon in s[10]; shield in s[11]
 function myState(){
   const f=(P.onGround?1:0)|(P.crouch?2:0)|(mode==='build'&&!edit?4:0)|(net.dead?8:0)|(edit?16:0)|(adsK>0.5?32:0);
-  return {type:'st',id:net.id,n:net.name,o:outfitIdx(settings.outfit),s:[+P.pos.x.toFixed(3),+P.pos.y.toFixed(3),+P.pos.z.toFixed(3),+P.vel.x.toFixed(2),+P.vel.y.toFixed(2),+P.vel.z.toFixed(2),+P.yaw.toFixed(3),+P.pitch.toFixed(3),f,net.lastSwing,mode==='gun'&&!edit?WCODE[P.wpn]:0,Math.round(P.sh)]};
+  return {type:'st',id:net.id,n:net.name,o:outfitIdx(settings.outfit),p:pickIdx(settings.pickaxe),s:[+P.pos.x.toFixed(3),+P.pos.y.toFixed(3),+P.pos.z.toFixed(3),+P.vel.x.toFixed(2),+P.vel.y.toFixed(2),+P.vel.z.toFixed(2),+P.yaw.toFixed(3),+P.pitch.toFixed(3),f,net.lastSwing,mode==='gun'&&!edit?WCODE[P.wpn]:0,Math.round(P.sh)]};
 }
 function onState(m){
   if(m.id===net.id) return;
   const pl=getPlayer(m.id,m.n), s=m.s;
-  if(m.o!=null&&OUTFITS[m.o]) reskin(pl.h,OUTFITS[m.o]);
+  if(m.o!=null&&OUTFITS[m.o]) reskin(pl.h,OUTFITS[m.o],(PICKAXES[m.p]||PICKAXES[0]).id);
   pl.tgt.set(s[0],s[1],s[2]); pl.vel.set(s[3],s[4],s[5]); pl.yaw=s[6]; pl.pitch=s[7]; pl.flags=s[8];
   pl.crouch=!!(s[8]&2); pl.wpn=WNAME[s[10]||0]; pl.sh=s[11]??100;
   const alive=!(s[8]&8); if(alive!==pl.alive){ pl.alive=alive; pl.h.group.visible=alive; if(alive){ pl.pos.copy(pl.tgt); animEvent(pl.h,'revive'); } }
@@ -2977,11 +3025,12 @@ function pickBotTarget(dt){
 // in a room the bot is one more player: it shows up for everyone, can be eliminated, and comes back 3 s later
 function botState(){
   const f=(B.onGround?1:0)|(B.buildPose>0||B.state==='rush'?4:0)|(B.alive?0:8)|(B.editPose>0?16:0);
-  return {type:'st',id:'bot',n:'Bot',o:outfitIdx(B.h.outfit),s:[+B.pos.x.toFixed(3),+B.pos.y.toFixed(3),+B.pos.z.toFixed(3),+B.vel.x.toFixed(2),+B.vel.y.toFixed(2),+B.vel.z.toFixed(2),+B.yaw.toFixed(3),+B.pitch.toFixed(3),f,0,B.editPose>0?0:WCODE[B.wpn]||1,Math.round(B.sh)]};
+  return {type:'st',id:'bot',n:'Bot',o:outfitIdx(B.h.outfit),p:pickIdx(B.h.pickaxe),s:[+B.pos.x.toFixed(3),+B.pos.y.toFixed(3),+B.pos.z.toFixed(3),+B.vel.x.toFixed(2),+B.vel.y.toFixed(2),+B.vel.z.toFixed(2),+B.yaw.toFixed(3),+B.pitch.toFixed(3),f,0,B.editPose>0?0:WCODE[B.wpn]||1,Math.round(B.sh)]};
 }
 function makeBot(){
   const mine=outfitIdx(settings.outfit); let oi=Math.floor(Math.random()*(OUTFITS.length-1)); if(oi>=mine) oi++;
-  const h=heroFor(OUTFITS[oi]); h.outfit=OUTFITS[oi].id; scene.add(h.group);
+  const bp=PICKAXES[Math.floor(Math.random()*PICKAXES.length)].id;
+  const h=heroFor(OUTFITS[oi],bp); h.outfit=OUTFITS[oi].id; h.pickaxe=bp; scene.add(h.group);
   B={pos:new THREE.Vector3(),vel:new THREE.Vector3(),onGround:true,groundSlab:null,crouch:false,yaw:0,pitch:0,rot:0,
      hp:100,sh:100,alive:true,active:false,h,skill:0.35,bias:0,
      state:'fight',stateT:0,react:1,los:false,losT:0,blockPiece:null,fireT:0,burst:0,ammo:GUN.mag,reloadT:0,
@@ -3239,7 +3288,15 @@ syncBot();
 // locker: render a portrait of every outfit once, then build the cards
 (function(){
   const box=$('outfits');
-  const pick=id=>{ settings.outfit=id; saveSettings(); reskin(localHero,OUTFITS[outfitIdx(id)]); box.querySelectorAll('.ofit').forEach(b=>{ const on=b.dataset.id===id; b.classList.toggle('on',on); b.setAttribute('aria-selected',on); }); };
+  const pbox=$('picks');
+  const mark=(el,id)=>el.querySelectorAll('.ofit').forEach(b=>{ const on=b.dataset.id===id; b.classList.toggle('on',on); b.setAttribute('aria-selected',on); });
+  const wear=()=>reskin(localHero,OUTFITS[outfitIdx(settings.outfit)],PICKAXES[pickIdx(settings.pickaxe)].id);
+  const pick=id=>{ settings.outfit=id; saveSettings(); wear(); mark(box,id);
+    if(B&&B.h.outfit===id){ const others=OUTFITS.filter(o=>o.id!==id); reskin(B.h,others[Math.floor(Math.random()*others.length)],B.h.pickaxe); } }; // the bot never dresses like you
+  const pickPk=id=>{ settings.pickaxe=id; saveSettings(); wear(); mark(pbox,id); };
+  PICKAXES.forEach(p=>{ const b=document.createElement('button'); b.type='button'; b.className='ofit '+p.rarity; b.dataset.id=p.id; b.setAttribute('role','option');
+    b.innerHTML=`<span>${p.name}<small>${p.rarity}</small></span>`; b.addEventListener('click',()=>pickPk(p.id)); pbox.appendChild(b); });
+  mark(pbox,PICKAXES[pickIdx(settings.pickaxe)].id);
   OUTFITS.forEach(o=>{ const b=document.createElement('button'); b.type='button'; b.className='ofit '+o.rarity; b.dataset.id=o.id; b.setAttribute('role','option');
     b.innerHTML=`<span>${o.name}<small>${o.rarity}</small></span>`; b.addEventListener('click',()=>pick(o.id)); box.appendChild(b); });
   pick(OUTFITS[outfitIdx(settings.outfit)].id);
@@ -3254,6 +3311,11 @@ syncBot();
       h.rig.pick.visible=false;
       r.render(sc,cam); const img=new Image(); img.alt=''; img.src=r.domElement.toDataURL('image/png'); sc.remove(h.group);
       const b=box.querySelector(`[data-id="${o.id}"]`); if(b) b.prepend(img); });
+    // pickaxe portraits: the pickaxe alone, tilted like it's on display
+    r.setSize(150,150); const pcam=new THREE.PerspectiveCamera(30,1,0.05,10); pcam.position.set(2.15,.05,0); pcam.lookAt(0,.05,0);
+    PICKAXES.forEach(p=>{ const h=heroFor(OUTFITS[0],p.id), pg=h.rig.pick; pg.parent.remove(pg); pg.visible=true; pg.position.set(0,0,0); pg.rotation.set(Math.PI*.8,0,0); pg.updateMatrixWorld(true); const bb=new THREE.Box3().setFromObject(pg), cc=bb.getCenter(new THREE.Vector3()); pg.position.sub(cc).add(new THREE.Vector3(0,.05,0)); sc.add(pg);
+      r.render(sc,pcam); const img=new Image(); img.alt=''; img.src=r.domElement.toDataURL('image/png'); sc.remove(pg);
+      const b=pbox.querySelector(`[data-id="${p.id}"]`); if(b) b.prepend(img); });
     r.dispose(); if(r.forceContextLoss) r.forceContextLoss();
   }catch(e){} },60);
 })();
