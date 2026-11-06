@@ -149,6 +149,22 @@ body.touch #bottom{left:calc(50% - 60px)}
   body.touch #vitals{width:200px} body.touch .mats{padding:5px 8px}
   body.touch #tFireL{top:46%}
 }
+/* mobile: keep the middle of the screen clear */
+body.touch #compass{display:none}
+body.touch .mapwrap{width:98px;height:98px}
+body.touch .chips{max-width:180px;gap:3px} body.touch .chip{font-size:13px;padding:2px 6px}
+body.touch #vitals{width:170px;gap:2px} body.touch .vit b{font-size:15px} body.touch .vit .bar{height:9px} body.touch .vit{grid-template-columns:30px 1fr}
+body.touch .slot{width:44px;height:44px;border-width:2px} body.touch .slot svg{width:30px;height:30px} body.touch .slot.on{transform:translateY(-3px)}
+body.touch .slot .am{font-size:12px} body.touch .slot.empty{display:none} body.touch .wname{font-size:12px}
+body.touch .mats{padding:4px 7px;font-size:13px}
+@media (orientation:landscape){body.touch #bottom{left:calc(env(safe-area-inset-left,0px) + 170px);transform:none;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);gap:3px}}
+body.touch #feed{max-width:34vw} body.touch #feed div{font-size:11px;padding:3px 7px}
+body.touch #xAmmo{font-size:12px}
+body.touch #botTag .bars{width:56px}
+body.touch .tb{width:52px;height:52px}
+body.touch #tFire{width:74px;height:74px}
+body.touch #tJump{width:62px;height:62px}
+body.touch #stickHint{width:100px;height:100px;opacity:.6}
 #toast{left:50%;top:62%;transform:translateX(-50%);background:var(--hud-glass);padding:7px 14px;border-radius:5px;font-weight:600;font-size:14px;opacity:0;transition:opacity .2s}
 #toast.show{opacity:1}
 
@@ -220,6 +236,22 @@ kbd{font-family:var(--font-ui);background:#1c2a40;border-radius:3px;padding:1px 
   body.touch #vitals{width:200px} body.touch .mats{padding:5px 8px}
   body.touch #tFireL{top:46%}
 }
+/* mobile: keep the middle of the screen clear */
+body.touch #compass{display:none}
+body.touch .mapwrap{width:98px;height:98px}
+body.touch .chips{max-width:180px;gap:3px} body.touch .chip{font-size:13px;padding:2px 6px}
+body.touch #vitals{width:170px;gap:2px} body.touch .vit b{font-size:15px} body.touch .vit .bar{height:9px} body.touch .vit{grid-template-columns:30px 1fr}
+body.touch .slot{width:44px;height:44px;border-width:2px} body.touch .slot svg{width:30px;height:30px} body.touch .slot.on{transform:translateY(-3px)}
+body.touch .slot .am{font-size:12px} body.touch .slot.empty{display:none} body.touch .wname{font-size:12px}
+body.touch .mats{padding:4px 7px;font-size:13px}
+@media (orientation:landscape){body.touch #bottom{left:calc(env(safe-area-inset-left,0px) + 170px);transform:none;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);gap:3px}}
+body.touch #feed{max-width:34vw} body.touch #feed div{font-size:11px;padding:3px 7px}
+body.touch #xAmmo{font-size:12px}
+body.touch #botTag .bars{width:56px}
+body.touch .tb{width:52px;height:52px}
+body.touch #tFire{width:74px;height:74px}
+body.touch #tJump{width:62px;height:62px}
+body.touch #stickHint{width:100px;height:100px;opacity:.6}
 #toast{transition:none}}
 </style>
 </head>
@@ -365,7 +397,7 @@ const DEFAULT_BINDS={forward:'KeyW',back:'KeyS',left:'KeyA',right:'KeyD',jump:'S
   wall:'KeyQ',floor:'KeyF',ramp:'KeyE',cone:'KeyC',edit:'KeyG',reset:'Mouse2',rotate:'KeyR',pick:'Digit1',gun:'Digit2',pump:'Digit3',reload:'KeyT',material:'KeyX',aim:'Mouse2'};
 const BIND_LABELS={forward:'Move forward',back:'Move back',left:'Move left',right:'Move right',jump:'Jump',crouch:'Crouch (hold)',
   fire:'Place / select tiles',wall:'Wall',floor:'Floor',ramp:'Ramp',cone:'Cone',edit:'Edit / confirm',reset:'Reset edit',rotate:'Rotate ramp',pick:'Pickaxe',gun:'Assault rifle',pump:'Pump shotgun',reload:'Reload',material:'Switch material',aim:'Aim down sights'};
-const settings={bot:'adaptive', btnSize:1, btnOpacity:0.85, leftFire:true, autoFire:false, aimAssist:true, editSens:1, sens:1, fov:78, turbo:0.05, editRelease:true, instantBuild:false, shadows:!isTouch, binds:{}};
+const settings={bot:'adaptive', btnSize:1, btnOpacity:0.7, leftFire:true, autoFire:false, aimAssist:true, editSens:1, sens:1, fov:78, turbo:0.05, editRelease:true, instantBuild:false, shadows:!isTouch, binds:{}};
 try{ Object.assign(settings, JSON.parse(localStorage.getItem('cranklab.settings')||'{}')); }catch(e){}
 settings.binds=Object.assign({},DEFAULT_BINDS,settings.binds||{});
 function saveSettings(){ try{ localStorage.setItem('cranklab.settings', JSON.stringify(settings)); }catch(e){} }
@@ -850,11 +882,11 @@ function groundAt(x,z,maxTop,ps){
   }
   return [best,slab];
 }
-function ceilAt(x,z,top0,ps){
+function ceilAt(x,z,top0,ps,minSlab=-Infinity){
   let c=Infinity;
   for(const p of ps){
     for(const b of p.boxes) if(ovl(b,x,z)&&b[1]>=top0-0.08&&b[1]<c) c=b[1];
-    if(p.slab) for(const s of SAMP){ const t=slabTop(p,x+s[0],z+s[1]); if(t!==null){ const bot=t-ST; if(bot>=top0-0.08&&bot<c) c=bot; } }
+    if(p.slab) for(const s of SAMP){ const t=slabTop(p,x+s[0],z+s[1]); if(t!==null&&t>minSlab){ const bot=t-ST; if(bot>=top0-0.08&&bot<c) c=bot; } }
   }
   return c;
 }
@@ -864,7 +896,7 @@ function depen(ps,E=P){
     for(const b of p.boxes){
       const f=E.pos.y, x=E.pos.x, z=E.pos.z;
       if(!(ovl(b,x,z)&&b[1]<f+h&&b[4]>f+0.001)) continue;
-      if(b[4]-f<=1.0){ E.pos.y=b[4]; if(E.vel.y<0)E.vel.y=0; E.onGround=true; continue; }
+      if(b[4]-f<=0.62&&b[1]<=f+0.35){ E.pos.y=b[4]; if(E.vel.y<0)E.vel.y=0; E.onGround=true; continue; } // only step up a real step, never through a floor overhead
       if(b[4]-b[1]<0.5) continue; // thin floor at head height: let ceiling logic handle it
       const pushes=[[(x+R)-b[0],-1,0],[b[3]-(x-R),1,0],[(z+R)-b[2],0,-1],[b[5]-(z-R),0,1]];
       pushes.sort((a,c)=>a[0]-c[0]);
@@ -872,7 +904,7 @@ function depen(ps,E=P){
     }
     if(p.slab){
       const t=slabTop(p,E.pos.x,E.pos.z);
-      if(t!==null&&t>E.pos.y+0.01&&t-E.pos.y<=1.4){ E.pos.y=t; if(E.vel.y<0)E.vel.y=0; E.onGround=true; E.groundSlab=p.type==='ramp'?p:null; }
+      if(t!==null&&t>E.pos.y+0.01&&t-E.pos.y<=0.62){ E.pos.y=t; if(E.vel.y<0)E.vel.y=0; E.onGround=true; E.groundSlab=p.type==='ramp'?p:null; }
     }
   }
 }
@@ -882,7 +914,7 @@ function physStep(dt,E=P){
   E.vel.y-=GRAV*dt;
   depen(ps,E);
   const step=E.onGround?0.6:0.3;
-  const ox=E.pos.x, oz=E.pos.z;
+  const ox=E.pos.x, oz=E.pos.z, f0=E.pos.y;
   const nx=ox+E.vel.x*dt;
   if(blocked(nx,oz,ox,oz,E.pos.y,h,step,ps)) E.vel.x=0; else E.pos.x=nx;
   const nz=oz+E.vel.z*dt;
@@ -894,7 +926,10 @@ function physStep(dt,E=P){
     E.pos.y=nf; E.onGround=false; E.groundSlab=null;
   } else {
     const [g,sl]=groundAt(E.pos.x,E.pos.z,f+step,ps), nf=f+E.vel.y*dt;
-    if(E.onGround&&g>=f-0.6){ E.pos.y=g; E.vel.y=0; E.groundSlab=sl; }
+    if(E.onGround&&g>=f-0.6){
+      // walking up a stair into a floor or cone above: that's a ceiling, so stop instead of popping through it
+      if(g>f+0.01&&g+h>ceilAt(E.pos.x,E.pos.z,f0+0.4,ps,f0+1.3)-0.02){ E.pos.x=ox; E.pos.z=oz; E.vel.x=0; E.vel.z=0; }
+      else { E.pos.y=g; E.vel.y=0; E.groundSlab=sl; } }
     else if(nf<=g){ E.pos.y=g; E.vel.y=0; E.onGround=true; E.groundSlab=sl; }
     else { E.pos.y=nf; E.onGround=false; E.groundSlab=null; }
   }
@@ -1062,11 +1097,12 @@ function validatePlacement(t,E=P){
   return {ok:true};
 }
 function tryPlace(type,E=P){
+  if(E===P&&isDead()) return false;
   const t=computeTarget(type,E);
   if(!validatePlacement(t,E).ok) return false;
   t.mat=E===P?buildMat:(B&&E===B?(B.boxMat||(B.skill>0.65?'brick':'wood')):'wood'); t.owner=E===P?net.id:'bot';
   const np=addPiece(t); burst(pieceCenter(np),4,3,0.07);
-  if(E===P){ sfx('place'); stat('b'); animEvent(localHero,'build'); netOp({op:'place',t:pick(t)}); } else { sfxAt('place',E.pos); if(B&&E===B) animEvent(B.h,'build'); }
+  if(E===P){ np.ts=performance.now(); sfx('place'); stat('b'); animEvent(localHero,'build'); netOp({op:'place',t:pick(t)}); } else { sfxAt('place',E.pos); if(B&&E===B) animEvent(B.h,'build'); }
   return true;
 }
 
@@ -1094,6 +1130,7 @@ function aimHit(maxExtra){
   return hits.length?hits[0]:null;
 }
 function enterEdit(){
+  if(isDead()) return;
   const hit=aimHit(5.5);
   if(!hit){ toast('Aim at a build to edit it'); return; }
   const p=hit.object.userData.piece;
@@ -1231,7 +1268,10 @@ function toggleBuild(){
   if(mode==='build'){ if(P.lastWeapon==='pick') selectPick(); else selectGun(P.lastWeapon); }
   else selectPiece(piece);
 }
+// eliminated (in a room, or by the bot) = no moving, shooting, building or editing until you respawn
+function isDead(){ return net.dead||(typeof round!=='undefined'&&round.state==='over'&&P.hp<=0); }
 function fireDown(src){
+  if(isDead()) return;
   if(edit){ if(src==='desk'){ edit.painting=null; edit.mouse=true; paintTile(tileAtNDC(0,0)); } return; }
   fireHeld=true;
   if(mode==='build'){ tryPlace(heldPiece||piece); turboT=settings.turbo; }
@@ -2001,8 +2041,14 @@ fitView();
 /* ---------- multiplayer (PeerJS / WebRTC, host relays everything) ---------- */
 const PREFIX='cranklab-v1-';
 const COLORS=[0x2a8f88,0xc8463c,0x6a4fc2,0xd88a1e,0x3f7fd0,0x4f9a3a,0xc54b8f,0x8a6a3e];
-const net={peer:null,role:null,host:null,conns:new Map(),code:null,id:'me',players:new Map(),sendT:0,name:'',lastSwing:0,kills:0,deaths:0,dead:false};
-const PEER_OPTS=Object.assign({debug:0},window.CRANK_PEER_OPTS||{}); // tests can point this at a local signalling server
+const net={lat:new Map(),pingT:0,peer:null,role:null,host:null,conns:new Map(),code:null,id:'me',players:new Map(),sendT:0,name:'',lastSwing:0,kills:0,deaths:0,dead:false};
+// STUN finds a direct path; TURN relays the traffic when a direct path is impossible (phone on cellular, strict routers)
+const ICE={iceServers:[
+  {urls:'stun:stun.l.google.com:19302'},{urls:'stun:global.stun.twilio.com:3478'},
+  {urls:'turn:openrelay.metered.ca:80',username:'openrelayproject',credential:'openrelayproject'},
+  {urls:'turn:openrelay.metered.ca:443',username:'openrelayproject',credential:'openrelayproject'},
+  {urls:'turn:openrelay.metered.ca:443?transport=tcp',username:'openrelayproject',credential:'openrelayproject'}]};
+const PEER_OPTS=Object.assign({debug:0,config:ICE},window.CRANK_PEER_OPTS||{}); // tests can point this at a local signalling server
 const pick=t=>({type:t.type,axis:t.axis,i:t.i,j:t.j,l:t.l,dir:t.dir,key:t.key,mat:t.mat,owner:t.owner});
 const WCODE={ar:1,pump:2}, WNAME=['pick','ar','pump'];
 function colorFor(id){ let h=0; for(const ch of String(id)) h=(h*31+ch.charCodeAt(0))>>>0; return COLORS[h%COLORS.length]; }
@@ -2051,6 +2097,7 @@ function stepPlayers(dt){
 }
 function applyOp(o,quiet){
   if(o.op==='place'){ if(!pieces.has(o.t.key)){ const np=addPiece(o.t); if(o.t.hp!=null) np.hp=o.t.hp; if(!quiet&&pieceCenter(np).distanceTo(P.pos)<30) sfx('place'); } }
+  else if(o.op==='replace'){ const old=pieces.get(o.t.key); if(old){ if(edit&&edit.piece===old) exitEdit(false); removePiece(old); } addPiece(o.t); }
   else if(o.op==='hp'){ const p=pieces.get(o.key); if(p){ p.hp=Math.min(p.hp,o.hp); growing.delete(p); } }
   else if(o.op==='break'){ const p=pieces.get(o.key); if(p){ burst(pieceCenter(p),14,6,0.3); const nb_=neighbors(p); removePiece(p); collapseFrom(nb_); if(pieceCenter(p).distanceTo(P.pos)<30) sfx('break'); } }
   else if(o.op==='shape'){ const p=pieces.get(o.key); if(p){ if(edit&&edit.piece===p) exitEdit(false); p.mask=o.mask; p.dir=o.dir; p.half=o.half; buildPiece(p); startAnim(p,140); popPlayerOut(); } }
@@ -2069,14 +2116,22 @@ function hostData(from,m){
     m.id=from; const o=m.o, c=net.conns.get(from);
     if(o.op==='place'){
       // already built here, or nothing to attach to: tell that player to undo, and send the real piece if there is one
+      // when did this player really place it? arrival time minus their measured one-way lag
+      const ts=performance.now()-(net.lat.get(from)||0);
       const have=pieces.get(o.t.key);
+      if(have&&ts<(have.ts||0)-5){
+        // they placed first: their piece replaces the later one, on every screen (including the host's)
+        removePiece(have); o.t.owner=from; const np=addPiece(o.t); np.ts=ts;
+        netSend({type:'op',id:from,o:{op:'replace',t:pick(np)}}); return;
+      }
       if(have||!supported(o.t)){ if(c&&c.open) c.send({type:'undo',key:o.t.key,real:have?Object.assign(pick(have),{mask:have.mask,half:have.half,hp:Math.round(have.hp)}):null}); return; }
-      o.t.owner=from;
+      o.t.owner=from; o.ts=ts;
     } else if(o.op==='shape'){
       const p=pieces.get(o.key); if(!p||p.owner!==from){ if(p&&c&&c.open) c.send({type:'fix',key:p.key,mask:p.mask,dir:p.dir,half:p.half}); return; }
     } else if(o.op==='clear') return; // only the host clears
-    applyOp(o); netSend(m,from);
+    applyOp(o); if(o.op==='place'&&o.ts){ const np=pieces.get(o.t.key); if(np) np.ts=o.ts; delete o.ts; } netSend(m,from);
   }
+  else if(m.type==='pong'){ const rtt=performance.now()-m.t; const old=net.lat.get(from); net.lat.set(from,old==null?rtt/2:old*0.7+rtt*0.15); }
   else if(m.type==='shot'){ m.id=from; onShot(m); netSend(m,from); }
   else if(m.type==='hit'){ m.id=from; if(m.to===net.id) onHit(m); else { const c=net.conns.get(m.to); if(c&&c.open) c.send(m); } }
   else if(m.type==='elim'){ m.id=from; onElim(m); netSend(m,from); }
@@ -2108,6 +2163,7 @@ function clientData(m){
   if(m.type==='welcome'){ net.id=m.you; clearBuilds(); m.pieces.forEach(t=>{ const p=addPiece(t); p.mask=t.mask??p.mask; p.half=t.half; if(t.hp!=null){ p.hp=t.hp; if(p.hp>=p.maxHp) growing.delete(p); } buildPiece(p); }); respawn(); syncBot(); toast('Joined room '+net.code); updateRoomUI(); }
   else if(m.type==='st') onState(m);
   else if(m.type==='op'){ if(m.id!==net.id) applyOp(m.o); }
+  else if(m.type==='ping'){ if(net.host&&net.host.open) net.host.send({type:'pong',t:m.t}); }
   else if(m.type==='undo'){ const p=pieces.get(m.key); if(p&&p.owner===net.id){ removePiece(p); } if(m.real&&!pieces.has(m.real.key)){ const q=addPiece(m.real); q.mask=m.real.mask; q.half=m.real.half; if(m.real.hp!=null) q.hp=m.real.hp; buildPiece(q); } }
   else if(m.type==='fix'){ const p=pieces.get(m.key); if(p){ if(edit&&edit.piece===p) exitEdit(false); p.mask=m.mask; p.dir=m.dir; p.half=m.half; buildPiece(p); } }
   else if(m.type==='shot'){ if(m.id!==net.id) onShot(m); }
@@ -2149,7 +2205,9 @@ function joinGame(){
   const peer=new Peer(PEER_OPTS); net.peer=peer;
   peer.on('open',()=>{
     const conn=peer.connect(PREFIX+code,{reliable:true}); net.host=conn;
-    conn.on('open',()=>{ net.role='client'; net.code=code; net.dead=false; updateRoomUI(); $('clear').disabled=true; });
+    const to=setTimeout(()=>{ if(net.role!=='client'){ setRoomStatus("Couldn't connect to the host. Check the code, make sure the host is still in the room, then try again."); leaveGame(true); } },15000);
+    conn.on('error',()=>{ clearTimeout(to); setRoomStatus('Connection to the host failed. Try again.'); leaveGame(true); });
+    conn.on('open',()=>{ clearTimeout(to); net.role='client'; net.code=code; net.dead=false; updateRoomUI(); $('clear').disabled=true; });
     conn.on('data',m=>{ if(m&&m.type==='full'){ setRoomStatus('That room is full (8 players).'); leaveGame(true); return; } clientData(m); });
     conn.on('close',()=>{ if(net.role==='client'){ toast('The host closed the room'); leaveGame(); } });
   });
@@ -2437,7 +2495,12 @@ function botHurt(dmg){
 }
 function botBuild(q){ const oy=B.yaw, op=B.pitch; B.yaw=q.yaw; B.pitch=q.pitch; if(tryPlace(q.type,B)) B.buildPose=0.35; B.yaw=oy; B.pitch=op; }
 function botFacingWall(){ const t=computeTarget('wall',{pos:B.pos,yaw:snapYaw(Math.atan2(-(P.pos.x-B.pos.x),-(P.pos.z-B.pos.z))),pitch:0,onGround:B.onGround,groundSlab:B.groundSlab,rot:0}); return pieces.get(t.key); }
-function botEditWall(p,mask){ if(!p||!pieces.has(p.key)||p.owner!=='bot') return; p.mask=mask; buildPiece(p); startAnim(p,120); popPlayerOut(); }
+function botEditWall(p,mask){
+  if(!p||!pieces.has(p.key)||p.owner!=='bot'||p.type!=='wall') return;
+  const removed=[]; for(let i=0;i<9;i++) if(!(mask>>i&1)) removed.push(i);
+  if(mask!==511&&!WALL_OK.has(removed.join(','))) return; // bots only make real edits (window, door, ...)
+  p.mask=mask; buildPiece(p); startAnim(p,80); popPlayerOut(); B.editPose=0.35; sfxAt('confirm',B.pos);
+}
 function botFire(eye,dist,s){
   const w=B.wpn, W=WEAPONS[w];
   const head=Math.random()<0.08+0.32*s;
@@ -2533,7 +2596,7 @@ function botUpdate(dt){
 }
 function animateBot(dt){
   if(!B.h.group.visible) return;
-  animateRig(B.h,{slope:slopeFor(B),pos:B.pos,vel:B.vel,yaw:B.yaw,pitch:B.pitch,onGround:B.onGround,crouch:false,building:B.buildPose>0||B.state==='rush',gun:B.wpn,swingT:0,reload:B.reloadT>0?{w:'ar',p:Math.min(1,1-B.reloadT/2.4)}:null},dt);
+  animateRig(B.h,{slope:slopeFor(B),pos:B.pos,vel:B.vel,yaw:B.yaw,pitch:B.pitch,onGround:B.onGround,crouch:false,building:B.buildPose>0||B.state==='rush',editing:(B.editPose-=lastDt)>0,gun:(B.editPose>0)?false:B.wpn,swingT:0,reload:B.reloadT>0?{w:'ar',p:Math.min(1,1-B.reloadT/2.4)}:null},dt);
 }
 function updateCombatHUD(){
   stepDmgNums(lastDt);
@@ -2671,7 +2734,7 @@ function frame(now){
   const dt=Math.min(0.05,(now-last)/1000); last=now; lastDt=dt;
   pollPad(dt);
   if(playing){
-    moveInput(dt);
+    if(isDead()){ P.vel.x=0; P.vel.z=0; fireHeld=false; heldPiece=null; if(edit) exitEdit(false); } else moveInput(dt);
     if(B&&B.active) botUpdate(dt);
     const n=Math.max(1,Math.ceil(dt/0.008)); for(let k=0;k<n;k++){ physStep(dt/n,P); if(B&&B.active) physStep(dt/n,B); }
     combatTick(dt);
@@ -2688,7 +2751,8 @@ function frame(now){
   } else { P.vel.x*=0.8; P.vel.z*=0.8; }
   if(swingT>0) swingT-=dt;
   stepAnims(now); stepChunks(dt); stepPlayers(dt); stepTracers(dt); if(B&&B.active) animateBot(dt);
-  if(net.role){ net.sendT-=dt; if(net.sendT<=0){ net.sendT=0.05; netSend(myState()); } }
+  if(net.role){ net.sendT-=dt; if(net.sendT<=0){ net.sendT=0.05; netSend(myState()); }
+    if(net.role==='host'){ net.pingT-=dt; if(net.pingT<=0){ net.pingT=1; const t=performance.now(); net.conns.forEach(c=>{ if(c.open) try{c.send({type:'ping',t});}catch(e){} }); } } }
   fitView(); updateCamera(); animateHero(dt); updateGhost(); updateHUD();
   renderer.render(scene,camera);
   requestAnimationFrame(frame);
