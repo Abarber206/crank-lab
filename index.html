@@ -629,12 +629,13 @@ const editGeoCache=new Map();
 /* Smooth staircase edits: a kept tile whose corner sits on a staircase step (open on both sides of that corner,
    with the staircase continuing through the diagonal neighbours) is cut along its diagonal, so a stepped edit
    reads as one straight slanted edge. Windows, doors, arches and half walls have no such corners and stay square. */
+function removedKey(mask){ const r=[]; for(let i=0;i<9;i++) if(!(mask>>i&1)) r.push(i); return r.join(','); }
 function wallTiles(mask){
   const kept=(r,c)=>r>=0&&r<3&&c>=0&&c<3&&!!(mask>>(r*3+c)&1), inside=(r,c)=>r>=0&&r<3&&c>=0&&c<3;
   const openOrOut=(r,c)=>!kept(r,c), hole=(r,c)=>inside(r,c)&&!kept(r,c), keptOrOut=(r,c)=>!inside(r,c)||kept(r,c);
   const out=[];
   for(let r=0;r<3;r++)for(let c=0;c<3;c++){ if(!kept(r,c)) continue; let cut=null;
-    if(mask!==511) for(const [sx,sy] of [[1,-1],[-1,-1],[1,1],[-1,1]]){
+    if(mask!==511&&SLICED.has(removedKey(mask))) for(const [sx,sy] of [[1,-1],[-1,-1],[1,1],[-1,1]]){
       const H=[r,c+sx], V=[r+sy,c];
       if(openOrOut(...H)&&openOrOut(...V)&&(hole(...H)||hole(...V))&&keptOrOut(r-sy,c+sx)&&keptOrOut(r+sy,c-sx)){ cut=[sx,sy]; break; } }
     out.push({r,c,cut}); }
@@ -785,7 +786,7 @@ function addPiece(t){
   for(const [a,b] of cellsOf(p)){ const k=a+','+b; let s=cellIndex.get(k); if(!s){s=new Set(); cellIndex.set(k,s);} s.add(p); }
   buildPiece(p); startAnim(p,M.fill);
   if(order.length>MAX_BUILDS) removePiece(order[0]);
-  popPlayerOut(p);
+  phaseCheck(p); popPlayerOut(p);
   return p;
 }
 // Builds gain health while they finish constructing (Fortnite-style build-up)
@@ -908,9 +909,20 @@ function depen(ps,E=P){
     }
   }
 }
-function popPlayerOut(){ depen(near(P.pos.x,P.pos.z),P); if(B&&B.active) depen(near(B.pos.x,B.pos.z),B); }
+function bodyOverlaps(E,p){
+  const f=E.pos.y, h=eh(E), x=E.pos.x, z=E.pos.z, r=R*0.9;
+  for(const b of p.boxes) if(x+r>b[0]&&x-r<b[3]&&z+r>b[2]&&z-r<b[5]&&b[4]>f+0.62&&b[1]<f+h-0.05) return true;
+  if(p.slab) for(const sm of SAMP){ const t=slabTop(p,x+sm[0]*0.9,z+sm[1]*0.9); if(t!==null&&t>f+0.62&&t-ST<f+h-0.05) return true; }
+  return false;
+}
+// below your feet (a step's height) a new piece lifts you; anything cutting through your body is ghosted for you instead
+function phaseCheck(p){ for(const E of [P,B]){ if(!E||(E===B&&!B.active)) continue; if(!E.phase) E.phase=new Set(); if(bodyOverlaps(E,p)) E.phase.add(p); } }
+function updatePhase(E){ if(!E||!E.phase||!E.phase.size) return; E.phase.forEach(p=>{ if(!pieces.has(p.key)||!bodyOverlaps(E,p)) E.phase.delete(p); }); }
+const solidNear=(E)=>{ const ps=near(E.pos.x,E.pos.z); if(E.phase&&E.phase.size) E.phase.forEach(p=>ps.delete(p)); return ps; };
+function popPlayerOut(){ depen(solidNear(P),P); if(B&&B.active) depen(solidNear(B),B); }
 function physStep(dt,E=P){
-  const ps=near(E.pos.x,E.pos.z), h=eh(E);
+  updatePhase(E);
+  const ps=solidNear(E), h=eh(E);
   E.vel.y-=GRAV*dt;
   depen(ps,E);
   const step=E.onGround?0.6:0.3;
@@ -921,7 +933,7 @@ function physStep(dt,E=P){
   if(blocked(E.pos.x,nz,E.pos.x,oz,E.pos.y,h,step,ps)) E.vel.z=0; else E.pos.z=nz;
   const f=E.pos.y;
   if(E.vel.y>0){
-    let nf=f+E.vel.y*dt; const c=ceilAt(E.pos.x,E.pos.z,f+h,ps);
+    let nf=f+E.vel.y*dt; const c=ceilAt(E.pos.x,E.pos.z,f+0.4,ps,f+1.3);
     if(nf+h>c){ nf=Math.max(f,c-h); E.vel.y=0; }
     E.pos.y=nf; E.onGround=false; E.groundSlab=null;
   } else {
@@ -965,7 +977,7 @@ function moveBody(E,fw,st,jump,dt){
   // coyote time: a jump still counts for a moment after running off an edge
   if(E.onGround) E.coyT=0.12; else E.coyT=(E.coyT||0)-dt;
   if(jump&&(E.onGround||E.coyT>0)&&E.vel.y<=0.5){ E.vel.y=JUMP; E.onGround=false; E.groundSlab=null; E.coyT=0;
-    if(E===P) animEvent(localHero,'jump'); else if(B&&E===B) animEvent(B.h,'jump'); }
+    if(E===P){ animEvent(localHero,'jump'); sfx('jump'); } else if(B&&E===B) animEvent(B.h,'jump'); }
 }
 
 /* ---------- targeting ---------- */
@@ -1016,6 +1028,7 @@ function computeTargetRaw(type,E=P){
    Floors/cones: the cell you're looking at, at the nearest floor height. Stairs: the cell you're looking at.
    Standing on a stair and facing up it still continues the stair. */
 const _lo=new THREE.Vector3(), _ld=new THREE.Vector3();
+const REACH=3.6;
 function lookTarget(type){
   const E=P, x=E.pos.x, z=E.pos.z, fy=E.pos.y, cellOf=v=>Math.floor(v/CELL);
   const fx=-Math.sin(E.yaw), fz=-Math.cos(E.yaw), dirIdx=Math.abs(fx)>=Math.abs(fz)?(fx>0?0:2):(fz>0?1:3);
@@ -1025,11 +1038,13 @@ function lookTarget(type){
   camera.updateMatrixWorld(); _lo.copy(camera.position); _ld.copy(aimDir());
   const ci=cellOf(x), cj=cellOf(z);
   if(type==='wall'){
-    // first cell edge the horizontal look ray crosses, measured from you
+    // the grid edge nearest a point ~3.6 m out along your view (so it doesn't land on top of you), never behind you
     const hx=_ld.x, hz=_ld.z, hl=Math.hypot(hx,hz); if(hl<0.15) return null;
-    const tx=hx>0?((ci+1)*CELL-x)/hx:hx<0?(ci*CELL-x)/hx:1e9, tz=hz>0?((cj+1)*CELL-z)/hz:hz<0?(cj*CELL-z)/hz:1e9;
+    const ux=hx/hl, uz=hz/hl, lx=x+ux*REACH, lz=z+uz*REACH;
     let axis,i,j,t;
-    if(tx<=tz){ axis='x'; i=hx>0?ci+1:ci; j=cj; t=tx; } else { axis='z'; j=hz>0?cj+1:cj; i=ci; t=tz; }
+    if(Math.abs(ux)>=Math.abs(uz)){ axis='x'; i=Math.round(lx/CELL); if((i*CELL-x)*Math.sign(ux)<0.4) i+=Math.sign(ux); j=cellOf(z+uz*Math.abs((i*CELL-x)/ux)); t=Math.abs((i*CELL-x)/ux); }
+    else { axis='z'; j=Math.round(lz/CELL); if((j*CELL-z)*Math.sign(uz)<0.4) j+=Math.sign(uz); i=cellOf(x+ux*Math.abs((j*CELL-z)/uz)); t=Math.abs((j*CELL-z)/uz); }
+    t/=hl;
     const eyeY=fy+1.6, yAt=eyeY+_ld.y*t;
     let l=Math.floor(yAt/LVL); l=Math.max(Math.max(0,feetL-1),Math.min(feetL+1,l));
     return {type,axis,i,j,l,key:`w${axis}${i}_${j}_${l}`};
@@ -1040,7 +1055,10 @@ function lookTarget(type){
   let pt=hits.length?hits[0].point.clone():null;
   if(!pt&&_ld.y<-0.01){ const tg=-_lo.y/_ld.y; if(tg>0&&tg<camDist+6) pt=_lo.clone().addScaledVector(_ld,tg); }
   if(!pt) pt=_lo.clone().addScaledVector(_ld,camDist+5);
-  let i=cellOf(pt.x+_ld.x*0.01), j=cellOf(pt.z+_ld.z*0.01);
+  // the tile ~3.6 m out along your view, unless you're looking down at something closer
+  const hl2=Math.hypot(_ld.x,_ld.z)||1, far={x:x+_ld.x/hl2*REACH,z:z+_ld.z/hl2*REACH};
+  const usePt=Math.hypot(pt.x-x,pt.z-z)<REACH&&_ld.y<-0.35;
+  let i=cellOf(usePt?pt.x:far.x), j=cellOf(usePt?pt.z:far.z);
   i=Math.max(ci-1,Math.min(ci+1,i)); j=Math.max(cj-1,Math.min(cj+1,j));
   if(type!=='ramp'&&_ld.y>0.6){ i=onRamp?onRamp.i:ci; j=onRamp?onRamp.j:cj; pt.y=Math.max(pt.y,(feetL+1)*LVL); } // looking steeply up: over your head
   let l;
@@ -1067,11 +1085,10 @@ function computeTarget(type,E=P){
       const d=DIRS[dirIdx];
       for(const dl of [1,0]){ const ahead=pieces.get(`m${r.i+d[0]}_${r.j+d[1]}_${r.l+dl}`);
         if(ahead&&ahead.type==='ramp'){ const n=retarget({...t,i:t.i+(t.axis==='x'?d[0]:0),j:t.j+(t.axis==='z'?d[1]:0)},ahead.l); return pieces.has(n.key)?t:n; } }
-      const up=retarget(t,t.l+1); return pieces.has(up.key)?t:up; }
+      return t; }
     return t;
   }
-  if(type!=='wall') return t;
-  const up=retarget(t,t.l+1); return pieces.has(up.key)?t:up;
+  return t; // a taken spot stays taken: no stacking walls above your head
 }
 /* Every placement (yours, the bot's, preview) goes through this. Rules marked "approx" are best guesses at the
    real game's behaviour. */
@@ -1102,7 +1119,7 @@ function tryPlace(type,E=P){
   if(!validatePlacement(t,E).ok) return false;
   t.mat=E===P?buildMat:(B&&E===B?(B.boxMat||(B.skill>0.65?'brick':'wood')):'wood'); t.owner=E===P?net.id:'bot';
   const np=addPiece(t); burst(pieceCenter(np),4,3,0.07);
-  if(E===P){ np.ts=performance.now(); sfx('place'); stat('b'); animEvent(localHero,'build'); netOp({op:'place',t:pick(t)}); } else { sfxAt('place',E.pos); if(B&&E===B) animEvent(B.h,'build'); }
+  if(E===P){ np.ts=performance.now(); sfx('place_'+np.mat); stat('b'); animEvent(localHero,'build'); netOp({op:'place',t:pick(t)}); } else { sfxAt('place_'+np.mat,E.pos); if(B&&E===B) animEvent(B.h,'build'); }
   return true;
 }
 
@@ -1172,16 +1189,16 @@ function enterEdit(){
 }
 function refreshTiles(){ edit.tiles.forEach(m=>{ const i=m.userData.idx; m.material=edit.sel.has(i)?(edit.bad?tileBadMat:tileSelMat):i===edit.hover?tileHoverMat:tileMat; }); updateEditLabel(); }
 // Is the current tile pattern a real edit? (walls/floors need one tile left, cones one corner down, ramps two tiles on one side)
-const WALL_SHAPES={'':'No change','4':'Window','3,4,5':'Wide window','1,4':'Door','0,1,3,4':'Wide door','1,2,4,5':'Wide door','0,3':'Side door','2,5':'Side door',
-  '0,1,2,4':'Arch','6,7,8':'Half wall','3,4,5,6,7,8':'Low wall','0,1,2':'Raised wall','0,1,2,3,4,5':'Top strip','1,4,7':'Center slot','0,3,6':'Side gap','2,5,8':'Side gap','7':'Peephole','4,7':'Tall window'};
-// Only real wall edits are allowed: the named shapes, their mirror images, and the diagonal corner cuts
-const WALL_OK=(()=>{ const set=new Set(), mir=k=>k.split(',').map(Number).map(i=>(i/3|0)*3+(2-i%3)).sort((a,b)=>a-b).join(',');
-  const add=k=>{ if(!k) return; set.add(k); set.add(mir(k)); };
-  Object.keys(WALL_SHAPES).forEach(add); ['0','2','6','8','1,2,5','0,1,3','3,6,7','5,7,8'].forEach(add); return set; })();
+// Wall edit tiles: idx = row*3 + col, row 0 is the bottom. Only these shapes (and their mirror images) are allowed.
+const WALL_SHAPES={'':'No change','4':'Window','3':'Side window','5':'Side window','3,5':'Side windows','1,4':'Door','0,3':'Side door','2,5':'Side door',
+  '6,7,8':'Lower wall','3,4,5,6,7,8':'Half wall','1,2,4,5,7,8':'Side wall','0,1,3,4,6,7':'Side wall',
+  '1,2,5':'Half-sliced wall','0,1,3':'Half-sliced wall','5,7,8':'Half-sliced wall','3,6,7':'Half-sliced wall'};
+const SLICED=new Set(['1,2,5','0,1,3','5,7,8','3,6,7']);
+const WALL_OK=new Set(Object.keys(WALL_SHAPES).filter(k=>k));
 function editShapeName(){
   const p=edit.piece, key=[...edit.sel].sort((a,b)=>a-b).join(','), n=edit.sel.size;
   if(!editValid()) return p.type==='ramp'?'Pick 2 side-by-side tiles or all 4':p.type==='wall'?'Not a valid edit':'Keep at least one tile';
-  if(p.type==='wall') return WALL_SHAPES[key]||WALL_SHAPES[key.split(',').map(Number).map(i=>(i/3|0)*3+(2-i%3)).sort((a,b)=>a-b).join(',')]||(edit.sel.size<=1?'Corner cut':'Slant');
+  if(p.type==='wall') return WALL_SHAPES[key]||'Not a valid edit';
   if(p.type==='floor') return n===0?'No change':n===1?'Corner cut':n===3?'Single tile':(key==='0,3'||key==='1,2')?'Diagonal':'Half floor';
   if(p.type==='cone') return n===0?'Pyramid':n===1?'Corner roof':n===3?'Pocket':(key==='0,3'||key==='1,2')?'Ridge':'Ramp roof';
   return n===0?'No change':n===2?'Half stairs':'Full stairs';
@@ -1240,7 +1257,7 @@ function exitEdit(apply){
   if(apply) stat('e');
   edit.tiles.forEach(m=>scene.remove(m));
   mode=edit.prevMode; edit=null;
-  if(pieces.has(p.key)){ buildPiece(p); startAnim(p,80); popPlayerOut(); netOp({op:'shape',key:p.key,mask:p.mask,dir:p.dir,half:p.half}); }
+  if(pieces.has(p.key)){ buildPiece(p); startAnim(p,80); phaseCheck(p); popPlayerOut(); netOp({op:'shape',key:p.key,mask:p.mask,dir:p.dir,half:p.half}); }
   sfx(apply?'confirm':'edit'); syncMode();
 }
 function resetEdit(){
@@ -1260,7 +1277,7 @@ const adsOn=()=>adsHeld&&canAim();
 function selectGun(w){
   if(edit) exitEdit(true);
   w=w||P.wpn;
-  if(mode!=='gun'||P.wpn!==w){ P.reloadT=0; P.equipT=WEAPONS[w].equip; animEvent(localHero,'equip'); }
+  if(mode!=='gun'||P.wpn!==w){ P.reloadT=0; P.equipT=WEAPONS[w].equip; animEvent(localHero,'equip'); sfx('equip'); }
   P.wpn=w; P.lastWeapon=w; mode='gun'; syncMode();
 }
 function toggleBuild(){
@@ -1287,49 +1304,85 @@ function swing(){
   swingT=0.22; net.lastSwing=(net.lastSwing%1e6)+1;
   const hit=aimHit(3.4);
   // the pickaxe chips builds (50 a hit) instead of deleting them
-  if(hit){ const hp_=hit.object.userData.piece; dmgNum(hit.point,PICK_DMG,'build'); sfx('tick'); damagePiece(hp_,PICK_DMG,hit.point); } else sfx('whiff');
+  if(hit){ const hp_=hit.object.userData.piece; dmgNum(hit.point,PICK_DMG,'build'); sfx('pick_hit'); damagePiece(hp_,PICK_DMG,hit.point); } else sfx('whiff');
 }
 function toggleEdit(){ if(edit) exitEdit(true); else enterEdit(); }
 function respawn(){ animEvent(localHero,'revive'); P.pos.set(...SPAWN); P.vel.set(0,0,0); P.onGround=true; P.hp=100; P.sh=100; P.ammo={ar:WEAPONS.ar.mag,pump:WEAPONS.pump.mag}; P.reloadT=0; }
 
 /* ---------- audio ---------- */
-let AC=null, noiseBuf=null, sfxGain=1;
-function sfxAt(k,pos){ const d=pos.distanceTo(P.pos); if(d>90) return; sfxGain=Math.max(0.12,1-d/90); sfx(k); sfxGain=1; }
+let AC=null, noiseBuf=null, sfxGain=1, sfxLP=20000, sfxVerb=0, master=null, verb=null, cur=null;
+// far-away sounds are quieter and duller
+function sfxAt(k,pos){ const d=pos.distanceTo(P.pos); if(d>110) return; sfxGain=Math.max(0.1,1-d/110); sfxLP=Math.max(1200,20000*Math.pow(1-d/110,2.2)); sfx(k); sfxGain=1; sfxLP=20000; }
 function audioInit(){
   if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)();
-    noiseBuf=AC.createBuffer(1,AC.sampleRate*0.3,AC.sampleRate); const d=noiseBuf.getChannelData(0); for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1; }catch(e){ AC=null; } }
+    noiseBuf=AC.createBuffer(1,AC.sampleRate*0.5,AC.sampleRate); const d=noiseBuf.getChannelData(0); for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
+    const comp=AC.createDynamicsCompressor(); comp.threshold.value=-14; comp.ratio.value=4; comp.connect(AC.destination);
+    master=AC.createGain(); master.gain.value=0.9; master.connect(comp);
+    // short outdoor echo for gunshots and breaks
+    verb=AC.createConvolver(); const len=AC.sampleRate*1.1, ir=AC.createBuffer(2,len,AC.sampleRate);
+    for(let c=0;c<2;c++){ const ch=ir.getChannelData(c); for(let i=0;i<len;i++) ch[i]=(Math.random()*2-1)*Math.pow(1-i/len,3.2)*(i<AC.sampleRate*0.012?0:1); }
+    verb.buffer=ir; const vg=AC.createGain(); vg.gain.value=0.5; verb.connect(vg); vg.connect(comp);
+  }catch(e){ AC=null; } }
   if(AC&&AC.state==='suspended') AC.resume();
 }
+function bus(){ const g=AC.createGain(); g.gain.value=sfxGain; let n=g;
+  if(sfxLP<19000){ const f=AC.createBiquadFilter(); f.type='lowpass'; f.frequency.value=sfxLP; g.connect(f); n=f; }
+  n.connect(master); if(sfxVerb>0){ const sg=AC.createGain(); sg.gain.value=sfxVerb; n.connect(sg); sg.connect(verb); } return g; }
 function tone(type,f0,f1,dur,vol,delay=0){
-  vol*=sfxGain; const t=AC.currentTime+delay, o=AC.createOscillator(), g=AC.createGain();
-  o.type=type; o.frequency.setValueAtTime(f0,t); o.frequency.exponentialRampToValueAtTime(f1,t+dur);
-  g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
-  o.connect(g).connect(AC.destination); o.start(t); o.stop(t+dur+0.02);
+  const t=AC.currentTime+delay, o=AC.createOscillator(), g=AC.createGain();
+  o.type=type; o.frequency.setValueAtTime(f0,t); o.frequency.exponentialRampToValueAtTime(Math.max(20,f1),t+dur);
+  g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(vol,t+0.004); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  o.connect(g).connect(cur); o.start(t); o.stop(t+dur+0.03);
 }
-function noise(freq,dur,vol,q=1){
-  vol*=sfxGain; const t=AC.currentTime, s=AC.createBufferSource(), f=AC.createBiquadFilter(), g=AC.createGain();
-  s.buffer=noiseBuf; f.type='bandpass'; f.frequency.value=freq; f.Q.value=q;
-  g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
-  s.connect(f).connect(g).connect(AC.destination); s.start(t); s.stop(t+dur);
+// filtered noise burst; type 'bandpass' | 'lowpass' | 'highpass'; f1 sweeps the filter
+function noise(freq,dur,vol,q=1,delay=0,type='bandpass',f1){
+  const t=AC.currentTime+delay, s=AC.createBufferSource(), f=AC.createBiquadFilter(), g=AC.createGain();
+  s.buffer=noiseBuf; s.playbackRate.value=0.8+Math.random()*0.4; f.type=type; f.frequency.setValueAtTime(freq,t); if(f1) f.frequency.exponentialRampToValueAtTime(f1,t+dur); f.Q.value=q;
+  g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(vol,t+0.003); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  s.connect(f).connect(g).connect(cur); s.start(t,Math.random()*0.2); s.stop(t+dur+0.02);
 }
+const click=(f,v,d=0)=>{ noise(f,0.025,v,2.5,d); tone('square',f*0.4,f*0.3,0.02,v*0.25,d); };
 function sfx(k){
   if(!AC) return;
-  if(k==='place'){ tone('square',210,80,0.07,0.07); noise(1400,0.06,0.18,0.8); }
-  else if(k==='edit'){ tone('triangle',520,880,0.06,0.08); }
-  else if(k==='tick'){ tone('sine',1200,1500,0.03,0.05); }
-  else if(k==='confirm'){ tone('triangle',700,1050,0.05,0.08); tone('triangle',1050,1400,0.05,0.07,0.05); }
-  else if(k==='break'){ noise(700,0.16,0.35,0.6); tone('sawtooth',160,50,0.12,0.06); }
-  else if(k==='whiff'){ noise(2600,0.08,0.05,2); }
-  else if(k==='shot'){ noise(1500,0.11,0.34,0.6); tone('square',150,55,0.09,0.07); }
-  else if(k==='pump'){ noise(900,0.18,0.45,0.5); tone('square',110,40,0.14,0.09); tone('square',600,400,0.03,0.04,0.32); }
-  else if(k==='step'){ noise(260+Math.random()*120,0.05,0.05,1.4); }
-  else if(k==='shell'){ tone('square',700,500,0.03,0.04); }
-  else if(k==='hit'){ tone('sine',1700,1500,0.045,0.08); }
-  else if(k==='headhit'){ tone('sine',2300,2000,0.06,0.09); tone('sine',1700,1500,0.04,0.06,0.03); }
-  else if(k==='hurt'){ tone('sawtooth',230,90,0.13,0.08); noise(500,0.08,0.12,0.8); }
-  else if(k==='reload'){ tone('square',420,300,0.04,0.05); tone('square',520,700,0.05,0.05,0.9); }
-  else if(k==='win'){ tone('triangle',520,780,0.12,0.09); tone('triangle',780,1040,0.16,0.09,0.12); }
-  else if(k==='lose'){ tone('triangle',420,260,0.25,0.09); }
+  sfxVerb=({shot:0.22,pump:0.3,break_wood:0.15,break_brick:0.18,break_metal:0.2,break:0.15})[k]||0;
+  cur=bus();
+  const r=()=>0.94+Math.random()*0.12;
+  switch(k){
+    case 'shot': noise(3200,0.035,0.55,0.7,0,'highpass'); noise(950*r(),0.14,0.5,0.8); tone('sine',140,42,0.13,0.55); tone('square',2300,1700,0.015,0.05); noise(400,0.18,0.12,0.6,0.02,'lowpass'); break;
+    case 'pump': noise(2600,0.05,0.5,0.7,0,'highpass'); noise(1500,0.3,0.65,0.5,0,'lowpass',400); tone('sine',95,32,0.24,0.75); click(2600,0.22,0.34); click(1800,0.26,0.46); noise(1200,0.06,0.12,1.5,0.4); break;
+    case 'reload_ar': click(1800,0.2); tone('square',300,180,0.05,0.07); noise(900,0.07,0.15,1,0.55); click(1300,0.3,0.6); noise(3500,0.09,0.1,1,0.85,'highpass',1500); click(2400,0.22,0.98); break;
+    case 'shell': click(2200,0.2); noise(1200,0.04,0.1,1.2,0.03); break;
+    case 'equip': noise(2500,0.06,0.08,1,0,'highpass'); click(1600,0.12,0.05); break;
+    case 'place': case 'place_wood': tone('triangle',190*r(),115,0.09,0.28); noise(900,0.07,0.22,2); noise(3000,0.02,0.08,1,0,'highpass'); break;
+    case 'place_brick': tone('sine',115*r(),70,0.12,0.4); noise(600,0.1,0.3,0.8,0,'lowpass'); noise(2000,0.03,0.08,1); break;
+    case 'place_metal': [520,733,1240].forEach((f,q)=>tone('sine',f*r(),f*0.98,0.32-q*0.06,0.09)); noise(4000,0.03,0.12,1,0,'highpass'); tone('square',180,90,0.05,0.05); break;
+    case 'break': case 'break_wood': noise(1300,0.2,0.5,0.7); tone('sawtooth',170,55,0.14,0.07); for(let q=0;q<5;q++) noise(1600+Math.random()*1800,0.03,0.12,3,0.05+q*0.05+Math.random()*0.03); break;
+    case 'break_brick': noise(700,0.28,0.6,0.6,0,'lowpass',200); tone('sine',90,40,0.2,0.35); for(let q=0;q<6;q++) noise(900+Math.random()*900,0.04,0.12,2,0.06+q*0.05); break;
+    case 'break_metal': [430,610,980].forEach((f,q)=>tone('sine',f,f*0.9,0.45-q*0.08,0.1)); noise(3000,0.12,0.3,0.8,0,'highpass'); for(let q=0;q<4;q++) click(2500+Math.random()*1500,0.12,0.08+q*0.07); break;
+    case 'pick_hit': tone('triangle',320*r(),150,0.09,0.22); noise(1500,0.07,0.28,1.2); break;
+    case 'whiff': noise(700,0.14,0.08,1.5,0,'bandpass',2600); break;
+    case 'edit': tone('triangle',520,880,0.06,0.08); break;
+    case 'tick': click(2400,0.08); break;
+    case 'confirm': tone('triangle',700,1050,0.05,0.08); tone('triangle',1050,1400,0.05,0.07,0.05); break;
+    case 'hit': tone('sine',2050,1850,0.05,0.14); noise(5500,0.02,0.1,1,0,'highpass'); break;
+    case 'headhit': tone('sine',2700,2500,0.09,0.17); tone('sine',3500,3400,0.07,0.1,0.03); noise(6000,0.02,0.1,1,0,'highpass'); break;
+    case 'hurt': noise(600,0.1,0.3,0.8); tone('sine',210,90,0.15,0.14); break;
+    case 'step': case 'step_grass': noise(650*r(),0.07,0.06,0.6,0,'lowpass'); break;
+    case 'step_wood': tone('triangle',150*r(),120,0.05,0.07); noise(1000,0.04,0.05,1.5); break;
+    case 'step_brick': noise(700*r(),0.05,0.08,1.2); break;
+    case 'step_metal': tone('sine',880*r(),860,0.06,0.035); noise(3200,0.025,0.04,1,0,'highpass'); break;
+    case 'jump': noise(500,0.07,0.06,0.7,0,'lowpass'); break;
+    case 'land': tone('sine',95,48,0.11,0.16); noise(420,0.09,0.12,0.7,0,'lowpass'); break;
+    case 'win': tone('triangle',520,780,0.12,0.09); tone('triangle',780,1040,0.16,0.09,0.12); break;
+    case 'lose': tone('triangle',420,260,0.25,0.09); break;
+  }
+}
+// what you're standing on decides the footstep sound
+function stepSound(E){
+  if(E.pos.y<0.05) return 'step_grass';
+  if(E.groundSlab) return 'step_'+(E.groundSlab.mat||'wood');
+  const i=Math.floor(E.pos.x/CELL), j=Math.floor(E.pos.z/CELL), l=Math.round(E.pos.y/LVL), f=pieces.get(`f${i}_${j}_${l}`);
+  return 'step_'+(f?f.mat:'wood');
 }
 
 /* ---------- characters: an original toon-shaded builder with ink outlines and a jointed rig ----------
@@ -1490,34 +1543,58 @@ function createHero(jacketHex,opts){
   part(rbox(.3,.006,.22,.003),0x3d8fe0,rig.plan,0,0,0,[.45,0,0],null,0.005);
   part(rbox(.26,.008,.02,.003),0xd7ecff,rig.plan,0,.004,-.04,[.45,0,0],null,0);
   part(rbox(.02,.008,.18,.003),0xd7ecff,rig.plan,.05,.004,0,[.45,0,0],null,0);
-  // assault rifle (uncommon: green accents)
+  // assault rifle (uncommon: green trim). Hand space: -y forward, -z up, +x right
+  const cylY=(r,len,seg=14)=>new THREE.CylinderGeometry(r,r,len,seg);
   rig.gun=grp(rig.armR.hand,0,0,0);
-  part(rbox(.034,.07,.1,.012),C.metal,rig.gun,0,.01,.055,[.25,0,0],null,0.006);
-  part(rbox(.06,.36,.1,.018),C.metal,rig.gun,0,-.1,-.035);
-  part(rbox(.066,.22,.085,.02),C.metalL,rig.gun,0,-.33,-.035);
-  part(rbox(.07,.14,.02,.006),0x4fc142,rig.gun,0,-.36,-.081,null,null,0);
-  part(limbGeo(.016,.016,.2),C.metal,rig.gun,0,-.45,-.045,null,null,0.005);
-  part(limbGeo(.025,.025,.055),C.metal,rig.gun,0,-.63,-.045,null,null,0.005);
-  rig.arMag=part(rbox(.04,.075,.17,.014),0x23272e,rig.gun,0,-.2,.085,[-.28,0,0],null,0.006);
-  part(rbox(.052,.22,.09,.02),C.metal,rig.gun,0,.17,-.01);
-  part(rbox(.03,.08,.04,.01),C.metal,rig.gun,0,-.12,-.1,null,null,0.005);
-  part(rbox(.012,.012,.012,.004),0x4fc142,rig.gun,0,-.15,-.125,null,null,0);
-  rig.muzzleAR=grp(rig.gun,0,-.68,-.045);
-  rig.gripAR=grp(rig.gun,0,-.31,.045);
-  rig.magAR=grp(rig.gun,0,-.2,.17);
-  // pump shotgun (rare: blue accents), with a sliding fore-end
+  const GA=rig.gun, gm=C.metal, gl=C.metalL, gd=0x1b1f26, green=0x4fc142;
+  part(rbox(.036,.075,.11,.014),gm,GA,0,.025,.06,[.32,0,0],null,0.006);                     // angled grip
+  part(new THREE.TorusGeometry(.028,.006,6,14,Math.PI),gd,GA,0,-.035,.045,[0,Math.PI/2,0],null,0); // trigger guard
+  part(rbox(.058,.3,.075,.016),gm,GA,0,-.08,-.015);                                          // lower receiver
+  part(rbox(.062,.34,.058,.016),gl,GA,0,-.1,-.062);                                          // upper receiver
+  part(rbox(.03,.3,.012,.004),gd,GA,0,-.12,-.097,null,null,0);                                // top rail
+  for(let q=0;q<7;q++) part(rbox(.036,.012,.016,.003),gd,GA,0,-.005-q*.04,-.1,null,null,0);  // rail teeth
+  part(cylY(.022,.12),gd,GA,0,-.1,-.135,null,null,0.005);                                     // optic tube
+  part(cylY(.017,.006),0x6fd3ff,GA,0,-.161,-.135,null,null,0);                                // optic lens
+  [-.06,-.14].forEach(y=>part(rbox(.02,.02,.03,.006),gd,GA,0,y,-.112,null,null,0));          // optic mounts
+  part(rbox(.08,.016,.016,.005),gd,GA,0,-.02,-.07,null,null,0);                               // charging handle
+  part(rbox(.066,.24,.082,.02),gl,GA,0,-.35,-.045);                                           // handguard
+  [-.29,-.35,-.41].forEach(y=>[-1,1].forEach(sx=>part(rbox(.004,.03,.036,.002),gd,GA,sx*.034,y,-.045,null,null,0))); // vents
+  part(rbox(.07,.15,.012,.004),green,GA,0,-.35,-.088,null,null,0);                            // rarity trim
+  part(cylY(.015,.2),gm,GA,0,-.55,-.045,null,null,0.005);                                     // barrel
+  part(cylY(.026,.07),gd,GA,0,-.66,-.045,null,null,0.005);                                    // muzzle brake
+  [-1,1].forEach(sx=>part(rbox(.004,.04,.01,.002),0x0b0d10,GA,sx*.026,-.66,-.045,null,null,0));
+  part(rbox(.01,.02,.03,.004),gd,GA,0,-.47,-.1,null,null,0);                                  // front sight
+  rig.arMag=grp(GA,0,0,0);                                                                     // curved, ribbed magazine
+  [[-.17,.07,0],[-.19,.13,-.22],[-.215,.185,-.44]].forEach(([y,z,rx])=>{ part(rbox(.04,.055,.065,.012),0x23272e,rig.arMag,0,y,z,[rx,0,0],null,0.005); part(rbox(.042,.008,.067,.003),gd,rig.arMag,0,y-.024,z,[rx,0,0],null,0); });
+  part(rbox(.05,.2,.08,.018),gm,GA,0,.17,-.02);                                               // stock
+  part(rbox(.052,.1,.028,.01),gd,GA,0,.15,-.07,null,null,0.004);                              // cheek rest
+  part(rbox(.056,.025,.1,.008),gd,GA,0,.28,-.01,null,null,0.004);                             // butt pad
+  part(rbox(.053,.06,.012,.004),green,GA,0,.17,-.061,null,null,0);
+  rig.muzzleAR=grp(GA,0,-.71,-.045);
+  rig.gripAR=grp(GA,0,-.31,.045);
+  rig.magAR=grp(GA,0,-.2,.17);
+  // pump shotgun (rare: blue trim), with a ribbed sliding fore-end and side shell holder
   rig.pump=grp(rig.armR.hand,0,0,0);
-  part(rbox(.034,.07,.1,.012),C.metal,rig.pump,0,.01,.055,[.25,0,0],null,0.006);
-  part(rbox(.065,.28,.1,.02),C.metal,rig.pump,0,-.09,-.035);
-  part(rbox(.07,.12,.02,.006),0x2b86e0,rig.pump,0,-.09,-.086,null,null,0);
-  part(limbGeo(.021,.021,.44),C.metal,rig.pump,0,-.22,-.065,null,null,0.005);
-  part(limbGeo(.017,.017,.34),C.metalL,rig.pump,0,-.22,-.025,null,null,0.005);
-  rig.slide=grp(rig.pump,0,-.33,-.025);
-  part(rbox(.078,.16,.075,.025),C.wood,rig.slide,0,0,.005);
+  const S2=rig.pump, wood=C.wood, woodD=0x6a4322, blue=0x2b86e0;
+  part(rbox(.04,.08,.1,.016),woodD,S2,0,.045,.05,[.5,0,0],null,0.006);                       // grip
+  part(new THREE.TorusGeometry(.028,.006,6,14,Math.PI),gd,S2,0,-.03,.045,[0,Math.PI/2,0],null,0);
+  part(rbox(.066,.27,.095,.02),gm,S2,0,-.08,-.035);                                          // receiver
+  part(rbox(.004,.08,.03,.002),0x0b0d10,S2,.034,-.09,-.05,null,null,0);                      // ejection port
+  part(rbox(.07,.12,.016,.004),blue,S2,0,-.09,-.085,null,null,0);                            // rarity trim
+  part(limbGeo(.021,.021,.44),gm,S2,0,-.22,-.065,null,null,0.005);                           // barrel
+  part(limbGeo(.017,.017,.34),gl,S2,0,-.22,-.025,null,null,0.005);                           // magazine tube
+  part(cylY(.032,.02),gd,S2,0,-.58,-.045,[0,0,0],[1,1,1.5],0.004);                           // barrel clamp
+  part(sph(.009),0xffe27a,S2,0,-.645,-.09,null,null,0);                                      // bead sight
+  part(rbox(.01,.12,.05,.004),gd,S2,.041,-.08,-.03,null,null,0);                             // shell holder
+  [-.12,-.08,-.04].forEach(y=>{ const sg=new THREE.CylinderGeometry(.011,.011,.046,10); sg.rotateX(Math.PI/2); part(sg,0xc8322a,S2,.05,y,-.03,null,null,0); part(cylY(.0115,.012),0xd4af37,S2,.05,y,-.006,[Math.PI/2,0,0],null,0); });
+  rig.slide=grp(S2,0,-.33,-.025);
+  part(rbox(.078,.16,.075,.025),wood,rig.slide,0,0,.005);
+  for(let q=0;q<5;q++) part(rbox(.082,.01,.079,.004),woodD,rig.slide,0,-.06+q*.03,.005,null,null,0);
   rig.gripPump=grp(rig.slide,0,0,.05);
-  part(rbox(.06,.25,.1,.025),C.wood,rig.pump,0,.17,.0,[-.1,0,0]);
-  rig.muzzlePump=grp(rig.pump,0,-.67,-.065);
-  rig.portPump=grp(rig.pump,0,-.1,.04);
+  part(rbox(.06,.25,.1,.025),wood,S2,0,.17,0,[-.1,0,0]);                                     // stock
+  part(rbox(.062,.02,.104,.006),gd,S2,0,.29,.01,[-.1,0,0],null,0.004);                       // recoil pad
+  rig.muzzlePump=grp(S2,0,-.67,-.065);
+  rig.portPump=grp(S2,0,-.1,.04);
   rig.muzzle=rig.muzzleAR;
   rig.gun.visible=rig.pump.visible=rig.hammer.visible=rig.plan.visible=false;
 
@@ -1584,7 +1661,7 @@ function animateRig(H,S,dt){
   // ----- events decay -----
   A.recoil=Math.max(0,A.recoil-dt*(gun==='pump'?4:12)); A.hurt=Math.max(0,A.hurt-dt*3.5); A.strike=Math.max(0,A.strike-dt*6); A.equip=Math.max(0,A.equip-dt*3.2); A.pumpT=Math.max(0,A.pumpT-dt);
   // ----- landing spring -----
-  if(!A.wasGround&&S.onGround){ const imp=Math.min(1,Math.max(0,-A.vy-3)/15); A.sqV-=imp*3.2; if(H===localHero) camDip=Math.min(camDip,-0.16*imp); if(imp>0.35&&A.dustCd<=0){ burst(_fp.copy(S.pos).setY(S.pos.y+0.05),6,2.2,0.07,dustMat); A.dustCd=0.2; } }
+  if(!A.wasGround&&S.onGround){ const imp=Math.min(1,Math.max(0,-A.vy-3)/15); A.sqV-=imp*3.2; if(H===localHero){ camDip=Math.min(camDip,-0.16*imp); if(imp>0.15) sfx('land'); } if(imp>0.35&&A.dustCd<=0){ burst(_fp.copy(S.pos).setY(S.pos.y+0.05),6,2.2,0.07,dustMat); A.dustCd=0.2; } }
   A.wasGround=S.onGround; A.vy=S.vel.y; A.dustCd-=dt;
   A.sqV+=(-130*A.sq-15*A.sqV)*dt; A.sq=Math.max(-0.28,Math.min(0.08,A.sq+A.sqV*dt));
   // ----- turn in place: feet stay planted, then step -----
@@ -1611,7 +1688,7 @@ function animateRig(H,S,dt){
     T.spX=-0.2*k*Math.max(0,cm)*(S.crouch?0.5:1)+0.06*k*Math.max(0,-cm); T.chY=-T.hipsY*1.25;
     if(bounceArms){ T.shL=-0.85*k*s1*cm; T.shR=0.85*k*s1*cm; T.elL=T.elR=0.35+0.95*k; T.shLz=-0.1-0.08*k; T.shRz=0.1+0.08*k; }
     // footstep dust
-    { const st0=Math.sign(s1); if(k>0.3&&st0!==A.stepSign){ A.stepSign=st0; if(H===localHero) sfx('step'); else if(H.group.visible&&H.group.position.distanceTo(P.pos)<30) sfxAt('step',H.group.position); } }
+    { const st0=Math.sign(s1); if(k>0.3&&st0!==A.stepSign){ A.stepSign=st0; if(H===localHero) sfx(stepSound(P)); else if(H.group.visible&&H.group.position.distanceTo(P.pos)<30) sfxAt(B&&H===B.h?stepSound(B):'step_grass',H.group.position); } }
     if(k>0.65&&A.dustCd<=0){ const st=Math.sign(s1); if(st!==A.lastSign){ A.lastSign=st; const ft=(st>0?r.legR:r.legL).foot; ft.getWorldPosition(_fp); if(_fp.distanceTo(P.pos)<40){ burst(_fp,2,1.1,0.05,dustMat); A.dustCd=0.12; } } }
     // idle: breathing, weight shift, look around
     if(sp<0.3){
@@ -2293,7 +2370,7 @@ function damagePiece(p,dmg,point){
   if(!pieces.has(p.key)) return;
   p.hp-=dmg; burst(point,3,3,0.07,matFor[p.mat].chip);
   if(p.hp>0&&net.role){ const now=performance.now(); if(!p.hpSent||now-p.hpSent>120){ p.hpSent=now; netOp({op:'hp',key:p.key,hp:Math.round(p.hp)}); } }
-  if(p.hp<=0){ burst(pieceCenter(p),16,6,0.3,matFor[p.mat].chip); const nb=neighbors(p); removePiece(p); collapseFrom(nb); sfxAt('break',point); netOp({op:'break',key:p.key}); }
+  if(p.hp<=0){ burst(pieceCenter(p),16,6,0.3,matFor[p.mat].chip); const nb=neighbors(p); removePiece(p); collapseFrom(nb); sfxAt('break_'+p.mat,point); netOp({op:'break',key:p.key}); }
 }
 function hurt(E,dmg){ const s=Math.min(E.sh,dmg); E.sh-=s; E.hp=Math.max(0,E.hp-(dmg-s)); return E.hp<=0; }
 
@@ -2346,7 +2423,7 @@ function playerShoot(){
 function startReload(){
   const W=WEAPONS[P.wpn];
   if(mode!=='gun'||P.reloadT>0||P.ammo[P.wpn]>=W.mag) return;
-  P.reloadDur=W.shell||W.reload; P.reloadT=P.reloadDur; sfx('reload');
+  P.reloadDur=W.shell||W.reload; P.reloadT=P.reloadDur; sfx(W.shell?'shell':'reload_ar');
 }
 let phT=0;
 function pieceHpTick(dt){
@@ -2499,7 +2576,7 @@ function botEditWall(p,mask){
   if(!p||!pieces.has(p.key)||p.owner!=='bot'||p.type!=='wall') return;
   const removed=[]; for(let i=0;i<9;i++) if(!(mask>>i&1)) removed.push(i);
   if(mask!==511&&!WALL_OK.has(removed.join(','))) return; // bots only make real edits (window, door, ...)
-  p.mask=mask; buildPiece(p); startAnim(p,80); popPlayerOut(); B.editPose=0.35; sfxAt('confirm',B.pos);
+  p.mask=mask; buildPiece(p); startAnim(p,80); phaseCheck(p); popPlayerOut(); B.editPose=0.35; sfxAt('confirm',B.pos);
 }
 function botFire(eye,dist,s){
   const w=B.wpn, W=WEAPONS[w];
@@ -2557,7 +2634,7 @@ function botUpdate(dt){
     if(B.stateT<=0||B.pos.y>P.pos.y+1.5){ B.state='fight'; B.queue.length=0; }
   } else if(B.state==='boxed'){
     B.stateT-=dt;
-    if(B.queue.length===0&&!B.peek&&s>0.55){ B.peekT-=dt; if(B.peekT<=0){ const w=botFacingWall(); if(w&&w.mask===511){ botEditWall(w,511&~56); B.peek={p:w,t:0.8+0.6*s}; B.react=0.1; } B.peekT=1.3+Math.random(); } }
+    if(B.queue.length===0&&!B.peek&&s>0.55){ B.peekT-=dt; if(B.peekT<=0){ const w=botFacingWall(); if(w&&w.mask===511){ botEditWall(w,511&~40); B.peek={p:w,t:0.8+0.6*s}; B.react=0.1; } B.peekT=1.3+Math.random(); } }
     if(!B.peek&&B.queue.length===0&&!botFacingWall()&&B.buildT<=0&&s>0.45){ B.queue.push({type:'wall',yaw:snapYaw(Math.atan2(-(P.pos.x-B.pos.x),-(P.pos.z-B.pos.z))),pitch:0}); }
 
     if(B.stateT<=0){ if(B.peek){ botEditWall(B.peek.p,511); B.peek=null; } const w=botFacingWall(); if(w&&w.mask===511) botEditWall(w,511&~18); B.state='fight'; }
@@ -2577,7 +2654,7 @@ function botUpdate(dt){
         else { damagePiece(r.piece,GUN.dmg*(WEAPONS.ar.build||1),r.point); B.fireT=GUN.rate*1.5; tracer(eye,r.point,0xff9f80); sfxAt('shot',B.pos); } } }
   } else B.stuckT=0;
   moveBody(B,fw,st,jump,dt);
-  if(B.peek){ B.peek.t-=dt; if(B.peek.t<=0){ if(B.peek.p.mask===(511&~56)) botEditWall(B.peek.p,511); B.peek=null; } }
+  if(B.peek){ B.peek.t-=dt; if(B.peek.t<=0){ if(B.peek.p.mask===(511&~40)) botEditWall(B.peek.p,511); B.peek=null; } }
   // building
   B.buildT-=dt; B.buildPose-=dt;
   if(B.queue.length&&B.buildT<=0){ botBuild(B.queue.shift()); B.buildT=0.5-0.42*s; }
@@ -2589,7 +2666,7 @@ function botUpdate(dt){
     if(B.los&&B.react<=0) botFire(eye,dist,s);
     else if(!B.los&&B.blockPiece&&B.blockPiece.owner==='bot'&&B.blockPiece.type==='wall'&&!B.peek&&s>0.3&&dist<40){
       // its own wall blocks the shot: edit a window to shoot through, close it again shortly after
-      const w=B.blockPiece; if(w.mask===511){ botEditWall(w,511&~56); B.peek={p:w,t:0.9+0.6*s}; B.react=Math.min(B.react,0.15); } }
+      const w=B.blockPiece; if(w.mask===511){ botEditWall(w,511&~40); B.peek={p:w,t:0.9+0.6*s}; B.react=Math.min(B.react,0.15); } }
     else if(!B.los&&B.blockPiece&&B.blockPiece.owner!=='bot'&&dist<45&&s>0.3&&Math.random()<dt*5*s) botFire(eye,dist,s); // shoot your cover down
   }
   if(B.pos.y<-20) botSpawn();
