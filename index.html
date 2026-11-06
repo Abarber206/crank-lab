@@ -123,6 +123,19 @@ body.touch .mats .k{display:none}
 .slot.out{opacity:.45}
 .modepick{display:flex;align-items:center;gap:8px;font:700 15px/1 var(--font-ui,inherit);color:var(--ink)}
 .modepick select{font:inherit;background:#1c2a40;color:var(--ink);border:1px solid rgba(255,255,255,.25);border-radius:6px;padding:8px 10px}
+/* locker: outfit cards with a rarity glow behind each character */
+.locker h2{margin-bottom:8px}
+.outfits{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:8px;margin-bottom:14px}
+.ofit{position:relative;aspect-ratio:3/4;border:2px solid rgba(255,255,255,.22);border-radius:6px;padding:0;overflow:hidden;cursor:pointer;display:flex;align-items:flex-end;color:#fff;font:inherit;transition:transform .1s}
+.ofit:hover{transform:translateY(-2px)} .ofit:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.ofit img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;pointer-events:none}
+.ofit span{position:relative;width:100%;padding:16px 4px 5px;background:linear-gradient(transparent,rgba(5,10,20,.88));font:800 italic 13px/1 var(--font-hud);letter-spacing:.04em;text-transform:uppercase;text-align:center}
+.ofit small{display:block;font:700 9px/1.2 var(--font-hud);letter-spacing:.08em;opacity:.8;font-style:normal}
+.ofit.uncommon{background:radial-gradient(circle at 50% 38%,#8fe87a,#2a7a2a 70%)}
+.ofit.rare{background:radial-gradient(circle at 50% 38%,#7cc4ff,#1c5aa8 70%)}
+.ofit.epic{background:radial-gradient(circle at 50% 38%,#d295ff,#6a2fae 70%)}
+.ofit.legendary{background:radial-gradient(circle at 50% 38%,#ffcf7a,#c2621a 70%)}
+.ofit.on{border-color:#ffe14d;box-shadow:0 0 0 2px #ffe14d,0 0 18px rgba(255,225,77,.45)}
 #pieceHp{left:50%;top:calc(50% + 28px);transform:translateX(-50%);display:grid;justify-items:center;gap:3px;font:800 italic 14px/1 var(--font-hud);text-shadow:0 1px 3px #000}
 #pieceHp .pb{width:96px;height:6px;background:rgba(10,18,30,.6);border:1px solid rgba(255,255,255,.4)}
 #pieceHp .pb i{display:block;height:100%;background:#fff}
@@ -331,6 +344,10 @@ body.touch #stickHint{width:100px;height:100px;opacity:.6}
     <h1>Crank Lab</h1>
     <p class="sub">A build-fight practice range. Snappy Chapter 1-style running and jumping, turbo build on a 5&nbsp;m by 4&nbsp;m grid, and wall, floor, ramp and cone edits. Ramp rush, crank 90s, and chase your best height.</p>
     <div class="actions"><label class="modepick" for="modeSel">Mode <select id="modeSel"><option value="fight">Build fight</option><option value="horde">Zombie horde</option></select></label><button class="btn primary" id="play">Play</button><button class="btn" id="respawn">Respawn</button><button class="btn" id="clear">Clear builds</button><button class="btn" id="fs">Fullscreen</button></div>
+    <section class="locker">
+      <h2>Locker</h2>
+      <div id="outfits" class="outfits" role="listbox" aria-label="Outfit"></div>
+    </section>
     <section class="mp">
       <h2>Multiplayer</h2>
       <div id="roomIdle" class="mprow">
@@ -408,7 +425,7 @@ const DEFAULT_BINDS={forward:'KeyW',back:'KeyS',left:'KeyA',right:'KeyD',jump:'S
   wall:'KeyQ',floor:'KeyF',ramp:'KeyE',cone:'KeyC',edit:'KeyG',reset:'Mouse2',rotate:'KeyR',pick:'Digit1',gun:'Digit2',pump:'Digit3',bandage:'Digit4',mini:'Digit5',reload:'KeyT',material:'KeyX',aim:'Mouse2'};
 const BIND_LABELS={forward:'Move forward',back:'Move back',left:'Move left',right:'Move right',jump:'Jump',crouch:'Crouch (hold)',
   fire:'Place / select tiles',wall:'Wall',floor:'Floor',ramp:'Ramp',cone:'Cone',edit:'Edit / confirm',reset:'Reset edit',rotate:'Rotate ramp',pick:'Pickaxe',gun:'Assault rifle',pump:'Pump shotgun',bandage:'Bandages',mini:'Small shield potion',reload:'Reload',material:'Switch material',aim:'Aim down sights'};
-const settings={mode:'fight', bot:'adaptive', btnSize:1, btnOpacity:0.7, leftFire:true, autoFire:false, aimAssist:true, editSens:1, sens:1, fov:78, turbo:0.05, editRelease:true, instantBuild:false, shadows:!isTouch, binds:{}};
+const settings={outfit:'rook', mode:'fight', bot:'adaptive', btnSize:1, btnOpacity:0.7, leftFire:true, autoFire:false, aimAssist:true, editSens:1, sens:1, fov:78, turbo:0.05, editRelease:true, instantBuild:false, shadows:!isTouch, binds:{}};
 try{ Object.assign(settings, JSON.parse(localStorage.getItem('cranklab.settings')||'{}')); }catch(e){}
 settings.binds=Object.assign({},DEFAULT_BINDS,settings.binds||{});
 function saveSettings(){ try{ localStorage.setItem('cranklab.settings', JSON.stringify(settings)); }catch(e){} }
@@ -434,6 +451,7 @@ sun.shadow.mapSize.set(isTouch?1024:2048, isTouch?1024:2048);
 const sc=sun.shadow.camera; sc.left=-32; sc.right=32; sc.top=32; sc.bottom=-32; sc.near=1; sc.far=160;
 sun.shadow.bias=-0.0006;
 scene.add(sun); scene.add(sun.target);
+const rimL=new THREE.DirectionalLight(0xbfe1ff,0.32); rimL.position.set(-40,30,-50); scene.add(rimL); // cool back light for a toon rim
 
 /* ---------- textures ---------- */
 function woodCanvas(draw){
@@ -1500,13 +1518,31 @@ const _ikS=new THREE.Vector3(), _ikD=new THREE.Vector3(), _ikP=new THREE.Vector3
       _ikX=new THREE.Vector3(), _ikY=new THREE.Vector3(), _ikZ=new THREE.Vector3(), _ikM=new THREE.Matrix4(), _ikQ=new THREE.Quaternion(), _ikQ2=new THREE.Quaternion(), _ikT=new THREE.Vector3();
 const angDiff=(a,b)=>((a-b+Math.PI*3)%(Math.PI*2))-Math.PI;
 
+/* Outfits: original characters, each a colour scheme plus hair, headwear, top and back bling */
+const OUTFITS=[
+  {id:'rook',name:'Rook',rarity:'uncommon',jacket:0x2a8f88,hair:0x3a2418,accent:0xff6a3d,top:'jacket',head:'goggles',hairStyle:'spiky',back:'pack'},
+  {id:'nova',name:'Nova',rarity:'epic',jacket:0xeef1f5,pants:0xdfe4ea,boot:0xc4ccd6,glove:0xf28c28,pack:0xdfe4ea,accent:0xf28c28,top:'suit',head:'helmet',back:'jetpack'},
+  {id:'ember',name:'Ember',rarity:'rare',jacket:0xc8342b,pants:0x22252e,boot:0xeeeeee,glove:0x22252e,pack:0x24252e,accent:0xffa424,skin:0xe7b48f,top:'hoodie',head:'hood',back:'cape'},
+  {id:'sprig',name:'Sprig',rarity:'uncommon',jacket:0x5f7a3a,pants:0x7a6847,boot:0x5a3d26,glove:0x5a3d26,skin:0x8d5a3b,hair:0x1b1b1b,pack:0x9a6a3a,accent:0xe0782b,top:'jacket',head:'beanie',hairStyle:'ponytail',back:'shield'},
+  {id:'volt',name:'Volt',rarity:'legendary',jacket:0x1d1f27,pants:0x1d1f27,boot:0x15161b,glove:0xffd400,skin:0xe0ac8a,hair:0xb04cff,pack:0xffd400,packD:0x15161b,accent:0xffd400,top:'racer',head:'shades',hairStyle:'mohawk',back:'guitar'},
+  {id:'glacier',name:'Glacier',rarity:'epic',jacket:0x7fb8e6,pants:0x3c4a66,boot:0xb9c7d6,glove:0xb9c7d6,pack:0x9fd8f5,packD:0x5d8fb8,accent:0x2fc7ff,top:'armor',head:'knight',back:'shield'},
+  {id:'whisk',name:'Whisk',rarity:'rare',jacket:0x7b5cd6,pants:0x2d2a3a,boot:0xf2f2f2,glove:0x2d2a3a,skin:0xf3cfb0,accent:0xff8fc8,top:'hoodie',head:'cathood',back:'none'}
+];
+const outfitIdx=id=>Math.max(0,OUTFITS.findIndex(o=>o.id===id));
+function heroFor(o){ return createHero(o.jacket,o); }
+// swap a character's look in place (keeps its animation state and scene placement)
+function reskin(H,o){ if(!o||H.outfit===o.id) return; const nh=heroFor(o), g=H.group;
+  while(g.children.length) g.remove(g.children[0]); while(nh.group.children.length) g.add(nh.group.children[0]);
+  H.rig=nh.rig; H.ink=nh.ink; H.outfit=o.id; }
 function createHero(jacketHex,opts){
   opts=opts||{};
   const hero=new THREE.Group(); hero.rotation.order='YXZ';
   const rig={}, ink=[];
   const jC=new THREE.Color(jacketHex), jD=jC.clone().multiplyScalar(.68).getHex(), jL=jC.clone().lerp(new THREE.Color(0xffffff),.25).getHex();
-  const C={jacket:jacketHex, jacketD:jD, jacketL:jL, pants:0x2b3350, pantsD:0x1f253b, boot:0x4a3426, sole:0x1c1c22, glove:0x2b2d34, skin:opts.skin||0xf1c7a0,
-           hair:opts.hair||0x3a2418, pack:opts.pack||0xe8a62c, packD:0xb07a16, roll:0xd8c9a3, accent:opts.accent||0xff6a3d, lens:0x8fd6ff, metal:0x2a2f38, metalL:0x434b57, wood:0x8a5a2e, steel:0xc9d2dc};
+  const pC=new THREE.Color(opts.pants||0x2b3350);
+  const C={jacket:jacketHex, jacketD:jD, jacketL:jL, pants:pC.getHex(), pantsD:pC.clone().multiplyScalar(.72).getHex(), boot:opts.boot||0x4a3426, sole:0x1c1c22, glove:opts.glove||0x2b2d34, skin:opts.skin||0xf1c7a0,
+           hair:opts.hair||0x3a2418, pack:opts.pack||0xe8a62c, packD:opts.packD||(opts.pack?new THREE.Color(opts.pack).multiplyScalar(.7).getHex():0xb07a16), roll:0xd8c9a3, accent:opts.accent||0xff6a3d, lens:0x8fd6ff, metal:0x2a2f38, metalL:0x434b57, wood:0x8a5a2e, steel:0xc9d2dc};
+  const top=opts.top||'jacket', headwear=opts.head||'goggles', hairStyle=opts.hairStyle||'spiky', back=opts.back||'pack';
   // part(geometry, color, parent, x,y,z, rotation, scale, inkWidth)
   const part=(geo,col,parent,x=0,y=0,z=0,rot,scl,w=0.011)=>{
     const m=new THREE.Mesh(geo,toon(col)); m.position.set(x,y,z); if(rot) m.rotation.set(rot[0]||0,rot[1]||0,rot[2]||0); if(scl) m.scale.set(scl[0],scl[1],scl[2]);
@@ -1527,23 +1563,63 @@ function createHero(jacketHex,opts){
   part(rbox(.28,.19,.19,.08),C.jacket,rig.spine,0,.07,0);
   rig.chest=grp(rig.spine,0,.16,0);
   part(rbox(.37,.27,.22,.1),C.jacket,rig.chest,0,.12,0);
-  [-1,1].forEach(sx=>{ part(rbox(.075,.07,.02,.012),C.jacketL,rig.chest,sx*.11,.07,-.11,null,null,0.004); part(rbox(.012,.012,.012,.004),C.steel,rig.chest,sx*.1,.17,-.124,null,null,0); });
   part(rbox(.38,.06,.225,.03),C.jacketD,rig.chest,0,.04,0,null,null,0.006);
-  part(rbox(.016,.34,.01,.004),C.jacketD,rig.chest,0,.07,-.112,null,null,0);
-  part(rbox(.08,.06,.02,.015),C.jacketL,rig.chest,.09,.14,-.112,null,null,0.005);
   part(new THREE.CylinderGeometry(.115,.135,.07,14,1,true),C.jacketD,rig.chest,0,.27,0,null,null,0.008);
-  part(sph(.12),C.jacketD,rig.chest,0,.24,.1,null,[1.15,.6,.7]);
-  // straps and pack
-  part(rbox(.045,.27,.02,.01),C.packD,rig.chest,-.1,.13,-.115,null,null,0.005);
-  part(rbox(.045,.27,.02,.01),C.packD,rig.chest,.1,.13,-.115,null,null,0.005);
+  if(top==='jacket'||top==='racer'){
+    [-1,1].forEach(sx=>{ part(rbox(.075,.07,.02,.012),C.jacketL,rig.chest,sx*.11,.07,-.11,null,null,0.004); part(rbox(.012,.012,.012,.004),C.steel,rig.chest,sx*.1,.17,-.124,null,null,0); });
+    part(rbox(.016,.34,.01,.004),C.jacketD,rig.chest,0,.07,-.112,null,null,0);
+    part(rbox(.08,.06,.02,.015),C.jacketL,rig.chest,.09,.14,-.112,null,null,0.005);
+    part(sph(.12),C.jacketD,rig.chest,0,.24,.1,null,[1.15,.6,.7]);
+    if(top==='racer'){ [-1,1].forEach(sx=>{ part(rbox(.035,.28,.23,.008),C.accent,rig.chest,sx*.12,.12,0,null,null,0); part(rbox(.03,.2,.21,.006),C.accent,rig.spine,sx*.1,.07,0,null,null,0); }); part(rbox(.39,.03,.226,.006),C.accent,rig.chest,0,.21,0,null,null,0); }
+  } else if(top==='hoodie'){
+    part(rbox(.22,.1,.03,.02),C.jacketD,rig.spine,0,.08,-.1,null,null,0.005); // front pocket
+    [-1,1].forEach(sx=>part(limbGeo(.007,.007,.12),0xf0ece2,rig.chest,sx*.04,.24,-.112,null,null,0)); // drawstrings
+    if(headwear!=='hood'&&headwear!=='cathood') part(sph(.13),C.jacket,rig.chest,0,.25,.1,null,[1.2,.75,.75]); // hood down
+  } else if(top==='suit'){
+    part(rbox(.2,.14,.03,.03),C.accent,rig.chest,0,.13,-.11,null,null,0.005); // chest panel
+    [[-.05,0x5fff9a],[0,0xffd400],[.05,0xff5a5a]].forEach(([x,c])=>part(sph(.012),c,rig.chest,x,.14,-.128,null,null,0));
+    part(new THREE.TorusGeometry(.13,.025,8,20),0xc9d2dc,rig.chest,0,.28,0,[Math.PI/2,0,0],null,0.006); // helmet ring
+    part(rbox(.39,.03,.226,.006),C.accent,rig.spine,0,.02,0,null,null,0);
+  } else if(top==='armor'){
+    part(rbox(.4,.25,.24,.09),C.jacketL,rig.chest,0,.12,-.005,null,null,0.01); // breastplate
+    part(rbox(.06,.2,.02,.01),C.accent,rig.chest,0,.13,-.128,null,null,0);
+    part(rbox(.33,.05,.22,.02),0x6b4a2a,rig.spine,0,.0,0,null,null,0.006); part(rbox(.06,.05,.02,.01),0xd4af37,rig.spine,0,.0,-.112,null,null,0);
+  }
+  // back bling (sways with the pack spring)
   rig.pack=grp(rig.chest,0,.2,.13);
-  part(rbox(.28,.33,.14,.06),C.pack,rig.pack,0,-.08,.04);
-  part(rbox(.29,.11,.15,.04),C.packD,rig.pack,0,.03,.045);
-  part(rbox(.16,.1,.04,.02),C.packD,rig.pack,0,-.15,.12,null,null,0.006);
-  const roll=new THREE.CylinderGeometry(.055,.055,.32,14); roll.rotateZ(Math.PI/2);
-  part(roll,C.roll,rig.pack,0,.12,.05);
-  part(new THREE.CylinderGeometry(.012,.012,.36,6),C.wood,rig.pack,.16,-.02,.06,[0,0,.25],null,0.005);
-  part(rbox(.05,.09,.04,.01),C.steel,rig.pack,.205,.15,.06,[0,0,.25],null,0.005);
+  if(back==='pack'||back==='jetpack'){ part(rbox(.045,.27,.02,.01),C.packD,rig.chest,-.1,.13,-.115,null,null,0.005); part(rbox(.045,.27,.02,.01),C.packD,rig.chest,.1,.13,-.115,null,null,0.005); }
+  if(back==='pack'){
+    part(rbox(.28,.33,.14,.06),C.pack,rig.pack,0,-.08,.04);
+    part(rbox(.29,.11,.15,.04),C.packD,rig.pack,0,.03,.045);
+    part(rbox(.16,.1,.04,.02),C.packD,rig.pack,0,-.15,.12,null,null,0.006);
+    const roll=new THREE.CylinderGeometry(.055,.055,.32,14); roll.rotateZ(Math.PI/2);
+    part(roll,C.roll,rig.pack,0,.12,.05);
+    part(new THREE.CylinderGeometry(.012,.012,.36,6),C.wood,rig.pack,.16,-.02,.06,[0,0,.25],null,0.005);
+    part(rbox(.05,.09,.04,.01),C.steel,rig.pack,.205,.15,.06,[0,0,.25],null,0.005);
+  } else if(back==='jetpack'){
+    part(rbox(.2,.24,.06,.03),0xc9d2dc,rig.pack,0,-.08,.0);
+    [-1,1].forEach(sx=>{ part(limbGeo(.06,.06,.32),C.pack,rig.pack,sx*.075,.08,.06); part(sph(.06),C.pack,rig.pack,sx*.075,.08,.06,null,[1,.6,1]);
+      part(new THREE.CylinderGeometry(.035,.055,.07,12),0x2a2f38,rig.pack,sx*.075,-.27,.06); part(new THREE.ConeGeometry(.03,.09,10),new THREE.MeshBasicMaterial({color:0xffb347}),rig.pack,sx*.075,-.33,.06,[Math.PI,0,0],null,0);
+      part(rbox(.02,.2,.02,.006),C.accent,rig.pack,sx*.075,-.06,.122,null,null,0); });
+  } else if(back==='cape'){
+    part(rbox(.36,.66,.02,.01),C.pack,rig.pack,0,-.36,.0,[.1,0,0]);
+    part(rbox(.37,.04,.025,.01),C.accent,rig.pack,0,-.68,.03,[.1,0,0],null,0.004);
+    [-1,1].forEach(sx=>part(sph(.03),0xd4af37,rig.chest,sx*.14,.25,-.09,null,null,0.005));
+  } else if(back==='guitar'){
+    const gt=grp(rig.pack,0,-.2,.05); gt.rotation.z=.75;
+    const bd=new THREE.CylinderGeometry(.115,.115,.045,20); bd.rotateX(Math.PI/2); const bd2=new THREE.CylinderGeometry(.088,.088,.045,20); bd2.rotateX(Math.PI/2);
+    part(bd,C.pack,gt,0,-.1,0); part(bd2,C.pack,gt,0,.04,0); part(rbox(.05,.04,.05,.012),C.pack,gt,.09,.11,0,[0,0,-.6],null,0.008); // offset horn
+    const sh2=new THREE.CylinderGeometry(.03,.03,.05,12); sh2.rotateX(Math.PI/2); part(sh2,0x15161b,gt,0,-.02,.0,null,null,0);
+    part(rbox(.04,.34,.03,.01),0x2a1e16,gt,0,.27,0); part(rbox(.07,.09,.035,.015),0x15161b,gt,0,.47,0);
+    [-.012,0,.012].forEach(x=>part(rbox(.003,.44,.003,.001),0xe8e8e8,gt,x,.17,.024,null,null,0));
+    part(rbox(.03,.5,.02,.008),C.packD,rig.chest,0,.12,-.112,[0,0,-.55],null,0.004);
+  } else if(back==='shield'){
+    const sd=new THREE.CylinderGeometry(.2,.2,.04,24); sd.rotateX(Math.PI/2);
+    part(sd,C.pack,rig.pack,0,-.07,.03); part(new THREE.TorusGeometry(.2,.018,8,24),C.packD,rig.pack,0,-.07,.03,null,null,0.004);
+    part(sph(.05),0xc9d2dc,rig.pack,0,-.07,.06,null,[1,1,.6],0.005);
+    [0,Math.PI/2].forEach(a=>part(rbox(.34,.025,.008,.004),C.accent,rig.pack,0,-.07,.053,[0,0,a],null,0));
+    part(rbox(.03,.5,.02,.008),C.packD,rig.chest,0,.12,-.112,[0,0,.55],null,0.004);
+  }
   // head
   rig.neck=grp(rig.chest,0,.27,0);
   part(limbGeo(.055,.06,.09),C.skin,rig.neck,0,.08,0,null,null,0.006);
@@ -1556,22 +1632,69 @@ function createHero(jacketHex,opts){
   rig.eyes=[-1,1].map(sx=>{ const e=grp(rig.head,sx*.055,.145,-.122); part(sph(.029),0xffffff,e,0,0,0,null,[1,1.25,.5],0.004); part(sph(.019),0x1a1f29,e,0,-.003,-.011,null,[1,1.25,.6],0); return e; });
   rig.brows=[-1,1].map(sx=>part(rbox(.065,.018,.02,.008),C.hair,rig.head,sx*.056,.198,-.127,null,null,0));
   rig.mouth=part(rbox(.065,.014,.012,.006),0x6b2f2a,rig.head,0,.055,-.126,null,null,0);
-  // hair: cap + spikes + fringe
-  part(rbox(.27,.11,.27,.06),C.hair,rig.head,0,.245,.005);
   rig.tuft=grp(rig.head,0,.28,.02);
-  [[0,.06,.0,-.3,0],[-.07,.04,.04,-.5,.4],[.07,.04,.04,-.5,-.4],[0,.03,.09,-1,0],[-.09,.0,-.06,.2,.5],[.08,.01,-.07,.2,-.45]].forEach(([x,y,z,rx,rz])=>part(rbox(.07,.12,.06,.025),C.hair,rig.tuft,x,y,z,[rx,0,rz]));
-  part(rbox(.24,.05,.06,.02),C.hair,rig.head,0,.215,-.115,[.25,0,0]);
-  [[-.04,.07,-.05,-.6,.2],[.05,.075,-.03,-.7,-.3],[0,.09,.05,-1.2,0]].forEach(([x,y,z,rx,rz])=>part(rbox(.05,.1,.05,.02),C.hair,rig.tuft,x,y,z,[rx,0,rz]));
-  // headband with goggles pushed up
-  part(new THREE.CylinderGeometry(.134,.134,.035,18,1,true),C.accent,rig.head,0,.205,.0,null,null,0.006);
-  [-1,1].forEach(sx=>{ const gg=new THREE.CylinderGeometry(.038,.038,.03,14); gg.rotateX(Math.PI/2);
-    part(gg,C.sole,rig.head,sx*.05,.235,-.13,[-.35,0,0],null,0.006);
-    const lens=new THREE.CircleGeometry(.03,14); const lm=new THREE.Mesh(lens,toon(C.lens)); lm.position.set(sx*.05,.24,-.147); lm.rotation.x=-.35+Math.PI; lm.rotation.y=Math.PI; rig.head.add(lm); });
+  const covered=headwear==='helmet'||headwear==='knight'||headwear==='hood'||headwear==='cathood';
+  if(!covered){
+    if(hairStyle==='spiky'){
+      part(rbox(.27,.11,.27,.06),C.hair,rig.head,0,.245,.005);
+      [[0,.06,.0,-.3,0],[-.07,.04,.04,-.5,.4],[.07,.04,.04,-.5,-.4],[0,.03,.09,-1,0],[-.09,.0,-.06,.2,.5],[.08,.01,-.07,.2,-.45]].forEach(([x,y,z,rx,rz])=>part(rbox(.07,.12,.06,.025),C.hair,rig.tuft,x,y,z,[rx,0,rz]));
+      part(rbox(.24,.05,.06,.02),C.hair,rig.head,0,.215,-.115,[.25,0,0]);
+      [[-.04,.07,-.05,-.6,.2],[.05,.075,-.03,-.7,-.3],[0,.09,.05,-1.2,0]].forEach(([x,y,z,rx,rz])=>part(rbox(.05,.1,.05,.02),C.hair,rig.tuft,x,y,z,[rx,0,rz]));
+    } else if(hairStyle==='mohawk'){
+      part(rbox(.262,.05,.262,.03),new THREE.Color(C.hair).multiplyScalar(.55).getHex(),rig.head,0,.24,.005,null,null,0.006); // shaved sides
+      for(let q=0;q<6;q++) part(rbox(.05,.13+.04*Math.sin(q*.6+.4),.07,.022),C.hair,rig.tuft,0,.02+.02*Math.sin(q*.6+.4),-.12+q*.05,[-.25+q*.12,0,0]);
+    } else if(hairStyle==='ponytail'){
+      part(rbox(.27,.1,.27,.06),C.hair,rig.head,0,.24,.005);
+      part(rbox(.26,.13,.06,.03),C.hair,rig.head,0,.17,.115);
+      part(sph(.045),C.accent,rig.tuft,0,-.08,.12,null,null,0.005);
+      part(limbGeo(.05,.025,.26),C.hair,rig.tuft,0,-.08,.15,[-.5,0,0]);
+    }
+  }
+  if(headwear==='goggles'){
+    part(new THREE.CylinderGeometry(.134,.134,.035,18,1,true),C.accent,rig.head,0,.205,.0,null,null,0.006);
+    [-1,1].forEach(sx=>{ const gg=new THREE.CylinderGeometry(.038,.038,.03,14); gg.rotateX(Math.PI/2);
+      part(gg,C.sole,rig.head,sx*.05,.235,-.13,[-.35,0,0],null,0.006);
+      const lens=new THREE.CircleGeometry(.03,14); const lm=new THREE.Mesh(lens,toon(C.lens)); lm.position.set(sx*.05,.24,-.147); lm.rotation.x=-.35+Math.PI; lm.rotation.y=Math.PI; rig.head.add(lm); });
+  } else if(headwear==='shades'){
+    part(rbox(.26,.065,.03,.018),0x15171d,rig.head,0,.145,-.152,null,null,0.006);
+    [-1,1].forEach(sx=>{ part(rbox(.095,.045,.006,.012),0x6a3cff,rig.head,sx*.058,.145,-.169,null,null,0); part(rbox(.03,.01,.004,.003),0xd9c8ff,rig.head,sx*.058-.02,.157,-.173,null,null,0); });
+    rig.eyes.forEach(e=>e.visible=false); rig.lids.forEach(e=>e.visible=false);
+  } else if(headwear==='beanie'){
+    part(rbox(.285,.14,.285,.08),C.accent,rig.head,0,.25,.005);
+    part(new THREE.CylinderGeometry(.148,.148,.05,20),new THREE.Color(C.accent).multiplyScalar(.8).getHex(),rig.head,0,.2,.005,null,null,0.006);
+    part(sph(.05),0xf3efe4,rig.tuft,0,.06,-.02);
+    [-1,1].forEach(sx=>part(rbox(.03,.025,.012,.006),0x1a1f29,rig.head,sx*.07,.1,-.128,[0,0,sx*.3],null,0)); // face paint
+  } else if(headwear==='helmet'){
+    const dome=new THREE.SphereGeometry(.205,22,16); part(dome,C.jacket,rig.head,0,.13,0);
+    part(sph(.12),0x1e2f56,rig.head,0,.12,-.14,null,[1.3,.95,.75],0.006); // tinted visor
+    part(sph(.03),0xbfe6ff,rig.head,-.06,.17,-.218,null,[1.4,.6,.4],0); part(sph(.014),0xffffff,rig.head,.05,.08,-.225,null,null,0); // glints
+    [-1,1].forEach(sx=>part(limbGeo(.04,.04,.03),C.accent,rig.head,sx*.2,.15,0,[0,0,Math.PI/2],null,0.005));
+    part(limbGeo(.006,.006,.12),0xc9d2dc,rig.tuft,.08,.06,.05,null,null,0); part(sph(.016),C.accent,rig.tuft,.08,.06,.05,null,null,0);
+  } else if(headwear==='hood'||headwear==='cathood'){
+    const hc=headwear==='hood'?C.jacket:C.jacket, hd=new THREE.Color(hc).multiplyScalar(.75).getHex();
+    part(rbox(.32,.08,.32,.04),hc,rig.head,0,.285,.02); part(rbox(.32,.34,.07,.04),hc,rig.head,0,.13,.15);
+    [-1,1].forEach(sx=>part(rbox(.06,.34,.32,.03),hc,rig.head,sx*.155,.13,.02));
+    part(rbox(.3,.06,.07,.025),hd,rig.head,0,.265,-.14,[.3,0,0],null,0.006);
+    [-1,1].forEach(sx=>part(rbox(.05,.3,.05,.02),hd,rig.head,sx*.135,.12,-.14,null,null,0.005));
+    if(headwear==='cathood'){ [-1,1].forEach(sx=>{ part(new THREE.ConeGeometry(.065,.13,4),hc,rig.tuft,sx*.1,.06,-.02,[0,Math.PI/4,sx*-.25]); part(new THREE.ConeGeometry(.035,.07,4),C.accent,rig.tuft,sx*.1,.05,-.045,[0,Math.PI/4,sx*-.25],null,0); });
+      part(sph(.015),C.accent,rig.head,0,.105,-.15,null,[1.3,.8,.6],0); [-1,1].forEach(sx=>[0,1].forEach(q=>part(rbox(.07,.006,.004,.002),0x2a2633,rig.head,sx*.1,.09-q*.02,-.128,[0,0,sx*(q?.15:-.1)],null,0))); }
+    else { part(rbox(.27,.12,.05,.03),C.accent,rig.head,0,.055,-.122,null,null,0.006); part(new THREE.ConeGeometry(.06,.09,3),C.accent,rig.head,0,-.02,-.12,[Math.PI,0,0],null,0.005);
+      [-1,1].forEach(sx=>part(sph(.01),0xffffff,rig.head,sx*.06+.02,.07,-.15,null,null,0)); }
+  } else if(headwear==='knight'){
+    part(rbox(.29,.31,.29,.1),0xcfdbe6,rig.head,0,.14,0,null,null,0.012);
+    part(rbox(.2,.03,.01,.008),0x0f1a2a,rig.head,0,.15,-.146,null,null,0); part(rbox(.03,.12,.01,.008),0x0f1a2a,rig.head,0,.09,-.146,null,null,0);
+    part(rbox(.03,.16,.296,.012),C.accent,rig.head,0,.22,0,null,null,0);
+    for(let q=0;q<6;q++) part(rbox(.04,.1-q*.008,.06,.018),C.accent,rig.tuft,0,.05+q*.006,-.12+q*.055,[-.3+q*.15,0,0]);
+  }
+  // ink lines on the face look odd under helmets and hoods that cover it
+  if(headwear==='helmet'||headwear==='knight'){ rig.eyes.forEach(e=>e.visible=false); rig.lids.forEach(e=>e.visible=false); rig.brows.forEach(e=>e.visible=false); rig.mouth.visible=false; }
   // arms
   const arm=sx=>{
     const sh=grp(rig.chest,sx*.205,.21,0); sh.rotation.order='XZY';
     part(sph(.07),C.jacket,sh,0,-.01,0);
     part(limbGeo(.058,.052,.25),C.jacket,sh);
+    if(top==='armor') part(sph(.095),C.jacketL,sh,0,.0,0,null,[1.1,.75,1.1]);
+    if(top==='suit') part(new THREE.TorusGeometry(.06,.014,8,16),C.accent,sh,0,-.12,0,[Math.PI/2,0,0],null,0);
     const el=grp(sh,0,-.25,0);
     part(sph(.052),C.jacket,el,0,0,0,null,null,0.008);
     part(limbGeo(.052,.044,.21),C.jacket,el);
@@ -1682,7 +1805,7 @@ function createHero(jacketHex,opts){
   return {group:hero,rig,ink,anim:{t:Math.random()*10,phase:0,prevYaw:null,lag:0,stepT:0,sq:0,sqV:0,wasGround:true,vy:0,recoil:0,pumpT:0,hurt:0,hurtSide:1,strike:0,equip:0,
     dead:false,deadT:0,blinkT:2,idleT:0,pack:0,packV:0,tuft:0,tuftV:0,prevHipY:0.94,lastStep:[0,0],dustCd:0}};
 }
-const localHero=createHero(0x2a8f88), hero=localHero.group; scene.add(hero);
+const localHero=heroFor(OUTFITS[outfitIdx(settings.outfit)]), hero=localHero.group; localHero.outfit=OUTFITS[outfitIdx(settings.outfit)].id; scene.add(hero);
 const lerp=(a,b,k)=>a+(b-a)*k;
 
 function animEvent(H,ev,arg){
@@ -2232,11 +2355,12 @@ function dropPlayer(id){ const pl=net.players.get(id); if(!pl) return; scene.rem
 // flags: 1 ground, 2 crouch, 4 building, 8 dead, 16 editing, 32 aiming; weapon in s[10]; shield in s[11]
 function myState(){
   const f=(P.onGround?1:0)|(P.crouch?2:0)|(mode==='build'&&!edit?4:0)|(net.dead?8:0)|(edit?16:0)|(adsK>0.5?32:0);
-  return {type:'st',id:net.id,n:net.name,s:[+P.pos.x.toFixed(3),+P.pos.y.toFixed(3),+P.pos.z.toFixed(3),+P.vel.x.toFixed(2),+P.vel.y.toFixed(2),+P.vel.z.toFixed(2),+P.yaw.toFixed(3),+P.pitch.toFixed(3),f,net.lastSwing,mode==='gun'&&!edit?WCODE[P.wpn]:0,Math.round(P.sh)]};
+  return {type:'st',id:net.id,n:net.name,o:outfitIdx(settings.outfit),s:[+P.pos.x.toFixed(3),+P.pos.y.toFixed(3),+P.pos.z.toFixed(3),+P.vel.x.toFixed(2),+P.vel.y.toFixed(2),+P.vel.z.toFixed(2),+P.yaw.toFixed(3),+P.pitch.toFixed(3),f,net.lastSwing,mode==='gun'&&!edit?WCODE[P.wpn]:0,Math.round(P.sh)]};
 }
 function onState(m){
   if(m.id===net.id) return;
   const pl=getPlayer(m.id,m.n), s=m.s;
+  if(m.o!=null&&OUTFITS[m.o]) reskin(pl.h,OUTFITS[m.o]);
   pl.tgt.set(s[0],s[1],s[2]); pl.vel.set(s[3],s[4],s[5]); pl.yaw=s[6]; pl.pitch=s[7]; pl.flags=s[8];
   pl.crouch=!!(s[8]&2); pl.wpn=WNAME[s[10]||0]; pl.sh=s[11]??100;
   const alive=!(s[8]&8); if(alive!==pl.alive){ pl.alive=alive; pl.h.group.visible=alive; if(alive){ pl.pos.copy(pl.tgt); animEvent(pl.h,'revive'); } }
@@ -2853,10 +2977,11 @@ function pickBotTarget(dt){
 // in a room the bot is one more player: it shows up for everyone, can be eliminated, and comes back 3 s later
 function botState(){
   const f=(B.onGround?1:0)|(B.buildPose>0||B.state==='rush'?4:0)|(B.alive?0:8)|(B.editPose>0?16:0);
-  return {type:'st',id:'bot',n:'Bot',s:[+B.pos.x.toFixed(3),+B.pos.y.toFixed(3),+B.pos.z.toFixed(3),+B.vel.x.toFixed(2),+B.vel.y.toFixed(2),+B.vel.z.toFixed(2),+B.yaw.toFixed(3),+B.pitch.toFixed(3),f,0,B.editPose>0?0:WCODE[B.wpn]||1,Math.round(B.sh)]};
+  return {type:'st',id:'bot',n:'Bot',o:outfitIdx(B.h.outfit),s:[+B.pos.x.toFixed(3),+B.pos.y.toFixed(3),+B.pos.z.toFixed(3),+B.vel.x.toFixed(2),+B.vel.y.toFixed(2),+B.vel.z.toFixed(2),+B.yaw.toFixed(3),+B.pitch.toFixed(3),f,0,B.editPose>0?0:WCODE[B.wpn]||1,Math.round(B.sh)]};
 }
 function makeBot(){
-  const h=createHero(0xc8463c,{hair:0x1b1b22,skin:0xc68a5e,accent:0x62bdff,pack:0x5d7186}); scene.add(h.group);
+  const mine=outfitIdx(settings.outfit); let oi=Math.floor(Math.random()*(OUTFITS.length-1)); if(oi>=mine) oi++;
+  const h=heroFor(OUTFITS[oi]); h.outfit=OUTFITS[oi].id; scene.add(h.group);
   B={pos:new THREE.Vector3(),vel:new THREE.Vector3(),onGround:true,groundSlab:null,crouch:false,yaw:0,pitch:0,rot:0,
      hp:100,sh:100,alive:true,active:false,h,skill:0.35,bias:0,
      state:'fight',stateT:0,react:1,los:false,losT:0,blockPiece:null,fireT:0,burst:0,ammo:GUN.mag,reloadT:0,
@@ -3111,6 +3236,27 @@ function drawMini(){
   ms.addEventListener('change',()=>{ settings.mode=ms.value; saveSettings(); if(net.role==='client') toast('The host picks the mode in a room'); });
 })();
 syncBot();
+// locker: render a portrait of every outfit once, then build the cards
+(function(){
+  const box=$('outfits');
+  const pick=id=>{ settings.outfit=id; saveSettings(); reskin(localHero,OUTFITS[outfitIdx(id)]); box.querySelectorAll('.ofit').forEach(b=>{ const on=b.dataset.id===id; b.classList.toggle('on',on); b.setAttribute('aria-selected',on); }); };
+  OUTFITS.forEach(o=>{ const b=document.createElement('button'); b.type='button'; b.className='ofit '+o.rarity; b.dataset.id=o.id; b.setAttribute('role','option');
+    b.innerHTML=`<span>${o.name}<small>${o.rarity}</small></span>`; b.addEventListener('click',()=>pick(o.id)); box.appendChild(b); });
+  pick(OUTFITS[outfitIdx(settings.outfit)].id);
+  setTimeout(()=>{ try{
+    const W=168, Hh=224, r=new THREE.WebGLRenderer({antialias:true,alpha:true,preserveDrawingBuffer:true}); r.setPixelRatio(1); r.setSize(W,Hh); r.setClearColor(0,0);
+    const sc=new THREE.Scene(); sc.add(new THREE.HemisphereLight(0xffffff,0x5a6a80,0.95)); const kl=new THREE.DirectionalLight(0xffffff,0.75); kl.position.set(2,4,-5); sc.add(kl);
+    const rl=new THREE.DirectionalLight(0xcfe6ff,0.45); rl.position.set(-3,2,4); sc.add(rl);
+    const cam=new THREE.PerspectiveCamera(27,W/Hh,0.1,20); cam.position.set(0.95,1.3,-3.55); cam.lookAt(0,0.95,0);
+    const zero=new THREE.Vector3();
+    OUTFITS.forEach(o=>{ const h=heroFor(o); sc.add(h.group);
+      for(let k=0;k<40;k++) animateRig(h,{pos:zero,vel:zero,yaw:0.35,pitch:0,onGround:true,crouch:false,building:false,editing:false,gun:false,ads:0,swingT:0},1/30);
+      h.rig.pick.visible=false;
+      r.render(sc,cam); const img=new Image(); img.alt=''; img.src=r.domElement.toDataURL('image/png'); sc.remove(h.group);
+      const b=box.querySelector(`[data-id="${o.id}"]`); if(b) b.prepend(img); });
+    r.dispose(); if(r.forceContextLoss) r.forceContextLoss();
+  }catch(e){} },60);
+})();
 
 /* ---------- controller (standard gamepad mapping) ----------
    Combat: RT fire, RB/LB next/prev weapon, X reload, Y edit, B build mode.
