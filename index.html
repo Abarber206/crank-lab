@@ -1515,6 +1515,8 @@ function respawn(){ animEvent(localHero,'revive'); P.pos.set(...SPAWN); P.vel.se
 /* ---------- audio ---------- */
 let AC=null, noiseBuf=null, sfxGain=1, sfxLP=20000, sfxVerb=0, master=null, verb=null, cur=null;
 // far-away sounds are quieter and duller
+// zombies: quieter overall, and they fade to near silence past ~40 m
+function zsfx(k,pos){ const d=pos.distanceTo(P.pos); if(d>45) return; const f=1-d/45; sfxGain=0.5*f*f; sfxLP=Math.max(700,16000*f*f); sfx(k); sfxGain=1; sfxLP=20000; }
 function sfxAt(k,pos){ const d=pos.distanceTo(P.pos); if(d>110) return; sfxGain=Math.max(0.1,1-d/110); sfxLP=Math.max(1200,20000*Math.pow(1-d/110,2.2)); sfx(k); sfxGain=1; sfxLP=20000; }
 function audioInit(){
   if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)();
@@ -1625,7 +1627,7 @@ function sfx(k){
     case 'zhurt': voice({f0:150*r(),f1:92,dur:0.26,vol:0.36,vowel:VOW.AH,vowel2:VOW.UH,breath:0.6,fry:0.6,jitter:0.06,attack:0.015}); knock(240,0.07,0.25,3); break;
     case 'zdie': voice({f0:125*r(),f1:48,dur:1.0,vol:0.36,vowel:VOW.AH,vowel2:VOW.OO,breath:0.6,fry:0.7,jitter:0.06,attack:0.03}); noise(260,0.3,0.4,0.9,0.55,'lowpass',90); knock(110,0.12,0.3,3,0.6); break;
     case 'claw': noise(900,0.12,0.14,1.3,0,'bandpass',2600); knock(260*r(),0.07,0.35,3,0.09); noise(1400,0.05,0.18,1.5,0.09); break; // whoosh, then a meaty hit
-    case 'wave': for(let q=0;q<4;q++) zombieGroan(0.22,q*0.28+Math.random()*0.15); noise(120,1.6,0.25,0.8,0,'lowpass',60); break; // a horde moaning in the distance
+    case 'wave': for(let q=0;q<4;q++) zombieGroan(0.1,q*0.28+Math.random()*0.15); noise(120,1.6,0.25,0.8,0,'lowpass',60); break; // a horde moaning in the distance
     case 'unwrap': for(let q=0;q<6;q++) noise(3000+q*300,0.06,0.05,1.5,q*0.45,'highpass'); break;
     case 'uncork': click(1400,0.25); tone('sine',600,900,0.12,0.06,0.05); for(let q=0;q<5;q++) tone('sine',300+q*60,280+q*60,0.12,0.04,0.3+q*0.25); break;
     case 'heal': tone('triangle',520,700,0.18,0.08); tone('triangle',700,940,0.22,0.07,0.1); break;
@@ -3035,67 +3037,67 @@ function playerHurt(dmg,from){
 /* ---------- zombie horde mode ----------
    Waves of zombies walk in from the edges toward the nearest player, claw through any build in their way and chew
    the bottom out of towers. Build a fort between waves. In a room the host's game runs the zombies for everyone. */
-const ZT={ // three kinds of forest demon (internal ids kept for the network and waves)
-  husk:  {name:'Hollow',  hp:110,spd:0.56,dmg:12,bld:16,sc:1.12,skin:0x1f1c22,bone:0xd9d0bc,horn:0x3b2f27,claw:0x1a1214,eye:0xff2a14,face:'skull',antlers:true,shroud:0x121014,pts:1},
-  runner:{name:'Stalker', hp:70, spd:0.98,dmg:8, bld:10,sc:0.98,skin:0x9c9a96,bone:0xd8d4cc,horn:0x2a2226,claw:0x14100f,eye:0xe6f6ff,face:'stalker',pts:1},
-  brute: {name:'Behemoth',hp:520,spd:0.42,dmg:30,bld:55,sc:1.5, skin:0x2a1515,bone:0x8c7d6e,horn:0x1c1412,claw:0x140c0b,eye:0xff6a1a,face:'skull',tusks:true,spikes:true,cracks:true,pts:3}
+const ZT={ // walkers, runners and brutes: pale, rotting, bloodied
+  husk:  {name:'Walker',hp:110,spd:0.56,dmg:12,bld:16,sc:1,   skin:0x9ba1aa,shirt:0x6b5d4c,pants:0x3d4250,hair:0x2a221c,pts:1},
+  runner:{name:'Runner',hp:70, spd:0.98,dmg:8, bld:10,sc:0.95,skin:0xb3a7ad,shirt:0x7a2f2f,pants:0x2e3340,hair:0x3a2a20,pts:1},
+  brute: {name:'Brute', hp:520,spd:0.42,dmg:30,bld:55,sc:1.45,skin:0x857b88,shirt:0x000000,pants:0x3a3328,hair:0x1c1816,pts:3}
 };
 const ZCODE=['husk','runner','brute'];
 var horde={on:false,wave:0,phase:'idle',t:0,toSpawn:0,spawnT:0,kills:0,zs:new Map(),nextId:1,sendT:0,downT:0,best:0};
-const zEye=new THREE.MeshBasicMaterial({color:0xff2a14}), zGlow=new THREE.MeshBasicMaterial({color:0xff3a1a,transparent:true,opacity:.28,blending:THREE.AdditiveBlending,depthWrite:false}), zVein=new THREE.MeshBasicMaterial({color:0xff4a1a}), zHorn=toon(0x2b1d1a), zMouth=toon(0x2a1414), zBone=toon(0xd9d2bd), goreMat=new THREE.MeshLambertMaterial({color:0x6fbf3a});
+const zEye=new THREE.MeshBasicMaterial({color:0xff2a14}), zGlow=new THREE.MeshBasicMaterial({color:0xff3a1a,transparent:true,opacity:.28,blending:THREE.AdditiveBlending,depthWrite:false}), zVein=new THREE.MeshBasicMaterial({color:0xff4a1a}), zHorn=toon(0x2b1d1a), zMouth=toon(0x2a1414), zBone=toon(0xd9d2bd), goreMat=new THREE.MeshLambertMaterial({color:0x5a1215});
 function makeZombie(type){
   const T=ZT[type], g=new THREE.Group(); g.rotation.order='YXZ';
   const part=(geo,mat,parent,x=0,y=0,z=0,w=0.012)=>{ const m=new THREE.Mesh(geo,typeof mat==='number'?toon(mat):mat); m.position.set(x,y,z); parent.add(m);
     if(w>0) m.add(new THREE.Mesh(inkGeo(geo,w),inkMat)); return m; };
   const grp=(parent,x=0,y=0,z=0)=>{ const q=new THREE.Group(); q.position.set(x,y,z); parent.add(q); return q; };
-  const cone=(r,h,seg=6)=>new THREE.ConeGeometry(r,h,seg).translate(0,h/2,0); // base at the origin, tip along +y
-  const R={}, skin=T.skin, dark=new THREE.Color(skin).multiplyScalar(.6).getHex(), bone=T.bone, eye=T.eye;
-  const eyeMat=new THREE.MeshBasicMaterial({color:eye}), haloMat=new THREE.MeshBasicMaterial({color:eye,transparent:true,opacity:.22,blending:THREE.AdditiveBlending,depthWrite:false});
-  const hipY=type==='stalker'?0.78:0.98; R.hipY=hipY;
-  R.hips=grp(g,0,hipY,0);
-  part(rbox(.24,.13,.16,.05),skin,R.hips);
-  // legs: long, thin, digitigrade-looking (a backward kink at the shin) with clawed toes
-  R.legL=grp(R.hips,-.09,-.03,0); R.legR=grp(R.hips,.09,-.03,0);
-  for(const L of [R.legL,R.legR]){ part(limbGeo(.06,.04,.5),skin,L); const sh=grp(L,0,-.5,0); sh.rotation.x=-0.35; part(limbGeo(.04,.03,.48),dark,sh);
-    const ft=grp(sh,0,-.48,0); ft.rotation.x=0.35; for(let q=0;q<3;q++){ const c=part(cone(.016,.13),bone,ft,-.025+q*.025,0,-.02,0.004); c.rotation.x=-1.45; } }
-  // torso: a narrow, starved ribcage hunched far forward
-  R.spine=grp(R.hips,0,.07,0); R.spine.rotation.x=type==='stalker'?-0.75:-0.5;
-  const torso=part(rbox(.3,.44,.19,.07),skin,R.spine,0,.22,0); torso.castShadow=true;
-  for(let q=0;q<4;q++) [-1,1].forEach(sx=>part(rbox(.11,.016,.02,.006),bone,R.spine,sx*.07,.14+q*.065,-.096,0).rotation.z=sx*0.35); // ribs
-  for(let q=0;q<5;q++) part(sph(.028),bone,R.spine,0,.06+q*.08,.1,0.004);                                                   // spine knobs
-  if(T.cracks) [[.06,.2,.5],[-.07,.28,-.6],[.0,.12,.15],[.09,.33,-.3]].forEach(([x,y,rz])=>part(rbox(.012,.13,.006,.003),eyeMat,R.spine,x,y,-.098,0).rotation.z=rz);
-  // tattered shroud strips hanging off the shoulders
-  if(T.shroud) for(let q=0;q<7;q++){ const a=(q/6-.5)*2.4, st=part(rbox(.06,.3+Math.random()*.25,.012,.005),T.shroud,R.spine,Math.sin(a)*.17,.3,Math.cos(a)*.11,0.004); st.rotation.set(0.12,a,0); st.position.y-=st.geometry.parameters?0:0; }
-  // head
-  R.head=grp(R.spine,0,.5,-.04);
-  if(T.face==='skull'){
-    part(rbox(.15,.15,.26,.035),bone,R.head,0,.09,-.03);                     // long, narrow animal skull
-    part(rbox(.1,.07,.2,.02),bone,R.head,0,.045,-.22);                       // snout
-    part(rbox(.16,.03,.07,.01),new THREE.Color(bone).multiplyScalar(.75).getHex(),R.head,0,.15,-.14,0.004); // brow ridge
-    [-1,1].forEach(sx=>{ part(sph(.036),0x070405,R.head,sx*.05,.11,-.14,0); part(sph(.012),eyeMat,R.head,sx*.05,.11,-.172,0); part(sph(.03),haloMat,R.head,sx*.05,.11,-.17,0).renderOrder=3; });
-    part(rbox(.035,.025,.02,.008),0x070405,R.head,0,.06,-.322,0);           // nose cavity
-    [-1,1].forEach(sx=>part(rbox(.012,.05,.12,.004),0x2a2420,R.head,sx*.052,.03,-.24,0)); // cracks along the snout
-    // antlers or horns
-    [-1,1].forEach(sx=>{ const an=grp(R.head,sx*.07,.16,.0); an.rotation.set(-0.3,0,sx*-0.55);
-      if(T.antlers){ part(limbGeo(.018,.012,.42).translate(0,.42,0),T.horn,an,0,0,0,0.004);
-        [[.14,.7],[.26,-.6],[.36,.5]].forEach(([y,rz])=>{ const t=grp(an,0,y,0); t.rotation.set(-0.3,0,rz*sx); part(limbGeo(.012,.006,.18).translate(0,.18,0),T.horn,t,0,0,0,0.003); }); }
-      else { part(cone(.05,.2,8),T.horn,an,0,0,0,0.005); const t2=grp(an,0,.18,0); t2.rotation.set(-1.0,0,sx*-0.3); part(cone(.035,.18,8),T.horn,t2,0,0,0,0.004); } });
-    R.jaw=grp(R.head,0,-.01,-.06); part(rbox(.09,.035,.24,.015),bone,R.jaw,0,-.02,-.1,0.006);
-    for(let q=0;q<7;q++) [-1,1].forEach(sx=>part(cone(.007,.035,4),0xf2ecdc,R.jaw,sx*.035,.0,-.02-q*.03,0)); // rows of teeth
-    if(T.tusks) [-1,1].forEach(sx=>part(cone(.02,.14,6),0xf2ecdc,R.jaw,sx*.07,-.01,-.13,0.004).rotation.set(-0.4,0,sx*-0.3));
-  } else { // stalker: a stretched, eyeless-looking face that is mostly mouth
-    part(rbox(.2,.32,.22,.08),skin,R.head,0,.1,-.02);
-    [-1,1].forEach(sx=>{ part(sph(.03),eyeMat,R.head,sx*.05,.19,-.13,0); part(sph(.05),haloMat,R.head,sx*.05,.19,-.13,0).renderOrder=3; });
-    R.jaw=grp(R.head,0,.02,-.02); part(rbox(.17,.12,.08,.03),0x120708,R.jaw,0,-.02,-.1,0.006);
-    for(let q=0;q<7;q++){ part(cone(.009,.05,4),0xf2ecdc,R.jaw,-.06+q*.02,.035,-.14,0).rotation.x=Math.PI; part(cone(.009,.045,4),0xf2ecdc,R.jaw,-.06+q*.02,-.075,-.14,0); }
+  const R={}, skin=T.skin, skinD=new THREE.Color(skin).multiplyScalar(.72).getHex(), blood=0x4a0c10, gore=0x7a1a1c, bone=0xe3dccb, rot=0x3b3438;
+  const eyeMat=new THREE.MeshBasicMaterial({color:0xf2e6b0}), haloMat=new THREE.MeshBasicMaterial({color:0xffd27a,transparent:true,opacity:.16,blending:THREE.AdditiveBlending,depthWrite:false});
+  const brute=type==='brute', thin=type==='runner';
+  R.hipY=0.9; R.armL0=1.25; R.armR0=0.45; // one arm reaching out, the other hanging
+  R.hips=grp(g,0,0.9,0);
+  part(rbox(.32,.18,.22,.07),T.pants,R.hips);
+  part(rbox(.33,.04,.23,.02),0x2a2420,R.hips,0,.07,0,0.006);                                    // belt
+  R.legL=grp(R.hips,-.1,-.04,0); R.legR=grp(R.hips,.1,-.04,0);
+  for(const [L,torn] of [[R.legL,false],[R.legR,true]]){
+    part(limbGeo(thin?.07:.085,.066,.82),T.pants,L);
+    if(torn){ part(limbGeo(.058,.05,.3),skin,L,0,-.5,0,0.008); part(rbox(.03,.06,.012,.004),blood,L,0,-.62,-.055,0); }      // ripped trouser leg, bare bruised shin
+    part(rbox(.12,.08,.23,.03),torn?skinD:0x2b2420,L,0,-.85,-.04,0.008); }                      // one shoe lost
+  R.spine=grp(R.hips,0,.08,0); R.spine.rotation.x=thin?-0.42:-0.3;
+  if(brute){
+    const belly=part(sph(.26),skin,R.spine,0,.18,-.04); belly.scale.set(1.15,1.05,1); belly.castShadow=true;
+    part(rbox(.44,.3,.26,.1),skin,R.spine,0,.36,.02);
+    for(let q=0;q<5;q++) part(rbox(.006,.03,.004,.002),0x1a1214,R.spine,-.06+q*.03,.18,-.33,0).rotation.z=0.6;           // stitches
+    part(rbox(.16,.006,.004,.002),0x1a1214,R.spine,0,.18,-.332,0);
+    part(rbox(.1,.08,.01,.02),gore,R.spine,.12,.3,-.12,0); part(rbox(.14,.12,.01,.02),blood,R.spine,-.1,.08,-.27,0);
+  } else {
+    const torso=part(rbox(.36,.44,.23,.08),T.shirt,R.spine,0,.22,0); torso.castShadow=true;
+    part(rbox(.37,.06,.234,.02),new THREE.Color(T.shirt).multiplyScalar(.75).getHex(),R.spine,0,.03,0,0.006); // ragged hem
+    part(rbox(.14,.12,.01,.03),skin,R.spine,.08,.14,-.118,0.006);                                 // torn hole: skin showing
+    part(rbox(.1,.16,.01,.02),gore,R.spine,-.1,.22,-.118,0);                                      // open wound
+    for(let q=0;q<3;q++) part(rbox(.08,.014,.012,.005),bone,R.spine,-.1,.17+q*.045,-.123,0);     // ribs showing through it
+    part(rbox(.12,.18,.01,.03),blood,R.spine,.02,.33,-.118,0); part(rbox(.06,.09,.01,.02),blood,R.spine,.13,.06,-.118,0); // blood
+    part(rbox(.06,.14,.01,.02),blood,R.spine,-.06,.2,.118,0);
   }
-  // arms: hang to the knees, with long hooked claws
-  R.armL=grp(R.spine,-.19,.4,0); R.armR=grp(R.spine,.19,.4,0);
-  for(const A of [R.armL,R.armR]){ part(sph(.05),bone,A,0,0,0,0.005); part(limbGeo(.045,.032,.5),skin,A); const fa=grp(A,0,-.5,0); fa.rotation.x=0.25; part(limbGeo(.032,.026,.48),dark,fa);
-    const hd=grp(fa,0,-.48,0); part(rbox(.07,.07,.05,.02),dark,hd,0,-.02,0,0.006);
-    for(let q=0;q<4;q++){ const c=part(cone(.013,.2),T.claw,hd,-.03+q*.02,-.04,-.01,0.004); c.rotation.set(Math.PI-0.35,0,(q-1.5)*0.08); } }
-  if(T.spikes){ for(let q=0;q<5;q++) part(cone(.04,.16+q%2*.05,6),T.horn,R.spine,0,.12+q*.08,.09,0.005).rotation.x=0.9;
-    [-1,1].forEach(sx=>{ for(let q=0;q<3;q++) part(cone(.03,.14,6),T.horn,R.spine,sx*(.15+q*.04),.44,-.03+q*.04,0.004).rotation.z=sx*-0.6; }); }
+  // head: sagging, sunken-eyed, jaw hanging loose
+  R.head=grp(R.spine,0,brute?.55:.5,-.02); R.head.rotation.z=0.2;
+  part(limbGeo(.06,.065,.1),skinD,R.head,0,0,0,0.006);
+  part(rbox(.24,.27,.24,.09),skin,R.head,0,.12,0);
+  part(rbox(.22,.04,.05,.02),skinD,R.head,0,.17,-.11,0.006);                                     // heavy brow
+  [-1,1].forEach(sx=>{ part(sph(.04),0x120a0c,R.head,sx*.056,.135,-.112,0); part(sph(.014),eyeMat,R.head,sx*.056,.132,-.148,0);
+    part(sph(.03),haloMat,R.head,sx*.056,.132,-.14,0).renderOrder=3; });                           // dead, sunken eyes with a faint glow
+  part(rbox(.03,.05,.03,.01),skinD,R.head,0,.1,-.125,0.005);                                       // nose
+  part(rbox(.07,.05,.01,.02),gore,R.head,.075,.06,-.122,0); for(let q=0;q<3;q++) part(rbox(.012,.02,.01,.003),bone,R.head,.06+q*.015,.06,-.128,0); // torn cheek, teeth
+  part(rbox(.06,.05,.01,.01),blood,R.head,-.06,.2,-.122,0);                                         // scalp wound
+  for(let q=0;q<5;q++){ const a=q*1.3; part(rbox(.05,.03,.06,.012),T.hair,R.head,Math.cos(a)*.08,.255,Math.sin(a)*.07-.01,0); } // patchy hair
+  R.jaw=grp(R.head,0,.02,-.02); part(rbox(.17,.06,.11,.02),skinD,R.jaw,0,-.02,-.07,0.008); part(rbox(.12,.03,.05,.01),0x1a0c0e,R.jaw,0,.01,-.1,0);
+  for(let q=0;q<5;q++) part(rbox(.014,.02,.01,.003),bone,R.jaw,-.04+q*.02,.025,-.12,0);
+  // arms: torn sleeves, grey hands with blood on the fingers
+  R.armL=grp(R.spine,brute?-.3:-.24,brute?.44:.38,0); R.armR=grp(R.spine,brute?.3:.24,brute?.44:.38,0);
+  for(const [A,sleeve] of [[R.armL,true],[R.armR,!thin]]){
+    if(sleeve&&!brute) part(rbox(.12,.18,.12,.03),T.shirt,A,0,-.07,0,0.008);
+    part(limbGeo(brute?.085:.062,brute?.07:.048,.66),skin,A); part(rbox(.03,.12,.01,.004),blood,A,0,-.45,-.05,0);
+    const hd=grp(A,0,-.7,0); part(rbox(.09,.09,.07,.025),skinD,hd,0,0,0,0.008);
+    for(let q=0;q<4;q++) part(rbox(.016,.07,.018,.005),q%2?skinD:blood,hd,-.03+q*.02,-.07,0,0.004); }
   g.scale.setScalar(T.sc); scene.add(g);
   return {g,R};
 }
@@ -3111,9 +3113,9 @@ function clearZombies(){ [...horde.zs.values()].forEach(dropZombie); }
 function hordeTargets(){ const a=[]; if(!(net.dead||P.hp<=0)) a.push(P); net.players.forEach(pl=>{ if(pl.alive&&pl.id!=='bot') a.push(pl); }); return a; }
 function zombieHurt(z,dmg,by){
   if(!z.alive) return; z.hp-=dmg; z.hitFlash=0.12;
-  if(z.hp<=0){ z.alive=false; z.hp=0; z.deadT=0; horde.kills++; zombieLoot(z); burst(z.pos.clone().setY(z.pos.y+1.1*z.sc),10,4,0.09,goreMat); sfxAt('zdie',z.pos);
+  if(z.hp<=0){ z.alive=false; z.hp=0; z.deadT=0; horde.kills++; zombieLoot(z); burst(z.pos.clone().setY(z.pos.y+1.1*z.sc),10,4,0.09,goreMat); zsfx('zdie',z.pos);
     if(by===net.id||!net.role) stat('h',0); }
-  else if(Math.random()<0.35) sfxAt('zhurt',z.pos);
+  else if(Math.random()<0.35) zsfx('zhurt',z.pos);
 }
 function hordeHurtMe(dmg,from){
   if(net.dead||P.hp<=0) return;
@@ -3129,7 +3131,7 @@ function zombieCanHit(z,who){
   _zo.set(z.pos.x,z.pos.y+1.0*z.sc,z.pos.z); _zd.set(dx,who.pos.y+1.0-_zo.y,dz); const len=_zd.length(); _zd.multiplyScalar(1/len);
   return castShot(_zo,_zd,len,0,null).kind!=='piece'; // no clawing through walls
 }
-function zombieAttack(z,who){ z.atk=0.45; z.swipe={who,t:0.28}; sfxAt('claw',z.pos); }
+function zombieAttack(z,who){ z.atk=0.45; z.swipe={who,t:0.28}; zsfx('claw',z.pos); }
 function zombieSwipeLands(z){
   const T=ZT[z.type], who=z.swipe.who; z.swipe=null;
   if(!z.alive||!zombieCanHit(z,who)) return;
@@ -3140,7 +3142,7 @@ const _zo=new THREE.Vector3(), _zd=new THREE.Vector3();
 function zombieThink(z,dt,tg){
   const T=ZT[z.type];
   z.tT-=dt; if(z.tT<=0||!z.target||!tg.includes(z.target)){ z.tT=0.5; let bd=Infinity; z.target=null; for(const t of tg){ const d=t.pos.distanceToSquared(z.pos); if(d<bd){ bd=d; z.target=t; } } }
-  z.atkT-=dt; z.atk=Math.max(0,z.atk-dt); z.groanT-=dt; if(z.groanT<=0){ z.groanT=4+Math.random()*7; sfxAt('groan',z.pos); }
+  z.atkT-=dt; z.atk=Math.max(0,z.atk-dt); z.groanT-=dt; if(z.groanT<=0){ z.groanT=4+Math.random()*7; zsfx('groan',z.pos); }
   const t=z.target; let fw=0, st=0;
   if(t){
     const dx=t.pos.x-z.pos.x, dz=t.pos.z-z.pos.z, hd=Math.hypot(dx,dz), dy=t.pos.y-z.pos.y;
@@ -3165,7 +3167,7 @@ function zombieThink(z,dt,tg){
         _zo.set(z.pos.x,z.pos.y+0.9,z.pos.z); _zd.set(-Math.sin(z.yaw),0,-Math.cos(z.yaw));
         let r=castShot(_zo,_zd,1.2*z.sc+0.4,0,null); if(r.kind!=='piece'){ _zo.y=z.pos.y+0.3; r=castShot(_zo,_zd,1.2*z.sc+0.4,0,null); }
         if(r.kind==='piece') z.chew={p:r.piece,pt:r.point}; }
-      if(z.chew&&pieces.has(z.chew.p.key)){ fw=0; if(z.atkT<=0){ z.atkT=0.95; z.atk=0.45; sfxAt('claw',z.pos); damagePiece(z.chew.p,T.bld,z.chew.pt); } }
+      if(z.chew&&pieces.has(z.chew.p.key)){ fw=0; if(z.atkT<=0){ z.atkT=0.95; z.atk=0.45; zsfx('claw',z.pos); damagePiece(z.chew.p,T.bld,z.chew.pt); } }
       else z.chew=null;
       // stuck on something it can't see: side-step for a moment
       if(fw&&Math.hypot(z.vel.x,z.vel.z)<0.4){ z.stuckT+=dt; if(z.stuckT>0.8){ z.stuckT=0; z.side=Math.random()<0.5?-1:1; z.sideT=0.7; } } else z.stuckT=0;
@@ -3243,7 +3245,7 @@ function onHordeMsg(m){
     if(!z){ z=newZombie(ZCODE[s[1]]||'husk',s[2],s[4],s[0]); z.pos.set(s[2],s[3],s[4]); }
     z.tgt.set(s[2],s[3],s[4]); z.yawT=s[5]; z.vel.set(s[8]||0,0,s[9]||0);
     const wasAlive=z.alive; z.alive=s[6]>0; z.hp=s[6]*z.maxHp; if(s[7]&&z.atk<=0.05) z.atk=0.45;
-    if(wasAlive&&!z.alive){ z.deadT=0; burst(z.pos.clone().setY(z.pos.y+1.1*z.sc),10,4,0.09,goreMat); sfxAt('zdie',z.pos); } }
+    if(wasAlive&&!z.alive){ z.deadT=0; burst(z.pos.clone().setY(z.pos.y+1.1*z.sc),10,4,0.09,goreMat); zsfx('zdie',z.pos); } }
   horde.zs.forEach(z=>{ if(!seen.has(z.id)) dropZombie(z); });
 }
 function hordeClientStep(dt){
@@ -3264,7 +3266,8 @@ function animateZombie(z,dt){
   const at=z.atk>0?Math.sin((0.45-z.atk)/0.45*Math.PI):0;
   // long arms hang and sway; a swipe raises them high, then rakes down
   const pre=z.atk>0.3?(0.45-z.atk)/0.15:0, rake=z.atk>0&&z.atk<=0.3?Math.sin((0.3-z.atk)/0.3*Math.PI):0;
-  R.armL.rotation.x=0.55+Math.sin(z.walk*0.9)*0.25*Math.min(1,sp)+pre*1.9-rake*0.4; R.armR.rotation.x=0.45-Math.sin(z.walk*0.9)*0.25*Math.min(1,sp)+pre*1.6-rake*0.3;
+  const aL=R.armL0??0.55, aR=R.armR0??0.45;
+  R.armL.rotation.x=aL+Math.sin(z.walk*0.9)*0.12+pre*(2.2-aL)-rake*0.5; R.armR.rotation.x=aR-Math.sin(z.walk*0.9)*0.25*Math.min(1,sp)+pre*1.7-rake*0.4;
   R.armL.rotation.z=-0.18-pre*0.3; R.armR.rotation.z=0.18+pre*0.3;
   R.jaw.rotation.x=0.12+Math.max(0,Math.sin(z.walk*1.3))*0.18+at*0.55;
   // twitchy, unnatural head movement
