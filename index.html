@@ -1398,9 +1398,9 @@ function fireUp(src){
   fireHeld=false;
   if(edit&&src==='desk'&&edit.mouse){ edit.mouse=false; edit.painting=null; if(settings.editRelease) releaseEdit(); }
 }
-const PICK_DMG=50;
+const PICK_DMG=50, SWING_T=0.34;
 function swing(){
-  swingT=0.22; net.lastSwing=(net.lastSwing%1e6)+1;
+  swingT=SWING_T; net.lastSwing=(net.lastSwing%1e6)+1;
   // pickaxe a zombie in front of you
   let zb=null, zd=1e9; const fx=-Math.sin(P.yaw), fz=-Math.cos(P.yaw);
   horde.zs.forEach(z=>{ if(!z.alive) return; const dx=z.pos.x-P.pos.x, dz=z.pos.z-P.pos.z, d=Math.hypot(dx,dz);
@@ -1409,7 +1409,7 @@ function swing(){
     if(net.role==='client') netSend({type:'zhit',id:net.id,z:zb.id,dmg}); else zombieHurt(zb,dmg,net.id); return; }
   const hit=aimHit(3.4);
   // the pickaxe chips builds (50 a hit) instead of deleting them
-  if(hit&&hit.object.userData.piece&&hit.object.userData.piece.isProp){ swingT=0.22; propHit(hit.object.userData.piece,PICK_DMG,hit.point,true); return; }
+  if(hit&&hit.object.userData.piece&&hit.object.userData.piece.isProp){ swingT=SWING_T; propHit(hit.object.userData.piece,PICK_DMG,hit.point,true); return; }
   if(hit){ const hp_=hit.object.userData.piece; dmgNum(hit.point,PICK_DMG,'build'); sfx('pick_hit'); damagePiece(hp_,PICK_DMG,hit.point); } else sfx('whiff');
 }
 function toggleEdit(){ if(edit) exitEdit(true); else enterEdit(); }
@@ -1755,7 +1755,8 @@ function createHero(jacketHex,opts){
   rig.legL=leg(-1); rig.legR=leg(1);
 
   // tools: pickaxe (resting on the shoulder in pickaxe mode)
-  rig.pick=grp(rig.armR.hand,0,0,0);
+  // held through the fist: the handle angles up and forward out of the hand, the long spike leads the swing
+  rig.pick=grp(rig.armR.hand,0,0,0); rig.pick.rotation.set(0.95,Math.PI,0);
   const pk=opts.pickaxe||'steel', glow=c=>new THREE.MeshBasicMaterial({color:c});
   const ph=grp(rig.pick,0,-.56,0);
   if(pk==='steel'){
@@ -1903,6 +1904,21 @@ function ikArm(arm,targetW,poleW,handQ){
 const _aim=new THREE.Vector3(), _up=new THREE.Vector3(), _rt=new THREE.Vector3(), _hq=new THREE.Quaternion(), _hq2=new THREE.Quaternion(), _tw=new THREE.Vector3(), _tw2=new THREE.Vector3(), _pole=new THREE.Vector3(), _fp=new THREE.Vector3();
 function handQuat(out,fwd,up){ _ikY.copy(fwd).negate(); _ikZ.copy(up).addScaledVector(fwd,-up.dot(fwd)).normalize().negate(); _ikX.crossVectors(_ikY,_ikZ).normalize(); _ikM.makeBasis(_ikX,_ikY,_ikZ); return out.setFromRotationMatrix(_ikM); }
 
+// pickaxe swing keyframes (t 0..1): wind-up, strike, recover
+function pickSwing(t,pitch){
+  const ease=x=>x*x*(3-2*x), K=[ // t, shoulder fwd, shoulder out, elbow, chest twist, spine lean, wrist
+    [0,   0.3,  0.14, 0.5,  0,    0,   -0.3],
+    [0.2, 2.75, 0.5,  1.55,-0.5, -0.06,-0.45],
+    [0.27,2.6,  0.42, 1.35,-0.42,-0.04,-0.35],
+    [0.45,0.22+pitch*0.45,-0.3,0.05,0.42,0.24,0],
+    [0.62,0.3+pitch*0.4,-0.26,0.12,0.36,0.2,-0.08],
+    [1,   0.3,  0.14, 0.5,  0,    0,   -0.3]];
+  // (handle angle from straight down = shoulder + elbow + wrist + spine lean + 0.95 grip tilt: ~1.5 is level in front)
+  let i=0; while(i<K.length-2&&t>K[i+1][0]) i++;
+  const a=K[i], b=K[i+1], u=Math.max(0,Math.min(1,(t-a[0])/(b[0]-a[0]))), e=i===2?u*u:ease(u); // the strike accelerates into the hit
+  const L=j=>a[j]+(b[j]-a[j])*e;
+  return {sh:L(1),shz:L(2),el:L(3),ch:L(4),sp:L(5),wr:L(6),k:t>0.2&&t<0.7?Math.sin((t-0.2)/0.5*Math.PI):0};
+}
 function animateRig(H,S,dt){
   const G=H.group, r=H.rig, A=H.anim; A.t+=dt;
   G.position.copy(S.pos);
@@ -1992,13 +2008,13 @@ function animateRig(H,S,dt){
     T.shL=0.95+S.pitch*0.6; T.elL=0.85; T.shLz=0.15; T.chY+=0.1;
   } else if(S.editing){ T.shR=1.35+S.pitch*0.7; T.elR=0.3; T.shL=0.95; T.elL=0.85; T.shLz=0.15; }
   else if(S.swingT>0){
-    const t=1-S.swingT/0.22, wind=t<0.3, e=wind?t/0.3:(t-0.3)/0.7;
-    if(wind){ T.shR=lerp(0.5,2.9,e); T.elR=lerp(1.6,0.9,e); T.chY+=0.4*e; T.spX+=0.08*e; }
-    else { const ee=1-Math.pow(1-e,3); T.shR=lerp(2.9,-0.15,ee)+S.pitch*0.4; T.elR=lerp(0.9,0.2,ee); T.chY+=lerp(0.4,-0.5,ee); T.spX-=0.18*Math.sin(e*Math.PI); }
-    T.shL=0.4; T.elL=0.8;
+    // overhead chop: wind up over the right shoulder, whip down across the body, settle back
+    const t=Math.min(1,1-S.swingT/SWING_T), sw=pickSwing(t,S.pitch);
+    T.shR=sw.sh; T.shRz=sw.shz; T.elR=sw.el; T.chY+=sw.ch; T.spX+=sw.sp; T.wrR=sw.wr;
+    T.shL=0.35+0.45*sw.k; T.elL=0.9; T.shLz=-0.05;
   } else if(S.gun===false&&!building){
-    // pickaxe carried low at the side
-    T.shR=T.shR*0.6+0.12; T.elR=Math.max(0.3,T.elR*0.6); T.shRz=0.16;
+    // pickaxe carried at the side, head forward
+    T.shR=T.shR*0.5+0.3; T.elR=Math.max(0.5,T.elR*0.6); T.shRz=0.14; T.wrR=-0.3;
   }
   // ----- apply (smoothed) -----
   const set=(o,ax,v,f)=>{ o.rotation[ax]=lerp(o.rotation[ax],v,f||sm); };
@@ -2010,10 +2026,11 @@ function animateRig(H,S,dt){
   for(const [L,h,hz,kn,an] of [[r.legL,T.hpL,T.hpLz,T.knL,T.anL],[r.legR,T.hpR,T.hpRz,T.knR,T.anR]]){
     set(L.hp,'x',h,smF); set(L.hp,'z',hz,smF); set(L.kn,'x',kn,smF); set(L.an,'x',an,smF); }
   if(!gun){
-    set(r.armL.sh,'x',T.shL); set(r.armR.sh,'x',T.shR); set(r.armL.sh,'z',T.shLz); set(r.armR.sh,'z',T.shRz);
+    const fa=S.swingT>0?1:sm; // keyframes are already smooth: follow them exactly // the swing is fast: follow it closely
+    set(r.armL.sh,'x',T.shL); set(r.armR.sh,'x',T.shR,fa); set(r.armL.sh,'z',T.shLz); set(r.armR.sh,'z',T.shRz,fa);
     set(r.armL.sh,'y',0); set(r.armR.sh,'y',0);
-    set(r.armL.el,'x',T.elL); set(r.armR.el,'x',T.elR); r.armL.el.rotation.y=r.armL.el.rotation.z=r.armR.el.rotation.y=r.armR.el.rotation.z=0;
-    set(r.armL.wr,'x',building?-0.5:0); set(r.armR.wr,'x',S.gun===false&&!building&&!(S.swingT>0)?0.75:0); r.armL.wr.rotation.y=r.armL.wr.rotation.z=r.armR.wr.rotation.y=r.armR.wr.rotation.z=0;
+    set(r.armL.el,'x',T.elL); set(r.armR.el,'x',T.elR,fa); r.armL.el.rotation.y=r.armL.el.rotation.z=r.armR.el.rotation.y=r.armR.el.rotation.z=0;
+    set(r.armL.wr,'x',building?-0.5:0); set(r.armR.wr,'x',S.gun===false&&!building&&!S.editing?(T.wrR||0):0,fa); r.armL.wr.rotation.y=r.armL.wr.rotation.z=r.armR.wr.rotation.y=r.armR.wr.rotation.z=0;
   }
   // ----- weapons: two-handed IK -----
   r.gun.visible=gun==='ar'||gun===true; r.pump.visible=gun==='pump'; r.hammer.visible=building; r.plan.visible=building||!!S.editing; r.pick.visible=!gun&&!building&&!S.editing&&!S.item;
@@ -2428,7 +2445,7 @@ function onState(m){
   pl.tgt.set(s[0],s[1],s[2]); pl.vel.set(s[3],s[4],s[5]); pl.yaw=s[6]; pl.pitch=s[7]; pl.flags=s[8];
   pl.crouch=!!(s[8]&2); pl.wpn=WNAME[s[10]||0]; pl.sh=s[11]??100;
   const alive=!(s[8]&8); if(alive!==pl.alive){ pl.alive=alive; pl.h.group.visible=alive; if(alive){ pl.pos.copy(pl.tgt); animEvent(pl.h,'revive'); } }
-  if(s[9]&&s[9]!==pl.swingId){ pl.swingId=s[9]; if(!pl.fresh) pl.swingT=0.22; }
+  if(s[9]&&s[9]!==pl.swingId){ pl.swingId=s[9]; if(!pl.fresh) pl.swingT=SWING_T; }
   if(pl.fresh){ pl.pos.copy(pl.tgt); pl.fresh=false; }
 }
 function stepPlayers(dt){
