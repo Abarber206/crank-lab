@@ -1412,15 +1412,29 @@ function fireDown(src){
   if(mode==='build'){ tryPlace(heldPiece||piece); turboT=settings.turbo; }
   else if(mode==='gun'){ if(P.gunT<=0) playerShoot(); }
   else if(mode==='item') startUse();
-  else { swing(); pickT=0.32; }
+  else startSwing();
 }
 function fireUp(src){
   fireHeld=false;
   if(edit&&src==='desk'&&edit.mouse){ edit.mouse=false; edit.painting=null; if(settings.editRelease) releaseEdit(); }
 }
-const PICK_DMG=50, SWING_T=0.34;
-function swing(){
-  swingT=SWING_T; net.lastSwing=(net.lastSwing%1e6)+1;
+const PICK_DMG=50, SWING_T=0.34, PICK_CD=0.42, PICK_IMPACT=0.15;
+// Swings have a short cooldown; the hit lands when the pickaxe comes down (not the instant you click).
+// A click just before the cooldown ends is remembered so fast clicking still feels responsive.
+let pickCd=0, pickHitT=0, pickQueued=false;
+function startSwing(){
+  if(isDead()) return;
+  if(pickCd>0){ if(pickCd<0.16) pickQueued=true; return; }
+  pickCd=PICK_CD; pickHitT=PICK_IMPACT; pickQueued=false;
+  swingT=SWING_T; net.lastSwing=(net.lastSwing%1e6)+1; sfx('whoosh');
+}
+function stepPick(dt){
+  if(pickCd>0) pickCd-=dt;
+  if(pickHitT>0){ pickHitT-=dt; if(pickHitT<=0){ if(mode==='pick'&&!edit&&!isDead()) swing(true); } }
+  if(pickQueued&&pickCd<=0) startSwing();
+}
+function swing(fromImpact){
+  if(!fromImpact){ swingT=SWING_T; net.lastSwing=(net.lastSwing%1e6)+1; }
   // pickaxe a zombie in front of you
   let zb=null, zd=1e9; const fx=-Math.sin(P.yaw), fz=-Math.cos(P.yaw);
   horde.zs.forEach(z=>{ if(!z.alive) return; const dx=z.pos.x-P.pos.x, dz=z.pos.z-P.pos.z, d=Math.hypot(dx,dz);
@@ -1429,8 +1443,8 @@ function swing(){
     if(net.role==='client') netSend({type:'zhit',id:net.id,z:zb.id,dmg}); else zombieHurt(zb,dmg,net.id); return; }
   const hit=aimHit(3.4);
   // the pickaxe chips builds (50 a hit) instead of deleting them
-  if(hit&&hit.object.userData.piece&&hit.object.userData.piece.isProp){ swingT=SWING_T; propHit(hit.object.userData.piece,PICK_DMG,hit.point,true); return; }
-  if(hit){ const hp_=hit.object.userData.piece; dmgNum(hit.point,PICK_DMG,'build'); sfx('pick_hit'); damagePiece(hp_,PICK_DMG,hit.point); } else sfx('whiff');
+  if(hit&&hit.object.userData.piece&&hit.object.userData.piece.isProp){ propHit(hit.object.userData.piece,PICK_DMG,hit.point,true); return; }
+  if(hit){ const hp_=hit.object.userData.piece; dmgNum(hit.point,PICK_DMG,'build'); sfx('pick_hit'); damagePiece(hp_,PICK_DMG,hit.point); }
 }
 function toggleEdit(){ if(edit) exitEdit(true); else enterEdit(); }
 function respawn(){ animEvent(localHero,'revive'); P.pos.set(...SPAWN); P.vel.set(0,0,0); P.onGround=true; P.hp=100; P.sh=100; P.ammo={ar:WEAPONS.ar.mag,pump:WEAPONS.pump.mag}; P.reloadT=0; P.useT=0; P.items={bandage:ITEMS.bandage.start,mini:ITEMS.mini.start}; syncItems(); P.mats={wood:30,brick:0,metal:0}; if(typeof syncMats==='function'&&document.getElementById('matStock')) syncMats(); }
@@ -1468,6 +1482,36 @@ function noise(freq,dur,vol,q=1,delay=0,type='bandpass',f1){
   s.connect(f).connect(g).connect(cur); s.start(t,Math.random()*0.2); s.stop(t+dur+0.02);
 }
 const click=(f,v,d=0)=>{ noise(f,0.025,v,2.5,d); tone('square',f*0.4,f*0.3,0.02,v*0.25,d); };
+// a struck object: a very short burst of noise ringing through a narrow resonance (wood knock, stone tick, thud)
+const knock=(f,dur,vol,q=7,delay=0)=>noise(f,dur,vol*q*1.7,q,delay,'bandpass',f*0.82); // narrow bands lose energy: make up for it
+/* A throat: a wobbly buzz plus breath, shaped by vowel resonances (formants), with optional rasp.
+   o: f0->f1 pitch (Hz), dur, vol, vowel / vowel2 as [[freq,gain,Q]...], breath, fry (rasp 0..1), jitter, attack, delay */
+const VOW={
+  UH:[[560,1,6],[1000,.5,8],[2200,.18,10]], OO:[[330,1,6],[760,.45,8],[2100,.12,10]], AH:[[680,1,6],[1080,.6,8],[2350,.2,10]],
+  ER:[[470,1,6],[1250,.5,8],[1600,.3,10]], HAH:[[780,1,6],[1250,.6,8],[2650,.22,10]], HUH:[[620,1,6],[1150,.5,8],[2500,.2,10]] };
+function voice(o){
+  const t=AC.currentTime+(o.delay||0), d=o.dur, a=o.attack||0.07, vv=o.vol*0.42;
+  const out=AC.createGain(); out.gain.setValueAtTime(0.0001,t); out.gain.exponentialRampToValueAtTime(vv,t+a);
+  out.gain.setValueAtTime(vv,t+Math.max(a,d*0.55)); out.gain.exponentialRampToValueAtTime(0.0001,t+d); out.connect(cur);
+  const osc=AC.createOscillator(); osc.type='sawtooth'; osc.frequency.setValueAtTime(o.f0,t); osc.frequency.exponentialRampToValueAtTime(o.f1,t+d);
+  const lfo=(type,fr,depth,target)=>{ const l=AC.createOscillator(), g=AC.createGain(); l.type=type; l.frequency.value=fr; g.gain.value=depth; l.connect(g).connect(target); l.start(t); l.stop(t+d+0.05); };
+  lfo('sine',4+Math.random()*3,o.f0*(o.jitter||0.04),osc.frequency);     // vibrato
+  lfo('triangle',0.6+Math.random()*1.4,o.f0*0.07,osc.frequency);         // slow, uneven drift
+  const src=AC.createGain(); osc.connect(src);
+  if(o.fry){ src.gain.value=1-o.fry*0.5; lfo('square',20+Math.random()*18,o.fry*0.5,src.gain); } // rasp
+  const nz=AC.createBufferSource(); nz.buffer=noiseBuf; nz.loop=true; const ng=AC.createGain(); ng.gain.value=o.breath||0.3; nz.connect(ng);
+  const V=o.vowel, V2=o.vowel2||V;
+  V.forEach((fm,i)=>{ const bp=AC.createBiquadFilter(); bp.type='bandpass'; bp.Q.value=fm[2]; bp.frequency.setValueAtTime(fm[0],t); bp.frequency.linearRampToValueAtTime(V2[i][0],t+d);
+    const g=AC.createGain(); g.gain.value=fm[1]*(i?5:3.2); src.connect(bp); ng.connect(bp); bp.connect(g).connect(out); });
+  osc.start(t); osc.stop(t+d+0.05); nz.start(t,Math.random()*0.3); nz.stop(t+d+0.05);
+}
+function zombieGroan(vol,delay=0){
+  const r=Math.random(), p=0.85+Math.random()*0.3;
+  if(r<0.45) voice({f0:88*p,f1:66*p,dur:1.1+Math.random()*0.6,vol,vowel:VOW.UH,vowel2:VOW.OO,breath:0.5,fry:0.35,jitter:0.05,attack:0.18,delay}); // long moan
+  else if(r<0.75) voice({f0:118*p,f1:82*p,dur:0.6+Math.random()*0.3,vol:vol*1.1,vowel:VOW.ER,vowel2:VOW.AH,breath:0.65,fry:0.8,jitter:0.07,attack:0.06,delay}); // snarl
+  else { voice({f0:76*p,f1:60*p,dur:1.4,vol:vol*0.9,vowel:VOW.AH,vowel2:VOW.UH,breath:0.55,fry:0.6,jitter:0.06,attack:0.12,delay}); // gargled moan
+    for(let q=0;q<5;q++) knock(180+Math.random()*120,0.05,vol*0.35,4,delay+0.3+q*0.13+Math.random()*0.05); }
+}
 function sfx(k){
   if(!AC) return;
   sfxVerb=({shot:0.22,pump:0.3,break_wood:0.15,break_brick:0.18,break_metal:0.2,break:0.15})[k]||0;
@@ -1479,36 +1523,36 @@ function sfx(k){
     case 'reload_ar': click(1800,0.2); tone('square',300,180,0.05,0.07); noise(900,0.07,0.15,1,0.55); click(1300,0.3,0.6); noise(3500,0.09,0.1,1,0.85,'highpass',1500); click(2400,0.22,0.98); break;
     case 'shell': click(2200,0.2); noise(1200,0.04,0.1,1.2,0.03); break;
     case 'equip': noise(2500,0.06,0.08,1,0,'highpass'); click(1600,0.12,0.05); break;
-    case 'place': case 'place_wood': tone('triangle',190*r(),115,0.09,0.28); noise(900,0.07,0.22,2); noise(3000,0.02,0.08,1,0,'highpass'); break;
-    case 'place_brick': tone('sine',115*r(),70,0.12,0.4); noise(600,0.1,0.3,0.8,0,'lowpass'); noise(2000,0.03,0.08,1); break;
+    case 'place': case 'place_wood': knock(230*r(),0.11,0.55,6); knock(700*r(),0.05,0.25,5); noise(3000,0.02,0.08,1,0,'highpass'); break;
+    case 'place_brick': noise(380*r(),0.14,0.55,0.9,0,'lowpass',140); knock(900*r(),0.04,0.2,4); for(let q=0;q<3;q++) noise(1800+Math.random()*1500,0.02,0.07,3,0.02+q*0.03); break;
     case 'place_metal': [520,733,1240].forEach((f,q)=>tone('sine',f*r(),f*0.98,0.32-q*0.06,0.09)); noise(4000,0.03,0.12,1,0,'highpass'); tone('square',180,90,0.05,0.05); break;
-    case 'break': case 'break_wood': noise(1300,0.2,0.5,0.7); tone('sawtooth',170,55,0.14,0.07); for(let q=0;q<5;q++) noise(1600+Math.random()*1800,0.03,0.12,3,0.05+q*0.05+Math.random()*0.03); break;
+    case 'break': case 'break_wood': noise(1300,0.2,0.5,0.7); knock(190,0.2,0.5,4); for(let q=0;q<5;q++) noise(1600+Math.random()*1800,0.03,0.12,3,0.05+q*0.05+Math.random()*0.03); break;
     case 'break_brick': noise(700,0.28,0.6,0.6,0,'lowpass',200); tone('sine',90,40,0.2,0.35); for(let q=0;q<6;q++) noise(900+Math.random()*900,0.04,0.12,2,0.06+q*0.05); break;
     case 'break_metal': [430,610,980].forEach((f,q)=>tone('sine',f,f*0.9,0.45-q*0.08,0.1)); noise(3000,0.12,0.3,0.8,0,'highpass'); for(let q=0;q<4;q++) click(2500+Math.random()*1500,0.12,0.08+q*0.07); break;
-    case 'pick_hit': tone('triangle',320*r(),150,0.09,0.22); noise(1500,0.07,0.28,1.2); break;
-    case 'whiff': noise(700,0.14,0.08,1.5,0,'bandpass',2600); break;
+    case 'pick_hit': knock(300*r(),0.1,0.55,6); knock(1100*r(),0.04,0.25,6); noise(3000,0.03,0.12,1,0,'highpass'); break;
+    case 'whiff': case 'whoosh': noise(600,0.17,0.3,1.4,0,'bandpass',2200); break;
     case 'edit': tone('triangle',520,880,0.06,0.08); break;
     case 'tick': click(2400,0.08); break;
     case 'confirm': tone('triangle',700,1050,0.05,0.08); tone('triangle',1050,1400,0.05,0.07,0.05); break;
     case 'hit': tone('sine',2050,1850,0.05,0.14); noise(5500,0.02,0.1,1,0,'highpass'); break;
     case 'headhit': tone('sine',2700,2500,0.09,0.17); tone('sine',3500,3400,0.07,0.1,0.03); noise(6000,0.02,0.1,1,0,'highpass'); break;
-    case 'hurt': noise(600,0.1,0.3,0.8); tone('sine',210,90,0.15,0.14); break;
+    case 'hurt': { const p=0.9+Math.random()*0.2; voice({f0:190*p,f1:130*p,dur:0.2,vol:0.32,vowel:VOW.HAH,vowel2:VOW.HUH,breath:0.35,fry:0.15,jitter:0.03,attack:0.012}); knock(160,0.08,0.18,2); } break;
     case 'step': case 'step_grass': noise(650*r(),0.07,0.06,0.6,0,'lowpass'); break;
     case 'step_wood': tone('triangle',150*r(),120,0.05,0.07); noise(1000,0.04,0.05,1.5); break;
     case 'step_brick': noise(700*r(),0.05,0.08,1.2); break;
     case 'step_metal': tone('sine',880*r(),860,0.06,0.035); noise(3200,0.025,0.04,1,0,'highpass'); break;
     case 'jump': noise(500,0.07,0.06,0.7,0,'lowpass'); break;
-    case 'land': tone('sine',95,48,0.11,0.16); noise(420,0.09,0.12,0.7,0,'lowpass'); break;
+    case 'land': noise(260,0.13,0.9,0.8,0,'lowpass',90); knock(140,0.08,0.2,3); break;
     case 'win': tone('triangle',520,780,0.12,0.09); tone('triangle',780,1040,0.16,0.09,0.12); break;
     case 'lose': tone('triangle',420,260,0.25,0.09); break;
-    case 'chop': noise(700*r(),0.09,0.45,1.2); tone('triangle',150*r(),90,0.1,0.25); click(2000,0.12,0.01); break;
-    case 'stone': noise(2600*r(),0.05,0.4,1.5); tone('square',210*r(),120,0.05,0.08); noise(500,0.12,0.2,0.8,0.01,'lowpass'); break;
+    case 'chop': knock(320*r(),0.12,0.6,6); knock(820*r(),0.05,0.35,5); noise(2600,0.04,0.18,1.2,0,'highpass'); for(let q=0;q<3;q++) noise(4000+Math.random()*2000,0.02,0.06,2,0.03+q*0.03); break;
+    case 'stone': noise(3400*r(),0.035,0.45,1.2); knock(1250*r(),0.05,0.3,9); noise(420,0.14,0.28,0.7,0.01,'lowpass',160); for(let q=0;q<4;q++) noise(2500+Math.random()*3000,0.015,0.08,3,0.04+q*0.025); break;
     case 'clang': [880,1320,1870].forEach((fq,q)=>tone('sine',fq*r(),fq*0.97,0.35-q*0.08,0.08)); noise(4200,0.04,0.2,1,0,'highpass'); break;
-    case 'groan': { const f=70+Math.random()*40; tone('sawtooth',f*1.4,f,0.9,0.05); tone('sawtooth',f*2.1,f*1.5,0.8,0.025,0.05); noise(400,0.7,0.05,3,0,'bandpass',260); } break;
-    case 'zhurt': tone('sawtooth',180*r(),90,0.22,0.06); noise(700,0.12,0.12,2); break;
-    case 'zdie': tone('sawtooth',140*r(),45,0.6,0.07); noise(500,0.35,0.16,1,0.05,'lowpass',150); click(900,0.15,0.3); break;
-    case 'claw': noise(2400,0.08,0.22,1.2,0,'bandpass',900); noise(1800,0.07,0.16,1.2,0.07,'bandpass',700); break;
-    case 'wave': tone('sawtooth',98,92,1.1,0.06); tone('sawtooth',147,139,1.1,0.04); tone('sine',49,46,1.2,0.12); break;
+    case 'groan': zombieGroan(0.34); break;
+    case 'zhurt': voice({f0:150*r(),f1:92,dur:0.26,vol:0.36,vowel:VOW.AH,vowel2:VOW.UH,breath:0.6,fry:0.6,jitter:0.06,attack:0.015}); knock(240,0.07,0.25,3); break;
+    case 'zdie': voice({f0:125*r(),f1:48,dur:1.0,vol:0.36,vowel:VOW.AH,vowel2:VOW.OO,breath:0.6,fry:0.7,jitter:0.06,attack:0.03}); noise(260,0.3,0.4,0.9,0.55,'lowpass',90); knock(110,0.12,0.3,3,0.6); break;
+    case 'claw': noise(900,0.12,0.14,1.3,0,'bandpass',2600); knock(260*r(),0.07,0.35,3,0.09); noise(1400,0.05,0.18,1.5,0.09); break; // whoosh, then a meaty hit
+    case 'wave': for(let q=0;q<4;q++) zombieGroan(0.22,q*0.28+Math.random()*0.15); noise(120,1.6,0.25,0.8,0,'lowpass',60); break; // a horde moaning in the distance
     case 'unwrap': for(let q=0;q<6;q++) noise(3000+q*300,0.06,0.05,1.5,q*0.45,'highpass'); break;
     case 'uncork': click(1400,0.25); tone('sine',600,900,0.12,0.06,0.05); for(let q=0;q<5;q++) tone('sine',300+q*60,280+q*60,0.12,0.04,0.3+q*0.25); break;
     case 'heal': tone('triangle',520,700,0.18,0.08); tone('triangle',700,940,0.22,0.07,0.1); break;
@@ -3553,11 +3597,11 @@ function frame(now){
       if(mode==='build'){ turboT-=dt; if(turboT<=0){ noStack=true; tryPlace(heldPiece||piece); noStack=false; turboT=settings.turbo; } }
       else if(mode==='gun'){ if(P.gunT<=0) playerShoot(); }
       else if(mode==='item'){ if(!P.useT) startUse(true); }
-      else { pickT-=dt; if(pickT<=0){ swing(); pickT=0.32; } }
+      else startSwing();
     }
   } else { P.vel.x*=0.8; P.vel.z*=0.8; }
   if(swingT>0) swingT-=dt;
-  stepProps(dt); if(playing||net.role) hordeUpdate(dt); stepDusk(dt); updateHordeHUD(); stepUse(dt); updateUseBar();
+  stepPick(dt); stepProps(dt); if(playing||net.role) hordeUpdate(dt); stepDusk(dt); updateHordeHUD(); stepUse(dt); updateUseBar();
   stepAnims(now); stepChunks(dt); stepPlayers(dt); stepTracers(dt); if(B&&B.active) animateBot(dt);
   if(!playing&&net.role==='host'&&B&&B.active){ botUpdate(dt); const n=Math.max(1,Math.ceil(dt/0.008)); for(let k=0;k<n;k++) physStep(dt/n,B); }
   if(net.role){ net.sendT-=dt; if(net.sendT<=0){ net.sendT=0.05; netSend(myState()); if(net.role==='host'&&B&&B.active) netSend(botState()); }
