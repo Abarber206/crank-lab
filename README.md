@@ -13,6 +13,9 @@ Trees, pines, rocks and junk cars are scattered around the range, the same for e
 ## Zombie horde
 Pick **Zombie horde** next to Play. You get 20 seconds to build a fort, then waves of zombies walk in from every side. Husks shamble, runners sprint (from wave 2), and brutes (from wave 4) are huge, tanky and smash builds fast. Zombies claw through anything built in their way, and if you're up on a tower they go for the piece holding it up. Clearing a wave gives you a 15-second break, 50 shield, 30 health, 3 bandages and 2 small shields. In a room the host picks the mode and runs the zombies for everyone; zombies get tougher and waves bigger with more players, and anyone who goes down is back in 3 seconds.
 
+## The map and materials
+Trees, pine trees, rocks and old cars are scattered around the map. They're solid, so you, the bot and zombies have to go around them. Materials are infinite by default. Turn off **Infinite materials** in Settings and every build costs 10 of its material: pickaxe trees for wood, rocks for brick and cars for metal (your stock shows on the right). You start each life with 30 wood. Anything you harvest grows back in its spot after 35–80 seconds. In a room everyone sees the same map, and the host decides when things grow back.
+
 ## Heals
 Slot 4 is bandages (15 health each, up to 75, 3.5 s) and slot 5 is small shield potions (25 shield each, up to 50, 2 s). Click to use one, hold fire to keep using them. You start with 5 bandages and 3 small shields.
 
