@@ -7,6 +7,9 @@ A browser build-fight practice range: Chapter 1-style movement, turbo build, wal
 ## Locker
 Pick an outfit in the menu: Rook, Nova, Ember, Sprig, Volt, Glacier or Whisk. Each has its own hair or headwear, top and back bling. Below the outfits are six pickaxes: Steel Pick, Bonk Mallet, Neon Cleaver, Geode Pick, Frostreap and Gilded Pick. Everyone in a room sees your outfit and pickaxe, and the bot wears a different outfit.
 
+## The map and materials
+Trees, pines, rocks and junk cars are scattered around the range, the same for everyone in a room. Pickaxe trees for wood, rocks for brick and cars for metal; they grow back 35–80 seconds after they're gone. Materials are infinite by default. Turn off **Infinite materials** in Settings and every piece costs 10 of the selected material: you start with 30 wood, your counts show on the right, and clearing a horde wave gives a bonus.
+
 ## Zombie horde
 Pick **Zombie horde** next to Play. You get 20 seconds to build a fort, then waves of zombies walk in from every side. Husks shamble, runners sprint (from wave 2), and brutes (from wave 4) are huge, tanky and smash builds fast. Zombies claw through anything built in their way, and if you're up on a tower they go for the piece holding it up. Clearing a wave gives you a 15-second break, 50 shield, 30 health, 3 bandages and 2 small shields. In a room the host picks the mode and runs the zombies for everyone; zombies get tougher and waves bigger with more players, and anyone who goes down is back in 3 seconds.
 

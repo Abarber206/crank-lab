@@ -121,6 +121,11 @@ body.touch .mats .k{display:none}
 #useBar .pb i{display:block;height:100%;width:0;background:#7be36a}
 #useBar.sh .pb i{background:#5fc0ff}
 .slot.out{opacity:.45}
+#matStock{right:calc(env(safe-area-inset-right,0px) + 14px);top:46%;display:grid;gap:4px;font:800 italic 16px/1 var(--font-hud);text-shadow:0 1px 2px #000}
+#matStock span{display:flex;align-items:center;gap:6px;justify-content:flex-end;background:var(--slot-dark);padding:4px 8px;border-radius:4px;opacity:.75;min-width:64px}
+#matStock span.on{opacity:1;box-shadow:inset 0 0 0 2px rgba(255,255,255,.6)}
+#matStock i{width:14px;height:14px;border-radius:3px;box-shadow:inset 0 0 0 2px rgba(0,0,0,.35)}
+.dn.mat{color:#ffe7a0;font-size:16px}
 .modepick{display:flex;align-items:center;gap:8px;font:700 15px/1 var(--font-ui,inherit);color:var(--ink)}
 .modepick select{font:inherit;background:#1c2a40;color:var(--ink);border:1px solid rgba(255,255,255,.25);border-radius:6px;padding:8px 10px}
 /* locker: outfit cards with a rarity glow behind each character */
@@ -302,6 +307,7 @@ body.touch #stickHint{width:100px;height:100px;opacity:.6}
 <div class="hud" id="dmgDir"></div>
 <div class="hud" id="xAmmo"></div>
 <div class="hud" id="buildReason" hidden></div>
+<div class="hud" id="matStock" hidden></div>
 <div class="hud" id="useBar" hidden><span id="useT"></span><span class="pb"><i id="useB"></i></span></div>
 <div class="hud" id="pieceHp" hidden><span id="pieceHpT"></span><span class="pb"><i id="pieceHpB"></i></span></div>
 <div class="hud" id="banner"><div class="big" id="banTitle"></div><div class="small" id="banSub"></div></div>
@@ -402,6 +408,7 @@ body.touch #stickHint{width:100px;height:100px;opacity:.6}
           <label for="editRel">Edit on release (mouse and touch) <input type="checkbox" id="editRel"></label>
           <label for="instantBuild">Instant build on piece bind (hold to turbo) <input type="checkbox" id="instantBuild"></label>
           <label for="shadows">Shadows <input type="checkbox" id="shadows"></label>
+          <label for="infMats">Infinite materials (off: farm trees, rocks and cars for builds) <input type="checkbox" id="infMats"></label>
         </div>
       </div>
     </div>
@@ -430,7 +437,7 @@ const DEFAULT_BINDS={forward:'KeyW',back:'KeyS',left:'KeyA',right:'KeyD',jump:'S
   wall:'KeyQ',floor:'KeyF',ramp:'KeyE',cone:'KeyC',edit:'KeyG',reset:'Mouse2',rotate:'KeyR',pick:'Digit1',gun:'Digit2',pump:'Digit3',bandage:'Digit4',mini:'Digit5',reload:'KeyT',material:'KeyX',aim:'Mouse2'};
 const BIND_LABELS={forward:'Move forward',back:'Move back',left:'Move left',right:'Move right',jump:'Jump',crouch:'Crouch (hold)',
   fire:'Place / select tiles',wall:'Wall',floor:'Floor',ramp:'Ramp',cone:'Cone',edit:'Edit / confirm',reset:'Reset edit',rotate:'Rotate ramp',pick:'Pickaxe',gun:'Assault rifle',pump:'Pump shotgun',bandage:'Bandages',mini:'Small shield potion',reload:'Reload',material:'Switch material',aim:'Aim down sights'};
-const settings={outfit:'rook', pickaxe:'steel', mode:'fight', bot:'adaptive', btnSize:1, btnOpacity:0.7, leftFire:true, autoFire:false, aimAssist:true, editSens:1, sens:1, fov:78, turbo:0.05, editRelease:true, instantBuild:false, shadows:!isTouch, binds:{}};
+const settings={infMats:true, outfit:'rook', pickaxe:'steel', mode:'fight', bot:'adaptive', btnSize:1, btnOpacity:0.7, leftFire:true, autoFire:false, aimAssist:true, editSens:1, sens:1, fov:78, turbo:0.05, editRelease:true, instantBuild:false, shadows:!isTouch, binds:{}};
 try{ Object.assign(settings, JSON.parse(localStorage.getItem('cranklab.settings')||'{}')); }catch(e){}
 settings.binds=Object.assign({},DEFAULT_BINDS,settings.binds||{});
 function saveSettings(){ try{ localStorage.setItem('cranklab.settings', JSON.stringify(settings)); }catch(e){} }
@@ -542,6 +549,8 @@ function groundTexture(size){
 const GROUND=600;
 const ground=new THREE.Mesh(new THREE.PlaneGeometry(GROUND,GROUND), new THREE.MeshLambertMaterial({map:groundTexture(GROUND)}));
 ground.rotation.x=-Math.PI/2; ground.position.y=-0.03; ground.receiveShadow=true; scene.add(ground);
+// push the grass back in depth so floors built on the ground never sink into it at a distance
+ground.material.polygonOffset=true; ground.material.polygonOffsetFactor=4; ground.material.polygonOffsetUnits=16;
 (function decor(){
   const mm=new THREE.MeshLambertMaterial({color:0x86a39b, flatShading:true});
   for(let k=0;k<22;k++){
@@ -891,7 +900,7 @@ function slabTop(p,x,z){
 }
 
 /* ---------- player ---------- */
-const P={pos:new THREE.Vector3(...SPAWN), vel:new THREE.Vector3(), onGround:true, groundSlab:null, crouch:false, yaw:Math.PI*0.75, pitch:-0.08, rot:0, best:0};
+const P={mats:{wood:30,brick:0,metal:0}, pos:new THREE.Vector3(...SPAWN), vel:new THREE.Vector3(), onGround:true, groundSlab:null, crouch:false, yaw:Math.PI*0.75, pitch:-0.08, rot:0, best:0};
 const hp=()=>P.crouch?H_CROUCH:H_STAND;
 const eh=E=>E.crouch?H_CROUCH:H_STAND;
 let B=null; // the bot, created when the opponent is on
@@ -954,7 +963,7 @@ function bodyOverlaps(E,p){
 // below your feet (a step's height) a new piece lifts you; anything cutting through your body is ghosted for you instead
 function phaseCheck(p){ for(const E of [P,B]){ if(!E||(E===B&&!B.active)) continue; if(!E.phase) E.phase=new Set(); if(bodyOverlaps(E,p)) E.phase.add(p); } }
 function updatePhase(E){ if(!E||!E.phase||!E.phase.size) return; E.phase.forEach(p=>{ if(!pieces.has(p.key)||!bodyOverlaps(E,p)) E.phase.delete(p); }); }
-const solidNear=(E)=>{ const ps=near(E.pos.x,E.pos.z); if(E.phase&&E.phase.size) E.phase.forEach(p=>ps.delete(p)); return ps; };
+const solidNear=(E)=>{ const ps=near(E.pos.x,E.pos.z); if(E.phase&&E.phase.size) E.phase.forEach(p=>ps.delete(p)); if(props.length) propsNear(E.pos.x,E.pos.z,ps); return ps; };
 function popPlayerOut(){ depen(solidNear(P),P); if(B&&B.active) depen(solidNear(B),B); }
 // a floor, stair or cone cutting through you pushes you up on top of it whenever there's room above it;
 // walls (and pieces with no headroom over them) stay ghosted until you walk out
@@ -1197,6 +1206,7 @@ function validatePlacement(t,E=P){
   if(c.distanceTo(_c.set(E.pos.x,E.pos.y+1.2,E.pos.z))>BUILD_RULES.reach) return {ok:false,reason:'Out of reach'};
   if(!supported(t)) return {ok:false,reason:'Nothing to attach to'};
   if(wallBetween(t,E)) return {ok:false,reason:'Wall in the way'};
+  if(E===P&&!settings.infMats&&((P.mats&&P.mats[buildMat])|0)<BUILD_COST) return {ok:false,reason:'Not enough '+MATERIALS[buildMat].name.toLowerCase()+' – farm trees, rocks and cars'};
   const others=[]; if(E!==P) others.push(P); if(B&&B.active&&B.alive&&E!==B) others.push(B); net.players.forEach(pl=>others.push({pos:pl.pos,crouch:!!(pl.flags&2)}));
   for(const o of others) if(bodyBlocks(t,o)) return {ok:false,reason:'Player in the way'};
   return {ok:true};
@@ -1207,7 +1217,7 @@ function tryPlace(type,E=P){
   if(!validatePlacement(t,E).ok) return false;
   t.mat=E===P?buildMat:(B&&E===B?(B.boxMat||(B.skill>0.65?'brick':'wood')):'wood'); t.owner=E===P?net.id:'bot';
   const np=addPiece(t); burst(pieceCenter(np),4,3,0.07);
-  if(E===P){ np.ts=performance.now(); sfx('place_'+np.mat); stat('b'); animEvent(localHero,'build'); netOp({op:'place',t:pick(t)}); } else { sfxAt('place_'+np.mat,E.pos); if(B&&E===B){ animEvent(B.h,'build'); if(net.role==='host'){ np.ts=performance.now(); netOp({op:'place',t:pick(t)}); } } }
+  if(E===P){ if(!settings.infMats){ P.mats[buildMat]-=BUILD_COST; syncMats(); } np.ts=performance.now(); sfx('place_'+np.mat); stat('b'); animEvent(localHero,'build'); netOp({op:'place',t:pick(t)}); } else { sfxAt('place_'+np.mat,E.pos); if(B&&E===B){ animEvent(B.h,'build'); if(net.role==='host'){ np.ts=performance.now(); netOp({op:'place',t:pick(t)}); } } }
   return true;
 }
 
@@ -1231,7 +1241,7 @@ let camDist=2.9;
 function aimHit(maxExtra){
   camera.updateMatrixWorld();
   ray.setFromCamera({x:0,y:0},camera); ray.far=camDist+maxExtra;
-  const hits=ray.intersectObjects(nearMeshes(P.pos.x,P.pos.z,2),false);
+  const hits=ray.intersectObjects(nearMeshes(P.pos.x,P.pos.z,2).concat(propMeshesNear(P.pos.x,P.pos.z)),false);
   return hits.length?hits[0]:null;
 }
 function enterEdit(){
@@ -1399,10 +1409,11 @@ function swing(){
     if(net.role==='client') netSend({type:'zhit',id:net.id,z:zb.id,dmg}); else zombieHurt(zb,dmg,net.id); return; }
   const hit=aimHit(3.4);
   // the pickaxe chips builds (50 a hit) instead of deleting them
+  if(hit&&hit.object.userData.piece&&hit.object.userData.piece.isProp){ swingT=0.22; propHit(hit.object.userData.piece,PICK_DMG,hit.point,true); return; }
   if(hit){ const hp_=hit.object.userData.piece; dmgNum(hit.point,PICK_DMG,'build'); sfx('pick_hit'); damagePiece(hp_,PICK_DMG,hit.point); } else sfx('whiff');
 }
 function toggleEdit(){ if(edit) exitEdit(true); else enterEdit(); }
-function respawn(){ animEvent(localHero,'revive'); P.pos.set(...SPAWN); P.vel.set(0,0,0); P.onGround=true; P.hp=100; P.sh=100; P.ammo={ar:WEAPONS.ar.mag,pump:WEAPONS.pump.mag}; P.reloadT=0; P.useT=0; P.items={bandage:ITEMS.bandage.start,mini:ITEMS.mini.start}; syncItems(); }
+function respawn(){ animEvent(localHero,'revive'); P.pos.set(...SPAWN); P.vel.set(0,0,0); P.onGround=true; P.hp=100; P.sh=100; P.ammo={ar:WEAPONS.ar.mag,pump:WEAPONS.pump.mag}; P.reloadT=0; P.useT=0; P.items={bandage:ITEMS.bandage.start,mini:ITEMS.mini.start}; syncItems(); P.mats={wood:30,brick:0,metal:0}; if(typeof syncMats==='function'&&document.getElementById('matStock')) syncMats(); }
 
 /* ---------- audio ---------- */
 let AC=null, noiseBuf=null, sfxGain=1, sfxLP=20000, sfxVerb=0, master=null, verb=null, cur=null;
@@ -1470,6 +1481,9 @@ function sfx(k){
     case 'land': tone('sine',95,48,0.11,0.16); noise(420,0.09,0.12,0.7,0,'lowpass'); break;
     case 'win': tone('triangle',520,780,0.12,0.09); tone('triangle',780,1040,0.16,0.09,0.12); break;
     case 'lose': tone('triangle',420,260,0.25,0.09); break;
+    case 'chop': noise(700*r(),0.09,0.45,1.2); tone('triangle',150*r(),90,0.1,0.25); click(2000,0.12,0.01); break;
+    case 'stone': noise(2600*r(),0.05,0.4,1.5); tone('square',210*r(),120,0.05,0.08); noise(500,0.12,0.2,0.8,0.01,'lowpass'); break;
+    case 'clang': [880,1320,1870].forEach((fq,q)=>tone('sine',fq*r(),fq*0.97,0.35-q*0.08,0.08)); noise(4200,0.04,0.2,1,0,'highpass'); break;
     case 'groan': { const f=70+Math.random()*40; tone('sawtooth',f*1.4,f,0.9,0.05); tone('sawtooth',f*2.1,f*1.5,0.8,0.025,0.05); noise(400,0.7,0.05,3,0,'bandpass',260); } break;
     case 'zhurt': tone('sawtooth',180*r(),90,0.22,0.06); noise(700,0.12,0.12,2); break;
     case 'zdie': tone('sawtooth',140*r(),45,0.6,0.07); noise(500,0.35,0.16,1,0.05,'lowpass',150); click(900,0.15,0.3); break;
@@ -2109,6 +2123,7 @@ function syncMode(){
   $('tBuild').classList.toggle('on',inBuild);
   $('matName').textContent=MATERIALS[buildMat].name; $('matSw').style.background='#'+MATERIALS[buildMat].chip.toString(16).padStart(6,'0');
   if(edit) updateEditLabel();
+  if(typeof syncMats==='function') syncMats();
 }
 function updateHUD(){
   if(P.pos.y>P.best) P.best=P.pos.y;
@@ -2155,6 +2170,7 @@ function bindSettings(){
   ts.addEventListener('change',()=>{ settings.turbo=+ts.value; saveSettings(); });
   er.addEventListener('change',()=>{ settings.editRelease=er.checked; saveSettings(); });
   sh.addEventListener('change',()=>{ settings.shadows=sh.checked; sun.castShadow=sh.checked; saveSettings(); });
+  const im=$('infMats'); im.checked=settings.infMats; im.addEventListener('change',()=>{ settings.infMats=im.checked; saveSettings(); ghostKey=''; syncMats(); });
 }
 bindSettings();
 
@@ -2433,6 +2449,8 @@ function applyOp(o,quiet){
   else if(o.op==='break'){ const p=pieces.get(o.key); if(p){ burst(pieceCenter(p),14,6,0.3); const nb_=neighbors(p); removePiece(p); collapseFrom(nb_); if(pieceCenter(p).distanceTo(P.pos)<30) sfx('break'); } }
   else if(o.op==='shape'){ const p=pieces.get(o.key); if(p){ if(edit&&edit.piece===p) exitEdit(false); p.mask=o.mask; p.dir=o.dir; p.half=o.half; buildPiece(p); startAnim(p,140); popPlayerOut(); } }
   else if(o.op==='clear') clearBuilds();
+  else if(o.op==='pv'){ const p=props[o.id]; if(p&&p.alive){ p.hp=Math.min(p.hp,o.hp); p.wob=1; if(p.hp<=0) propBreak(p); } }
+  else if(o.op==='pb'){ const p=props[o.id]; if(p&&!p.alive) propRevive(p); }
 }
 function snapshot(){ return order.map(p=>Object.assign(pick(p),{mask:p.mask,half:p.half,hp:Math.round(p.hp)})); }
 function netSend(m,except){
@@ -2492,7 +2510,7 @@ function onElim(m){
 }
 function clientData(m){
   if(!m||typeof m!=='object') return;
-  if(m.type==='welcome'){ net.id=m.you; clearBuilds(); m.pieces.forEach(t=>{ const p=addPiece(t); p.mask=t.mask??p.mask; p.half=t.half; if(t.hp!=null){ p.hp=t.hp; if(p.hp>=p.maxHp) growing.delete(p); } buildPiece(p); }); respawn(); syncBot(); toast('Joined room '+net.code); updateRoomUI(); }
+  if(m.type==='welcome'){ net.id=m.you; clearBuilds(); (m.pd||[]).forEach(i=>{ const p=props[i]; if(p&&p.alive){ propBreak(p,true); p.dying=0; p.g.visible=false; } }); m.pieces.forEach(t=>{ const p=addPiece(t); p.mask=t.mask??p.mask; p.half=t.half; if(t.hp!=null){ p.hp=t.hp; if(p.hp>=p.maxHp) growing.delete(p); } buildPiece(p); }); respawn(); syncBot(); toast('Joined room '+net.code); updateRoomUI(); }
   else if(m.type==='st') onState(m);
   else if(m.type==='op'){ if(m.id!==net.id) applyOp(m.o); }
   else if(m.type==='ping'){ if(net.host&&net.host.open) net.host.send({type:'pong',t:m.t}); }
@@ -2516,7 +2534,7 @@ function hostGame(){
     conn.on('open',()=>{
       if(net.conns.size>=7){ try{conn.send({type:'full'});}catch(e){} setTimeout(()=>conn.close(),300); return; }
       net.conns.set(conn.peer,conn);
-      conn.send({type:'welcome',you:conn.peer,pieces:snapshot()});
+      conn.send({type:'welcome',you:conn.peer,pieces:snapshot(),pd:props.filter(p=>!p.alive).map(p=>p.id)});
       conn.send(myState()); net.players.forEach(pl=>conn.send({type:'st',id:pl.id,n:pl.name,s:[pl.tgt.x,pl.tgt.y,pl.tgt.z,0,0,0,pl.yaw,pl.pitch,pl.flags,0]}));
       updateRoomUI();
     });
@@ -2937,7 +2955,7 @@ function hordeUpdate(dt){
   horde.zs.forEach(z=>animateZombie(z,dt));
   if(net.role==='host'){ horde.sendT-=dt; if(horde.sendT<=0){ horde.sendT=0.1; netSend(hordeState()); } }
 }
-function hordeHeal(){ giveItems(3,2); if(net.dead) return; P.sh=Math.min(100,P.sh+50); P.hp=Math.min(100,P.hp+30); }
+function hordeHeal(){ giveItems(3,2); giveMats('wood',60); giveMats('brick',40); giveMats('metal',20); if(net.dead) return; P.sh=Math.min(100,P.sh+50); P.hp=Math.min(100,P.hp+30); }
 function hordeState(){
   const zs=[]; horde.zs.forEach(z=>zs.push([z.id,ZCODE.indexOf(z.type),+z.pos.x.toFixed(2),+z.pos.y.toFixed(2),+z.pos.z.toFixed(2),+z.yaw.toFixed(2),+(z.hp/z.maxHp).toFixed(2),z.atk>0?1:0,+z.vel.x.toFixed(1),+z.vel.z.toFixed(1)]));
   return {type:'hz',w:horde.wave,ph:horde.phase,t:+horde.t.toFixed(1),k:horde.kills,left:horde.toSpawn,zs};
@@ -2995,6 +3013,115 @@ function updateHordeHUD(){
   $('waveL').textContent=horde.phase==='break'?'IN '+Math.ceil(horde.t)+'S':horde.phase==='wave'?(alive+horde.toSpawn)+' LEFT':'';
   $('killN').textContent=horde.kills;
 }
+
+
+/* ---------- the map: trees, rocks and junk cars you can harvest ----------
+   Same layout for everyone (seeded). Pickaxe them for wood, stone (brick) and metal; they grow back after a while.
+   They're solid: you and the zombies walk around them. */
+const PROP_T={
+  tree:{hp:300,mat:'wood',per:[6,9],snd:'chop'}, pine:{hp:260,mat:'wood',per:[5,8],snd:'chop'},
+  rock:{hp:360,mat:'brick',per:[7,10],snd:'stone'}, car:{hp:420,mat:'metal',per:[7,11],snd:'clang'}
+};
+const props=[], propCells=new Map(), PCELL=10;
+const pkey=(x,z)=>Math.floor(x/PCELL)+','+Math.floor(z/PCELL);
+function seeded(seed){ return ()=>{ seed=seed+0x6D2B79F5|0; let t=Math.imul(seed^seed>>>15,1|seed); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+function propPart(geo,col,parent,x,y,z,rx=0,ry=0,rz=0,w=0.03,flat){
+  const mat=flat?new THREE.MeshToonMaterial({color:col,gradientMap:toonGrad,flatShading:true}):toon(col);
+  const m=new THREE.Mesh(geo,mat); m.position.set(x,y,z); m.rotation.set(rx,ry,rz); m.castShadow=true; m.receiveShadow=true; parent.add(m);
+  if(w>0) m.add(new THREE.Mesh(inkGeo(geo,w),inkMat)); return m; }
+function buildPropMesh(p,r){
+  const g=new THREE.Group(); g.position.set(p.x,0,p.z); g.rotation.y=r()*Math.PI*2; const s=p.s;
+  if(p.kind==='tree'){
+    propPart(limbGeo(.32*s,.42*s,3.2*s),0x7a5232,g,0,3.2*s,0);
+    propPart(limbGeo(.12*s,.16*s,1.1*s),0x7a5232,g,.45*s,2.6*s,0,0,0,-.9);
+    const greens=[0x4f9a3a,0x5fae44,0x468a33];
+    [[0,4.3,0,1.9],[1.1,3.7,.4,1.35],[-1,3.8,-.3,1.4],[.2,3.6,-1.1,1.3],[-.3,5.2,.2,1.25],[.4,3.5,1.0,1.2]].forEach(([x,y,z,rr],q)=>propPart(sph(rr*s),greens[q%3],g,x*s,y*s,z*s,0,0,0,0.05));
+  } else if(p.kind==='pine'){
+    propPart(limbGeo(.26*s,.34*s,2.4*s),0x6a4528,g,0,2.4*s,0);
+    [[2.1,3.0,1.6],[1.7,3.9,1.4],[1.25,4.7,1.2],[.8,5.4,1.0]].forEach(([rr,y,h],q)=>propPart(new THREE.ConeGeometry(rr*s,h*s*1.4,8),q%2?0x2f7a4a:0x3a8c55,g,0,y*s,0,0,q*.4,0,0.05));
+  } else if(p.kind==='rock'){
+    const geo=new THREE.DodecahedronGeometry(1,0); geo.scale(1.25*s,.9*s,1.05*s);
+    propPart(geo,0x9aa1a8,g,0,.55*s,0,r()*.4,0,r()*.3,0.04,true);
+    const g2=new THREE.DodecahedronGeometry(.55,0); propPart(g2,0x878e96,g,.95*s,.3*s,.5*s,r(),r(),0,0.03,true);
+    if(r()<.5) propPart(new THREE.DodecahedronGeometry(.4,0),0xa9b0b6,g,-.8*s,.22*s,-.6*s,r(),r(),0,0.03,true);
+  } else if(p.kind==='car'){
+    const body=[0xb5532f,0x4a7fae,0xc9a227,0x6d8f5a][Math.floor(r()*4)];
+    propPart(rbox(3.9,.8,1.8,.25),body,g,0,.75,0);
+    propPart(rbox(2.0,.7,1.6,.25),body,g,-.2,1.45,0);
+    propPart(rbox(1.7,.5,1.62,.15),0x9fd6ee,g,-.2,1.5,0,0,0,0,0.02); // windows
+    propPart(rbox(.12,.3,1.5,.05),0xd9d9d9,g,1.98,.75,0,0,0,0,0.02);  // grille
+    [[-1.25,.85],[1.25,.85],[-1.25,-.85],[1.25,-.85]].forEach(([x,z])=>{ const w=new THREE.CylinderGeometry(.42,.42,.3,14); w.rotateX(Math.PI/2); propPart(w,0x1d1f24,g,x,.42,z); });
+    propPart(rbox(.9,.06,.9,.03),0x8a4a2a,g,.9,1.16,.2,0,0,0,0); // rust patch
+    [-1,1].forEach(sz=>propPart(sph(.1),0xfff1b0,g,1.98,.85,sz*.6,0,0,0,0));
+  }
+  mergeProp(g,p.kind==='rock'); scene.add(g); return g;
+}
+// one coloured mesh + one outline mesh per prop (instead of a dozen parts) keeps the draw count low on phones
+let propMat=null, propMatFlat=null;
+function mergeProp(g,flat){
+  if(!propMat){ propMat=new THREE.MeshToonMaterial({vertexColors:true,gradientMap:toonGrad}); propMatFlat=new THREE.MeshToonMaterial({vertexColors:true,gradientMap:toonGrad,flatShading:true}); }
+  g.updateMatrixWorld(true); const inv=new THREE.Matrix4().copy(g.matrixWorld).invert(), col=[], ink=[];
+  g.traverse(m=>{ if(!m.isMesh) return; const geo=m.geometry.index?m.geometry.toNonIndexed():m.geometry.clone(); geo.applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv,m.matrixWorld));
+    if(m.material===inkMat) ink.push(geo); else { const c=m.material.color, n=geo.attributes.position.count, a=new Float32Array(n*3); for(let i=0;i<n;i++){ a[i*3]=c.r; a[i*3+1]=c.g; a[i*3+2]=c.b; } geo.setAttribute('color',new THREE.BufferAttribute(a,3)); col.push(geo); } });
+  while(g.children.length) g.remove(g.children[0]);
+  const cat=(arr,keys)=>{ const out=new THREE.BufferGeometry(); for(const k of keys){ let len=0; arr.forEach(x=>len+=x.attributes[k].array.length); const A=new Float32Array(len); let o=0; arr.forEach(x=>{ A.set(x.attributes[k].array,o); o+=x.attributes[k].array.length; }); out.setAttribute(k,new THREE.BufferAttribute(A,3)); } out.computeBoundingSphere(); return out; };
+  const mesh=new THREE.Mesh(cat(col,['position','normal','color']),flat?propMatFlat:propMat); mesh.castShadow=mesh.receiveShadow=true; g.add(mesh);
+  if(ink.length) g.add(new THREE.Mesh(cat(ink,['position','normal']),inkMat));
+}
+function propBoxes(p){
+  const s=p.s, x=p.x, z=p.z;
+  if(p.kind==='tree'||p.kind==='pine'){ const t=(p.kind==='tree'?.42:.34)*s+0.05; return [[x-t,0,z-t,x+t,3.2*s,z+t]]; }
+  if(p.kind==='rock'){ const a=1.05*s, c=.9*s; return [[x-a,0,z-c,x+a,1.35*s,z+c]]; }
+  // car: long side follows its yaw, rounded to the nearest 90 degrees for a simple box
+  const along=Math.abs(Math.cos(p.g.rotation.y))>.7; return [along?[x-2,0,z-.95,x+2,1.8,z+.95]:[x-.95,0,z-2,x+.95,1.8,z+2]];
+}
+function initProps(){
+  const r=seeded(20261106); let id=0, tries=0;
+  const kinds=[['tree',46],['pine',30],['rock',34],['car',10]];
+  for(const [kind,n] of kinds){ let made=0;
+    while(made<n&&tries<4000){ tries++;
+      const a=r()*Math.PI*2, d=18+Math.pow(r(),0.8)*160, x=SPAWN[0]+Math.cos(a)*d, z=SPAWN[2]+Math.sin(a)*d;
+      if(props.some(q=>Math.hypot(q.x-x,q.z-z)<(kind==='car'||q.kind==='car'?9:6))) continue;
+      const p={id:id++,kind,x,z,s:kind==='rock'?.8+r()*.7:kind==='car'?1:.85+r()*.4,isProp:true,type:'prop',slab:false,alive:true,respawnT:0,wob:0,grow:1};
+      p.key='prop'+p.id; p.mat=PROP_T[kind].mat; p.maxHp=Math.round(PROP_T[kind].hp*(kind==='rock'?p.s:1)); p.hp=p.maxHp;
+      p.g=buildPropMesh(p,r); p.g.traverse(m=>{ if(m.isMesh&&m.material!==inkMat) m.userData.piece=p; }); p.boxes=propBoxes(p);
+      props.push(p); const k=pkey(x,z); let set=propCells.get(k); if(!set){ set=new Set(); propCells.set(k,set); } set.add(p); made++; }
+  }
+}
+function propsNear(x,z,out,rad=1){ const cx=Math.floor(x/PCELL), cz=Math.floor(z/PCELL);
+  for(let i=-rad;i<=rad;i++) for(let j=-rad;j<=rad;j++){ const set=propCells.get((cx+i)+','+(cz+j)); if(set) set.forEach(p=>{ if(p.alive) out.add?out.add(p):out.push(p); }); } return out; }
+function propMeshesNear(x,z){ const out=[]; propsNear(x,z,[]).forEach(p=>p.g.traverse(m=>{ if(m.isMesh&&m.userData.piece) out.push(m); })); return out; }
+// pickaxe (or a shot) hits a prop: it shakes, and the pickaxe pays out materials
+function propHit(p,dmg,point,byPick,quiet){
+  if(!p.alive) return;
+  p.hp=Math.max(0,p.hp-dmg); p.wob=1;
+  const T=PROP_T[p.kind];
+  if(!quiet){ sfxAt(T.snd,point); burst(point,4,3,0.08,matFor[p.mat].chip); }
+  if(byPick){ const n=Math.round((T.per[0]+Math.random()*(T.per[1]-T.per[0]))*(dmg/50)); giveMats(p.mat,n,point); }
+  if(p.hp<=0) propBreak(p,quiet);
+  if(!quiet&&net.role) netOp({op:'pv',id:p.id,hp:Math.round(p.hp)});
+}
+function propBreak(p,quiet){
+  if(!p.alive) return; p.alive=false; p.hp=0; p.respawnT=35+Math.random()*45; p.grow=1; p.dying=0.35;
+  burst(new THREE.Vector3(p.x,1.2,p.z),18,6,0.25,matFor[p.mat].chip); if(!quiet) sfxAt('break_'+p.mat,new THREE.Vector3(p.x,1,p.z));
+}
+function propRevive(p){ p.alive=true; p.hp=p.maxHp; p.grow=0; p.dying=0; p.g.visible=true; p.g.scale.setScalar(0.01); }
+function stepProps(dt){
+  for(const p of props){
+    if(p.wob>0){ p.wob=Math.max(0,p.wob-dt*4); const w=Math.sin(p.wob*22)*p.wob*0.04; p.g.rotation.z=w; p.g.rotation.x=w*0.6; }
+    if(p.dying>0){ p.dying-=dt; const k=Math.max(0.01,p.dying/0.35); p.g.scale.setScalar(k); if(p.dying<=0) p.g.visible=false; }
+    if(p.alive&&p.grow<1){ p.grow=Math.min(1,p.grow+dt*1.6); const e=p.grow<1?1-Math.pow(1-p.grow,3)*1.0+Math.sin(p.grow*Math.PI)*0.08:1; p.g.scale.setScalar(e); }
+    // grows back after a while (the host decides in a room), never on top of someone
+    if(!p.alive&&net.role!=='client'){ p.respawnT-=dt;
+      if(p.respawnT<=0){ const blocked=hordeTargets().some(t=>Math.hypot(t.pos.x-p.x,t.pos.z-p.z)<4)||(B&&B.active&&Math.hypot(B.pos.x-p.x,B.pos.z-p.z)<4);
+        if(blocked) p.respawnT=3; else { propRevive(p); if(net.role) netOp({op:'pb',id:p.id}); } } }
+  }
+}
+/* materials: infinite by default; switch it off in Settings to farm for your builds */
+const MAT_MAX=999, BUILD_COST=10;
+function giveMats(mat,n,point){ if(settings.infMats||n<=0) return; P.mats[mat]=Math.min(MAT_MAX,(P.mats[mat]|0)+n); if(point) dmgNum(point,'+'+n+' '+MATERIALS[mat].name.toUpperCase(),'mat'); syncMats(); }
+function syncMats(){ const sm=$('matBtn').querySelector('small'); if(sm) sm.textContent=settings.infMats?'∞':((P.mats&&P.mats[buildMat])|0);
+  const st=$('matStock'); if(st){ st.hidden=settings.infMats; if(!settings.infMats) st.innerHTML=MAT_ORDER.map(m=>`<span class="${m===buildMat?'on':''}"><i style="background:#${MATERIALS[m].chip.toString(16).padStart(6,'0')}"></i>${(P.mats&&P.mats[m])|0}</span>`).join(''); } }
 
 /* ---------- skill tracking: how you play over the last 40 s ---------- */
 const stats=[]; let fightStart=performance.now();
@@ -3261,6 +3388,8 @@ function drawMini(){
     const qx=m>lim?c+dx/m*lim:px, qz=m>lim?c+dz/m*lim:pz; g.fillStyle=col; g.strokeStyle='#fff'; g.lineWidth=1.5*dpr; g.beginPath(); g.arc(qx,qz,r,0,7); g.fill(); g.stroke(); };
   net.players.forEach(pl=>dot(pl.pos.x,pl.pos.z,'#'+colorFor(pl.id).toString(16).padStart(6,'0')));
   if(B&&B.active&&B.h.group.visible) dot(B.pos.x,B.pos.z,'#ff4b3a');
+  propsNear(ox,oz,[],Math.ceil(R/PCELL)+1).forEach(p=>{ const px=tx(p.x), pz=tz(p.z); if(px<-4||pz<-4||px>S+4||pz>S+4) return;
+    g.fillStyle=p.kind==='rock'?'#a8aeb4':p.kind==='car'?'#c47a4a':'#2f6b2a'; g.beginPath(); g.arc(px,pz,(p.kind==='car'?2.6:p.kind==='rock'?2.2:2.8)*p.s*dpr,0,7); g.fill(); });
   horde.zs.forEach(z=>{ if(!z.alive) return; const px=tx(z.pos.x), pz=tz(z.pos.z); if(px<0||pz<0||px>S||pz>S) return; g.fillStyle=z.type==='brute'?'#c6ff5a':'#7fdc4a'; g.strokeStyle='#14240f'; g.lineWidth=dpr; g.beginPath(); g.arc(px,pz,(z.type==='brute'?3.6:2.6)*dpr,0,7); g.fill(); g.stroke(); });
   // you: arrow pointing where you face
   g.save(); g.translate(c,c); g.rotate(-P.yaw); g.fillStyle='#fff'; g.strokeStyle='#0d1726'; g.lineWidth=1.5*dpr;
@@ -3284,6 +3413,7 @@ function drawMini(){
   const ms=$('modeSel'); ms.value=settings.mode==='horde'?'horde':'fight';
   ms.addEventListener('change',()=>{ settings.mode=ms.value; saveSettings(); if(net.role==='client') toast('The host picks the mode in a room'); });
 })();
+initProps(); syncMats();
 syncBot();
 // locker: render a portrait of every outfit once, then build the cards
 (function(){
@@ -3384,7 +3514,7 @@ function frame(now){
     }
   } else { P.vel.x*=0.8; P.vel.z*=0.8; }
   if(swingT>0) swingT-=dt;
-  if(playing||net.role) hordeUpdate(dt); stepDusk(dt); updateHordeHUD(); stepUse(dt); updateUseBar();
+  stepProps(dt); if(playing||net.role) hordeUpdate(dt); stepDusk(dt); updateHordeHUD(); stepUse(dt); updateUseBar();
   stepAnims(now); stepChunks(dt); stepPlayers(dt); stepTracers(dt); if(B&&B.active) animateBot(dt);
   if(!playing&&net.role==='host'&&B&&B.active){ botUpdate(dt); const n=Math.max(1,Math.ceil(dt/0.008)); for(let k=0;k<n;k++) physStep(dt/n,B); }
   if(net.role){ net.sendT-=dt; if(net.sendT<=0){ net.sendT=0.05; netSend(myState()); if(net.role==='host'&&B&&B.active) netSend(botState()); }
