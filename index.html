@@ -165,6 +165,7 @@ body.touch .mats .k{display:none}
 #pieceHp .pb{width:96px;height:6px;background:rgba(10,18,30,.6);border:1px solid rgba(255,255,255,.4)}
 #pieceHp .pb i{display:block;height:100%;background:#fff}
 #pieceHp.growing .pb i{background:var(--ghost)}
+#pieceHpS{font:700 10px/1 var(--font-hud);letter-spacing:.08em;text-transform:uppercase;opacity:.82}
 body.touch .slot .k{display:none}
 #banner{left:50%;top:30%;transform:translate(-50%,-50%);text-align:center;opacity:0;transition:opacity .25s;width:90%}
 #banner.show{opacity:1}
@@ -338,7 +339,7 @@ body.touch #stickHint{width:100px;height:100px;opacity:.6}
   </div>
 </div>
 <div class="hud" id="useBar" hidden><span id="useT"></span><span class="pb"><i id="useB"></i></span></div>
-<div class="hud" id="pieceHp" hidden><span id="pieceHpT"></span><span class="pb"><i id="pieceHpB"></i></span></div>
+<div class="hud" id="pieceHp" hidden><span id="pieceHpT"></span><span class="pb"><i id="pieceHpB"></i></span><span id="pieceHpS"></span></div>
 <div class="hud" id="banner"><div class="big" id="banTitle"></div><div class="small" id="banSub"></div></div>
 <div id="hurtfx"></div>
 <div class="hud" id="bottom">
@@ -440,6 +441,7 @@ body.touch #stickHint{width:100px;height:100px;opacity:.6}
           <label for="editRel">Edit on release (mouse and touch) <input type="checkbox" id="editRel"></label>
           <label for="instantBuild">Instant build on piece bind (hold to turbo) <input type="checkbox" id="instantBuild"></label>
           <label for="shadows">Shadows <input type="checkbox" id="shadows"></label>
+          <label for="editRuleSel">Who can edit builds (the host's choice counts in a room) <select id="editRuleSel"><option value="owner">Only the builder</option><option value="team">Builder and teammates</option><option value="anyone">Anyone</option></select></label>
           <label for="infMats">Infinite materials (off: farm trees, rocks and cars for builds) <input type="checkbox" id="infMats"></label>
         </div>
       </div>
@@ -469,7 +471,7 @@ const DEFAULT_BINDS={forward:'KeyW',back:'KeyS',left:'KeyA',right:'KeyD',jump:'S
   wall:'KeyQ',floor:'KeyF',ramp:'KeyE',cone:'KeyC',edit:'KeyG',reset:'Mouse2',rotate:'KeyR',pick:'Digit1',gun:'Digit2',pump:'Digit3',bandage:'Digit4',mini:'Digit5',slot6:'Digit6',inventory:'Tab',reload:'KeyT',material:'KeyX',aim:'Mouse2'};
 const BIND_LABELS={forward:'Move forward',back:'Move back',left:'Move left',right:'Move right',jump:'Jump',crouch:'Crouch (hold)',
   fire:'Place / select tiles',wall:'Wall',floor:'Floor',ramp:'Ramp',cone:'Cone',edit:'Edit / confirm',reset:'Reset edit',rotate:'Rotate ramp',pick:'Pickaxe',gun:'Slot 2',pump:'Slot 3',bandage:'Slot 4',mini:'Slot 5',slot6:'Slot 6',inventory:'Inventory',reload:'Reload',material:'Switch material',aim:'Aim down sights'};
-const settings={team:0, infMats:true, outfit:'rook', pickaxe:'steel', mode:'fight', bot:'adaptive', btnSize:1, btnOpacity:0.7, leftFire:true, autoFire:false, aimAssist:true, editSens:1, sens:1, fov:78, turbo:0.05, editRelease:true, instantBuild:false, shadows:!isTouch, binds:{}};
+const settings={team:0, editRule:'owner', infMats:true, outfit:'rook', pickaxe:'steel', mode:'fight', bot:'adaptive', btnSize:1, btnOpacity:0.7, leftFire:true, autoFire:false, aimAssist:true, editSens:1, sens:1, fov:78, turbo:0.05, editRelease:true, instantBuild:false, shadows:!isTouch, binds:{}};
 try{ Object.assign(settings, JSON.parse(localStorage.getItem('cranklab.settings')||'{}')); }catch(e){}
 settings.binds=Object.assign({},DEFAULT_BINDS,settings.binds||{});
 function saveSettings(){ try{ localStorage.setItem('cranklab.settings', JSON.stringify(settings)); }catch(e){} }
@@ -684,11 +686,24 @@ const MATERIALS={
   metal:{name:'Metal',maxHp:{wall:500,other:460}, start:0.3,buildTime:16, fill:650, chip:0x9aa5b0}
 };
 const MAT_ORDER=['wood','brick','metal'];
+/* Everything tunable about building lives here (no magic numbers scattered through the code).
+   Approximations of Fortnite's observable behaviour are marked approx. */
+const BUILD_CFG={
+  minContact:0.5,      // two pieces hold each other up only if they share an edge or face at least this long (a corner point is not a connection)
+  maxSupportDepth:0,   // 0 = unlimited: any chain that reaches the ground stands (approx: Fortnite has no visible cantilever limit). Set e.g. 12 to cap overhangs.
+  editRule:'owner',    // who may edit a build: 'owner' | 'team' | 'anyone' (the host's setting decides in a room)
+  resist:{wood:1,brick:1,metal:1},           // incoming damage multiplier per material
+  stages:{wood:{bands:7,label:'planks'},brick:{bands:6,label:'courses'},metal:{bands:3,label:'panels'}}, // construction sections per material
+  debris:{wood:12,brick:16,metal:9},         // debris pieces for a full-size piece when it's destroyed
+  crack:[0.12,0.38,0.62],                    // fraction of max health taken as damage before each crack stage shows
+  collapseStep:0.03, collapseMaxDelay:1.2, collapseFall:0.8, collapseShudder:0.14, maxFallers:160
+};
 const matFor={};
 const chunkMat=new THREE.MeshLambertMaterial({color:0xc9995a});
-const ghostMat=new THREE.MeshBasicMaterial({color:0x62bdff, transparent:true, opacity:.34, depthWrite:false});
+const ghostMat=new THREE.MeshBasicMaterial({color:0x4fe07a, transparent:true, opacity:.3, depthWrite:false});
 const ghostBad=new THREE.MeshBasicMaterial({color:0xff5a4a, transparent:true, opacity:.22, depthWrite:false});
-const ghostDim=new THREE.MeshBasicMaterial({color:0x62bdff, transparent:true, opacity:.1, depthWrite:false});
+const ghostDim=new THREE.MeshBasicMaterial({color:0xc9d6e2, transparent:true, opacity:.1, depthWrite:false});
+const ghostLine={ok:new THREE.LineBasicMaterial({color:0x8dffad,transparent:true,opacity:.9,depthWrite:false}),bad:new THREE.LineBasicMaterial({color:0xff7a6a,transparent:true,opacity:.85,depthWrite:false}),occ:new THREE.LineBasicMaterial({color:0xdfe8f0,transparent:true,opacity:.35,depthWrite:false})};
 const editPieceMat=new THREE.MeshBasicMaterial({color:0xbfe2ff, transparent:true, opacity:.16, depthWrite:false});
 const tileMat=new THREE.MeshBasicMaterial({depthTest:false,color:0x8fd3ff, transparent:true, opacity:.42, side:THREE.DoubleSide, depthWrite:false});
 const tileBadMat=new THREE.MeshBasicMaterial({depthTest:false,color:0xd81e3c, transparent:true, opacity:.8, side:THREE.DoubleSide, depthWrite:false});
@@ -861,79 +876,218 @@ function makeBoxes(p){
   return out;
 }
 const buildGlowMat=new THREE.MeshBasicMaterial({color:0xbfe8ff,transparent:true,opacity:.55,blending:THREE.AdditiveBlending,depthWrite:false});
-const sparkMat=new THREE.MeshBasicMaterial({color:0x9fdcff});
+const sparkMat=new THREE.MeshBasicMaterial({color:0x9fdcff}), hotSparkMat=new THREE.MeshBasicMaterial({color:0xffc864});
+const blueprintMat=new THREE.MeshBasicMaterial({color:0x62bdff,transparent:true,opacity:.2,depthWrite:false});
+/* ---------- construction: scaffold first, then the material fills in section by section ----------
+   Walls rise from the bottom, floors grow out from whatever they're attached to, stairs build from the low end up,
+   cones from the base. Wood comes in as planks, brick in courses, metal in big panels. Health keeps building after
+   the fill (as in Fortnite); a faint scaffold outline stays until the piece reaches full health. */
+const SCAF_COL={wood:0xf0c27a,brick:0xe6ddd0,metal:0xd9e8f7};
+const scaffoldMat={}; MAT_ORDER.forEach(m=>scaffoldMat[m]=new THREE.LineBasicMaterial({color:SCAF_COL[m],transparent:true,opacity:.75,depthWrite:false}));
+const curingMat={}; MAT_ORDER.forEach(m=>curingMat[m]=new THREE.LineBasicMaterial({color:SCAF_COL[m],transparent:true,opacity:.3,depthWrite:false}));
+const edgeCache=new Map();
+function edgesOf(geo){ let e=edgeCache.get(geo.uuid); if(!e){ e=new THREE.EdgesGeometry(geo,28); edgeCache.set(geo.uuid,e); } return e; }
+function edgeLines(src,mat){ const g=new THREE.Group();
+  src.children.forEach(m=>{ if(!m.isMesh) return; const l=new THREE.LineSegments(edgesOf(m.geometry),mat); l.position.copy(m.position); l.rotation.copy(m.rotation); l.renderOrder=2; g.add(l); });
+  return g; }
+function scaffoldFor(p,mat){ const g=new THREE.Group(); g.userData.scaffold=true;
+  p.group.children.forEach(m=>{ if(!m.isMesh) return; const l=new THREE.LineSegments(edgesOf(m.geometry),mat); l.position.copy(m.position); l.rotation.copy(m.rotation); l.renderOrder=2; g.add(l); });
+  return g; }
+function dropScaffold(p){ if(p.scaf){ if(p.scaf.parent) p.scaf.parent.remove(p.scaf); p.scaf=null; } }
+function buildAxis(p){
+  if(p.type==='wall'||p.type==='cone') return new THREE.Vector3(0,1,0);
+  if(p.type==='ramp'){ const d=DIRS[p.dir]; return new THREE.Vector3(d[0],0,d[1]); }
+  const c=pieceCenter(p), nb=conn.get(p); let from=null;
+  if(nb&&nb.size){ let best=Infinity; nb.forEach(q=>{ const qc=pieceCenter(q), d=Math.abs(qc.y-c.y); if(d<best){ best=d; from=qc; } }); }
+  if(!from) from=P.pos;
+  const v=new THREE.Vector3(c.x-from.x,0,c.z-from.z);
+  if(v.lengthSq()<0.04) return new THREE.Vector3(1,0,0);
+  return Math.abs(v.x)>=Math.abs(v.z)?new THREE.Vector3(Math.sign(v.x),0,0):new THREE.Vector3(0,0,Math.sign(v.z));
+}
 function finishAnim(p){
   if(!p.anim) return;
   if(p.group) p.group.scale.setScalar(1);
   scene.remove(p.anim.ghost);
-  p.group.children.forEach(m=>{ m.material=m.userData.baseMat; });
+  p.group.children.forEach(m=>{ if(m.isMesh&&m.userData.baseMat) m.material=m.userData.baseMat; });
   p.anim.mats.forEach(m=>m.dispose());
+  if(p.scaf&&p.scaf.userData.building){ dropScaffold(p); }
+  if(growing.has(p)&&!p.scaf&&p.group){ p.scaf=scaffoldFor(p,curingMat[p.mat]); p.group.add(p.scaf); } // still gaining health
   p.anim=null;
 }
-function startAnim(p,dur){
-  const box=new THREE.Box3().setFromObject(p.group), vertical=p.type!=='floor';
-  const plane=vertical? new THREE.Plane(new THREE.Vector3(0,-1,0),box.min.y) : new THREE.Plane(new THREE.Vector3(-1,0,0),box.min.x);
-  const mats=new Map();
-  p.group.children.forEach(m=>{ m.userData.baseMat=m.material; let c=mats.get(m.material); if(!c){ c=m.material.clone(); c.clippingPlanes=[plane]; c.emissive=new THREE.Color(0x2a6aa0); mats.set(m.material,c);} m.material=c; });
-  const ghost=makeGroup(p,ghostMat,false); scene.add(ghost);
-  // glowing line at the build front
+function startAnim(p,dur,kind){
+  if(p.anim){ finishAnim(p); anims.delete(p); }
+  kind=kind||'edit';
+  p.group.updateMatrixWorld(true);
+  const box=new THREE.Box3(); p.group.children.forEach(m=>{ if(m.isMesh) box.expandByObject(m); });
+  const axis=buildAxis(p); let lo=Infinity, hi=-Infinity;
+  for(const x of [box.min.x,box.max.x]) for(const y of [box.min.y,box.max.y]) for(const z of [box.min.z,box.max.z]){ const d=axis.x*x+axis.y*y+axis.z*z; if(d<lo) lo=d; if(d>hi) hi=d; }
+  const plane=new THREE.Plane(axis.clone().negate(),lo), mats=new Map();
+  p.group.children.forEach(m=>{ if(!m.isMesh) return; m.userData.baseMat=m.material; let c=mats.get(m.material); if(!c){ c=m.material.clone(); c.clippingPlanes=[plane]; if(c.emissive) c.emissive=new THREE.Color(0x2a6aa0); mats.set(m.material,c);} m.material=c; });
+  const ghost=makeGroup(p,blueprintMat,false); scene.add(ghost);
+  if(kind==='place'){ dropScaffold(p); p.scaf=scaffoldFor(p,scaffoldMat[p.mat]); p.scaf.userData.building=true; p.group.add(p.scaf); }
   const sz=box.getSize(new THREE.Vector3()), ctr=box.getCenter(new THREE.Vector3());
-  const front=new THREE.Mesh(new THREE.BoxGeometry(vertical?sz.x+0.08:0.06,vertical?0.06:sz.y+0.08,vertical?sz.z+0.08:sz.z+0.08),buildGlowMat);
-  front.position.copy(ctr); ghost.add(front); front.position.sub(ghost.position);
-  p.group.scale.setScalar(0.94);
-  p.anim={t0:performance.now(),dur,plane,vertical,lo:vertical?box.min.y:box.min.x,hi:(vertical?box.max.y:box.max.x)+0.05,mats:[...mats.values()],ghost,front,ctr,sz,sparkT:0};
+  const ax=Math.abs(axis.x)>0.5?'x':Math.abs(axis.z)>0.5?'z':'y';
+  const front=new THREE.Mesh(new THREE.BoxGeometry(ax==='x'?0.06:sz.x+0.08,ax==='y'?0.06:sz.y+0.08,ax==='z'?0.06:sz.z+0.08),buildGlowMat);
+  front.position.copy(ctr); ghost.add(front); front.position.sub(ghost.position); front.visible=p.type==='wall'||p.type==='floor';
+  if(kind==='place') p.group.scale.setScalar(0.94);
+  const bands=kind==='place'?(BUILD_CFG.stages[p.mat]||{bands:1}).bands:0;
+  p.anim={t0:performance.now(),dur,plane,axis,lo,hi:hi+0.05,mats:[...mats.values()],ghost,front,ctr,sz,sparkT:0,kind,bands,band:-1};
   anims.add(p);
 }
+const _sp=new THREE.Vector3();
 function stepAnims(now){
   anims.forEach(p=>{
     const a=p.anim; if(!a){ anims.delete(p); return; }
-    const k=Math.min(1,(now-a.t0)/a.dur), e=1-Math.pow(1-k,1.6); // starts filling at once, finishes smoothly
+    const k=Math.min(1,(now-a.t0)/a.dur);
+    let e;
+    if(a.bands){ const x=k*a.bands, i=Math.min(a.bands-1,Math.floor(x)), f=Math.min(1,(x-i)*1.7); e=(i+f*f*(3-2*f))/a.bands; // one section at a time
+      if(i!==a.band){ a.band=i; if(pieceCenter(p).distanceTo(P.pos)<30){ const at0=a.lo+(a.hi-a.lo)*(i/a.bands); _sp.copy(a.ctr).addScaledVector(a.axis,at0-a.axis.dot(a.ctr));
+        burst(_sp,p.mat==='metal'?3:2,2.2,0.05,p.mat==='metal'?sparkMat:matFor[p.mat].chip); } } }
+    else e=1-Math.pow(1-k,1.6);
     const at=a.lo+(a.hi-a.lo)*e;
     a.plane.constant=at;
-    a.mats.forEach(m=>m.emissive.setRGB(.2*(1-k),.5*(1-k),.75*(1-k)));
-    if(a.vertical) a.front.position.y=at-a.ghost.position.y; else a.front.position.x=at-a.ghost.position.x;
-    a.front.visible=k<0.97&&(p.type==='wall'||p.type==='floor'); // stairs/cones: a flat sweep plate would show as a big white sheet
-    // pop: slightly small, overshoot, settle
-    const pop=k<0.7?0.94+0.1*(k/0.7):1.04-0.04*((k-0.7)/0.3); p.group.scale.setScalar(pop);
-    if(now-a.sparkT>55&&k<0.95&&pieceCenter(p).distanceTo(P.pos)<35){ a.sparkT=now;
-      const sp=a.ctr.clone(); if(a.vertical){ sp.y=at; sp.x+=(Math.random()-.5)*a.sz.x; sp.z+=(Math.random()-.5)*a.sz.z; } else { sp.x=at; sp.z+=(Math.random()-.5)*a.sz.z; }
-      burst(sp,2,2.2,0.045,sparkMat); }
-    if(k>=1){ p.group.scale.setScalar(1); finishAnim(p); anims.delete(p); }
+    a.mats.forEach(m=>{ if(m.emissive) m.emissive.setRGB(.2*(1-k),.5*(1-k),.75*(1-k)); });
+    a.front.position.copy(a.ctr).addScaledVector(a.axis,at-a.axis.dot(a.ctr)).sub(a.ghost.position);
+    if(a.kind==='place'){ const pop=k<0.7?0.94+0.1*(k/0.7):1.04-0.04*((k-0.7)/0.3); p.group.scale.setScalar(pop); }
+    if(k>=1){ if(a.kind==='place'&&pieceCenter(p).distanceTo(P.pos)<22) burst(a.ctr,3,2.5,0.04,sparkMat); finishAnim(p); anims.delete(p); }
   });
 }
 const anims=new Set();
-/* wood chunks / sawdust */
-const chunkGeo=new THREE.BoxGeometry(1,1,1), chunks=[];
+/* ---------- pooled debris (chips, planks, bricks, panels) ---------- */
+const chunkGeo=new THREE.BoxGeometry(1,1,1), chunks=[], meshPool=[];
+const DEBRIS_GEO={plank:new THREE.BoxGeometry(1,0.16,0.07),brick:new THREE.BoxGeometry(0.44,0.21,0.21),panel:new THREE.BoxGeometry(0.75,0.6,0.04)};
+function getMesh(geo,mat){ const m=meshPool.pop()||new THREE.Mesh(); m.geometry=geo; m.material=mat; m.rotation.set(0,0,0); m.scale.set(1,1,1); m.castShadow=true; scene.add(m); return m; }
+function freeMesh(m){ scene.remove(m); if(meshPool.length<500) meshPool.push(m); }
+function spawnChunk(m,v,life,spin){ chunks.push({m,v,w:new THREE.Vector3(Math.random()*spin,Math.random()*spin,Math.random()*spin),life,s0:m.scale.clone()});
+  while(chunks.length>260){ freeMesh(chunks.shift().m); } }
 function burst(center,n,speed,size,mat){
   for(let k=0;k<n;k++){
-    const m=new THREE.Mesh(chunkGeo,mat||chunkMat); const s=size*(0.5+Math.random());
+    const m=getMesh(chunkGeo,mat||chunkMat), s=size*(0.5+Math.random());
     m.scale.set(s*(1+Math.random()*2),s*.6,s); m.position.copy(center).add(new THREE.Vector3((Math.random()-.5)*2,(Math.random()-.3)*2,(Math.random()-.5)*2));
-    m.castShadow=true; scene.add(m);
-    chunks.push({m,v:new THREE.Vector3((Math.random()-.5)*speed,Math.random()*speed*.9+1,(Math.random()-.5)*speed),w:new THREE.Vector3(Math.random()*9,Math.random()*9,Math.random()*9),life:0.7+Math.random()*0.5,s0:m.scale.clone()});
+    spawnChunk(m,new THREE.Vector3((Math.random()-.5)*speed,Math.random()*speed*.9+1,(Math.random()-.5)*speed),0.7+Math.random()*0.5,9);
   }
-  while(chunks.length>220){ const c=chunks.shift(); scene.remove(c.m); }
 }
 function stepChunks(dt){
   for(let i=chunks.length-1;i>=0;i--){
     const c=chunks[i]; c.life-=dt; c.v.y-=18*dt; c.m.position.addScaledVector(c.v,dt);
-    if(c.m.position.y<0.05){ c.m.position.y=0.05; c.v.y*=-.3; c.v.x*=.6; c.v.z*=.6; }
+    const gy=terrainH(c.m.position.x,c.m.position.z)+0.05;
+    if(c.m.position.y<gy){ c.m.position.y=gy; c.v.y*=-.3; c.v.x*=.6; c.v.z*=.6; c.w.multiplyScalar(0.6); }
     c.m.rotation.x+=c.w.x*dt; c.m.rotation.y+=c.w.y*dt; c.m.rotation.z+=c.w.z*dt;
-    if(c.life<0.25) c.m.scale.copy(c.s0).multiplyScalar(Math.max(0,c.life/0.25));
-    if(c.life<=0){ scene.remove(c.m); chunks.splice(i,1); }
+    if(c.life<0.3) c.m.scale.copy(c.s0).multiplyScalar(Math.max(0,c.life/0.3));
+    if(c.life<=0){ freeMesh(c.m); chunks.splice(i,1); }
+  }
+}
+// pieces of the actual material: planks for wood, bricks for brick, panels for metal, scattered from the whole piece
+function debrisFor(p,origin,count,power){
+  const bb=pieceAABB(p), kind=p.mat==='wood'?'plank':p.mat==='brick'?'brick':'panel', M=matFor[p.mat], mat=p.mat==='wood'?M.beam:M.wall;
+  const big=p.type==='wall'||p.type==='floor'?1:0.75; count=Math.round(count*big);
+  for(let k=0;k<count;k++){
+    const m=getMesh(DEBRIS_GEO[kind],mat), sc=0.55+Math.random()*0.75; m.scale.set(kind==='plank'?sc*1.6:sc,sc,sc);
+    m.position.set(bb[0]+Math.random()*(bb[3]-bb[0]||0.3),bb[1]+Math.random()*(bb[4]-bb[1]||0.3),bb[2]+Math.random()*(bb[5]-bb[2]||0.3));
+    m.rotation.set(Math.random()*3,Math.random()*3,Math.random()*3);
+    const v=new THREE.Vector3().subVectors(m.position,origin); v.y=Math.max(v.y,0); if(v.lengthSq()<0.01) v.set(Math.random()-.5,0.5,Math.random()-.5); v.normalize().multiplyScalar(power*(0.6+Math.random()*0.8)); v.y+=power*0.35+Math.random()*2;
+    spawnChunk(m,v,1.1+Math.random()*0.8,kind==='panel'?5:8);
+  }
+}
+const dustCol={wood:0xd9c39a,brick:0xc9bfb0,metal:0x9aa3ad}, dustMats={};
+let dustBudget=40;
+function dustAt(pos,matName,n,size){ n=Math.min(n,Math.floor(dustBudget)); if(n<=0) return; dustBudget-=n; if(!dustMats[matName]) dustMats[matName]=new THREE.MeshLambertMaterial({color:dustCol[matName]||0xb9b6b0,transparent:true,opacity:.5,depthWrite:false});
+  for(let q=0;q<n;q++) puff(pos.clone().add(new THREE.Vector3((Math.random()-.5)*2.4,Math.random()*1.2,(Math.random()-.5)*2.4)),0.7+Math.random()*0.6,1.1+Math.random()*0.6,dustMats[matName],new THREE.Vector3((Math.random()-.5)*1.2,0.5+Math.random()*0.6,(Math.random()-.5)*1.2)); }
+/* ---------- damage stages: cracks that build up as a piece takes damage ---------- */
+const crackMats={};
+(function makeCracks(){
+  const R=()=>Math.random();
+  MAT_ORDER.forEach(mat=>{
+    const N=256, c=document.createElement('canvas'); c.width=c.height=N; const g=c.getContext('2d'); g.lineCap='round'; g.lineJoin='round';
+    const crack=(x,y,len,ang,w,col)=>{ g.strokeStyle=col; g.lineWidth=w; g.beginPath(); g.moveTo(x,y); for(let i=0;i<len;i++){ ang+=(R()-.5)*0.9; x+=Math.cos(ang)*8; y+=Math.sin(ang)*8; g.lineTo(x,y);
+        if(R()<0.18){ const sx=x, sy=y, a2=ang+(R()<.5?1:-1)*(0.6+R()*0.6); g.moveTo(sx,sy); let xx=sx, yy=sy; for(let j=0;j<3;j++){ xx+=Math.cos(a2)*6; yy+=Math.sin(a2)*6; g.lineTo(xx,yy); } g.moveTo(x,y); } } g.stroke(); };
+    const stage=(n)=>{
+      for(let q=0;q<n;q++){
+        if(mat==='wood'){ const x=R()*N; crack(x,R()*N,6+R()*10,Math.PI/2+(R()-.5)*0.4,2.5+R()*2,'rgba(48,26,10,.92)'); // splits along the grain
+          g.strokeStyle='rgba(245,214,160,.85)'; g.lineWidth=2; g.beginPath(); for(let s2=0;s2<4;s2++){ const yy=R()*N; g.moveTo(x+3,yy); g.lineTo(x+8+R()*8,yy+R()*10); } g.stroke(); // splinters
+          g.fillStyle='rgba(30,16,6,.9)'; g.beginPath(); g.arc(R()*N,R()*N,2+R()*2,0,7); g.fill(); }
+        else if(mat==='brick'){ crack(R()*N,R()*N,8+R()*12,R()*7,2+R()*1.5,'rgba(28,22,20,.9)');
+          g.fillStyle='rgba(225,214,198,.55)'; g.fillRect(R()*N,R()*N,10+R()*18,6+R()*8); // chipped faces
+          g.fillStyle='rgba(40,34,30,.35)'; g.beginPath(); g.arc(R()*N,R()*N,6+R()*10,0,7); g.fill(); } // soot
+        else { const x=R()*N, y=R()*N, r=8+R()*14, gr=g.createRadialGradient(x,y,1,x,y,r); gr.addColorStop(0,'rgba(20,24,30,.85)'); gr.addColorStop(0.6,'rgba(40,46,56,.4)'); gr.addColorStop(0.85,'rgba(230,238,245,.55)'); gr.addColorStop(1,'rgba(0,0,0,0)');
+          g.fillStyle=gr; g.beginPath(); g.arc(x,y,r,0,7); g.fill(); // dents
+          g.strokeStyle='rgba(235,240,245,.7)'; g.lineWidth=1.2; g.beginPath(); const sx=R()*N, sy=R()*N; g.moveTo(sx,sy); g.lineTo(sx+(R()-.5)*60,sy+(R()-.5)*30); g.stroke(); // scratches
+          g.fillStyle='rgba(10,10,12,.95)'; g.beginPath(); g.arc(R()*N,R()*N,2.5,0,7); g.fill(); }
+      }
+      const t=new THREE.CanvasTexture(c); t.needsUpdate=true; const cp=document.createElement('canvas'); cp.width=cp.height=N; cp.getContext('2d').drawImage(c,0,0);
+      return new THREE.MeshLambertMaterial({map:new THREE.CanvasTexture(cp),transparent:true,depthWrite:false,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-6});
+    };
+    crackMats[mat]=[stage(mat==='metal'?4:5),stage(mat==='metal'?5:7),stage(mat==='metal'?7:10)];
+  });
+})();
+function damageStage(p){ const f=(p.dmgTaken||0)/p.maxHp, c=BUILD_CFG.crack; return f>=c[2]?3:f>=c[1]?2:f>=c[0]?1:0; }
+function applyDamageLook(p){
+  if(!p.group) return; const st=damageStage(p);
+  p.group.children.forEach(m=>{ if(!m.isMesh) return; let ov=m.userData.ov;
+    if(!st){ if(ov){ m.remove(ov); m.userData.ov=null; } return; }
+    if(!ov){ ov=new THREE.Mesh(m.geometry,crackMats[p.mat][st-1]); ov.renderOrder=1; m.add(ov); m.userData.ov=ov; } else ov.material=crackMats[p.mat][st-1]; });
+}
+// a hit makes the piece shudder for a moment
+const shaking=new Set();
+function stepShakes(dt){ shaking.forEach(p=>{ if(!pieces.has(p.key)||!p.group){ shaking.delete(p); return; } p.shakeT-=dt; const c=pieceCenter(p);
+  if(p.shakeT<=0){ p.group.position.copy(c); shaking.delete(p); return; } const a=0.05*(p.shakeT/0.16); p.group.position.set(c.x+(Math.random()-.5)*a,c.y+(Math.random()-.5)*a,c.z+(Math.random()-.5)*a); }); }
+/* ---------- destruction (shot/pickaxed down) vs collapse (lost its support) ---------- */
+// Direct destruction: the piece bursts apart from the hit point into its own material.
+function shatterFx(p,point){
+  const c=pieceCenter(p); point=point||c;
+  if(c.distanceTo(P.pos)<70){ debrisFor(p,point,BUILD_CFG.debris[p.mat]||10,5.5); if(p.mat==='metal') burst(point,8,7,0.04,hotSparkMat); dustAt(c,p.mat,p.mat==='brick'?3:p.mat==='wood'?2:1,1); }
+  sfxAt('break_'+p.mat,c);
+}
+function destroyPiece(p,point){
+  if(!pieces.has(p.key)) return;
+  const nb=neighbors(p); shatterFx(p,point); removePiece(p);
+  if(net.role==='client') return; // the host works out what falls and tells everyone
+  buildStats.decided++; const doomed=findUnsupported(nb);
+  if(doomed.length){ const oc=pieceCenter(p); doomed.sort((a,b)=>pieceCenter(a).distanceTo(oc)-pieceCenter(b).distanceTo(oc));
+    collapsePieces(doomed,oc); if(net.role==='host') netOp({op:'collapse',keys:doomed.map(q=>q.key),c:[+oc.x.toFixed(2),+oc.y.toFixed(2),+oc.z.toFixed(2)]}); }
+}
+// Collapse: a piece that lost its support goes dark, shudders, tips away from the break and falls, then crumbles.
+// It leaves the structure (and stops blocking) immediately; the fall is only visual.
+const fallers=[], darkMats=new Map();
+function darkOf(m){ let d=darkMats.get(m); if(!d){ d=m.clone(); if(d.color) d.color.multiplyScalar(0.62); darkMats.set(m,d); } return d; }
+function collapsePieces(list,oc){
+  let n=0; buildStats.collapsed+=list.length;
+  list.forEach((q,i)=>{ if(!pieces.has(q.key)) return; removePiece(q,true); dropScaffold(q); const g=q.group; // (removing may rebuild the mesh if it was being edited)
+    g.children.forEach(m=>{ if(m.isMesh){ m.material=darkOf(m.userData.baseMat||m.material); } });
+    if(fallers.length>=BUILD_CFG.maxFallers){ scene.remove(g); crumbleFx(q,g.position); return; }
+    const away=oc?new THREE.Vector3(g.position.x-oc.x,0,g.position.z-oc.z):new THREE.Vector3(Math.random()-.5,0,Math.random()-.5);
+    if(away.lengthSq()<0.01) away.set(Math.random()-.5,0,Math.random()-.5); away.normalize();
+    const delay=Math.min(BUILD_CFG.collapseMaxDelay,(oc?g.position.distanceTo(oc):i)*BUILD_CFG.collapseStep)+Math.random()*0.04;
+    fallers.push({p:q,g,t:-delay,vy:0,axis:new THREE.Vector3(away.z,0,-away.x),spin:0.7+Math.random()*0.9,base:g.position.clone(),drift:away.multiplyScalar(0.8+Math.random()*0.8)}); n++; });
+  if(n){ const c=oc||list[0].group.position; sfxAt('creak',c instanceof THREE.Vector3?c:new THREE.Vector3(...c)); }
+}
+function crumbleFx(p,pos){ if(pos.distanceTo(P.pos)<70){ debrisFor(p,pos.clone().add(new THREE.Vector3(0,2,0)),Math.ceil((BUILD_CFG.debris[p.mat]||10)*0.45),2.2); dustAt(pos,p.mat,2,1.2); } }
+let crumbleSndT=0;
+function stepFallers(dt){
+  crumbleSndT-=dt; dustBudget=Math.min(40,dustBudget+dt*30);
+  for(let i=fallers.length-1;i>=0;i--){ const f=fallers[i]; f.t+=dt; if(f.t<0) continue;
+    const sh=BUILD_CFG.collapseShudder;
+    if(f.t<sh){ const a=0.07; f.g.position.set(f.base.x+(Math.random()-.5)*a,f.base.y-f.t*0.4,f.base.z+(Math.random()-.5)*a); continue; }
+    const ft=f.t-sh; f.vy-=22*dt; f.g.position.y+=f.vy*dt; f.g.position.addScaledVector(f.drift,dt); f.g.rotateOnWorldAxis(f.axis,f.spin*dt*(0.5+ft*2.4));
+    if(ft>BUILD_CFG.collapseFall||f.g.position.y<terrainH(f.g.position.x,f.g.position.z)-0.5){
+      crumbleFx(f.p,f.g.position); if(crumbleSndT<=0){ crumbleSndT=0.12; sfxAt('crumble',f.g.position); }
+      scene.remove(f.g); fallers.splice(i,1); }
   }
 }
 function buildPiece(p){
   if(p.anim){ finishAnim(p); anims.delete(p); }
   if(p.group) scene.remove(p.group);
-  p.group=makeGroup(p,null,true); scene.add(p.group);
+  p.scaf=null; p.group=makeGroup(p,null,true); scene.add(p.group);
   p.boxes=makeBoxes(p); p.slab=(p.type==='ramp'||p.type==='cone'); p.bb=null; p.bb=pbox(p);
+  if(pieces.get(p.key)===p){ relinkPiece(p); if(growing.has(p)){ p.scaf=scaffoldFor(p,curingMat[p.mat]); p.group.add(p.scaf); } }
+  applyDamageLook(p);
 }
 function addPiece(t){
   const mat=MATERIALS[t.mat]?t.mat:'wood', M=MATERIALS[mat], maxHp=M.maxHp[t.type==='wall'?'wall':'other'];
-  const p=Object.assign({},t,{mat,owner:t.owner||'me',mask:t.type==='wall'?511:t.type==='floor'?15:0, born:performance.now(), maxHp, hp:maxHp*M.start});
+  const p=Object.assign({},t,{mat,owner:t.owner||'me',mask:t.type==='wall'?511:t.type==='floor'?15:0, born:performance.now(), maxHp, hp:maxHp*M.start, sdir:t.sdir??t.dir, dmgTaken:0});
   pieces.set(p.key,p); order.push(p); growing.add(p);
   for(const [a,b] of cellsOf(p)){ const k=a+','+b; let s=cellIndex.get(k); if(!s){s=new Set(); cellIndex.set(k,s);} s.add(p); }
-  buildPiece(p); startAnim(p,M.fill);
+  buildPiece(p); startAnim(p,M.fill,'place');
   if(order.length>MAX_BUILDS) removePiece(order[0]);
   phaseCheck(p); popPlayerOut(p);
   return p;
@@ -941,14 +1095,15 @@ function addPiece(t){
 // Builds gain health while they finish constructing (Fortnite-style build-up)
 const growing=new Set();
 function stepBuildHp(dt){ growing.forEach(p=>{ if(!pieces.has(p.key)){ growing.delete(p); return; } const M=MATERIALS[p.mat];
-  p.hp=Math.min(p.maxHp,p.hp+p.maxHp*(1-M.start)/M.buildTime*dt); if(p.hp>=p.maxHp) growing.delete(p); }); }
-function removePiece(p){
+  p.hp=Math.min(p.maxHp,p.hp+p.maxHp*(1-M.start)/M.buildTime*dt);
+  if(p.hp>=p.maxHp){ growing.delete(p); if(!p.anim){ dropScaffold(p); if(p.group&&pieceCenter(p).distanceTo(P.pos)<25) burst(pieceCenter(p),3,1.6,0.035,sparkMat); } } }); }
+function removePiece(p,keepMesh){ // keepMesh: a collapsing piece leaves the structure now but its mesh falls for a moment
   if(edit && edit.piece===p) exitEdit(false);
-  growing.delete(p);
+  growing.delete(p); shaking.delete(p);
   if(p.anim){ finishAnim(p); anims.delete(p); }
-  pieces.delete(p.key);
+  pieces.delete(p.key); unlinkPiece(p);
   for(const [a,b] of cellsOf(p)){ const s=cellIndex.get(a+','+b); if(s) s.delete(p); }
-  scene.remove(p.group);
+  if(!keepMesh){ dropScaffold(p); scene.remove(p.group); }
   const i=order.indexOf(p); if(i>=0) order.splice(i,1);
 }
 /* Structural support: a piece needs the ground or a touching piece. Breaking one drops anything left floating. */
@@ -960,14 +1115,30 @@ function pbox(p){
   const y=p.l*LVL, x0=p.i*CELL, z0=p.j*CELL, x1=x0+CELL, z1=z0+CELL;
   if(p.type==='wall') return [p.axis==='x'?[x0,y,z0,x0,y+LVL,z1]:[x0,y,z0,x1,y+LVL,z0]];
   if(p.type==='floor'||p.type==='cone') return [[x0,y,z0,x1,y,z1]];
-  const lo=[[x0,y,z0,x0,y,z1],[x0,y,z0,x1,y,z0],[x1,y,z0,x1,y,z1],[x0,y,z1,x1,y,z1]][p.dir];
-  const hi=[[x1,y+LVL,z0,x1,y+LVL,z1],[x0,y+LVL,z1,x1,y+LVL,z1],[x0,y+LVL,z0,x0,y+LVL,z1],[x0,y+LVL,z0,x1,y+LVL,z0]][p.dir];
+  const sd=p.sdir??p.dir; // approx: a rotated stair keeps the attachment it was placed with, so an edit never drops anything
+  const lo=[[x0,y,z0,x0,y,z1],[x0,y,z0,x1,y,z0],[x1,y,z0,x1,y,z1],[x0,y,z1,x1,y,z1]][sd];
+  const hi=[[x1,y+LVL,z0,x1,y+LVL,z1],[x0,y+LVL,z1,x1,y+LVL,z1],[x0,y+LVL,z0,x0,y+LVL,z1],[x0,y+LVL,z0,x1,y+LVL,z0]][sd];
   // sides: stairs side by side at the same level hold each other up (trimmed so stacked stairs still don't count)
   const yA=y+0.15, yB=y+LVL-0.15;
-  const sides=(p.dir===0||p.dir===2)?[[x0,yA,z0,x1,yB,z0],[x0,yA,z1,x1,yB,z1]]:[[x0,yA,z0,x0,yB,z1],[x1,yA,z0,x1,yB,z1]];
+  const sides=(sd===0||sd===2)?[[x0,yA,z0,x1,yB,z0],[x0,yA,z1,x1,yB,z1]]:[[x0,yA,z0,x0,yB,z1],[x1,yA,z0,x1,yB,z1]];
   return [lo,hi,...sides];
 }
-function touches(A,B){ const e=0.02; for(const a of A) for(const b of B) if(a[0]<=b[3]+e&&b[0]<=a[3]+e&&a[1]<=b[4]+e&&b[1]<=a[4]+e&&a[2]<=b[5]+e&&b[2]<=a[5]+e) return true; return false; }
+/* ---------- structural connections (cached graph) ----------
+   conn: piece -> Set of pieces it's attached to. Built from each piece's attachment shapes (pbox) when it's placed,
+   updated when it's edited or removed, never recomputed per frame. Two pieces connect only through a shared edge or
+   face (>= BUILD_CFG.minContact), so floors touching corner-to-corner don't hold each other up. Edits don't change
+   connections (approx: an edited wall still supports what's above it, as in Fortnite). */
+const conn=new Map(); let structVer=0;
+function connects(A,B){ const e=0.02, m=BUILD_CFG.minContact;
+  for(const a of A) for(const b of B){ const dx=Math.min(a[3],b[3])-Math.max(a[0],b[0]), dy=Math.min(a[4],b[4])-Math.max(a[1],b[1]), dz=Math.min(a[5],b[5])-Math.max(a[2],b[2]);
+    if(dx<-e||dy<-e||dz<-e) continue; if(Math.max(dx,dy,dz)>=m) return true; }
+  return false; }
+function touches(A,B){ return connects(A,B); }
+function linkPiece(p){ const set=new Set(), A=pbox(p); conn.set(p,set);
+  near(p.i*CELL+CELL/2,p.j*CELL+CELL/2,1).forEach(q=>{ if(q!==p&&conn.has(q)&&connects(A,pbox(q))){ set.add(q); conn.get(q).add(p); } }); structVer++; }
+function unlinkPiece(p){ const set=conn.get(p); if(set) set.forEach(q=>{ const t=conn.get(q); if(t) t.delete(p); }); conn.delete(p); structVer++; }
+function relinkPiece(p){ unlinkPiece(p); linkPiece(p); }
+// anchored = resting on (or dug into) the ground
 function grounded(p){
   if(p.l===0) return true;
   const y0=p.l*LVL-(p.type==='floor'?FT:0)-0.8, x0=p.i*CELL, z0=p.j*CELL; let pts;
@@ -976,26 +1147,54 @@ function grounded(p){
   return pts.some(([x,z])=>terrainH(x,z)>=y0);
 }
 function neighbors(p){
-  const A=pbox(p), out=[], cx=p.i*CELL+CELL/2, cz=p.j*CELL+CELL/2;
-  near(cx,cz,1).forEach(q=>{ if(q!==p&&q.key!==p.key&&touches(A,pbox(q))) out.push(q); });
-  return out;
+  if(pieces.get(p.key)===p&&conn.has(p)) return [...conn.get(p)];
+  const A=pbox(p), out=[]; near(p.i*CELL+CELL/2,p.j*CELL+CELL/2,1).forEach(q=>{ if(q!==p&&q.key!==p.key&&connects(A,pbox(q))) out.push(q); }); return out; // a piece that isn't built yet
 }
-function supported(t){ return grounded(t)||neighbors(t).length>0; }
-function collapseFrom(nbrs){
-  const safe=new Set(), doomed=[];
-  for(const n of nbrs){
-    if(safe.has(n)||doomed.includes(n)||!pieces.has(n.key)) continue;
+// hops from p to the nearest anchored piece through the graph (Infinity = no path). Only used when a depth limit is set.
+function supportDepth(p,skip){ if(grounded(p)) return 0; const seen=new Set([p]); let front=[p], d=0;
+  while(front.length){ d++; const nx=[]; for(const q of front) for(const r of (conn.get(q)||neighbors(q))){ if(seen.has(r)||r===skip) continue; if(grounded(r)) return d; seen.add(r); nx.push(r); } front=nx; if(d>400) break; }
+  return Infinity; }
+function supportState(p){ if(grounded(p)) return 'anchored'; return supportDepth(p)<Infinity?'supported':'unsupported'; }
+function supported(t){
+  if(grounded(t)) return true; const nb=neighbors(t); if(!nb.length) return false;
+  const lim=BUILD_CFG.maxSupportDepth; if(!lim) return true;
+  return nb.some(q=>supportDepth(q)<lim);
+}
+/* After something is removed: search outward only from the pieces it touched. A connected group that still reaches
+   the ground stands (even if it lost one of several supports); a group with no path left falls. */
+const buildStats={searches:0,decided:0,collapsed:0};
+function findUnsupported(starts,skip){ buildStats.searches++;
+  const safe=new Set(), doomed=new Set();
+  for(const n of starts){
+    if(n===skip||safe.has(n)||doomed.has(n)||!pieces.has(n.key)) continue;
     const seen=new Set([n]), stack=[n]; let ok=false;
     while(stack.length){ const q=stack.pop(); if(grounded(q)||safe.has(q)){ ok=true; break; }
-      for(const r of neighbors(q)) if(!seen.has(r)){ seen.add(r); stack.push(r); }
-      if(seen.size>4000){ ok=true; break; } }
-    if(ok) seen.forEach(q=>safe.add(q)); else doomed.push(...seen);
+      for(const r of conn.get(q)||[]) if(r!==skip&&!seen.has(r)){ seen.add(r); stack.push(r); } }
+    if(ok){ seen.forEach(q=>safe.add(q)); continue; }
+    seen.forEach(q=>doomed.add(q));
   }
-  if(!doomed.length) return;
-  doomed.sort((a,b)=>a.l-b.l);
-  doomed.forEach((q,i)=>setTimeout(()=>{ if(!pieces.has(q.key)) return; if(i<40) burst(pieceCenter(q),6,5,0.28); removePiece(q); if(i%6===0) sfx('break'); },70+i*22));
+  const lim=BUILD_CFG.maxSupportDepth;
+  if(lim){ safe.forEach(q=>{ if(!doomed.has(q)&&supportDepth(q,skip)>lim) doomed.add(q); }); }
+  return [...doomed];
 }
-function clearBuilds(){ if(edit) exitEdit(false); [...order].forEach(removePiece); }
+// what would fall if p went away (for the "holding up N" readout); cached per structure version
+const _depCache=new Map();
+function dependentsOf(p){ const k=p.key+'@'+structVer; if(_depCache.has(k)) return _depCache.get(k); if(_depCache.size>200) _depCache.clear();
+  const v=findUnsupported(conn.get(p)?[...conn.get(p)]:[],p).length; _depCache.set(k,v); return v; }
+function clearBuilds(){ if(edit) exitEdit(false); [...order].forEach(p=>removePiece(p)); }
+/* Who may edit a build. Owner = whoever placed it. The rule is the host's setting in a room (sent on join and when it
+   changes) and the host re-checks every edit, so a client can't edit around it. A player who leaves hands their
+   builds over to everyone ('public'). */
+const rules={editRule:'owner'};
+function teamOf(id){ if(id===net.id) return +settings.team||0; const pl=net.players.get(id); return pl?pl.team|0:0; }
+function canEdit(p,who){
+  if(!p.owner||p.owner==='public'||p.owner===who) return true;
+  const rule=net.role==='client'?rules.editRule:settings.editRule;
+  if(rule==='anyone') return true;
+  if(rule==='team'&&p.owner!=='bot'){ if(horde.on) return true; const a=teamOf(who), b=teamOf(p.owner); return a>0&&a===b; }
+  return false;
+}
+function releaseBuilds(id){ if(!id||id==='bot') return; pieces.forEach(p=>{ if(p.owner===id) p.owner='public'; }); }
 function near(x,z,rad=1){
   const ci=Math.floor(x/CELL), cj=Math.floor(z/CELL), out=new Set();
   for(let a=-rad;a<=rad;a++)for(let b=-rad;b<=rad;b++){ const s=cellIndex.get((ci+a)+','+(cj+b)); if(s) s.forEach(p=>out.add(p)); }
@@ -1348,6 +1547,7 @@ function updateGhost(){
   if(k===ghostKey) return;
   if(ghost) scene.remove(ghost);
   ghost=makeGroup(Object.assign({mask:t.type==='wall'?511:t.type==='floor'?15:0,mat:buildMat},t), occ?ghostDim:bad?ghostBad:ghostMat, false);
+  ghost.add(edgeLines(ghost,occ?ghostLine.occ:bad?ghostLine.bad:ghostLine.ok));
   ghost.renderOrder=2; scene.add(ghost); ghostKey=k;
 }
 
@@ -1364,8 +1564,11 @@ function enterEdit(){
   if(isDead()) return;
   const hit=aimHit(5.5);
   if(!hit){ toast('Aim at a build to edit it'); return; }
-  const p=hit.object.userData.piece;
-  if(p.owner&&p.owner!==net.id){ toast(p.owner==='bot'?"That's the bot's build":"You can only edit your own builds"); return; }
+  beginEdit(hit.object.userData.piece);
+}
+function beginEdit(p){
+  if(!p||p.isProp||!pieces.has(p.key)){ toast('Aim at a build to edit it'); return; }
+  if(!canEdit(p,net.id)){ toast(p.owner==='bot'?"That's the bot's build":rules.editRule==='team'?"Only your team's builds can be edited":"You can only edit your own builds"); return; }
   const tiles=[], sel=new Set();
   const mk=(geo,idx,pos,setRot)=>{ const m=new THREE.Mesh(geo,tileMat); m.position.copy(pos); setRot(m); m.userData.idx=idx; m.renderOrder=3; m.updateMatrixWorld(); scene.add(m); tiles.push(m); };
   if(p.type==='wall'){
@@ -1476,7 +1679,7 @@ function exitEdit(apply){
 }
 function resetEdit(){
   if(!edit) return; const p=edit.piece;
-  if(p.type==='wall') p.mask=511; else if(p.type==='floor') p.mask=15; else if(p.type==='cone') p.mask=0; else p.half=-1;
+  if(p.type==='wall') p.mask=511; else if(p.type==='floor') p.mask=15; else if(p.type==='cone') p.mask=0; else { p.half=-1; p.dir=p.sdir??p.dir; }
   edit.sel.clear(); exitEdit(false);
 }
 
@@ -1612,7 +1815,7 @@ function zombieGroan(vol,delay=0){
 }
 function sfx(k){
   if(!AC) return;
-  sfxVerb=({boom:0.45,rocket:0.25,shot_mg:0.22,shot_smg:0.15,shot:0.22,pump:0.3,break_wood:0.15,break_brick:0.18,break_metal:0.2,break:0.15})[k]||0;
+  sfxVerb=({boom:0.45,rocket:0.25,shot_mg:0.22,shot_smg:0.15,shot:0.22,pump:0.3,break_wood:0.15,break_brick:0.18,break_metal:0.2,break:0.15,creak:0.3,crumble:0.35})[k]||0;
   cur=bus();
   const r=()=>0.94+Math.random()*0.12;
   switch(k){
@@ -1624,6 +1827,8 @@ function sfx(k){
     case 'place': case 'place_wood': knock(230*r(),0.11,0.55,6); knock(700*r(),0.05,0.25,5); noise(3000,0.02,0.08,1,0,'highpass'); break;
     case 'place_brick': noise(380*r(),0.14,0.55,0.9,0,'lowpass',140); knock(900*r(),0.04,0.2,4); for(let q=0;q<3;q++) noise(1800+Math.random()*1500,0.02,0.07,3,0.02+q*0.03); break;
     case 'place_metal': [520,733,1240].forEach((f,q)=>tone('sine',f*r(),f*0.98,0.32-q*0.06,0.09)); noise(4000,0.03,0.12,1,0,'highpass'); tone('square',180,90,0.05,0.05); break;
+    case 'creak': tone('sawtooth',92*r(),58,0.55,0.05); tone('sawtooth',61*r(),44,0.7,0.04,0.08); noise(240,0.7,0.35,0.8,0,'lowpass',80); for(let q=0;q<4;q++) knock(260+Math.random()*320,0.06,0.16,5,0.12+q*0.1); break;
+    case 'crumble': noise(170*r(),0.45,0.5,0.7,0,'lowpass',70); knock(130*r(),0.16,0.38,4); for(let q=0;q<4;q++) noise(900+Math.random()*1500,0.03,0.09,3,0.03+q*0.06); break;
     case 'break': case 'break_wood': noise(1300,0.2,0.5,0.7); knock(190,0.2,0.5,4); for(let q=0;q<5;q++) noise(1600+Math.random()*1800,0.03,0.12,3,0.05+q*0.05+Math.random()*0.03); break;
     case 'break_brick': noise(700,0.28,0.6,0.6,0,'lowpass',200); tone('sine',90,40,0.2,0.35); for(let q=0;q<6;q++) noise(900+Math.random()*900,0.04,0.12,2,0.06+q*0.05); break;
     case 'break_metal': [430,610,980].forEach((f,q)=>tone('sine',f,f*0.9,0.45-q*0.08,0.1)); noise(3000,0.12,0.3,0.8,0,'highpass'); for(let q=0;q<4;q++) click(2500+Math.random()*1500,0.12,0.08+q*0.07); break;
@@ -2406,6 +2611,7 @@ function bindSettings(){
   ts.addEventListener('change',()=>{ settings.turbo=+ts.value; saveSettings(); });
   er.addEventListener('change',()=>{ settings.editRelease=er.checked; saveSettings(); });
   sh.addEventListener('change',()=>{ settings.shadows=sh.checked; sun.castShadow=sh.checked; saveSettings(); });
+  const ers=$('editRuleSel'); ers.value=settings.editRule||'owner'; ers.addEventListener('change',()=>{ settings.editRule=ers.value; saveSettings(); if(net.role==='host') netSend({type:'rules',er:settings.editRule}); });
   const im=$('infMats'); im.checked=settings.infMats; im.addEventListener('change',()=>{ settings.infMats=im.checked; saveSettings(); ghostKey=''; syncMats(); });
 }
 bindSettings();
@@ -2625,7 +2831,7 @@ fitView();
 /* ---------- multiplayer (PeerJS / WebRTC, host relays everything) ---------- */
 const PREFIX='cranklab-v1-';
 const COLORS=[0x2a8f88,0xc8463c,0x6a4fc2,0xd88a1e,0x3f7fd0,0x4f9a3a,0xc54b8f,0x8a6a3e];
-const net={lat:new Map(),pingT:0,peer:null,role:null,host:null,conns:new Map(),code:null,id:'me',players:new Map(),sendT:0,name:'',lastSwing:0,kills:0,deaths:0,dead:false};
+const net={seen:new Map(),lat:new Map(),pingT:0,peer:null,role:null,host:null,conns:new Map(),code:null,id:'me',players:new Map(),sendT:0,name:'',lastSwing:0,kills:0,deaths:0,dead:false};
 // STUN finds a direct path; TURN relays the traffic when a direct path is impossible (phone on cellular, strict routers)
 const ICE={iceServers:[
   {urls:'stun:stun.l.google.com:19302'},{urls:'stun:global.stun.twilio.com:3478'},
@@ -2633,7 +2839,7 @@ const ICE={iceServers:[
   {urls:'turn:openrelay.metered.ca:443',username:'openrelayproject',credential:'openrelayproject'},
   {urls:'turn:openrelay.metered.ca:443?transport=tcp',username:'openrelayproject',credential:'openrelayproject'}]};
 const PEER_OPTS=Object.assign({debug:0,config:ICE},window.CRANK_PEER_OPTS||{}); // tests can point this at a local signalling server
-const pick=t=>({type:t.type,axis:t.axis,i:t.i,j:t.j,l:t.l,dir:t.dir,key:t.key,mat:t.mat,owner:t.owner});
+const pick=t=>({type:t.type,axis:t.axis,i:t.i,j:t.j,l:t.l,dir:t.dir,sdir:t.sdir,key:t.key,mat:t.mat,owner:t.owner});
 const WCODE={ar:1,pump:2,smg:3,mg:4,gatling:5,rpg:6,nade:7}, WNAME=['pick','ar','pump','smg','mg','gatling','rpg','nade'];
 function colorFor(id){ let h=0; for(const ch of String(id)) h=(h*31+ch.charCodeAt(0))>>>0; return COLORS[h%COLORS.length]; }
 function nameSprite(text){
@@ -2694,21 +2900,22 @@ function stepPlayers(dt){
 function applyOp(o,quiet){
   if(o.op==='place'){ if(!pieces.has(o.t.key)){ const np=addPiece(o.t); if(o.t.hp!=null) np.hp=o.t.hp; if(!quiet&&pieceCenter(np).distanceTo(P.pos)<30) sfx('place'); } }
   else if(o.op==='replace'){ const old=pieces.get(o.t.key); if(old){ if(edit&&edit.piece===old) exitEdit(false); removePiece(old); } addPiece(o.t); }
-  else if(o.op==='hp'){ const p=pieces.get(o.key); if(p){ p.hp=Math.min(p.hp,o.hp); growing.delete(p); } }
-  else if(o.op==='break'){ const p=pieces.get(o.key); if(p){ burst(pieceCenter(p),14,6,0.3); const nb_=neighbors(p); removePiece(p); collapseFrom(nb_); if(pieceCenter(p).distanceTo(P.pos)<30) sfx('break'); } }
+  else if(o.op==='hp'){ const p=pieces.get(o.key); if(p){ const d=o.d!=null?o.d:Math.max(0,p.hp-o.hp); p.dmgTaken=(p.dmgTaken||0)+d; p.hp=Math.min(p.hp,o.hp); if(d>0) hitLook(p); } }
+  else if(o.op==='break'){ const p=pieces.get(o.key); if(p) destroyPiece(p,o.pt?new THREE.Vector3(o.pt[0],o.pt[1],o.pt[2]):null); }
+  else if(o.op==='collapse'){ const list=(o.keys||[]).map(k=>pieces.get(k)).filter(Boolean); if(list.length) collapsePieces(list,o.c?new THREE.Vector3(o.c[0],o.c[1],o.c[2]):null); }
   else if(o.op==='shape'){ const p=pieces.get(o.key); if(p){ if(edit&&edit.piece===p) exitEdit(false); p.mask=o.mask; p.dir=o.dir; p.half=o.half; buildPiece(p); startAnim(p,140); popPlayerOut(); } }
   else if(o.op==='clear') clearBuilds();
   else if(o.op==='pv'){ const p=props[o.id]; if(p&&p.alive){ p.hp=Math.min(p.hp,o.hp); p.wob=1; if(p.hp<=0) propBreak(p); } }
   else if(o.op==='pb'){ const p=props[o.id]; if(p&&!p.alive) propRevive(p); }
 }
-function snapshot(){ return order.map(p=>Object.assign(pick(p),{mask:p.mask,half:p.half,hp:Math.round(p.hp)})); }
+function snapshot(){ return order.map(p=>Object.assign(pick(p),{mask:p.mask,half:p.half,hp:Math.round(p.hp),dt:Math.round(p.dmgTaken||0)})); }
 function netSend(m,except){
   if(net.role==='host') net.conns.forEach((c,id)=>{ if(id!==except&&c.open) try{c.send(m);}catch(e){} });
   else if(net.role==='client'&&net.host&&net.host.open) try{ net.host.send(m); }catch(e){}
 }
 function netOp(o){ if(net.role) netSend({type:'op',id:net.id,o}); }
 function hostData(from,m){
-  if(!m||typeof m!=='object') return;
+  if(!m||typeof m!=='object') return; net.seen.set(from,performance.now());
   if(m.type==='st'){ m.id=from; onState(m); netSend(m,from); }
   else if(m.type==='op'){
     m.id=from; const o=m.o, c=net.conns.get(from);
@@ -2725,9 +2932,11 @@ function hostData(from,m){
       if(have||!supported(o.t)){ if(c&&c.open) c.send({type:'undo',key:o.t.key,real:have?Object.assign(pick(have),{mask:have.mask,half:have.half,hp:Math.round(have.hp)}):null}); return; }
       o.t.owner=from; o.ts=ts;
     } else if(o.op==='shape'){
-      const p=pieces.get(o.key); if(!p||p.owner!==from){ if(p&&c&&c.open) c.send({type:'fix',key:p.key,mask:p.mask,dir:p.dir,half:p.half}); return; }
-    } else if(o.op==='clear') return; // only the host clears
+      const p=pieces.get(o.key); if(!p||!canEdit(p,from)){ if(p&&c&&c.open) c.send({type:'fix',key:p.key,mask:p.mask,dir:p.dir,half:p.half}); return; }
+    } else if(o.op==='clear'||o.op==='collapse') return; // only the host clears and decides what falls
+    else if(o.op==='break'){ netSend(m,from); applyOp(o); return; }
     applyOp(o); if(o.op==='place'&&o.ts){ const np=pieces.get(o.t.key); if(np) np.ts=o.ts; delete o.ts; } netSend(m,from);
+    if(o.op==='shape'){ const p=pieces.get(o.key); if(p&&c&&c.open) c.send({type:'fix',key:p.key,mask:p.mask,dir:p.dir,half:p.half}); }
   }
   else if(m.type==='proj'){ m.id=from; launchProj(m.k,new THREE.Vector3(...m.p),new THREE.Vector3(...m.v),false,from); netSend(m,from); }
   else if(m.type==='pk'){ const d=drops.get(m.d); if(d){ removeDrop(d.id); netSend({type:'pkd',d:d.id,to:from,item:d.item,n:d.n}); } }
@@ -2763,16 +2972,17 @@ function onElim(m){
 }
 function clientData(m){
   if(!m||typeof m!=='object') return;
-  if(m.type==='welcome'){ net.id=m.you; clearBuilds(); [...drops.keys()].forEach(removeDrop); (m.dr||[]).forEach(d=>spawnDrop(d.item,d.n,new THREE.Vector3(...d.p),new THREE.Vector3(),d.id)); (m.pd||[]).forEach(i=>{ const p=props[i]; if(p&&p.alive){ propBreak(p,true); p.dying=0; p.g.visible=false; } }); m.pieces.forEach(t=>{ const p=addPiece(t); p.mask=t.mask??p.mask; p.half=t.half; if(t.hp!=null){ p.hp=t.hp; if(p.hp>=p.maxHp) growing.delete(p); } buildPiece(p); }); respawn(); syncBot(); toast('Joined room '+net.code); updateRoomUI(); }
+  if(m.type==='welcome'){ net.id=m.you; clearBuilds(); [...drops.keys()].forEach(removeDrop); (m.dr||[]).forEach(d=>spawnDrop(d.item,d.n,new THREE.Vector3(...d.p),new THREE.Vector3(),d.id)); (m.pd||[]).forEach(i=>{ const p=props[i]; if(p&&p.alive){ propBreak(p,true); p.dying=0; p.g.visible=false; } }); m.pieces.forEach(t=>{ const p=addPiece(t); p.mask=t.mask??p.mask; p.half=t.half; p.dmgTaken=t.dt||0; if(t.hp!=null){ p.hp=t.hp; if(p.hp>=p.maxHp) growing.delete(p); } buildPiece(p); }); rules.editRule=m.er||'owner'; respawn(); syncBot(); toast('Joined room '+net.code); updateRoomUI(); }
   else if(m.type==='st') onState(m);
   else if(m.type==='op'){ if(m.id!==net.id) applyOp(m.o); }
   else if(m.type==='ping'){ if(net.host&&net.host.open) net.host.send({type:'pong',t:m.t}); }
   else if(m.type==='undo'){ const p=pieces.get(m.key); if(p&&p.owner===net.id){ removePiece(p); } if(m.real&&!pieces.has(m.real.key)){ const q=addPiece(m.real); q.mask=m.real.mask; q.half=m.real.half; if(m.real.hp!=null) q.hp=m.real.hp; buildPiece(q); } }
-  else if(m.type==='fix'){ const p=pieces.get(m.key); if(p){ if(edit&&edit.piece===p) exitEdit(false); p.mask=m.mask; p.dir=m.dir; p.half=m.half; buildPiece(p); } }
+  else if(m.type==='fix'){ const p=pieces.get(m.key); if(p&&!(p.mask===m.mask&&(p.dir??0)===(m.dir??0)&&(p.half??-1)===(m.half??-1))){ if(edit&&edit.piece===p) exitEdit(false); p.mask=m.mask; p.dir=m.dir; p.half=m.half; buildPiece(p); } }
   else if(m.type==='shot'){ if(m.id!==net.id) onShot(m); }
   else if(m.type==='hit'){ if(m.to===net.id) onHit(m); }
   else if(m.type==='elim'){ if(m.id!==net.id||m.by===net.id) onElim(m); }
-  else if(m.type==='leave') dropPlayer(m.id);
+  else if(m.type==='leave'){ dropPlayer(m.id); releaseBuilds(m.id); }
+  else if(m.type==='rules'){ rules.editRule=m.er||'owner'; }
   else if(m.type==='hz') onHordeMsg(m);
   else if(m.type==='proj'){ if(m.id!==net.id) launchProj(m.k,new THREE.Vector3(...m.p),new THREE.Vector3(...m.v),false,m.id); }
   else if(m.type==='drop'){ if(!drops.has(m.d.id)) spawnDrop(m.d.item,m.d.n,new THREE.Vector3(...m.d.p),new THREE.Vector3(...m.d.v),m.d.id); }
@@ -2785,18 +2995,18 @@ function hostGame(){
   if(!netReady()) return; leaveGame(true); readName();
   const code=roomCode(); setRoomStatus('Creating room…');
   const peer=new Peer(PREFIX+code,PEER_OPTS); net.peer=peer;
-  peer.on('open',()=>{ net.role='host'; net.code=code; net.id='h'; net.dead=false; updateRoomUI(); toast('Room '+code+' is open'); });
+  peer.on('open',()=>{ net.role='host'; net.code=code; net.id='h'; pieces.forEach(p=>{ if(p.owner==='me') p.owner='h'; }); net.dead=false; updateRoomUI(); toast('Room '+code+' is open'); });
   peer.on('connection',conn=>{
     conn.on('open',()=>{
       if(net.conns.size>=7){ try{conn.send({type:'full'});}catch(e){} setTimeout(()=>conn.close(),300); return; }
       net.conns.set(conn.peer,conn);
-      conn.send({type:'welcome',you:conn.peer,dr:dropSnapshot(),pieces:snapshot(),pd:props.filter(p=>!p.alive).map(p=>p.id)});
+      conn.send({type:'welcome',you:conn.peer,dr:dropSnapshot(),pieces:snapshot(),pd:props.filter(p=>!p.alive).map(p=>p.id),er:settings.editRule});
       conn.send(myState()); net.players.forEach(pl=>conn.send({type:'st',id:pl.id,n:pl.name,s:[pl.tgt.x,pl.tgt.y,pl.tgt.z,0,0,0,pl.yaw,pl.pitch,pl.flags,0]}));
       updateRoomUI();
     });
     conn.on('data',m=>hostData(conn.peer,m));
-    const gone=()=>{ if(!net.conns.has(conn.peer)) return; net.conns.delete(conn.peer); const pl=net.players.get(conn.peer); dropPlayer(conn.peer); netSend({type:'leave',id:conn.peer}); if(pl) toast((pl.name||'A player')+' left'); };
-    conn.on('close',gone); conn.on('error',gone);
+    const gone=()=>{ if(!net.conns.has(conn.peer)) return; net.conns.delete(conn.peer); const pl=net.players.get(conn.peer); dropPlayer(conn.peer); releaseBuilds(conn.peer); netSend({type:'leave',id:conn.peer}); if(pl) toast((pl.name||'A player')+' left'); };
+    conn._gone=gone; net.seen.set(conn.peer,performance.now()); conn.on('close',gone); conn.on('error',gone);
   });
   peer.on('error',err=>{
     if(err.type==='unavailable-id'){ hostGame(); return; }
@@ -2820,7 +3030,9 @@ function joinGame(){
   });
   peer.on('error',err=>{ setRoomStatus(err.type==='peer-unavailable'?'No room with code '+code+'. Check the code and that the host is still in.':'Could not join: '+(err.type||'connection error')+'.'); leaveGame(true); });
 }
+window.addEventListener('pagehide',()=>{ if(net.role) leaveGame(true); });
 function leaveGame(silent){
+  const was=net.id; if(net.role) pieces.forEach(p=>{ if(p.owner===was) p.owner='me'; else if(p.owner!=='bot') p.owner='public'; }); // back to solo: everything left is yours to edit
   if(net.peer){ try{ net.peer.destroy(); }catch(e){} }
   net.peer=null; net.role=null; net.host=null; net.conns.clear(); net.code=null; net.id='me'; net.dead=false; $('clear').disabled=false;
   [...net.players.keys()].forEach(dropPlayer);
@@ -2928,10 +3140,14 @@ function castShot(o,d,range,nearT,target){
 }
 function damagePiece(p,dmg,point){
   if(!pieces.has(p.key)) return;
-  p.hp-=dmg; burst(point,3,3,0.07,matFor[p.mat].chip);
-  if(p.hp>0&&net.role){ const now=performance.now(); if(!p.hpSent||now-p.hpSent>120){ p.hpSent=now; netOp({op:'hp',key:p.key,hp:Math.round(p.hp)}); } }
-  if(p.hp<=0){ burst(pieceCenter(p),16,6,0.3,matFor[p.mat].chip); const nb=neighbors(p); removePiece(p); collapseFrom(nb); sfxAt('break_'+p.mat,point); netOp({op:'break',key:p.key}); }
+  dmg*=BUILD_CFG.resist[p.mat]||1;
+  p.hp-=dmg; p.dmgTaken=(p.dmgTaken||0)+dmg; p.dmgUnsent=(p.dmgUnsent||0)+dmg;
+  burst(point,3,3,0.07,p.mat==='metal'&&Math.random()<0.6?hotSparkMat:matFor[p.mat].chip);
+  if(p.hp>0){ hitLook(p);
+    if(net.role){ const now=performance.now(); if(!p.hpSent||now-p.hpSent>120){ p.hpSent=now; netOp({op:'hp',key:p.key,hp:Math.round(p.hp),d:Math.round(p.dmgUnsent)}); p.dmgUnsent=0; } } }
+  else { netOp({op:'break',key:p.key,pt:[+point.x.toFixed(2),+point.y.toFixed(2),+point.z.toFixed(2)]}); destroyPiece(p,point); }
 }
+function hitLook(p){ applyDamageLook(p); p.shakeT=0.16; shaking.add(p); }
 function hurt(E,dmg){ const s=Math.min(E.sh,dmg); E.sh-=s; E.hp=Math.max(0,E.hp-(dmg-s)); return E.hp<=0; }
 
 // One trigger pull: every pellet is its own ray; build damage is pooled per piece; falloff by distance
@@ -3000,6 +3216,9 @@ function pieceHpTick(dt){
   el.hidden=false; el.classList.toggle('growing',growing.has(p));
   $('pieceHpT').textContent=MATERIALS[p.mat].name+' '+Math.ceil(p.hp)+' / '+p.maxHp;
   $('pieceHpB').style.width=(100*p.hp/p.maxHp).toFixed(1)+'%';
+  if(p.isProp){ $('pieceHpS').textContent=''; return; }
+  const n=dependentsOf(p), st=grounded(p)?'Anchored':'Supported';
+  $('pieceHpS').textContent=st+(n?' · holding up '+n:'')+(growing.has(p)?' · building':'');
 }
 let afT=0, afOn=false;
 function assistTick(dt){
@@ -3535,10 +3754,19 @@ function stepProjs(dt){
     if(p.kind==='rocket') p.mesh.lookAt(_pd.clone().multiplyScalar(-1).add(p.pos)); else p.mesh.rotation.x+=dt*8;
   }
   for(let i=booms.length-1;i>=0;i--){ const b=booms[i]; b.t+=dt; const k=b.t/b.life;
-    if(k>=1){ scene.remove(b.m); booms.splice(i,1); continue; }
+    if(k>=1){ scene.remove(b.m); if(b.m.userData.puff&&puffPool.length<160) puffPool.push(b.m); booms.splice(i,1); continue; }
     b.m.scale.setScalar(b.s0+(b.s1-b.s0)*(1-Math.pow(1-k,2))); b.m.material.opacity=(b.o||0.9)*(1-k); if(b.v) b.m.position.addScaledVector(b.v,dt); }
 }
-function puff(pos,size,life,mat,v){ const m=new THREE.Mesh(sph(1),(mat||smokeMat).clone()); m.position.copy(pos); scene.add(m); booms.push({m,t:0,life,s0:size,s1:size*2.2,v:v||new THREE.Vector3(0,0.6,0),o:(mat||smokeMat).opacity}); }
+/* smoke, dust and fire puffs: soft billboards (a lumpy cloud texture) instead of balls; pooled */
+const softTex=(()=>{ const N=128, c=document.createElement('canvas'); c.width=c.height=N; const g=c.getContext('2d');
+  const blob=(x,y,r,a)=>{ const gr=g.createRadialGradient(x,y,0,x,y,r); gr.addColorStop(0,`rgba(255,255,255,${a})`); gr.addColorStop(0.55,`rgba(255,255,255,${a*0.45})`); gr.addColorStop(1,'rgba(255,255,255,0)'); g.fillStyle=gr; g.fillRect(0,0,N,N); };
+  blob(64,64,60,0.75); for(let q=0;q<7;q++){ const a=q/7*Math.PI*2+0.4, d=18+(q%3)*6; blob(64+Math.cos(a)*d,64+Math.sin(a)*d,26+(q%2)*8,0.5); }
+  const t=new THREE.CanvasTexture(c); return t; })();
+const puffPool=[];
+function puff(pos,size,life,mat,v){ const src=mat||smokeMat; let m=puffPool.pop();
+  if(!m){ m=new THREE.Sprite(new THREE.SpriteMaterial({map:softTex,transparent:true,depthWrite:false})); m.userData.puff=true; }
+  const sm=m.material; sm.color.copy(src.color); if(!src.isMeshBasicMaterial) sm.color.multiplyScalar(0.92); sm.blending=src.isMeshBasicMaterial?THREE.AdditiveBlending:THREE.NormalBlending; sm.rotation=Math.random()*6.283; size*=2.1;
+  m.position.copy(pos); scene.add(m); booms.push({m,t:0,life,s0:size,s1:size*2.2,v:v||new THREE.Vector3(0,0.6,0),o:(mat||smokeMat).opacity}); }
 const RPG_BLAST={r:4.6,dmg:110,bld:380}, NADE_BLAST={r:4.2,dmg:95,bld:300};
 function explode(pos,p){
   scene.remove(p.mesh); const X=p.kind==='rocket'?RPG_BLAST:NADE_BLAST;
@@ -4115,10 +4343,10 @@ function frame(now){
   } else { P.vel.x*=0.8; P.vel.z*=0.8; }
   if(swingT>0) swingT-=dt;
   stepClouds(dt); stepPick(dt); stepSpin(dt); stepProjs(dt); stepDrops(dt); stepProps(dt); if(playing||net.role) hordeUpdate(dt); stepDusk(dt); updateHordeHUD(); stepUse(dt); updateUseBar();
-  stepAnims(now); stepChunks(dt); stepPlayers(dt); stepTracers(dt); if(B&&B.active) animateBot(dt);
+  stepAnims(now); stepChunks(dt); stepFallers(dt); stepShakes(dt); stepPlayers(dt); stepTracers(dt); if(B&&B.active) animateBot(dt);
   if(!playing&&net.role==='host'&&B&&B.active){ botUpdate(dt); const n=Math.max(1,Math.ceil(dt/0.008)); for(let k=0;k<n;k++) physStep(dt/n,B); }
   if(net.role){ net.sendT-=dt; if(net.sendT<=0){ net.sendT=0.05; netSend(myState()); if(net.role==='host'&&B&&B.active) netSend(botState()); }
-    if(net.role==='host'){ net.pingT-=dt; if(net.pingT<=0){ net.pingT=1; const t=performance.now(); net.conns.forEach(c=>{ if(c.open) try{c.send({type:'ping',t});}catch(e){} }); } } }
+    if(net.role==='host'){ net.pingT-=dt; if(net.pingT<=0){ net.pingT=1; const t=performance.now(); net.conns.forEach((c,id)=>{ if(t-(net.seen.get(id)||t)>9000&&c._gone){ c._gone(); return; } if(c.open) try{c.send({type:'ping',t});}catch(e){} }); } } }
   fitView(); updateCamera(); animateHero(dt); updateGhost(); updateHUD();
   renderer.render(scene,camera);
   requestAnimationFrame(frame);

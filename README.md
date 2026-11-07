@@ -37,7 +37,7 @@ You can't build through walls: a spot behind a wall (or a window) is blocked, bu
 ## Multiplayer
 Open the menu, type a name, and press **Host a room**. Share the 5-letter code; friends press **Join** with it. Up to 8 players.
 
-Multiplayer is peer-to-peer (WebRTC via [PeerJS](https://peerjs.com)), no server to run. The host is the source of truth for builds: it checks every placement and edit and corrects conflicts. Players can shoot each other; each player applies the damage they take, eliminations show in the feed, and you respawn after 3 seconds. Build damage, health, materials, edits and half stairs stay in sync, and late joiners get the whole map. The room closes when the host leaves.
+Multiplayer is peer-to-peer (WebRTC via [PeerJS](https://peerjs.com)), no server to run. The host is the source of truth for builds: it checks every placement and edit, decides what collapses when a support breaks (so everyone sees exactly the same result) and corrects conflicts, including two players editing the same piece at once. Players can shoot each other; each player applies the damage they take, eliminations show in the feed, and you respawn after 3 seconds. Build damage, health, materials, edits and half stairs stay in sync, and late joiners get the whole map. The room closes when the host leaves.
 
 ## Default PC binds
 | Action | Bind |
@@ -59,7 +59,19 @@ Multiplayer is peer-to-peer (WebRTC via [PeerJS](https://peerjs.com)), no server
 Every bind can be changed in the menu.
 
 ## Building rules
-- Every placement goes through one validator, and the red preview shows the reason it fails: *Already built*, *Nothing to attach to*, *Out of reach*, *Player in the way*, *Build height limit* or *Edge of the map*.
-- Materials: wood 150/140, brick 300/280, metal 500/460 max health (wall / other pieces). Builds start weaker and gain health while they finish. Start health and build-up times are estimates and can be tuned in `MATERIALS`.
-- Edits are named live (Window, Door, Wide window, Arch, Half wall, Ridge, Ramp roof…). You can only edit your own builds.
+- **Preview.** Green outline: it will build. Red outline plus the reason underneath: *Already built*, *Nothing to attach to*, *Out of reach*, *Wall in the way*, *Player in the way*, *Build height limit* or *Edge of the map*. A grey outline means the spot is taken. Every placement (yours, the bot's, a joining player's) goes through the same validator, and in a room the host checks it again.
+- **Materials.** Wood 150/140, brick 300/280, metal 500/460 max health (wall / other pieces). Builds start weaker and gain health while they finish. Start health, build-up times, damage resistance, crack thresholds and debris are all in `MATERIALS` and `BUILD_CFG` near the top of the script.
+- **Construction.** A piece appears as a blue blueprint with a material-coloured frame, then fills in section by section: wood plank by plank, brick course by course, metal in a few big panels. Walls rise from the bottom, floors grow out from the side they're attached to, stairs build from the low end up and roofs from the base. A faint frame stays until the piece reaches full health.
+- **Support.** Pieces hold each other up only through a shared edge or face; floors that only touch at a corner don't count. Anything resting on the ground is *anchored*; anything with a chain of connections down to the ground is *supported*. Aim at a build with the pickaxe or in build mode to see its health, whether it's anchored, and how many pieces it's holding up. When a piece is destroyed, only the pieces it touched are re-checked: a group that still has another way down stays up, and a group with none left collapses.
+- **Damage and collapse.** Builds crack in three stages as they take damage (splits and splinters in wood, cracked and chipped brick, dents and scratches in metal) and shudder when hit. A destroyed piece bursts into its own material: planks, bricks, or metal panels and sparks. A piece that loses its support does something different: it darkens, shudders, tips away from the break, falls and crumbles into dust and debris, with pieces farther from the break going a moment later. It stops blocking you the instant it loses support.
+- **Edits.** Edits are named live (Window, Door, Wide window, Arch, Half wall, Ridge, Ramp roof…). Editing never changes what a piece holds up. Reset puts it back exactly as placed, rotated stairs included. In Settings, **Who can edit builds** lets you choose between only the builder, the builder and teammates, or anyone. In a room the host's choice counts and the host re-checks every edit. When a player leaves, their builds become editable by everyone.
+
+### Where this approximates Fortnite
+Exact Fortnite numbers aren't public, so these are best guesses, all adjustable in `BUILD_CFG`:
+- There's no limit on how far a structure can reach from the ground, as long as there's an unbroken chain to it (`maxSupportDepth: 0`). Set a number to cap overhangs.
+- A rotated stair keeps the attachment it was placed with, so an edit can never drop anything.
+- Start health, construction time and crack thresholds are estimates.
+
+### Tests
+The building system is covered by 35 scripted checks: placement, support, editing, damage, multiplayer and performance. Each one was run in a real browser, with two real clients for the multiplayer cases. They include a 540-piece, 5-level structure brought down wall by wall with the connection graph checked after every step, and a check that nothing is left behind afterwards.
 - Controller supported (standard gamepad mapping); see the in-game menu for the layout.
