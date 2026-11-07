@@ -23,6 +23,18 @@ The island is about 800 m across, ringed by mountains you can't climb past. The 
 ## Zombie horde
 Pick **Zombie horde** next to Play. You get 20 seconds to build a fort, then waves of zombies walk in from every side. The horde is pale, rotting, bloodied zombies: Walkers, fast Runners (from wave 2) and big bloated Brutes (from wave 4). Their groans fade out quickly with distance. They have to be right next to you to hit you and can't claw through walls. Zombies claw through anything built in their way, and if you're up on a tower they go for the piece holding it up. Clearing a wave gives you a 15-second break, 50 shield, 30 health, 3 bandages and 2 small shields. In a room the host picks the mode and runs the zombies for everyone; zombies get tougher and waves bigger with more players, and anyone who goes down is back in 3 seconds.
 
+## Towns, houses and chests
+Six small towns sit around the island (Rustwood, Pebble Point, Kettle Creek, Lantern Row, Mossy Mill and Hollow Hill), each with four to six houses on levelled ground. The minimap shows which way each town is, and its name pops up when you walk in.
+- **Houses.** They have doors, windows and pitched roofs, and many have a staircase up to a second floor. They're made of real build pieces, so you can shoot, pickaxe, crack and collapse them. **Clear builds**, or the start of a new round, puts them back.
+- **Chests.** Gold-banded chests sit in houses (some upstairs) and out in the wild. They hum and glow when you're close and show as gold squares on the minimap. Stand next to one for half a second and it bursts open, throwing out:
+  - a gun (any rarity, with rarer ones less likely)
+  - ammo for that gun
+  - often a bonus: heals, grenades or extra ammo
+
+  Opened chests refill after a couple of minutes.
+- **Floor loot.** Guns and ammo lie on the floors of houses from the start.
+- **In a room**, the host opens every chest, so two players can never loot the same one. Damage to houses and opened chests stay in sync, including for players who join later.
+
 ## Trees, rocks and cars
 Trees, pine trees, rocks and old cars are scattered around the map. They're solid, so you, the bot and zombies have to go around them. Materials are infinite by default. Turn off **Infinite materials** in Settings and every build costs 10 of its material: pickaxe trees for wood, rocks for brick and cars for metal (your stock shows on the right). You start each life with 30 wood. Anything you harvest grows back in its spot after 35–80 seconds. In a room everyone sees the same map, and the host decides when things grow back.
 
@@ -35,7 +47,20 @@ You carry a pickaxe plus 5 slots (keys 2–6) that hold any weapon or item. Pres
 
 On phones, the bag button opens the inventory. You can also hold a weapon in the hotbar for a moment and drag it onto another slot (empty ones show up while you drag).
 
-Weapons: Assault Rifle, Pump Shotgun, Submachine Gun, Machine Gun, Minigun (spins up before it fires), Rocket Launcher (explosive, wrecks builds) and Grenades (bounce, then explode after 2 s). Guns use light, medium, shells or rocket ammo; reloads come out of your reserves.
+### Weapons
+There are 22 guns plus grenades, and most come in several rarities: Common (grey), Uncommon (green), Rare (blue), Epic (purple) and Legendary (gold). That makes 67 guns in all. The rarer the gun, the more damage it does and the faster it reloads. Each gun's trim shows its rarity colour, and the inventory names the rarity.
+
+| Type | Guns |
+| --- | --- |
+| Rifles | Assault Rifle, Burst Rifle (3 rounds per pull), Heavy Rifle, Infantry Rifle |
+| Scoped rifles | Scoped Rifle, Bolt-Action Sniper (scope view, bolt cycles after each shot), Hunting Rifle |
+| Shotguns | Pump Shotgun, Tactical Shotgun, Heavy Shotgun, Double Barrel |
+| SMGs | Submachine Gun, Compact SMG, Suppressed SMG (quiet) |
+| Pistols | Pistol, Revolver, Hand Cannon |
+| Heavy guns | Machine Gun, Light Machine Gun, Minigun (spins up before it fires) |
+| Explosives | Rocket Launcher, Grenade Launcher (bouncing grenades that burst on anyone they hit), Grenades |
+
+Guns use light, medium, heavy, shell or rocket ammo, and reloads come out of your reserves. Aiming with a scoped gun brings up a full scope view.
 
 In zombie horde, demons sometimes drop loot when they die: about half drop nothing, others drop a random kind of ammo (not necessarily what you use), now and then a gun, heals or grenades, and Behemoths usually drop a gun. Loot falls and lands on the ground or on builds, and you pick it up by walking over it. In build fights ammo reserves are endless.
 
