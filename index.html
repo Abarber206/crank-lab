@@ -159,6 +159,7 @@ body.touch.dragging .slot.empty{display:grid!important} /* empty slots show up a
 #matStock span.on{opacity:1;box-shadow:inset 0 0 0 2px rgba(255,255,255,.6)}
 #matStock i{width:14px;height:14px;border-radius:3px;box-shadow:inset 0 0 0 2px rgba(0,0,0,.35)}
 .dn.mat{color:#ffe7a0;font-size:16px}
+.dn.pts{color:#ffcf4a;font-size:20px}
 .modepick{display:flex;align-items:center;gap:8px;font:700 15px/1 var(--font-ui,inherit);color:var(--ink)}
 .modepick select{font:inherit;background:#1c2a40;color:var(--ink);border:1px solid rgba(255,255,255,.25);border-radius:6px;padding:8px 10px}
 /* locker: outfit cards with a rarity glow behind each character */
@@ -208,6 +209,7 @@ body.touch .slot .k{display:none}
 #tReload{right:calc(env(safe-area-inset-right,0px) + 124px);bottom:calc(env(safe-area-inset-bottom,0px) + 172px);width:50px;height:50px}
 #tFireL{left:calc(env(safe-area-inset-left,0px) + 26px);top:38%;width:60px;height:60px}
 #menuBtn{top:calc(env(safe-area-inset-top,0px) + 10px);right:calc(env(safe-area-inset-right,0px) + 152px);width:42px;height:42px;border-radius:9px}
+#emoteBtn{top:calc(env(safe-area-inset-top,0px) + 10px);right:calc(env(safe-area-inset-right,0px) + 200px);width:42px;height:42px;border-radius:9px} #emoteBtn svg{width:24px;height:24px}
 body.touch #bottom{left:calc(50% - 60px)}
 @media (max-height:430px){ body.touch .slot{width:50px;height:50px} body.touch .slot svg{width:34px;height:34px} body.touch #vitals{width:210px} .mapwrap{width:110px;height:110px} body.touch #menuBtn{right:calc(env(safe-area-inset-right,0px) + 130px)} }
 @media (orientation:portrait){
@@ -274,6 +276,36 @@ kbd{font-family:var(--font-ui);background:#1c2a40;border-radius:3px;padding:1px 
 .btn{font:inherit;font-weight:700;font-size:15px;border:0;border-radius:6px;padding:11px 18px;cursor:pointer;background:#1f3150;color:var(--ink);letter-spacing:.04em}
 .btn.primary{background:var(--build);color:var(--hud);font-family:var(--font-display);font-weight:400;letter-spacing:.05em;font-size:17px}
 .mp{display:grid;gap:8px;background:#15233a;border-radius:8px;padding:12px 14px}
+/* tabbed menu */
+.mhead{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.wallet{display:flex;align-items:center;gap:6px;background:#15233a;border:1px solid rgba(255,207,74,.35);border-radius:999px;padding:6px 14px 6px 8px;font:800 italic 18px/1 var(--font-hud);color:#ffe08a}
+.wallet svg{width:24px;height:24px} .wallet span{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.wallet.bump{animation:bump .5s} @keyframes bump{30%{transform:scale(1.15)}}
+.mtabs{display:flex;gap:4px;border-bottom:1px solid rgba(255,255,255,.12);overflow-x:auto}
+.mtabs button{font:800 italic 15px/1 var(--font-hud);letter-spacing:.06em;text-transform:uppercase;background:none;border:0;border-bottom:3px solid transparent;color:var(--muted);padding:10px 14px 9px;cursor:pointer;white-space:nowrap}
+.mtabs button.on{color:var(--ink);border-bottom-color:var(--build)} .mtabs button:hover{color:var(--ink)}
+.mtab{display:grid;gap:14px;min-width:0}
+.modes{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.mode{display:grid;gap:6px;text-align:left;font:inherit;color:var(--ink);background:#15233a;border:2px solid rgba(255,255,255,.14);border-radius:10px;padding:14px 16px;cursor:pointer;transition:border-color .12s,transform .12s}
+.mode b{font:800 italic 20px/1 var(--font-hud);letter-spacing:.03em;text-transform:uppercase} .mode small{color:var(--muted);font-size:13px;line-height:1.35}
+.mode:hover{transform:translateY(-1px)} .mode.on{border-color:var(--build);box-shadow:0 0 0 1px var(--build) inset;background:#1a2c48}
+.mode[data-mode=horde].on{border-color:#ff6a4a;box-shadow:0 0 0 1px #ff6a4a inset}
+.mode:disabled{cursor:default;opacity:.75;transform:none}
+.plist{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.plist li{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.05);border-radius:8px;padding:7px 10px;min-width:0}
+.plist .av{width:30px;height:30px;border-radius:50%;flex:none;border:2px solid rgba(255,255,255,.35)}
+.plist .nm{flex:1;min-width:0;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.plist .tag{font:800 10px/1 var(--font-hud);letter-spacing:.08em;text-transform:uppercase;padding:4px 7px;border-radius:4px;background:rgba(255,255,255,.1);color:var(--muted)}
+.plist .tag.ok{background:rgba(95,220,110,.2);color:#8ff09a} .plist .tag.lead{background:rgba(255,207,74,.2);color:#ffe08a}
+.pctl{align-items:center} #startMatch:disabled{opacity:.5}
+#play.pulse{animation:pulse 1s infinite} @keyframes pulse{50%{box-shadow:0 0 0 6px rgba(255,225,77,.35)}}
+.shopbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#15233a;border-radius:8px;padding:10px 12px}
+.shopbar p{margin:0;flex:1;min-width:0;font-size:13px;color:var(--muted)}
+.ofit .price{position:absolute;top:6px;right:6px;display:flex;align-items:center;gap:3px;background:rgba(5,10,20,.75);border-radius:999px;padding:3px 7px;font:800 italic 12px/1 var(--font-hud);color:#ffe08a;z-index:1}
+.ofit .price::before{content:'';width:10px;height:10px;border-radius:50%;background:#ffcf4a;box-shadow:inset 0 0 0 2px #b07a16}
+.ofit.locked img{filter:saturate(.35) brightness(.7)} .ofit.locked.afford .price{background:rgba(30,90,40,.85);color:#c9ffc9}
+.buybox{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#1a2c48;border:1px solid rgba(255,207,74,.35);border-radius:8px;padding:10px 12px}
+.buybox p{margin:0;flex:1;min-width:0}
 .mp h2{margin:0}
 .mprow{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
 .field{display:grid;gap:4px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:700}
@@ -391,6 +423,7 @@ body.touch #stickHint{width:100px;height:100px;opacity:.6}
   <div id="stickHint">MOVE</div>
   <div id="stick"><div id="knob"></div></div>
   <button class="tb" id="menuBtn" data-act="menu" aria-label="Pause">II</button>
+  <button class="tb" id="emoteBtn" data-act="emote" aria-label="Emote"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="#fff" stroke-width="2"/><circle cx="9" cy="10" r="1.3" fill="#fff"/><circle cx="15" cy="10" r="1.3" fill="#fff"/><path d="M8 14.5c2.2 2.4 5.8 2.4 8 0" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg></button>
   <button class="tb" id="tFireL" data-act="fire" aria-label="Fire"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7" fill="none" stroke="#fff" stroke-width="2"/><path d="M12 2v6M12 16v6M2 12h6M16 12h6" stroke="#fff" stroke-width="2"/></svg></button>
   <button class="tb" id="tFire" data-act="fire" aria-label="Fire"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7" fill="none" stroke="#fff" stroke-width="2"/><path d="M12 2v6M12 16v6M2 12h6M16 12h6" stroke="#fff" stroke-width="2"/></svg></button>
   <button class="tb" id="tJump" data-act="jump" aria-label="Jump"><svg viewBox="0 0 24 24"><path d="M5 15l7-7 7 7" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
@@ -404,52 +437,63 @@ body.touch #stickHint{width:100px;height:100px;opacity:.6}
 
 <div id="menu">
   <div class="panel">
-    <h1>Crank Lab</h1>
-    <p class="sub">A build-fight practice range. Snappy Chapter 1-style running and jumping, turbo build on a 5&nbsp;m by 4&nbsp;m grid, and wall, floor, ramp and cone edits. Ramp rush, crank 90s, and chase your best height.</p>
-    <div class="actions"><label class="modepick" for="modeSel">Mode <select id="modeSel"><option value="fight">Build fight</option><option value="horde">Zombie horde</option></select></label><button class="btn primary" id="play">Play</button><button class="btn" id="respawn">Respawn</button><button class="btn" id="clear">Clear builds</button><button class="btn" id="fs">Fullscreen</button></div>
-    <section class="locker">
+    <header class="mhead">
+      <h1>Crank Lab</h1>
+      <div class="wallet" title="Points: earned by taking down zombies. Spend them in the Locker."><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="#ffcf4a"/><circle cx="12" cy="12" r="7" fill="none" stroke="#b07a16" stroke-width="2"/><path d="M12 7v10M9 9.5h4.5a1.8 1.8 0 0 1 0 3.6h-3a1.8 1.8 0 0 0 0 3.6H15" fill="none" stroke="#7a520c" stroke-width="1.8" stroke-linecap="round"/></svg><b id="ptsV">0</b><span>pts</span></div>
+    </header>
+    <nav class="mtabs" role="tablist" aria-label="Menu">
+      <button type="button" role="tab" data-tab="play" class="on">Play</button>
+      <button type="button" role="tab" data-tab="locker">Locker</button>
+      <button type="button" role="tab" data-tab="settings">Settings</button>
+      <button type="button" role="tab" data-tab="controls">Controls</button>
+    </nav>
+    <section class="mtab" data-tab="play">
+      <p class="sub">A build-fight practice range. Snappy Chapter 1-style running and jumping, turbo build on a 5&nbsp;m by 4&nbsp;m grid, and wall, floor, ramp and cone edits. Ramp rush, crank 90s, and chase your best height.</p>
+      <div class="modes" id="modeCards" role="radiogroup" aria-label="Mode">
+        <button type="button" class="mode" data-mode="fight" role="radio"><b>Build fight</b><small>Fight the bot or your friends: box up, edit, crank 90s.</small></button>
+        <button type="button" class="mode" data-mode="horde" role="radio"><b>Zombie horde</b><small>Build a fort, survive the waves and earn points for the Locker.</small></button>
+      </div>
+      <select id="modeSel" hidden><option value="fight">Build fight</option><option value="horde">Zombie horde</option></select>
+      <div class="actions"><button class="btn primary" id="play">Play</button><button class="btn" id="respawn">Respawn</button><button class="btn" id="clear">Clear builds</button><button class="btn" id="fs">Fullscreen</button></div>
+      <section class="mp" id="partyBox">
+        <h2>Party</h2>
+        <div id="roomIdle" class="mprow">
+          <label class="field" for="pname">Name<input id="pname" maxlength="16" placeholder="Player" autocomplete="off"></label>
+          <button class="btn" id="hostBtn" type="button">Create party</button>
+          <span class="or">or</span>
+          <label class="field" for="jcode">Party code<input id="jcode" maxlength="6" placeholder="K7Q2M" autocomplete="off" autocapitalize="characters" class="code"></label>
+          <button class="btn" id="joinBtn" type="button">Join</button>
+        </div>
+        <div id="roomLive" hidden>
+          <div class="mprow">
+            <div class="codebox"><span class="lbl">Party code</span><span id="roomCode" class="big"></span></div>
+            <button class="btn" id="copyCode" type="button">Copy code</button>
+            <span id="roomInfo" class="info"></span>
+            <button class="btn" id="leaveBtn" type="button">Leave party</button>
+          </div>
+          <ul id="partyList" class="plist" aria-label="Party members"></ul>
+          <div class="mprow pctl">
+            <button class="btn primary" id="startMatch" type="button">Start match</button>
+            <button class="btn" id="endMatch" type="button" hidden>Back to lobby</button>
+            <button class="btn" id="readyBtn" type="button" hidden>Ready</button>
+            <span id="partyState" class="info"></span>
+          </div>
+        </div>
+        <div class="mprow"><label class="field" for="teamSel">Team <select id="teamSel"><option value="0">No team</option><option value="1">Team 1 (blue)</option><option value="2">Team 2 (red)</option><option value="3">Team 3 (green)</option><option value="4">Team 4 (gold)</option></select></label><span class="info">Teammates can't hurt each other. In zombie horde everyone is on one side.</span></div>
+        <p id="roomStatus" class="status" role="status"></p>
+      </section>
+    </section>
+    <section class="mtab" data-tab="locker" hidden>
+      <section class="locker">
       <h2>Locker</h2>
       <div id="outfits" class="outfits" role="listbox" aria-label="Outfit"></div>
       <h3 class="lk">Pickaxe</h3>
       <div id="picks" class="outfits picks" role="listbox" aria-label="Pickaxe"></div>
     </section>
-    <section class="mp">
-      <h2>Multiplayer</h2>
-      <div class="mprow"><label class="field" for="teamSel">Team <select id="teamSel"><option value="0">No team</option><option value="1">Team 1 (blue)</option><option value="2">Team 2 (red)</option><option value="3">Team 3 (green)</option><option value="4">Team 4 (gold)</option></select></label><span class="info">Teammates can't hurt each other. In zombie horde everyone is on one side.</span></div>
-      <div id="roomIdle" class="mprow">
-        <label class="field" for="pname">Name<input id="pname" maxlength="16" placeholder="Player" autocomplete="off"></label>
-        <button class="btn" id="hostBtn" type="button">Host a room</button>
-        <span class="or">or</span>
-        <label class="field" for="jcode">Room code<input id="jcode" maxlength="6" placeholder="K7Q2M" autocomplete="off" autocapitalize="characters" class="code"></label>
-        <button class="btn" id="joinBtn" type="button">Join</button>
-      </div>
-      <div id="roomLive" class="mprow" hidden>
-        <div class="codebox"><span class="lbl">Room code</span><span id="roomCode" class="big"></span></div>
-        <button class="btn" id="copyCode" type="button">Copy code</button>
-        <span id="roomInfo" class="info"></span>
-        <button class="btn" id="leaveBtn" type="button">Leave room</button>
-      </div>
-      <p id="roomStatus" class="status" role="status"></p>
     </section>
-    <div class="cols">
-      <div>
-        <h2>Keybinds</h2>
-        <div id="bindsDesk"><p class="sub" style="font-size:12px;margin:0 0 8px">Click a bind, then press any key, mouse button (side buttons work) or scroll the wheel. Esc cancels. Taken binds swap.</p><div id="bindList" class="bindlist"></div><button class="btn" id="resetBinds" type="button" style="margin-top:10px;padding:7px 12px;font-size:13px">Reset to defaults</button></div>
-        <dl class="binds" id="bindsTouch" hidden>
-          <dt>Left side</dt><dd>Drag to move</dd>
-          <dt>Right side</dt><dd>Drag to look</dd>
-          <dt>Wall / Floor / Ramp / Cone</dt><dd>Tap to place, hold to turbo build</dd>
-          <dt>Edit</dt><dd>Aim at a build, tap Edit, then drag over tiles and lift your finger. A wrong pattern turns red until you fix it</dd>
-          <dt>Slot bar</dt><dd>Tap a weapon to equip it. In build mode, tap a piece to place it, hold to turbo</dd>
-          <dt>Hammer</dt><dd>Switch between weapons and build mode</dd>
-          <dt>Fire</dt><dd>Shoot, place the current piece, or swing the pickaxe</dd>
-        </dl>
-        <p class="sub" style="margin-top:10px;font-size:12px"><b>Controller:</b> A jump, R3 crouch, RT fire, RB/LB switch weapon, X reload, B build mode, Y edit. In build mode RT wall, RB floor, LT stairs, LB cone (hold to turbo), X rotate. In edit, RT selects tiles, Y confirms, B resets. D-pad right switches material.</p>
-        <p class="sub" style="margin-top:10px;font-size:12px">Stair edits: drag across two side-by-side tiles for a half stair that rises from the first tile you touched, or all four to re-aim the full stair. Cone edits: each selected tile raises that corner to the full height of the wall, so two side tiles make a ramp that reaches the top, one tile makes a corner roof, and two diagonal tiles make a ridge.</p>
-      </div>
-      <div>
-        <h2>Settings</h2>
-        <div class="set">
+    <section class="mtab" data-tab="settings" hidden>
+      <h2>Settings</h2>
+      <div class="set">
           <label for="sens">Look sensitivity <span class="v" id="sensV"></span><input type="range" id="sens" min="0.3" max="3" step="0.05"></label>
           <label for="fov">Field of view <span class="v" id="fovV"></span><input type="range" id="fov" min="60" max="100" step="1"></label>
           <label for="botSel">Opponent <select id="botSel"><option value="off">Off</option><option value="adaptive">Adaptive (matches you)</option><option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option><option value="expert">Expert</option></select></label>
@@ -469,7 +513,23 @@ body.touch #stickHint{width:100px;height:100px;opacity:.6}
           <label for="infMats">Infinite materials (off: farm trees, rocks and cars for builds) <input type="checkbox" id="infMats"></label>
         </div>
       </div>
-    </div>
+    </section>
+    <section class="mtab" data-tab="controls" hidden>
+      <h2>Keybinds</h2>
+        <div id="bindsDesk"><p class="sub" style="font-size:12px;margin:0 0 8px">Click a bind, then press any key, mouse button (side buttons work) or scroll the wheel. Esc cancels. Taken binds swap.</p><div id="bindList" class="bindlist"></div><button class="btn" id="resetBinds" type="button" style="margin-top:10px;padding:7px 12px;font-size:13px">Reset to defaults</button></div>
+        <dl class="binds" id="bindsTouch" hidden>
+          <dt>Left side</dt><dd>Drag to move</dd>
+          <dt>Right side</dt><dd>Drag to look</dd>
+          <dt>Wall / Floor / Ramp / Cone</dt><dd>Tap to place, hold to turbo build</dd>
+          <dt>Edit</dt><dd>Aim at a build, tap Edit, then drag over tiles and lift your finger. A wrong pattern turns red until you fix it</dd>
+          <dt>Slot bar</dt><dd>Tap a weapon to equip it. In build mode, tap a piece to place it, hold to turbo</dd>
+          <dt>Hammer</dt><dd>Switch between weapons and build mode</dd>
+          <dt>Fire</dt><dd>Shoot, place the current piece, or swing the pickaxe</dd>
+        </dl>
+        <p class="sub" style="margin-top:10px;font-size:12px"><b>Controller:</b> A jump, R3 crouch, RT fire, RB/LB switch weapon, X reload, B build mode, Y edit. In build mode RT wall, RB floor, LT stairs, LB cone (hold to turbo), X rotate. In edit, RT selects tiles, Y confirms, B resets. D-pad right switches material.</p>
+        <p class="sub" style="margin-top:10px;font-size:12px">Stair edits: drag across two side-by-side tiles for a half stair that rises from the first tile you touched, or all four to re-aim the full stair. Cone edits: each selected tile raises that corner to the full height of the wall, so two side tiles make a ramp that reaches the top, one tile makes a corner roof, and two diagonal tiles make a ridge.</p>
+      
+    </section>
   </div>
 </div>
 
@@ -492,12 +552,17 @@ const SPAWN=[2.5,0,2.5];
 
 /* ---------- settings ---------- */
 const DEFAULT_BINDS={forward:'KeyW',back:'KeyS',left:'KeyA',right:'KeyD',jump:'Space',crouch:'ShiftLeft',fire:'Mouse0',
-  wall:'KeyQ',floor:'KeyF',ramp:'KeyE',cone:'KeyC',edit:'KeyG',reset:'Mouse2',rotate:'KeyR',pick:'Digit1',gun:'Digit2',pump:'Digit3',bandage:'Digit4',mini:'Digit5',slot6:'Digit6',inventory:'Tab',reload:'KeyT',material:'KeyX',aim:'Mouse2'};
+  wall:'KeyQ',floor:'KeyF',ramp:'KeyE',cone:'KeyC',edit:'KeyG',reset:'Mouse2',rotate:'KeyR',pick:'Digit1',gun:'Digit2',pump:'Digit3',bandage:'Digit4',mini:'Digit5',slot6:'Digit6',inventory:'Tab',reload:'KeyT',material:'KeyX',aim:'Mouse2',emote:'KeyB'};
 const BIND_LABELS={forward:'Move forward',back:'Move back',left:'Move left',right:'Move right',jump:'Jump',crouch:'Crouch (hold)',
-  fire:'Place / select tiles',wall:'Wall',floor:'Floor',ramp:'Ramp',cone:'Cone',edit:'Edit / confirm',reset:'Reset edit',rotate:'Rotate ramp',pick:'Pickaxe',gun:'Slot 2',pump:'Slot 3',bandage:'Slot 4',mini:'Slot 5',slot6:'Slot 6',inventory:'Inventory',reload:'Reload',material:'Switch material',aim:'Aim down sights'};
-const settings={team:0, editRule:'owner', infMats:true, outfit:'rook', pickaxe:'steel', mode:'fight', bot:'adaptive', btnSize:1, btnOpacity:0.7, leftFire:true, autoRes:true, grassLevel:null, autoFire:false, aimAssist:true, editSens:1, sens:1, fov:78, turbo:0.05, editRelease:true, instantBuild:false, shadows:!isTouch, binds:{}};
+  fire:'Place / select tiles',wall:'Wall',floor:'Floor',ramp:'Ramp',cone:'Cone',edit:'Edit / confirm',reset:'Reset edit',rotate:'Rotate ramp',pick:'Pickaxe',gun:'Slot 2',pump:'Slot 3',bandage:'Slot 4',mini:'Slot 5',slot6:'Slot 6',inventory:'Inventory',reload:'Reload',material:'Switch material',aim:'Aim down sights',emote:'Emote'};
+const settings={team:0, editRule:'owner', infMats:true, outfit:'rook', pickaxe:'steel', mode:'fight', bot:'adaptive', btnSize:1, btnOpacity:0.7, leftFire:true, emote:'dance', autoRes:true, grassLevel:null, autoFire:false, aimAssist:true, editSens:1, sens:1, fov:78, turbo:0.05, editRelease:true, instantBuild:false, shadows:!isTouch, binds:{}};
 try{ Object.assign(settings, JSON.parse(localStorage.getItem('cranklab.settings')||'{}')); }catch(e){}
 settings.binds=Object.assign({},DEFAULT_BINDS,settings.binds||{});
+/* emotes: picked in the Locker, played with the Emote bind (B) or the smiley button; moving, jumping, shooting or
+   building stops them. The id travels in the player state so everyone sees it. */
+const EMOTES={wave:{name:'Wave',dur:2.6},dance:{name:'Groove',dur:12,beat:1.9},cheer:{name:'Cheer',dur:2.4},salute:{name:'Salute',dur:2.2}};
+const EMOTE_IDS=Object.keys(EMOTES);
+if(!EMOTES[settings.emote]) settings.emote='dance';
 function saveSettings(){ try{ localStorage.setItem('cranklab.settings', JSON.stringify(settings)); }catch(e){} }
 
 /* ---------- renderer / scene ---------- */
@@ -1651,8 +1716,19 @@ function wishInput(){
   fw+=-stick.y-pad.ly; st+=stick.x+pad.lx;
   return [fw,st];
 }
+function startEmote(id){
+  if(!EMOTES[id]||isDead()||edit||!P.onGround) return;
+  if(P.emote&&P.emote.id===id){ P.emote=null; return; } // pressing it again stops it
+  P.emote={id,t:0,beat:-1}; adsHeld=false; fireHeld=false; P.useT=0;
+}
+// an emote ends on its own, or as soon as you move, jump, fall, build, edit or get knocked out
+function stepEmote(dt,fw,st){
+  const e=P.emote; if(!e) return; e.t+=dt; const E=EMOTES[e.id];
+  if(e.t>E.dur||fw||st||isHeld('jump')||touchJump||!P.onGround||edit||mode==='build'||isDead()||!playing){ P.emote=null; return; }
+  if(E.beat){ const b=Math.floor(e.t*E.beat); if(b!==e.beat){ e.beat=b; sfx(b%4===2?'beat_snare':'beat_kick'); } }
+}
 function moveInput(dt){
-  const [fw,st]=wishInput();
+  const [fw,st]=wishInput(); stepEmote(dt,fw,st);
   const ms=(1-0.35*adsK)*(P.useT>0?0.55:1); moveBody(P,fw*ms,st*ms,isHeld('jump')||touchJump,dt);
 }
 function moveBody(E,fw,st,jump,dt){
@@ -2009,7 +2085,7 @@ function toggleBuild(){
 // eliminated (in a room, or by the bot) = no moving, shooting, building or editing until you respawn
 function isDead(){ return net.dead||(typeof round!=='undefined'&&round.state==='over'&&P.hp<=0)||(horde.on&&!net.role&&P.hp<=0); }
 function fireDown(src){
-  if(isDead()) return;
+  if(isDead()) return; if(P.emote) P.emote=null;
   if(edit){ if(src==='desk'){ edit.painting=null; edit.mouse=true; paintTile(tileAtNDC(0,0)); } return; }
   fireHeld=true;
   if(mode==='build'){ tryPlace(heldPiece||piece); turboT=settings.turbo; }
@@ -2131,6 +2207,8 @@ function sfx(k){
     case 'place': case 'place_wood': knock(230*r(),0.11,0.55,6); knock(700*r(),0.05,0.25,5); noise(3000,0.02,0.08,1,0,'highpass'); break;
     case 'place_brick': noise(380*r(),0.14,0.55,0.9,0,'lowpass',140); knock(900*r(),0.04,0.2,4); for(let q=0;q<3;q++) noise(1800+Math.random()*1500,0.02,0.07,3,0.02+q*0.03); break;
     case 'place_metal': [520,733,1240].forEach((f,q)=>tone('sine',f*r(),f*0.98,0.32-q*0.06,0.09)); noise(4000,0.03,0.12,1,0,'highpass'); tone('square',180,90,0.05,0.05); break;
+    case 'beat_kick': tone('sine',120,45,0.16,0.22); noise(5000,0.03,0.04,1,0.12,'highpass'); break;
+    case 'beat_snare': noise(1800,0.12,0.16,0.8); tone('triangle',190,150,0.06,0.07); break;
     case 'creak': tone('sawtooth',92*r(),58,0.55,0.05); tone('sawtooth',61*r(),44,0.7,0.04,0.08); noise(240,0.7,0.35,0.8,0,'lowpass',80); for(let q=0;q<4;q++) knock(260+Math.random()*320,0.06,0.16,5,0.12+q*0.1); break;
     case 'crumble': noise(170*r(),0.45,0.5,0.7,0,'lowpass',70); knock(130*r(),0.16,0.38,4); for(let q=0;q<4;q++) noise(900+Math.random()*1500,0.03,0.09,3,0.03+q*0.06); break;
     case 'break': case 'break_wood': noise(1300,0.2,0.5,0.7); knock(190,0.2,0.5,4); for(let q=0;q<5;q++) noise(1600+Math.random()*1800,0.03,0.12,3,0.05+q*0.05+Math.random()*0.03); break;
@@ -2203,7 +2281,8 @@ const toonGrad=(()=>{ const d=new Uint8Array([85,85,85,140,140,140,200,200,200,2
 const toonCache=new Map();
 // Models are shaded smoothly (no stepped cartoon bands, no black outlines): soft per-pixel light with a faint sheen.
 // (The name stuck from the cel-shaded days.)
-function toon(c){ let m=toonCache.get(c); if(!m){ m=new THREE.MeshPhongMaterial({color:c,shininess:16,specular:0x1c1c1c}); m.userData.part=true; toonCache.set(c,m); } return m; }
+function toon(c){ if(c&&c.isMaterial) return c; // a ready-made material (glowing parts) passes straight through
+  let m=toonCache.get(c); if(!m){ m=new THREE.MeshPhongMaterial({color:c,shininess:16,specular:0x1c1c1c}); m.userData.part=true; toonCache.set(c,m); } return m; }
 const inkMat=new THREE.MeshBasicMaterial({color:0x151a22,side:THREE.BackSide}); inkMat.visible=false; // outlines off: never drawn
 const OUTLINES=false;
 const inkCache=new Map();
@@ -2286,7 +2365,9 @@ const OUTFITS=[
 const outfitIdx=id=>Math.max(0,OUTFITS.findIndex(o=>o.id===id));
 const PICKAXES=[
   {id:'steel',name:'Steel Pick',rarity:'common'},{id:'mallet',name:'Bonk Mallet',rarity:'uncommon'},{id:'glow',name:'Neon Cleaver',rarity:'rare'},
-  {id:'crystal',name:'Geode Pick',rarity:'epic'},{id:'scythe',name:'Frostreap',rarity:'epic'},{id:'gold',name:'Gilded Pick',rarity:'legendary'}];
+  {id:'crystal',name:'Geode Pick',rarity:'epic'},{id:'scythe',name:'Frostreap',rarity:'epic'},{id:'gold',name:'Gilded Pick',rarity:'legendary'},
+  {id:'hatchet',name:'Ranger Hatchet',rarity:'uncommon'},{id:'tactical',name:'Breach Tool',rarity:'rare'},{id:'wrench',name:'Volt Wrench',rarity:'rare'},
+  {id:'anchor',name:'Tidebreaker',rarity:'epic'},{id:'ember',name:'Ember Pick',rarity:'epic'},{id:'hexaxe',name:'Hex Cleaver',rarity:'legendary'}];
 const pickIdx=id=>Math.max(0,PICKAXES.findIndex(p=>p.id===id));
 function heroFor(o,pk){ return createHero(o.jacket,Object.assign({},o,{pickaxe:pk||'steel'})); }
 // swap a character's look in place (keeps its animation state and scene placement)
@@ -2312,18 +2393,19 @@ function createHero(jacketHex,opts){
 
   // pelvis
   rig.hips=grp(hero,0,0.94,0);
-  part(rbox(.3,.17,.2,.07),C.pants,rig.hips,0,0,0);
-  part(rbox(.31,.045,.21,.02),C.sole,rig.hips,0,.07,0,null,null,0.006);
-  part(rbox(.06,.045,.02,.01),C.steel,rig.hips,0,.07,-.11,null,null,0);
-  part(rbox(.07,.09,.05,.02),C.packD,rig.hips,.15,.0,.02,null,null,0.006); // hip pouch (shells/mags come from here)
+  part(rbox(.27,.16,.185,.045),C.pants,rig.hips,0,0,0);
+  part(rbox(.28,.038,.195,.012),C.sole,rig.hips,0,.07,0,null,null,0.006);
+  part(rbox(.05,.036,.016,.006),C.steel,rig.hips,0,.07,-.1,null,null,0);
+  part(rbox(.06,.085,.045,.014),C.packD,rig.hips,.14,.0,.02,null,null,0.006); // hip pouch (shells/mags come from here)
   rig.pouch=grp(rig.hips,.16,.0,-.02);
   // torso
   rig.spine=grp(rig.hips,0,.09,0);
-  part(rbox(.28,.19,.19,.08),C.jacket,rig.spine,0,.07,0);
+  part(rbox(.25,.2,.175,.05),C.jacket,rig.spine,0,.07,0);
   rig.chest=grp(rig.spine,0,.16,0);
-  part(rbox(.37,.27,.22,.1),C.jacket,rig.chest,0,.12,0);
-  part(rbox(.38,.06,.225,.03),C.jacketD,rig.chest,0,.04,0,null,null,0.006);
-  part(new THREE.CylinderGeometry(.115,.135,.07,14,1,true),C.jacketD,rig.chest,0,.27,0,null,null,0.008);
+  part(rbox(.34,.27,.21,.06),C.jacket,rig.chest,0,.12,0);
+  part(rbox(.345,.05,.214,.02),C.jacketD,rig.chest,0,.04,0,null,null,0.006);
+  part(rbox(.3,.08,.19,.05),C.jacket,rig.chest,0,.22,0,null,null,0.006); // shoulders taper in to the neck
+  part(new THREE.CylinderGeometry(.085,.11,.07,16,1,true),C.jacketD,rig.chest,0,.27,0,null,null,0.008);
   if(top==='jacket'||top==='racer'){
     [-1,1].forEach(sx=>{ part(rbox(.075,.07,.02,.012),C.jacketL,rig.chest,sx*.11,.07,-.11,null,null,0.004); part(rbox(.012,.012,.012,.004),C.steel,rig.chest,sx*.1,.17,-.124,null,null,0); });
     part(rbox(.016,.34,.01,.004),C.jacketD,rig.chest,0,.07,-.112,null,null,0);
@@ -2381,16 +2463,16 @@ function createHero(jacketHex,opts){
   }
   // head
   rig.neck=grp(rig.chest,0,.27,0);
-  part(limbGeo(.055,.06,.09),C.skin,rig.neck,0,.08,0,null,null,0.006);
-  rig.head=grp(rig.neck,0,.06,0);
-  part(rbox(.25,.27,.25,.1,4),C.skin,rig.head,0,.12,0);
+  part(limbGeo(.044,.05,.1),C.skin,rig.neck,0,.085,0,null,null,0.006);
+  rig.head=grp(rig.neck,0,.06,0); rig.head.scale.setScalar(.88); // a realistic head-to-body ratio
+  part(rbox(.235,.26,.24,.095,4),C.skin,rig.head,0,.13,0);
+  part(rbox(.2,.07,.19,.035,3),C.skin,rig.head,0,.035,.005); // jaw line, tucked under the cheeks
   part(sph(.03),C.skin,rig.head,-.126,.11,.01,null,[.5,.95,.8],0.006); part(sph(.03),C.skin,rig.head,.126,.11,.01,null,[.5,.95,.8],0.006);
-  part(rbox(.045,.055,.04,.018),C.skin,rig.head,0,.1,-.13,null,null,0.006);
-  [-1,1].forEach(sx=>part(sph(.024),0xf2a08f,rig.head,sx*.085,.085,-.112,null,[1,.6,.4],0));
-  rig.lids=[-1,1].map(sx=>{ const l=part(sph(.031),C.skin,rig.head,sx*.055,.168,-.121,null,[1.05,.2,.55],0); return l; });
-  rig.eyes=[-1,1].map(sx=>{ const e=grp(rig.head,sx*.055,.145,-.122); part(sph(.029),0xffffff,e,0,0,0,null,[1,1.25,.5],0.004); part(sph(.019),0x1a1f29,e,0,-.003,-.011,null,[1,1.25,.6],0); return e; });
-  rig.brows=[-1,1].map(sx=>part(rbox(.065,.018,.02,.008),C.hair,rig.head,sx*.056,.198,-.127,null,null,0));
-  rig.mouth=part(rbox(.065,.014,.012,.006),0x6b2f2a,rig.head,0,.055,-.126,null,null,0);
+  part(rbox(.034,.062,.036,.012),C.skin,rig.head,0,.1,-.128,[-.12,0,0],null,0.006); // nose
+  rig.lids=[-1,1].map(sx=>{ const l=part(sph(.024),C.skin,rig.head,sx*.052,.168,-.118,null,[1.2,.2,.55],0); return l; });
+  rig.eyes=[-1,1].map(sx=>{ const e=grp(rig.head,sx*.052,.148,-.118); part(sph(.021),0xf4f1ea,e,0,0,0,null,[1.15,.78,.42],0.004); part(sph(.0125),0x2a2620,e,0,0,-.008,null,[1,1,.6],0); part(sph(.004),0xffffff,e,.004,.003,-.0145,null,null,0); return e; });
+  rig.brows=[-1,1].map(sx=>part(rbox(.06,.011,.014,.005),C.hair,rig.head,sx*.054,.19,-.124,[0,0,sx*-.08],null,0));
+  rig.mouth=part(rbox(.05,.009,.01,.004),0x7a3a33,rig.head,0,.05,-.122,null,null,0);
   rig.tuft=grp(rig.head,0,.28,.02);
   const covered=headwear==='helmet'||headwear==='knight'||headwear==='hood'||headwear==='cathood';
   if(!covered){
@@ -2449,42 +2531,42 @@ function createHero(jacketHex,opts){
   if(headwear==='helmet'||headwear==='knight'){ rig.eyes.forEach(e=>e.visible=false); rig.lids.forEach(e=>e.visible=false); rig.brows.forEach(e=>e.visible=false); rig.mouth.visible=false; }
   // arms
   const arm=sx=>{
-    const sh=grp(rig.chest,sx*.205,.21,0); sh.rotation.order='XZY';
-    part(sph(.07),C.jacket,sh,0,-.01,0);
-    part(limbGeo(.058,.052,.25),C.jacket,sh);
+    const sh=grp(rig.chest,sx*.19,.21,0); sh.rotation.order='XZY';
+    part(sph(.058),C.jacket,sh,0,-.01,0);
+    part(limbGeo(.048,.041,.25),C.jacket,sh);
     if(top==='armor') part(sph(.095),C.jacketL,sh,0,.0,0,null,[1.1,.75,1.1]);
     if(top==='suit') part(new THREE.TorusGeometry(.06,.014,8,16),C.accent,sh,0,-.12,0,[Math.PI/2,0,0],null,0);
     const el=grp(sh,0,-.25,0);
-    part(sph(.052),C.jacket,el,0,0,0,null,null,0.008);
-    part(limbGeo(.052,.044,.21),C.jacket,el);
-    part(new THREE.TorusGeometry(.053,.012,8,18),C.jacketD,el,0,-.02,0,[Math.PI/2,0,0],null,0);
-    part(limbGeo(.05,.05,.04),C.jacketD,el,0,-.18,0,null,null,0.006);
+    part(sph(.042),C.jacket,el,0,0,0,null,null,0.008);
+    part(limbGeo(.042,.033,.21),C.jacket,el);
+    part(new THREE.TorusGeometry(.043,.009,8,18),C.jacketD,el,0,-.02,0,[Math.PI/2,0,0],null,0);
+    part(limbGeo(.039,.039,.04),C.jacketD,el,0,-.18,0,null,null,0.006);
     const wr=grp(el,0,-.23,0);
-    part(rbox(.075,.085,.06,.025),C.glove,wr,0,-.035,0,null,null,0.007);
+    part(rbox(.062,.078,.044,.016),C.glove,wr,0,-.035,0,null,null,0.007);
     const fing=grp(wr,0,-.075,0);
-    for(let f=0;f<4;f++) part(rbox(.017,.06,.022,.008),C.glove,fing,-.026+f*.0175,-.028+(f===0||f===3?.006:0),-.004,null,null,0.004);
-    part(rbox(.074,.014,.05,.006),C.packD,wr,0,-.072,-.004,null,null,0);
-    part(rbox(.025,.055,.03,.012),C.glove,wr,-sx*.04,-.05,-.02,[0,0,sx*.4],null,0.006);
+    for(let f=0;f<4;f++) part(rbox(.0135,.055,.017,.006),C.glove,fing,-.021+f*.014,-.026+(f===0||f===3?.005:0),-.002,null,null,0.004);
+    part(rbox(.062,.011,.04,.004),C.packD,wr,0,-.072,-.002,null,null,0);
+    part(rbox(.019,.05,.022,.008),C.glove,wr,-sx*.034,-.048,-.016,[0,0,sx*.4],null,0.006);
     const hand=grp(wr,0,-.06,0);
     return {sh,el,wr,fing,hand,side:sx};
   };
   rig.armL=arm(-1); rig.armR=arm(1);
   // legs
   const leg=sx=>{
-    const hp=grp(rig.hips,sx*.088,-.05,0); hp.rotation.order='XZY';
-    part(limbGeo(.09,.074,.4),C.pants,hp);
-    part(rbox(.03,.1,.09,.012),C.pantsD,hp,sx*.085,-.2,0,null,null,0.005);
+    const hp=grp(rig.hips,sx*.08,-.05,0); hp.rotation.order='XZY';
+    part(limbGeo(.079,.06,.4),C.pants,hp);
+    part(rbox(.022,.1,.08,.008),C.pantsD,hp,sx*.074,-.19,0,null,null,0.005);
     const kn=grp(hp,0,-.4,0);
-    part(sph(.072),C.pants,kn,0,0,0,null,null,0.008);
-    part(rbox(.1,.11,.05,.025),C.pantsD,kn,0,-.02,-.055,null,null,0.006);
-    part(limbGeo(.071,.058,.36),C.pants,kn);
+    part(sph(.058),C.pants,kn,0,0,0,null,null,0.008);
+    part(rbox(.08,.1,.035,.016),C.pantsD,kn,0,-.02,-.05,null,null,0.006);
+    part(limbGeo(.058,.045,.36),C.pants,kn);
     const an=grp(kn,0,-.37,0);
-    part(rbox(.12,.13,.13,.045),C.boot,an,0,-.035,0);
-    for(let q=0;q<3;q++) part(rbox(.07,.008,.01,.003),0xe9e2d0,an,0,-.005-q*.025,-.068-q*.006,null,null,0);
-    part(rbox(.03,.02,.012,.004),C.steel,an,sx*.062,.0,0,null,null,0);
-    part(rbox(.115,.085,.11,.04),C.boot,an,0,-.075,-.09);
-    part(rbox(.128,.03,.26,.012),C.sole,an,0,-.12,-.045,null,null,0.006);
-    part(limbGeo(.068,.068,.035),C.packD,an,0,.04,0,null,null,0.005);
+    part(rbox(.098,.13,.11,.03),C.boot,an,0,-.035,0);
+    for(let q=0;q<3;q++) part(rbox(.055,.006,.008,.002),0xe9e2d0,an,0,-.005-q*.025,-.057-q*.006,null,null,0);
+    part(rbox(.022,.016,.01,.003),C.steel,an,sx*.05,.0,0,null,null,0);
+    part(rbox(.096,.072,.125,.03),C.boot,an,0,-.078,-.085);
+    part(rbox(.104,.022,.25,.008),C.sole,an,0,-.12,-.045,null,null,0.006);
+    part(limbGeo(.055,.055,.035),C.packD,an,0,.04,0,null,null,0.005);
     const foot=grp(an,0,-.13,-.06);
     return {hp,kn,an,foot,side:sx};
   };
@@ -2537,6 +2619,54 @@ function createHero(jacketHex,opts){
     part(rbox(.05,.07,.07,.02),0x5d8fb8,ph,0,0,0);
     for(let q=0;q<5;q++){ const a=-.12-q*.2; part(rbox(.02,.07-q*.008,.1,.01),0x9fe3ff,ph,0,.02+.012*q*q,-.07-.085*q,[a,0,0],null,0.005);
       part(rbox(.022,.012,.1,.004),glow(0xeaffff),ph,0,-.012-q*.006+.012*q*q,-.07-.085*q,[a,0,0],null,0); }
+  } else if(pk==='hatchet'){ // Ranger Hatchet: hickory handle, leather wrap, broad steel bit
+    part(limbGeo(.019,.023,.7),0x8a5a34,rig.pick,0,.12,0,null,null,0.006);
+    for(let q=0;q<6;q++) part(limbGeo(.025,.025,.022),q%2?0x3a2516:0x52341f,rig.pick,0,.08-q*.03,0,null,null,0);
+    part(limbGeo(.026,.03,.04),0x2e3136,rig.pick,0,-.5,0,null,null,0);
+    part(rbox(.046,.075,.08,.014),0x5b6068,ph,0,0,0);
+    part(rbox(.016,.2,.17,.008),0x9aa3ad,ph,0,0,-.115);
+    part(rbox(.018,.21,.016,.004),0xe6edf3,ph,0,0,-.2,null,null,0); // honed edge
+    part(rbox(.036,.06,.06,.012),0x5b6068,ph,0,0,.06);
+  } else if(pk==='tactical'){ // Breach Tool: black composite handle, red grip, spike and adze
+    part(limbGeo(.02,.022,.72),0x1d2024,rig.pick,0,.12,0,null,null,0.006);
+    part(limbGeo(.025,.025,.2),0xc0392b,rig.pick,0,.08,0,null,null,0.004);
+    for(let q=0;q<5;q++) part(limbGeo(.027,.027,.008),0x15171a,rig.pick,0,.0-q*.04,0,null,null,0);
+    part(rbox(.05,.09,.09,.016),0x2b2f35,ph,0,0,0);
+    const sp=new THREE.ConeGeometry(.026,.26,6); sp.rotateX(-Math.PI/2); part(sp,0x6b7380,ph,0,.01,-.17);
+    part(rbox(.03,.08,.13,.01),0x6b7380,ph,0,-.005,.1,[.25,0,0]);
+    part(rbox(.052,.02,.06,.006),0xc0392b,ph,0,.05,0,null,null,0);
+  } else if(pk==='wrench'){ // Volt Wrench: open jaw, insulated grips, a charged coil
+    part(limbGeo(.021,.021,.7),0x464d57,rig.pick,0,.12,0,null,null,0.006);
+    part(limbGeo(.026,.026,.24),0xf2b705,rig.pick,0,.1,0,null,null,0.004);
+    for(let q=0;q<3;q++) part(new THREE.TorusGeometry(.03,.006,6,14),glow(0x58e1ff),rig.pick,0,-.36-q*.04,0,[Math.PI/2,0,0],null,0);
+    part(rbox(.05,.12,.1,.02),0x6c7580,ph,0,0,0);
+    part(rbox(.03,.04,.15,.01),0x8a939e,ph,0,.05,-.11); part(rbox(.03,.04,.15,.01),0x8a939e,ph,0,-.05,-.11);
+    part(rbox(.032,.13,.03,.01),0x6c7580,ph,0,0,.07);
+    part(sph(.018),glow(0x58e1ff),ph,0,0,-.03,null,null,0);
+  } else if(pk==='anchor'){ // Tidebreaker: a ship's anchor with rope-bound shank
+    part(limbGeo(.021,.024,.74),0x2c4a5a,rig.pick,0,.14,0,null,null,0.006);
+    for(let q=0;q<7;q++) part(new THREE.TorusGeometry(.026,.007,6,14),0xc9a46a,rig.pick,0,.06-q*.035,0,[Math.PI/2,0,0],null,0);
+    part(new THREE.TorusGeometry(.045,.012,8,18),0xb08d57,rig.pick,0,.18,0,null,null,0.004); // ring
+    const arc=new THREE.TorusGeometry(.15,.022,8,22,Math.PI); arc.rotateY(Math.PI/2); arc.rotateX(Math.PI);
+    part(arc,0x2f6f86,ph,0,.06,0);
+    [-1,1].forEach(d=>{ const fl=new THREE.ConeGeometry(.05,.1,4); fl.rotateX(d<0?-Math.PI/2+.5:Math.PI/2-.5); part(fl,0x3c8ea8,ph,0,.08,d*.17); });
+    part(rbox(.03,.03,.24,.01),0xb08d57,rig.pick,0,-.38,0);
+  } else if(pk==='ember'){ // Ember Pick: obsidian with a molten core showing through the cracks
+    part(limbGeo(.02,.022,.72),0x1b1416,rig.pick,0,.12,0,null,null,0.006);
+    [0,.09,.18].forEach(y=>part(limbGeo(.024,.024,.01),glow(0xff6a1f),rig.pick,0,-.1-y,0,null,null,0));
+    part(rbox(.06,.1,.1,.03),0x231a1c,ph,0,0,0);
+    const sp=new THREE.ConeGeometry(.04,.3,5); sp.rotateX(-Math.PI/2); part(sp,0x2a2023,ph,0,.01,-.19);
+    const bk=new THREE.ConeGeometry(.034,.16,5); bk.rotateX(Math.PI/2); part(bk,0x2a2023,ph,0,.01,.13);
+    part(rbox(.064,.012,.2,.004),glow(0xff7b2a),ph,0,.012,-.13,[-.05,0,0],null,0); part(rbox(.064,.06,.012,.004),glow(0xffb347),ph,0,0,-.02,null,null,0);
+    part(sph(.024),glow(0xffd27a),ph,0,0,0,null,null,0);
+  } else if(pk==='hexaxe'){ // Hex Cleaver: twin hexagonal blades around a glowing core
+    part(limbGeo(.02,.022,.74),0x241b33,rig.pick,0,.13,0,null,null,0.006);
+    for(let q=0;q<4;q++) part(limbGeo(.025,.025,.02),0xd4af37,rig.pick,0,.05-q*.12,0,null,null,0);
+    const hx=new THREE.CylinderGeometry(.13,.13,.022,6); hx.rotateZ(Math.PI/2);
+    part(hx,0x6a3cff,ph,0,0,-.12); part(hx,0x6a3cff,ph,0,0,.1,null,[1,.7,.7]);
+    const rim=new THREE.CylinderGeometry(.135,.135,.012,6); rim.rotateZ(Math.PI/2); part(rim,0xd4af37,ph,.0,0,-.12,null,null,0);
+    part(rbox(.05,.09,.09,.02),0xd4af37,ph,0,0,0);
+    part(sph(.03),glow(0xc59bff),ph,0,0,-.12,null,[.9,1,1],0); part(sph(.022),glow(0xc59bff),ph,0,0,.1,null,null,0);
   }
   // hammer + blueprint (build mode)
   rig.hammer=grp(rig.armR.hand,0,0,0);
@@ -2826,7 +2956,11 @@ function animateRig(H,S,dt){
   const vf=S.vel.x*fx+S.vel.z*fz, vs=S.vel.x*rx+S.vel.z*rz, sp=Math.hypot(S.vel.x,S.vel.z), k=Math.min(1,sp/RUN);
   const mv=sp>0.2?Math.atan2(vs,vf):0, cm=Math.cos(mv), sm_=Math.sin(mv);
   const sm=1-Math.exp(-dt*18), smF=1-Math.exp(-dt*30);
-  const gun=!S.building&&S.gun?S.gun:false, building=!!S.building;
+  const emo=S.emote&&EMOTES[S.emote.id]?S.emote:null;
+  const gun=!S.building&&S.gun&&!emo?S.gun:false, building=!!S.building&&!emo;
+  // turn rate and acceleration, smoothed: the body banks into turns and leans with speed changes
+  A.yawRate=lerp(A.yawRate||0,Math.max(-8,Math.min(8,dYaw/Math.max(dt,1e-3))),Math.min(1,dt*10));
+  { const acc=(sp-(A.prevSp||0))/Math.max(dt,1e-3); A.prevSp=sp; A.accLean=lerp(A.accLean||0,Math.max(-0.2,Math.min(0.2,acc*0.012)),Math.min(1,dt*8)); }
   // ----- death -----
   if(A.dead){
     A.deadT+=dt; const f=Math.min(1,A.deadT/0.6), e=f*f*(3-2*f);
@@ -2850,7 +2984,7 @@ function animateRig(H,S,dt){
   if(A.stepT>0){ A.stepT-=dt; A.lag*=Math.exp(-dt*12); }
   A.lag=Math.max(-1,Math.min(1,A.lag));
   // ----- target pose -----
-  const T={hipY:0.94,hipsX:0,hipsY:0,hipsZ:0,spX:0,spY:0,chX:0,chY:0,chZ:0,nkX:0,nkY:0,
+  const T={hipY:0.94,hipsX:0,hipsY:0,hipsZ:0,spX:0,spY:0,chX:0,chY:0,chZ:0,nkX:0,nkY:0,nkZ:0,
     shL:0,shR:0,shLz:-0.1,shRz:0.1,elL:0.25,elR:0.25,hpL:0,hpR:0,hpLz:0,hpRz:0,knL:-0.06,knR:-0.06,anL:0,anR:0};
   const bounceArms=!gun&&!building;
   if(S.onGround){
@@ -2898,6 +3032,21 @@ function animateRig(H,S,dt){
   T.chX+=S.pitch*0.32; T.nkX=S.pitch*0.42-T.spX*0.6;
   // hurt flinch
   T.spX+=0.25*A.hurt; T.nkX+=0.3*A.hurt; T.chZ+=0.12*A.hurt*A.hurtSide;
+  // ----- motion detail: bank into turns, lean with acceleration, steady the head while running -----
+  if(S.onGround&&!S.crouch){ const bank=-(A.yawRate||0)*0.035*k; T.chZ+=bank; T.hipsZ+=bank*0.5; T.spX-=A.accLean*(gun?0.5:1);
+    T.nkX+=0.05*k*Math.sin(2*A.phase); T.nkY-=T.hipsY*0.6+T.chY*0.4*(gun?0:1); }
+  // ----- emotes (wave, dance, cheer, salute): only standing still on the ground -----
+  if(emo){ const t=emo.t, id=emo.id;
+    if(id==='wave'){ const up=Math.min(1,t*5); T.shR=lerp(T.shR,2.9,up); T.shRz=0.35*up; T.elR=0.55+0.45*Math.sin(t*10)*up; T.nkZ=0.12*up; T.chZ+=-0.05*up; T.nkY+=0.15*up; }
+    else if(id==='dance'){ const b=t*Math.PI*2*1.9, s1=Math.sin(b), s2=Math.sin(b/2);
+      T.hipsZ+=0.14*s2; T.hipY+=-0.04+0.035*Math.abs(Math.sin(b)); T.knL+=-0.35*Math.max(0,s2); T.knR+=-0.35*Math.max(0,-s2); T.hpL+=0.15*Math.max(0,s2); T.hpR+=0.15*Math.max(0,-s2);
+      T.chZ+=-0.1*s2; T.chY+=0.25*Math.sin(b/4); T.nkX+=0.1*Math.abs(s1)-0.04; T.nkZ=0.08*s2;
+      T.shL=1.2+0.9*Math.max(0,s1); T.shR=1.2+0.9*Math.max(0,-s1); T.shLz=-0.6; T.shRz=0.6; T.elL=1.4-0.6*Math.max(0,s1); T.elR=1.4-0.6*Math.max(0,-s1); }
+    else if(id==='cheer'){ const b=t*Math.PI*2*2.2, up=Math.min(1,t*6);
+      T.shL=lerp(T.shL,2.8,up); T.shR=lerp(T.shR,2.8,up); T.shLz=-0.35*up; T.shRz=0.35*up; T.elL=T.elR=0.25+0.35*Math.max(0,Math.sin(b));
+      T.hipY+=0.05*Math.max(0,Math.sin(b)); T.knL+=-0.25*Math.max(0,-Math.sin(b)); T.knR=T.knL; T.nkX-=0.25*up; }
+    else if(id==='salute'){ const up=Math.min(1,t*4); T.shR=lerp(T.shR,2.05,up); T.shRz=0.75*up; T.elR=lerp(T.elR,2.35,up); T.chX-=0.05*up; T.nkX-=0.05*up; }
+  }
   // ----- upper body by activity -----
   if(gun){ T.chY+=-0.42; T.nkY+=0.32; T.spY+=-0.05; }
   else if(building){
@@ -2920,7 +3069,7 @@ function animateRig(H,S,dt){
   set(r.hips,'x',T.hipsX); set(r.hips,'y',T.hipsY+A.lag); set(r.hips,'z',T.hipsZ);
   set(r.spine,'x',T.spX); set(r.spine,'y',T.spY);
   set(r.chest,'x',T.chX); set(r.chest,'y',T.chY-A.lag); set(r.chest,'z',T.chZ);
-  set(r.neck,'x',T.nkX); set(r.neck,'y',T.nkY);
+  set(r.neck,'x',T.nkX); set(r.neck,'y',T.nkY); set(r.neck,'z',T.nkZ);
   for(const [L,h,hz,kn,an] of [[r.legL,T.hpL,T.hpLz,T.knL,T.anL],[r.legR,T.hpR,T.hpRz,T.knR,T.anR]]){
     set(L.hp,'x',h,smF); set(L.hp,'z',hz,smF); set(L.kn,'x',kn,smF); set(L.an,'x',an,smF); }
   if(!gun){
@@ -2934,7 +3083,7 @@ function animateRig(H,S,dt){
   const mdl=modelOf(gun), GW=gun?WEAPONS[gun===true?'ar':gun]:null;
   for(const k of GUN_MODELS) if(r[k]) r[k].visible=mdl===k;
   r.gun.visible=mdl==='ar'; r.pump.visible=mdl==='pump';
-  if(GW&&A.trimW!==GW.id&&r.trims){ A.trimW=GW.id; (r.trims[mdl]||[]).forEach(m=>{ m.material.color.setHex(RCOL[GW.rarity]); m.material.emissive.setHex(GW.rarity==='legendary'?0x3a2400:GW.rarity==='epic'?0x1e0a30:0x0a0a0a); }); } r.hammer.visible=building; r.plan.visible=building||!!S.editing; r.pick.visible=!gun&&!building&&!S.editing&&!S.item;
+  if(GW&&A.trimW!==GW.id&&r.trims){ A.trimW=GW.id; (r.trims[mdl]||[]).forEach(m=>{ m.material.color.setHex(RCOL[GW.rarity]); m.material.emissive.setHex(GW.rarity==='legendary'?0x3a2400:GW.rarity==='epic'?0x1e0a30:0x0a0a0a); }); } r.hammer.visible=building; r.plan.visible=building||!!S.editing; r.pick.visible=!gun&&!building&&!S.editing&&!S.item&&!emo;
   r.muzzle=r['muzzle_'+mdl]||(mdl==='pump'?r.muzzlePump:r.muzzleAR);
   [r.armL,r.armR].forEach(a=>a.fing.rotation.x=lerp(a.fing.rotation.x,S.editing?0.25:0.95,sm));
   r.slide.position.y=-0.33+0.12*(A.pumpT>0?Math.sin(Math.min(1,(0.5-A.pumpT)/0.42)*Math.PI):0);
@@ -2948,10 +3097,14 @@ function animateRig(H,S,dt){
     const aimR=_tw2.copy(_aim).applyAxisAngle(_rt,0.16*rec+0.9*A.equip*A.equip);
     // reload tilts the gun
     const rl=S.reload, tilt=rl?Math.sin(Math.min(1,rl.p)*Math.PI)*(WEAPONS[rl.w]&&WEAPONS[rl.w].shell?0.35:0.7):0;
-    const upR=_fp.copy(_up).applyAxisAngle(aimR,-tilt);
+    // standing still with a gun for a while: tip it over to check it, then back
+    const insp=(!rl&&sp<0.3&&A.idleT>6&&(S.ads||0)<0.1&&S.onGround)?Math.pow(Math.sin(Math.min(1,((A.idleT-6)%10)/2.6)*Math.PI),2)*0.85:0;
+    const upR=_fp.copy(_up).applyAxisAngle(aimR,-tilt-insp);
     handQuat(_hq,aimR,upR);
     r.armR.sh.getWorldPosition(_tw);
-    const ad=S.ads||0; _tw.addScaledVector(_aim,0.2-0.07*rec+0.06*ad).addScaledVector(_up,-0.07+0.1*ad-0.25*A.equip-(rl?0.06:0)).addScaledVector(_rt,-0.09-0.07*ad);
+    const ad=S.ads||0; _tw.addScaledVector(_aim,0.2-0.07*rec+0.06*ad).addScaledVector(_up,-0.07+0.1*ad-0.25*A.equip-(rl?0.06:0)+0.05*insp).addScaledVector(_rt,-0.09-0.07*ad);
+    // weapon bob with the stride, a slow breathing sway, and lag when turning (all damped while aiming)
+    { const bb=(S.onGround?k:0)*(1-ad), na=1-0.8*ad; _tw.addScaledVector(_up,0.016*bb*Math.abs(Math.sin(A.phase))-0.008*bb+0.004*Math.sin(A.t*1.3)*na).addScaledVector(_rt,0.013*bb*Math.sin(A.phase)-Math.max(-1,Math.min(1,(A.yawRate||0)*0.12))*0.035*na); }
     _pole.copy(_tw).addScaledVector(_up,-1).addScaledVector(_rt,0.8);
     ikArm(r.armR,_tw,_pole,_hq);
     // left hand: fore-grip, or the reload path (gun -> hip pouch -> gun)
@@ -2993,7 +3146,7 @@ function slopeFor(E){
 }
 function animateHero(dt){
   animateRig(localHero,{slope:slopeFor(P),pos:P.pos,vel:P.vel,yaw:P.yaw,pitch:P.pitch,onGround:P.onGround,crouch:P.crouch,building:mode==='build'&&!edit,editing:!!edit,item:mode==='item'&&P.useT>0,
-    gun:mode==='gun'&&!edit?P.wpn:false,ads:adsK,swingT,reload:(mode==='gun'&&P.reloadT>0)?{w:P.wpn,p:1-P.reloadT/P.reloadDur}:null},dt);
+    gun:mode==='gun'&&!edit?P.wpn:false,ads:adsK,swingT,reload:(mode==='gun'&&P.reloadT>0)?{w:P.wpn,p:1-P.reloadT/P.reloadDur}:null,emote:P.emote},dt);
 }
 
 /* ---------- camera ---------- */
@@ -3136,6 +3289,7 @@ function pressAction(a){
   else if(a==='reset'){ if(edit) resetEdit(); }
   else if(a==='rotate'){ P.rot=(P.rot+1)%4; ghostKey=''; }
   else if(a==='crouch') P.crouch=true;
+  else if(a==='emote') startEmote(settings.emote);
 }
 function releaseAction(a){
   if(a==='aim') adsHeld=false;
@@ -3275,6 +3429,7 @@ document.querySelectorAll('.tb').forEach(b=>{
     else if(act==='build') toggleBuild();
     else if(act==='inventory') toggleInv();
     else if(act==='fire') fireDown('touch');
+    else if(act==='emote') startEmote(settings.emote);
   });
   const up=()=>{ b.classList.remove('down'); const act=b.dataset.act;
     if(act==='jump') touchJump=false;
@@ -3361,27 +3516,28 @@ function dropPlayer(id){ const pl=net.players.get(id); if(!pl) return; scene.rem
 // flags: 1 ground, 2 crouch, 4 building, 8 dead, 16 editing, 32 aiming; weapon in s[10]; shield in s[11]
 function myState(){
   const f=(P.onGround?1:0)|(P.crouch?2:0)|(mode==='build'&&!edit?4:0)|(net.dead?8:0)|(edit?16:0)|(adsK>0.5?32:0);
-  return {type:'st',id:net.id,n:net.name,t:+settings.team||0,o:outfitIdx(settings.outfit),p:pickIdx(settings.pickaxe),s:[+P.pos.x.toFixed(3),+P.pos.y.toFixed(3),+P.pos.z.toFixed(3),+P.vel.x.toFixed(2),+P.vel.y.toFixed(2),+P.vel.z.toFixed(2),+P.yaw.toFixed(3),+P.pitch.toFixed(3),f,net.lastSwing,mode==='gun'&&!edit?WCODE[P.wpn]:0,Math.round(P.sh)]};
+  return {type:'st',id:net.id,n:net.name,t:+settings.team||0,o:outfitIdx(settings.outfit),p:pickIdx(settings.pickaxe),s:[+P.pos.x.toFixed(3),+P.pos.y.toFixed(3),+P.pos.z.toFixed(3),+P.vel.x.toFixed(2),+P.vel.y.toFixed(2),+P.vel.z.toFixed(2),+P.yaw.toFixed(3),+P.pitch.toFixed(3),f,net.lastSwing,mode==='gun'&&!edit?WCODE[P.wpn]:0,Math.round(P.sh),P.emote?EMOTE_IDS.indexOf(P.emote.id)+1:0]};
 }
 function onState(m){
   if(m.id===net.id) return;
   const pl=getPlayer(m.id,m.n), s=m.s;
-  if(m.o!=null&&OUTFITS[m.o]) reskin(pl.h,OUTFITS[m.o],(PICKAXES[m.p]||PICKAXES[0]).id);
+  if(m.o!=null&&OUTFITS[m.o]){ if(pl.o!==m.o&&net.role==='host') party.syncT=0; pl.o=m.o; reskin(pl.h,OUTFITS[m.o],(PICKAXES[m.p]||PICKAXES[0]).id); }
   pl.tgt.set(s[0],s[1],s[2]); pl.vel.set(s[3],s[4],s[5]); pl.yaw=s[6]; pl.pitch=s[7]; pl.flags=s[8];
-  pl.crouch=!!(s[8]&2); pl.wpn=WNAME[s[10]||0]; pl.sh=s[11]??100; if((m.t|0)!==pl.team){ pl.team=m.t|0; teamMarker(pl); }
+  pl.crouch=!!(s[8]&2); pl.wpn=WNAME[s[10]||0]; pl.sh=s[11]??100;
+  { const ei=s[12]|0, eid=ei?EMOTE_IDS[ei-1]:null; if(!eid) pl.emote=null; else if(!pl.emote||pl.emote.id!==eid) pl.emote={id:eid,t:0}; } if((m.t|0)!==pl.team){ pl.team=m.t|0; teamMarker(pl); }
   const alive=!(s[8]&8); if(alive!==pl.alive){ pl.alive=alive; pl.h.group.visible=alive; if(alive){ pl.pos.copy(pl.tgt); animEvent(pl.h,'revive'); } }
   if(s[9]&&s[9]!==pl.swingId){ pl.swingId=s[9]; if(!pl.fresh) pl.swingT=SWING_T; }
   if(pl.fresh){ pl.pos.copy(pl.tgt); pl.fresh=false; }
 }
 function stepPlayers(dt){
   const k=1-Math.exp(-dt*14);
-  net.players.forEach(pl=>{
+  net.players.forEach(pl=>{ if(pl.emote) pl.emote.t+=dt;
     pl.tgt.addScaledVector(pl.vel,Math.min(dt,0.05)*0.6);
     if(pl.pos.distanceTo(pl.tgt)>6) pl.pos.copy(pl.tgt); else pl.pos.lerp(pl.tgt,k); if(pl.swingT>0) pl.swingT-=dt;
     // smooth yaw (shortest way round) so turning never snaps
     pl.dyaw=pl.dyaw===undefined?pl.yaw:pl.dyaw+angDiff(pl.yaw,pl.dyaw)*Math.min(1,dt*18);
     if(pl.h.group.visible) animateRig(pl.h,{pos:pl.pos,vel:pl.vel,yaw:pl.dyaw,pitch:pl.pitch,onGround:!!(pl.flags&1),crouch:pl.crouch,building:!!(pl.flags&4),editing:!!(pl.flags&16),
-      gun:pl.wpn==='pick'?false:pl.wpn,ads:(pl.flags&32)?1:0,swingT:pl.swingT},dt);
+      gun:pl.wpn==='pick'?false:pl.wpn,ads:(pl.flags&32)?1:0,swingT:pl.swingT,emote:pl.emote},dt);
   });
 }
 function applyOp(o,quiet){
@@ -3435,6 +3591,7 @@ function hostData(from,m){
   else if(m.type==='shot'){ m.id=from; onShot(m); netSend(m,from); }
   else if(m.type==='hit'){ m.id=from; if(m.to==='bot'){ if(B&&B.active){ botHurt(m.dmg,from,m.w); } } else if(m.to===net.id) onHit(m); else { const c=net.conns.get(m.to); if(c&&c.open) c.send(m); } }
   else if(m.type==='elim'){ m.id=from; onElim(m); netSend(m,from); }
+  else if(m.type==='ready'){ party.ready.set(from,!!m.v); partySync(); }
 }
 // someone else fired: tracers, muzzle flash and sound from their character
 function onShot(m){
@@ -3460,7 +3617,7 @@ function onElim(m){
   const pl=net.players.get(m.id); if(pl){ pl.alive=false; animEvent(pl.h,'die'); setTimeout(()=>{ if(!pl.alive) pl.h.group.visible=false; },900); }
 }
 function clientData(m){
-  if(!m||typeof m!=='object') return;
+  if(!m||typeof m!=='object') return; net.hostSeen=performance.now();
   if(m.type==='welcome'){ net.id=m.you; clearBuilds(); (m.wx||[]).forEach(k=>{ const p=pieces.get(k); if(p&&p.owner==='world') removePiece(p); }); (m.wd||[]).forEach(([k,hp,dt])=>{ const p=pieces.get(k); if(p){ p.hp=hp; p.dmgTaken=dt; applyDamageLook(p); } }); chests.forEach(c=>{ c.open=(m.co||[]).includes(c.id); c.lidA=c.open?1.95:0; }); [...drops.keys()].forEach(removeDrop); (m.dr||[]).forEach(d=>spawnDrop(d.item,d.n,new THREE.Vector3(...d.p),new THREE.Vector3(),d.id)); (m.pd||[]).forEach(i=>{ const p=props[i]; if(p&&p.alive){ propBreak(p,true); p.dying=0; p.g.visible=false; } }); m.pieces.forEach(t=>{ const p=addPiece(t); p.mask=t.mask??p.mask; p.half=t.half; p.dmgTaken=t.dt||0; if(t.hp!=null){ p.hp=t.hp; if(p.hp>=p.maxHp) growing.delete(p); } buildPiece(p); }); rules.editRule=m.er||'owner'; respawn(); syncBot(); toast('Joined room '+net.code); updateRoomUI(); }
   else if(m.type==='st') onState(m);
   else if(m.type==='op'){ if(m.id!==net.id) applyOp(m.o); }
@@ -3471,6 +3628,10 @@ function clientData(m){
   else if(m.type==='hit'){ if(m.to===net.id) onHit(m); }
   else if(m.type==='elim'){ if(m.id!==net.id||m.by===net.id) onElim(m); }
   else if(m.type==='leave'){ dropPlayer(m.id); releaseBuilds(m.id); }
+  else if(m.type==='party') onPartyMsg(m);
+  else if(m.type==='start') onPartyStart(m);
+  else if(m.type==='lobby') onPartyLobby();
+  else if(m.type==='pts'){ addPoints(m.n,m.p?new THREE.Vector3(m.p[0],m.p[1],m.p[2]):null); if(m.wave) toast('+'+m.n+' pts for clearing wave '+m.wave); }
   else if(m.type==='rules'){ rules.editRule=m.er||'owner'; }
   else if(m.type==='chestOpen'){ const c=chests[m.id]; if(c) openChest(c,false); }
   else if(m.type==='chestReset'){ const c=chests[m.id]; if(c) closeChest(c); }
@@ -3484,19 +3645,19 @@ function netReady(){ if(typeof Peer==='undefined'){ setRoomStatus('Multiplayer c
 function readName(){ const v=$('pname').value.trim(); net.name=v||'Player'; try{localStorage.setItem('cranklab.name',net.name);}catch(e){} }
 function hostGame(){
   if(!netReady()) return; leaveGame(true); readName();
-  const code=roomCode(); setRoomStatus('Creating room…');
+  const code=roomCode(); setRoomStatus('Creating party…');
   const peer=new Peer(PREFIX+code,PEER_OPTS); net.peer=peer;
-  peer.on('open',()=>{ net.role='host'; net.code=code; net.id='h'; pieces.forEach(p=>{ if(p.owner==='me') p.owner='h'; }); net.dead=false; updateRoomUI(); toast('Room '+code+' is open'); });
+  peer.on('open',()=>{ net.role='host'; net.code=code; net.id='h'; pieces.forEach(p=>{ if(p.owner==='me') p.owner='h'; }); net.dead=false; updateRoomUI(); toast('Party '+code+' created'); });
   peer.on('connection',conn=>{
     conn.on('open',()=>{
       if(net.conns.size>=7){ try{conn.send({type:'full'});}catch(e){} setTimeout(()=>conn.close(),300); return; }
       net.conns.set(conn.peer,conn);
       conn.send(Object.assign({type:'welcome',you:conn.peer,dr:dropSnapshot(),pieces:snapshot(),pd:props.filter(p=>!p.alive&&!p.gone).map(p=>p.id),er:settings.editRule,co:chests.filter(c=>c.open).map(c=>c.id)},worldDiff()));
       conn.send(myState()); net.players.forEach(pl=>conn.send({type:'st',id:pl.id,n:pl.name,s:[pl.tgt.x,pl.tgt.y,pl.tgt.z,0,0,0,pl.yaw,pl.pitch,pl.flags,0]}));
-      updateRoomUI();
+      updateRoomUI(); partySync();
     });
     conn.on('data',m=>hostData(conn.peer,m));
-    const gone=()=>{ if(!net.conns.has(conn.peer)) return; net.conns.delete(conn.peer); const pl=net.players.get(conn.peer); dropPlayer(conn.peer); releaseBuilds(conn.peer); netSend({type:'leave',id:conn.peer}); if(pl) toast((pl.name||'A player')+' left'); };
+    const gone=()=>{ if(!net.conns.has(conn.peer)) return; net.conns.delete(conn.peer); const pl=net.players.get(conn.peer); dropPlayer(conn.peer); releaseBuilds(conn.peer); netSend({type:'leave',id:conn.peer}); party.ready.delete(conn.peer); partySync(); if(pl) toast((pl.name||'A player')+' left'); };
     conn._gone=gone; net.seen.set(conn.peer,performance.now()); conn.on('close',gone); conn.on('error',gone);
   });
   peer.on('error',err=>{
@@ -3508,18 +3669,18 @@ function hostGame(){
 function joinGame(){
   if(!netReady()) return;
   const code=$('jcode').value.trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
-  if(code.length<4){ setRoomStatus('Type the room code your friend sees.'); return; }
+  if(code.length<4){ setRoomStatus('Type the party code your friend sees.'); return; }
   leaveGame(true); readName(); setRoomStatus('Joining '+code+'…');
   const peer=new Peer(PEER_OPTS); net.peer=peer;
   peer.on('open',()=>{
     const conn=peer.connect(PREFIX+code,{reliable:true}); net.host=conn;
-    const to=setTimeout(()=>{ if(net.role!=='client'){ setRoomStatus("Couldn't connect to the host. Check the code, make sure the host is still in the room, then try again."); leaveGame(true); } },15000);
+    const to=setTimeout(()=>{ if(net.role!=='client'){ setRoomStatus("Couldn't connect to the host. Check the code, make sure the host is still in the room, then try again."); leaveGame(true); } },30000);
     conn.on('error',()=>{ clearTimeout(to); setRoomStatus('Connection to the host failed. Try again.'); leaveGame(true); });
-    conn.on('open',()=>{ clearTimeout(to); net.role='client'; net.code=code; net.dead=false; updateRoomUI(); $('clear').disabled=true; });
-    conn.on('data',m=>{ if(m&&m.type==='full'){ setRoomStatus('That room is full (8 players).'); leaveGame(true); return; } clientData(m); });
-    conn.on('close',()=>{ if(net.role==='client'){ toast('The host closed the room'); leaveGame(); } });
+    conn.on('open',()=>{ clearTimeout(to); net.hostSeen=performance.now(); net.role='client'; net.code=code; net.dead=false; updateRoomUI(); $('clear').disabled=true; });
+    conn.on('data',m=>{ if(m&&m.type==='full'){ setRoomStatus('That party is full (8 players).'); leaveGame(true); return; } clientData(m); });
+    conn.on('close',()=>{ if(net.role==='client'){ toast('The party leader left, so the party closed'); leaveGame(); } });
   });
-  peer.on('error',err=>{ setRoomStatus(err.type==='peer-unavailable'?'No room with code '+code+'. Check the code and that the host is still in.':'Could not join: '+(err.type||'connection error')+'.'); leaveGame(true); });
+  peer.on('error',err=>{ setRoomStatus(err.type==='peer-unavailable'?'No party with code '+code+'. Check the code and that the leader is still in.':'Could not join: '+(err.type||'connection error')+'.'); leaveGame(true); });
 }
 window.addEventListener('pagehide',()=>{ if(net.role) leaveGame(true); });
 function leaveGame(silent){
@@ -3534,7 +3695,9 @@ function setRoomStatus(t){ $('roomStatus').textContent=t; }
 function updateRoomUI(){
   const inRoom=!!net.role, count=net.players.size+1;
   $('roomIdle').hidden=inRoom||!!window.CRANK_NO_MP; $('roomLive').hidden=!inRoom;
-  if(inRoom){ $('roomCode').textContent=net.code; $('roomInfo').textContent=(net.role==='host'?'You are hosting · ':'Connected · ')+count+(count===1?' player':' players'); setRoomStatus(''); }
+  if(inRoom){ $('roomCode').textContent=net.code; $('roomInfo').textContent=(net.role==='host'?'You lead · ':'Joined · ')+count+(count===1?' player':' players'); setRoomStatus(''); renderParty(); }
+  else { party.live=false; party.pendingStart=false; party.list=[]; party.ready.clear(); $('play').classList.remove('pulse'); }
+  if(typeof syncModeCards==='function') syncModeCards();
   if(typeof syncBot==='function'&&document.getElementById('vitals')) syncBot();
   $('hudRoom').hidden=!inRoom; if(inRoom) $('hudRoomV').textContent=net.code+' · '+count;
 }
@@ -3542,11 +3705,100 @@ try{ $('pname').value=localStorage.getItem('cranklab.name')||''; }catch(e){}
 $('hostBtn').addEventListener('click',hostGame);
 $('joinBtn').addEventListener('click',joinGame);
 $('jcode').addEventListener('keydown',e=>{ if(e.key==='Enter') joinGame(); });
-$('leaveBtn').addEventListener('click',()=>{ leaveGame(); toast('Left the room'); });
+$('leaveBtn').addEventListener('click',()=>{ leaveGame(); toast('Left the party'); });
 $('copyCode').addEventListener('click',()=>{
   const t=net.code||''; const done=()=>toast('Code copied');
   if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(done,()=>toast('Code: '+t)); else toast('Code: '+t);
 });
+
+/* ---------- menu tabs and mode cards ---------- */
+function showTab(name){ document.querySelectorAll('.mtabs button').forEach(b=>{ const on=b.dataset.tab===name; b.classList.toggle('on',on); b.setAttribute('aria-selected',on); });
+  document.querySelectorAll('.mtab').forEach(s=>s.hidden=s.dataset.tab!==name); }
+document.querySelectorAll('.mtabs button').forEach(b=>b.addEventListener('click',()=>showTab(b.dataset.tab)));
+function syncModeCards(){ const m=net.role==='client'?(party.mode||settings.mode):settings.mode;
+  document.querySelectorAll('#modeCards .mode').forEach(c=>{ const on=c.dataset.mode===m; c.classList.toggle('on',on); c.setAttribute('aria-checked',on); c.disabled=net.role==='client'; }); }
+document.querySelectorAll('#modeCards .mode').forEach(c=>c.addEventListener('click',()=>{
+  if(net.role==='client'){ toast('The party leader picks the mode'); return; }
+  const ms=$('modeSel'); ms.value=c.dataset.mode; ms.dispatchEvent(new Event('change')); }));
+
+/* ---------- party lobby ----------
+   Create a party (you lead it) or join one with its code. Everyone in the party shows in the list with their outfit
+   colour and whether they're ready. The leader picks the mode and starts the match: every member's game switches to
+   that mode together, builds are cleared and everyone respawns. "Back to lobby" ends the match for everyone.
+   You can still run around the shared map before a match starts. */
+const party={ready:new Map(), mode:null, live:false, seq:0, list:[], syncT:0, readyMe:false, pendingStart:false};
+function partyMembers(){
+  const L=[{id:net.id,name:net.name||'Player',o:outfitIdx(settings.outfit),ready:true,lead:true}];
+  net.conns.forEach((c,id)=>{ const pl=net.players.get(id); L.push({id,name:(pl&&pl.name)||'Joining…',o:pl&&pl.o!=null?pl.o:0,ready:!!party.ready.get(id),lead:false}); });
+  return L; }
+function partySync(){ if(net.role!=='host') return; party.list=partyMembers(); party.mode=settings.mode;
+  netSend({type:'party',m:party.list.map(x=>[x.id,x.name,x.o,x.ready?1:0,x.lead?1:0]),mode:settings.mode,live:party.live,seq:party.seq}); renderParty(); }
+function onPartyMsg(m){
+  party.list=(m.m||[]).map(a=>({id:a[0],name:a[1],o:a[2],ready:!!a[3],lead:!!a[4]})); party.mode=m.mode; party.live=!!m.live;
+  const me=party.list.find(x=>x.id===net.id); if(me) party.readyMe=me.ready;
+  syncModeCards(); renderParty(); }
+function renderParty(){
+  const live=!!net.role; if(!live) return;
+  const ul=$('partyList'); ul.innerHTML='';
+  const list=net.role==='host'?partyMembers():party.list;
+  list.forEach(x=>{ const li=document.createElement('li'), o=OUTFITS[x.o]||OUTFITS[0];
+    li.innerHTML=`<span class="av" style="background:#${o.jacket.toString(16).padStart(6,'0')}"></span><span class="nm"></span>`+(x.lead?'<span class="tag lead">Leader</span>':x.ready?'<span class="tag ok">Ready</span>':'<span class="tag">Not ready</span>')+(x.id===net.id?'<span class="tag">You</span>':'');
+    li.querySelector('.nm').textContent=x.name; ul.appendChild(li); });
+  const host=net.role==='host', n=list.length, ready=list.filter(x=>x.ready).length, mname=(party.mode||settings.mode)==='horde'?'Zombie horde':'Build fight';
+  $('startMatch').hidden=!host; $('endMatch').hidden=!(host&&party.live); $('readyBtn').hidden=host;
+  $('startMatch').textContent=party.live?'Restart match':'Start match';
+  $('readyBtn').textContent=party.readyMe?'Ready ✓':'Ready up'; $('readyBtn').classList.toggle('primary',!party.readyMe);
+  $('partyState').textContent=party.live?(host?'Match running: '+mname:'Match running: '+mname+'. Press Play to jump in.')
+    :host?(n===1?'Share the code so friends can join. Pick a mode, then start.':ready+' of '+n+' ready · '+mname):'Waiting for the leader to start · '+mname;
+  $('play').classList.toggle('pulse',party.pendingStart&&!playing);
+}
+function startMatch(){
+  if(net.role!=='host') return;
+  party.seq++; party.live=true; party.pendingStart=false;
+  if(horde.on) hordeStop();                      // a fresh horde (or none) every match
+  clearBuilds(); netOp({op:'clear'});
+  respawn(); round.you=0; round.bot=0;
+  netSend({type:'start',mode:settings.mode,seq:party.seq});
+  partySync(); syncBot();
+  banner(settings.mode==='horde'?'Zombie horde':'Build fight','Match started',2);
+  startPlay();
+}
+function endMatch(){
+  if(net.role!=='host') return;
+  party.live=false; if(horde.on) hordeStop();
+  netSend({type:'lobby'}); partySync(); openMenu(); showTab('play'); toast('Back in the lobby');
+}
+function onPartyStart(m){
+  party.live=true; party.mode=m.mode; syncModeCards();
+  respawn(); banner(m.mode==='horde'?'Zombie horde':'Build fight','The leader started the match',2.5); sfx('win');
+  if(!playing){ showTab('play'); party.pendingStart=true; if(isTouch) setTimeout(()=>{ if(!playing&&party.live) startPlay(); },900); }
+  renderParty();
+}
+function onPartyLobby(){ party.live=false; party.pendingStart=false; if(playing){ openMenu(); } showTab('play'); toast('The leader ended the match'); renderParty(); }
+$('startMatch').addEventListener('click',startMatch);
+$('endMatch').addEventListener('click',endMatch);
+$('readyBtn').addEventListener('click',()=>{ party.readyMe=!party.readyMe; if(net.role==='client'&&net.host&&net.host.open) try{ net.host.send({type:'ready',v:party.readyMe}); }catch(e){} renderParty(); });
+
+/* ---------- points: earned by taking down zombies, spent in the Locker ---------- */
+const WALLET_KEY='cranklab.wallet';
+const wallet={pts:0,owned:[]};
+try{ const w=JSON.parse(localStorage.getItem(WALLET_KEY)||'{}'); if(typeof w.pts==='number'&&isFinite(w.pts)) wallet.pts=Math.max(0,Math.floor(w.pts)); if(Array.isArray(w.owned)) wallet.owned=w.owned.filter(x=>typeof x==='string'); }catch(e){}
+function saveWallet(){ try{ localStorage.setItem(WALLET_KEY,JSON.stringify(wallet)); }catch(e){} }
+function renderWallet(bump){ const v=$('ptsV'); if(v) v.textContent=wallet.pts.toLocaleString(); const w=v&&v.parentNode; if(bump&&w){ w.classList.remove('bump'); void w.offsetWidth; w.classList.add('bump'); }
+  const hv=$('hudPts'); if(hv) hv.textContent=wallet.pts.toLocaleString(); if(typeof renderShop==='function') renderShop(); }
+const ZPTS={husk:10,runner:15,brute:60}, WAVE_PTS=w=>20+10*w;
+function addPoints(n,pos){ n=Math.round(n); if(!(n>0)) return; wallet.pts+=n; saveWallet(); renderWallet(true); if(pos) dmgNum(pos,'+'+n+' pts','pts'); }
+// who gets the points for a kill: you, or (as host) the player who landed it
+function creditKill(z,by){ const n=ZPTS[z.type]||10, pos=z.pos.clone().setY(z.pos.y+2.1*z.sc);
+  if(!net.role||by===net.id) addPoints(n,pos);
+  else if(net.role==='host'&&by&&by!=='bot'&&by!=='zombie'){ const c=net.conns.get(by); if(c&&c.open) try{ c.send({type:'pts',n,p:[+pos.x.toFixed(2),+pos.y.toFixed(2),+pos.z.toFixed(2)]}); }catch(e){} } }
+function waveBonus(w){ const n=WAVE_PTS(w); addPoints(n); toast('+'+n+' pts for clearing wave '+w); if(net.role==='host') netSend({type:'pts',n,wave:w}); }
+renderWallet();
+
+// heartbeats (timers keep running in a background tab, unlike frames): the leader pings members; a member that hears
+// nothing from the leader for 15 s treats the party as closed (the leader's tab or phone was closed)
+setInterval(()=>{ if(net.role==='host') netSend({type:'hb'});
+  else if(net.role==='client'&&net.hostSeen&&performance.now()-net.hostSeen>15000){ net.hostSeen=0; toast('Lost the party leader, so the party closed'); leaveGame(); } },2000);
 addEventListener('beforeunload',()=>{ if(net.peer) try{net.peer.destroy();}catch(e){} });
 
 /* ---------- combat: health, rifle, build damage ---------- */
@@ -3896,7 +4148,7 @@ function clearZombies(){ [...horde.zs.values()].forEach(dropZombie); }
 function hordeTargets(){ const a=[]; if(!(net.dead||P.hp<=0)) a.push(P); net.players.forEach(pl=>{ if(pl.alive&&pl.id!=='bot') a.push(pl); }); return a; }
 function zombieHurt(z,dmg,by){
   if(!z.alive) return; z.hp-=dmg; z.hitFlash=0.12;
-  if(z.hp<=0){ z.alive=false; z.hp=0; z.deadT=0; horde.kills++; zombieLoot(z); burst(z.pos.clone().setY(z.pos.y+1.1*z.sc),10,4,0.09,goreMat); zsfx('zdie',z.pos);
+  if(z.hp<=0){ z.alive=false; z.hp=0; z.deadT=0; horde.kills++; creditKill(z,by); zombieLoot(z); burst(z.pos.clone().setY(z.pos.y+1.1*z.sc),10,4,0.09,goreMat); zsfx('zdie',z.pos);
     if(by===net.id||!net.role) stat('h',0); }
   else if(Math.random()<0.35) zsfx('zhurt',z.pos);
 }
@@ -3974,7 +4226,7 @@ function hordeStart(){
   banner('Zombie horde','Build a fort – the first wave comes in 20 s',3); syncBot(); refreshTeamMarkers();
 }
 function hordeStop(){ clearZombies(); horde.on=false; horde.phase='idle'; if(net.role==='host') netSend({type:'hz',off:1}); syncBot(); refreshTeamMarkers(); }
-function hordeMine(){ return settings.mode==='horde'&&net.role!=='client'; } // solo, or hosting a room
+function hordeMine(){ return settings.mode==='horde'&&net.role!=='client'&&(!net.role||party.live); } // solo, or leading a party with a horde match running
 function hordeUpdate(dt){
   if(hordeMine()&&!horde.on) hordeStart();
   if(!hordeMine()&&horde.on&&net.role!=='client') hordeStop();
@@ -3989,7 +4241,7 @@ function hordeUpdate(dt){
       const w=horde.wave, r=Math.random(), type=w>=4&&r<Math.min(0.14,0.03*w)?'brute':w>=2&&r<0.3?'runner':'husk';
       const [x,z]=hordeSpawnPoint(); newZombie(type,x,z); horde.toSpawn--; }
     if(horde.toSpawn<=0&&alive===0){ horde.phase='break'; horde.t=15; horde.best=Math.max(horde.best,horde.wave);
-      banner('Wave '+horde.wave+' cleared','Next wave in 15 s – patch up your fort',3); sfx('win'); hordeHeal(); if(net.role==='host') netSend({type:'hz',heal:1}); }
+      banner('Wave '+horde.wave+' cleared','Next wave in 15 s – patch up your fort',3); sfx('win'); hordeHeal(); if(net.role==='host') netSend({type:'hz',heal:1}); waveBonus(horde.wave); }
   } else if(horde.phase==='over'){ horde.t-=dt; if(horde.t<=0){ horde.phase='idle'; hordeStart(); } }
   // everybody down in a room: the horde wins, start over
   if(net.role==='host'&&horde.phase==='wave'&&hordeTargets().length===0){ horde.downT+=dt; if(horde.downT>2.5){ horde.downT=0; horde.phase='over'; horde.t=6;
@@ -4993,7 +5245,8 @@ function drawMini(){
   sel.addEventListener('change',()=>{ settings.bot=sel.value; saveSettings(); if(B) B.active=false; syncBot(); });
   const tsel=$('teamSel'); tsel.value=String(settings.team||0); tsel.addEventListener('change',()=>{ settings.team=+tsel.value; saveSettings(); refreshTeamMarkers(); });
   const ms=$('modeSel'); ms.value=settings.mode==='horde'?'horde':'fight';
-  ms.addEventListener('change',()=>{ settings.mode=ms.value; saveSettings(); if(net.role==='client') toast('The host picks the mode in a room'); });
+  ms.addEventListener('change',()=>{ if(net.role==='client'){ ms.value=party.mode||settings.mode; toast('The party leader picks the mode'); syncModeCards(); return; } settings.mode=ms.value; saveSettings(); syncModeCards(); if(net.role==='host'){ partySync(); } });
+  syncModeCards();
 })();
 initProps(); props.forEach(p=>{ if(townAt(p.x,p.z,6)){ p.gone=true; p.alive=false; p.g.visible=false; } }); syncMats();
 buildWorld(); initChests(); spawnFloorLoot();
@@ -5101,7 +5354,8 @@ function frame(now){
   stepGrass(dt); stepChests(dt); stepAnims(now); stepChunks(dt); stepFallers(dt); stepShakes(dt); stepPlayers(dt); stepTracers(dt); if(B&&B.active) animateBot(dt);
   if(!playing&&net.role==='host'&&B&&B.active){ botUpdate(dt); const n=Math.max(1,Math.ceil(dt/0.008)); for(let k=0;k<n;k++) physStep(dt/n,B); }
   if(net.role){ net.sendT-=dt; if(net.sendT<=0){ net.sendT=0.05; netSend(myState()); if(net.role==='host'&&B&&B.active) netSend(botState()); }
-    if(net.role==='host'){ net.pingT-=dt; if(net.pingT<=0){ net.pingT=1; const t=performance.now(); net.conns.forEach((c,id)=>{ if(t-(net.seen.get(id)||t)>9000&&c._gone){ c._gone(); return; } if(c.open) try{c.send({type:'ping',t});}catch(e){} }); } } }
+    if(net.role==='host'){ party.syncT-=dt; if(party.syncT<=0){ party.syncT=2; partySync(); }
+      net.pingT-=dt; if(net.pingT<=0){ net.pingT=1; const t=performance.now(); net.conns.forEach((c,id)=>{ if(t-(net.seen.get(id)||t)>9000&&c._gone){ c._gone(); return; } if(c.open) try{c.send({type:'ping',t});}catch(e){} }); } } }
   fitView(); updateCamera(); animateHero(dt); updateGhost(); updateHUD();
   renderer.render(scene,camera);
   requestAnimationFrame(frame);
