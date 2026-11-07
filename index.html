@@ -485,7 +485,9 @@ body.touch #stickHint{width:100px;height:100px;opacity:.6}
     </section>
     <section class="mtab" data-tab="locker" hidden>
       <section class="locker">
-      <h2>Locker</h2>
+      <div class="shopbar"><p>Outfits and pickaxes with a price unlock with points. Earn them in <b>Zombie horde</b>: 10 for a walker, 15 for a runner, 60 for a brute, plus a bonus for every wave you clear.</p></div>
+      <div class="buybox" id="buyBox" hidden><p></p><button class="btn primary" id="buyOk" type="button">Buy</button><button class="btn" id="buyNo" type="button">Cancel</button></div>
+      <h3 class="lk">Outfits</h3>
       <div id="outfits" class="outfits" role="listbox" aria-label="Outfit"></div>
       <h3 class="lk">Pickaxe</h3>
       <div id="picks" class="outfits picks" role="listbox" aria-label="Pickaxe"></div>
@@ -2360,20 +2362,47 @@ const OUTFITS=[
   {id:'sprig',name:'Sprig',rarity:'uncommon',jacket:0x5f7a3a,pants:0x7a6847,boot:0x5a3d26,glove:0x5a3d26,skin:0x8d5a3b,hair:0x1b1b1b,pack:0x9a6a3a,accent:0xe0782b,top:'jacket',head:'beanie',hairStyle:'ponytail',back:'shield'},
   {id:'volt',name:'Volt',rarity:'legendary',jacket:0x1d1f27,pants:0x1d1f27,boot:0x15161b,glove:0xffd400,skin:0xe0ac8a,hair:0xb04cff,pack:0xffd400,packD:0x15161b,accent:0xffd400,top:'racer',head:'shades',hairStyle:'mohawk',back:'guitar'},
   {id:'glacier',name:'Glacier',rarity:'epic',jacket:0x7fb8e6,pants:0x3c4a66,boot:0xb9c7d6,glove:0xb9c7d6,pack:0x9fd8f5,packD:0x5d8fb8,accent:0x2fc7ff,top:'armor',head:'knight',back:'shield'},
-  {id:'whisk',name:'Whisk',rarity:'rare',jacket:0x7b5cd6,pants:0x2d2a3a,boot:0xf2f2f2,glove:0x2d2a3a,skin:0xf3cfb0,accent:0xff8fc8,top:'hoodie',head:'cathood',back:'none'}
+  {id:'whisk',name:'Whisk',rarity:'rare',jacket:0x7b5cd6,pants:0x2d2a3a,boot:0xf2f2f2,glove:0x2d2a3a,skin:0xf3cfb0,accent:0xff8fc8,top:'hoodie',head:'cathood',back:'none'},
+  // shop outfits: bought with points earned in the zombie horde
+  {id:'scout',name:'Scout',rarity:'common',shop:1,jacket:0x4f6d8f,pants:0x3b3f46,boot:0x6b4a2a,glove:0xe2b48f,skin:0xe2b48f,hair:0x6b3e1f,accent:0xd9483b,top:'tee',head:'cap',hairStyle:'swept',back:'pack'},
+  {id:'mason',name:'Mason',rarity:'common',shop:1,jacket:0x8a7a5a,pants:0x3b4a6b,boot:0x5a3d26,glove:0x9a8a6a,skin:0xc98f6a,hair:0x2a1e14,accent:0xffc61a,pack:0x7a6a4a,top:'vest',head:'hardhat',hairStyle:'buzz',back:'tank'},
+  {id:'drift',name:'Drift',rarity:'uncommon',shop:1,jacket:0xf0a830,pants:0x2d3a4a,boot:0xf2f2f2,glove:0xf3cfb0,skin:0xf3cfb0,hair:0x1c1c1c,accent:0x2a6fd6,top:'tee',head:'capb',hairStyle:'bun',back:'none'},
+  {id:'moss',name:'Moss',rarity:'uncommon',shop:1,jacket:0xa8392e,pants:0x3d4a30,boot:0x4a3426,glove:0x4a3426,skin:0xe7b48f,hair:0x8a4a1f,accent:0x2f6b3a,pack:0x6b5a3a,top:'flannel',head:'beanie',hairStyle:'long',back:'pack'},
+  {id:'dusk',name:'Dusk Ranger',rarity:'rare',shop:1,jacket:0x5a4636,pants:0x2e2a26,boot:0x2a1e16,glove:0x2a1e16,skin:0xd9a07a,hair:0x1c1410,accent:0x8a2a2a,pack:0x6b4423,top:'coat',head:'bandana',hairStyle:'swept',back:'quiver'},
+  {id:'blaze',name:'Blaze',rarity:'rare',shop:1,jacket:0x2d2f36,pants:0x2d2f36,boot:0x15161b,glove:0x15161b,skin:0x8d5a3b,hair:0x111111,accent:0xff5a1f,pack:0xc9d2dc,top:'vest',head:'headset',hairStyle:'buzz',back:'tank'},
+  {id:'frost',name:'Frostbyte',rarity:'rare',shop:1,jacket:0xe8f3fb,pants:0x5d7a96,boot:0xffffff,glove:0x9fd8f5,skin:0xf3d5bf,hair:0xdfeaf2,accent:0x2fc7ff,pack:0x9fd8f5,top:'jacket',head:'visor',hairStyle:'long',back:'shield'},
+  {id:'jinx',name:'Jinx',rarity:'epic',shop:1,jacket:0x1fb58a,pants:0x2a1e3a,boot:0xff4fa8,glove:0x2a1e3a,skin:0x7a4a2e,hair:0x2a1610,accent:0xff4fa8,pack:0xffd400,top:'hoodie',head:'bandana',hairStyle:'afro',back:'guitar'},
+  {id:'thorne',name:'Thorne',rarity:'epic',shop:1,jacket:0x2a1e2e,pants:0x1c1620,boot:0x15161b,glove:0x15161b,skin:0xe0c2b0,hair:0x3a1f2e,accent:0x9a1f3a,pack:0x3a1f2e,top:'coat',head:'tophat',hairStyle:'long',back:'sword'},
+  {id:'marina',name:'Marina',rarity:'epic',shop:1,jacket:0x1d6fa8,pants:0x15354f,boot:0xf2b705,glove:0x15354f,skin:0xe7b48f,hair:0xd96a2a,accent:0xf2b705,pack:0xf2b705,packD:0x8a6a10,top:'suit',head:'visor',hairStyle:'bun',back:'tank'},
+  {id:'nightfall',name:'Nightfall',rarity:'legendary',shop:1,jacket:0x15161b,pants:0x15161b,boot:0x2a2f38,glove:0x8a5cff,skin:0xd9b3a0,hair:0xeeeeff,accent:0x8a5cff,pack:0x2a2f38,packD:0x15161b,top:'racer',head:'headset',hairStyle:'swept',back:'wings'},
+  {id:'regalia',name:'Regalia',rarity:'legendary',shop:1,jacket:0xf2f2ee,pants:0x2a2a3a,boot:0xd4af37,glove:0xd4af37,skin:0xe7c3a5,hair:0xe8c86a,accent:0xd4af37,pack:0x7a1f3a,packD:0x4a1022,top:'armor',head:'crown',hairStyle:'long',back:'banner'}
 ];
 const outfitIdx=id=>Math.max(0,OUTFITS.findIndex(o=>o.id===id));
 const PICKAXES=[
   {id:'steel',name:'Steel Pick',rarity:'common'},{id:'mallet',name:'Bonk Mallet',rarity:'uncommon'},{id:'glow',name:'Neon Cleaver',rarity:'rare'},
   {id:'crystal',name:'Geode Pick',rarity:'epic'},{id:'scythe',name:'Frostreap',rarity:'epic'},{id:'gold',name:'Gilded Pick',rarity:'legendary'},
   {id:'hatchet',name:'Ranger Hatchet',rarity:'uncommon'},{id:'tactical',name:'Breach Tool',rarity:'rare'},{id:'wrench',name:'Volt Wrench',rarity:'rare'},
-  {id:'anchor',name:'Tidebreaker',rarity:'epic'},{id:'ember',name:'Ember Pick',rarity:'epic'},{id:'hexaxe',name:'Hex Cleaver',rarity:'legendary'}];
+  {id:'anchor',name:'Tidebreaker',rarity:'epic'},{id:'ember',name:'Ember Pick',rarity:'epic'},{id:'hexaxe',name:'Hex Cleaver',rarity:'legendary'},
+  {id:'crowbar',name:'Crowbar',rarity:'common',shop:1},{id:'shovel',name:'Trench Shovel',rarity:'uncommon',shop:1},{id:'icepick',name:'Summit Axe',rarity:'rare',shop:1},
+  {id:'sledge',name:'Sledge',rarity:'rare',shop:1},{id:'bone',name:'Bone Breaker',rarity:'epic',shop:1},{id:'candy',name:'Sweet Swing',rarity:'legendary',shop:1}];
 const pickIdx=id=>Math.max(0,PICKAXES.findIndex(p=>p.id===id));
 function heroFor(o,pk){ return createHero(o.jacket,Object.assign({},o,{pickaxe:pk||'steel'})); }
 // swap a character's look in place (keeps its animation state and scene placement)
 function reskin(H,o,pk){ pk=pk||'steel'; if(!o||(H.outfit===o.id&&H.pickaxe===pk)) return; const nh=heroFor(o,pk), g=H.group; H.pickaxe=pk;
   while(g.children.length) g.remove(g.children[0]); while(nh.group.children.length) g.add(nh.group.children[0]);
   H.rig=nh.rig; H.ink=nh.ink; H.outfit=o.id; }
+// smooth torso pieces: a lathed profile (radius at each height) squashed front-to-back into an oval
+const latheCache=new Map();
+function bodyLathe(prof,depth,seg=22){ const key=JSON.stringify(prof)+depth; let g=latheCache.get(key); if(g) return g;
+  g=new THREE.LatheGeometry(prof.map(([r,y])=>new THREE.Vector2(r,y)),seg); g.scale(1,1,depth); g.computeVertexNormals(); latheCache.set(key,g); return g; }
+// an oval skull with a slightly narrower jaw
+let skullGeo=null;
+function headGeo(){ if(skullGeo) return skullGeo; const g=new THREE.SphereGeometry(1,28,22), p=g.attributes.position;
+  for(let i=0;i<p.count;i++){ let x=p.getX(i), y=p.getY(i), z=p.getZ(i); const lo=Math.max(0,-y);
+    x*=0.112*(1-0.3*lo*lo);                                   // jaw narrows toward the chin
+    z*=z>0?0.125*(1-0.45*lo):0.118*(1-0.12*lo*lo);              // the back of the skull tucks in under it, the face stays forward
+    y*=y<0?0.15:0.138; p.setXYZ(i,x,y,z); }
+  g.computeVertexNormals(); return skullGeo=g; }
 function createHero(jacketHex,opts){
   opts=opts||{};
   const hero=new THREE.Group(); hero.rotation.order='YXZ';
@@ -2393,18 +2422,17 @@ function createHero(jacketHex,opts){
 
   // pelvis
   rig.hips=grp(hero,0,0.94,0);
-  part(rbox(.27,.16,.185,.045),C.pants,rig.hips,0,0,0);
+  part(bodyLathe([[0,-.085],[.11,-.08],[.145,-.04],[.15,.02],[.138,.08],[0,.085]],.68),C.pants,rig.hips,0,0,0);
   part(rbox(.28,.038,.195,.012),C.sole,rig.hips,0,.07,0,null,null,0.006);
   part(rbox(.05,.036,.016,.006),C.steel,rig.hips,0,.07,-.1,null,null,0);
   part(rbox(.06,.085,.045,.014),C.packD,rig.hips,.14,.0,.02,null,null,0.006); // hip pouch (shells/mags come from here)
   rig.pouch=grp(rig.hips,.16,.0,-.02);
   // torso
   rig.spine=grp(rig.hips,0,.09,0);
-  part(rbox(.25,.2,.175,.05),C.jacket,rig.spine,0,.07,0);
+  part(bodyLathe([[0,-.03],[.132,-.025],[.128,.05],[.136,.14],[0,.15]],.7),C.jacket,rig.spine,0,0,0); // waist
   rig.chest=grp(rig.spine,0,.16,0);
-  part(rbox(.34,.27,.21,.06),C.jacket,rig.chest,0,.12,0);
-  part(rbox(.345,.05,.214,.02),C.jacketD,rig.chest,0,.04,0,null,null,0.006);
-  part(rbox(.3,.08,.19,.05),C.jacket,rig.chest,0,.22,0,null,null,0.006); // shoulders taper in to the neck
+  part(bodyLathe([[0,-.02],[.14,-.015],[.158,.06],[.172,.15],[.168,.2],[.14,.245],[.09,.27],[0,.272]],.62),C.jacket,rig.chest,0,0,0); // chest, tapering up into the shoulders
+  part(bodyLathe([[.143,0],[.146,.035],[0,.036]],.64),C.jacketD,rig.chest,0,.02,0,null,null,0); // hem band
   part(new THREE.CylinderGeometry(.085,.11,.07,16,1,true),C.jacketD,rig.chest,0,.27,0,null,null,0.008);
   if(top==='jacket'||top==='racer'){
     [-1,1].forEach(sx=>{ part(rbox(.075,.07,.02,.012),C.jacketL,rig.chest,sx*.11,.07,-.11,null,null,0.004); part(rbox(.012,.012,.012,.004),C.steel,rig.chest,sx*.1,.17,-.124,null,null,0); });
@@ -2425,6 +2453,19 @@ function createHero(jacketHex,opts){
     part(rbox(.4,.25,.24,.09),C.jacketL,rig.chest,0,.12,-.005,null,null,0.01); // breastplate
     part(rbox(.06,.2,.02,.01),C.accent,rig.chest,0,.13,-.128,null,null,0);
     part(rbox(.33,.05,.22,.02),0x6b4a2a,rig.spine,0,.0,0,null,null,0.006); part(rbox(.06,.05,.02,.01),0xd4af37,rig.spine,0,.0,-.112,null,null,0);
+  } else if(top==='vest'){ // plate carrier over a shirt
+    part(bodyLathe([[.155,0],[.17,.06],[.184,.15],[.172,.205],[.12,.215]],.66),C.accent,rig.chest,0,0,0,null,null,0);
+    [-1,1].forEach(sx=>{ part(rbox(.062,.07,.03,.012),new THREE.Color(C.accent).multiplyScalar(.75).getHex(),rig.chest,sx*.07,.07,-.12); part(rbox(.045,.2,.02,.008),C.accent,rig.chest,sx*.09,.24,0,[0,0,sx*.12],[1,1,6]); });
+    part(rbox(.12,.04,.02,.008),0xd8d8d8,rig.chest,0,.16,-.122,null,null,0); // name tape
+  } else if(top==='coat'){ // long coat: high collar and tails to mid-thigh
+    part(new THREE.CylinderGeometry(.1,.12,.08,18,1,true),C.jacketD,rig.chest,0,.27,0,null,[1,1,.8]);
+    part(bodyLathe([[.15,.0],[.165,-.12],[.18,-.3]],.72),C.jacket,rig.hips,0,.04,0,null,null,0); // tails (open lathe)
+    part(rbox(.012,.38,.008,.004),C.jacketD,rig.chest,0,.08,-.108,null,null,0); [0,1,2].forEach(q=>part(sph(.01),0xd4af37,rig.chest,.025,.18-q*.07,-.112,null,null,0));
+  } else if(top==='flannel'){ // checked shirt: darker bands around the body
+    [.03,.11,.19].forEach(y=>part(bodyLathe([[.162+y*.06,y],[.164+y*.06,y+.025]],.63),C.jacketD,rig.chest,0,0,0,null,null,0));
+    part(rbox(.012,.3,.008,.004),C.jacketD,rig.chest,0,.1,-.108,null,null,0);
+  } else if(top==='tee'){
+    part(new THREE.CylinderGeometry(.075,.09,.03,16,1,true),C.skin,rig.chest,0,.265,-.005,null,[1,1,.8]); // open neckline
   }
   // back bling (sways with the pack spring)
   rig.pack=grp(rig.chest,0,.2,.13);
@@ -2461,34 +2502,61 @@ function createHero(jacketHex,opts){
     [0,Math.PI/2].forEach(a=>part(rbox(.34,.025,.008,.004),C.accent,rig.pack,0,-.07,.053,[0,0,a],null,0));
     part(rbox(.03,.5,.02,.008),C.packD,rig.chest,0,.12,-.112,[0,0,.55],null,0.004);
   }
+  else if(back==='quiver'){
+    const q=grp(rig.pack,.02,-.1,.02); q.rotation.z=-.45; part(limbGeo(.05,.045,.42),0x6b4423,q,0,.18,0); part(limbGeo(.053,.053,.03),0x3a2416,q,0,.17,0,null,null,0);
+    for(let k=0;k<5;k++){ const ax=(k-2)*.018; part(limbGeo(.005,.005,.2),0xd8c39a,q,ax,.33,(k%2)*.015); part(new THREE.ConeGeometry(.016,.05,3),k%2?C.accent:0xf2f2f2,q,ax,.31,(k%2)*.015); }
+    part(rbox(.03,.5,.015,.006),0x5a3a20,rig.chest,0,.12,-.112,[0,0,.6],null,0);
+  } else if(back==='wings'){
+    [-1,1].forEach(sx=>{ const w=grp(rig.pack,sx*.06,-.02,.03); w.rotation.set(.15,sx*.35,sx*.35);
+      for(let k=0;k<4;k++) part(rbox(.03,.34-k*.06,.012,.006),k%2?C.pack:C.packD,w,sx*(.07+k*.055),.02-k*.045,k*.004,[0,0,sx*(.5+k*.18)]); });
+  } else if(back==='tank'){
+    const t=new THREE.CylinderGeometry(.075,.075,.42,18); part(t,C.pack,rig.pack,0,-.12,.04); part(sph(.075),C.pack,rig.pack,0,.09,.04,null,[1,.6,1]);
+    part(limbGeo(.02,.02,.06),0x2a2f38,rig.pack,0,.17,.04); part(rbox(.06,.02,.02,.006),0x2a2f38,rig.pack,0,.16,.04,null,null,0);
+    part(rbox(.16,.03,.02,.008),C.packD,rig.pack,0,-.05,-.04,null,null,0); part(rbox(.16,.03,.02,.008),C.packD,rig.pack,0,-.25,-.04,null,null,0);
+  } else if(back==='sword'){
+    const sw=grp(rig.pack,0,-.05,.03); sw.rotation.z=.7;
+    part(rbox(.05,.62,.03,.012),0x2a1e16,sw,0,-.12,0); part(rbox(.052,.04,.032,.01),0xd4af37,sw,0,-.42,0,null,null,0);
+    part(rbox(.16,.025,.035,.01),0xd4af37,sw,0,.2,0); part(limbGeo(.016,.016,.13),0x3a2a1e,sw,0,.34,0); part(sph(.022),0xd4af37,sw,0,.35,0);
+    part(rbox(.03,.5,.02,.008),C.packD,rig.chest,0,.12,-.112,[0,0,-.6],null,0);
+  } else if(back==='banner'){
+    const bn=grp(rig.pack,.08,-.05,.04); part(limbGeo(.012,.012,.9),0x6b4423,bn,0,.55,0); part(sph(.02),0xd4af37,bn,0,.56,0);
+    part(rbox(.22,.28,.008,.004),C.accent,bn,.115,.4,0); part(rbox(.06,.06,.01,.004),C.pack,bn,.115,.4,-.002,[0,0,.785],null,0);
+  }
   // head
   rig.neck=grp(rig.chest,0,.27,0);
   part(limbGeo(.044,.05,.1),C.skin,rig.neck,0,.085,0,null,null,0.006);
   rig.head=grp(rig.neck,0,.06,0); rig.head.scale.setScalar(.88); // a realistic head-to-body ratio
-  part(rbox(.235,.26,.24,.095,4),C.skin,rig.head,0,.13,0);
-  part(rbox(.2,.07,.19,.035,3),C.skin,rig.head,0,.035,.005); // jaw line, tucked under the cheeks
-  part(sph(.03),C.skin,rig.head,-.126,.11,.01,null,[.5,.95,.8],0.006); part(sph(.03),C.skin,rig.head,.126,.11,.01,null,[.5,.95,.8],0.006);
-  part(rbox(.034,.062,.036,.012),C.skin,rig.head,0,.1,-.128,[-.12,0,0],null,0.006); // nose
-  rig.lids=[-1,1].map(sx=>{ const l=part(sph(.024),C.skin,rig.head,sx*.052,.168,-.118,null,[1.2,.2,.55],0); return l; });
-  rig.eyes=[-1,1].map(sx=>{ const e=grp(rig.head,sx*.052,.148,-.118); part(sph(.021),0xf4f1ea,e,0,0,0,null,[1.15,.78,.42],0.004); part(sph(.0125),0x2a2620,e,0,0,-.008,null,[1,1,.6],0); part(sph(.004),0xffffff,e,.004,.003,-.0145,null,null,0); return e; });
-  rig.brows=[-1,1].map(sx=>part(rbox(.06,.011,.014,.005),C.hair,rig.head,sx*.054,.19,-.124,[0,0,sx*-.08],null,0));
-  rig.mouth=part(rbox(.05,.009,.01,.004),0x7a3a33,rig.head,0,.05,-.122,null,null,0);
+  part(headGeo(),C.skin,rig.head,0,.135,0,null,null,0);
+  part(sph(.03),C.skin,rig.head,-.11,.12,.012,null,[.38,.9,.72],0); part(sph(.03),C.skin,rig.head,.11,.12,.012,null,[.38,.9,.72],0); // ears
+  { const ng=new THREE.ConeGeometry(.02,.055,10); ng.rotateX(-1.25); part(ng,C.skin,rig.head,0,.112,-.128,null,[1,1,.9],0); part(sph(.014),C.skin,rig.head,0,.093,-.138,null,[1.25,.8,1],0); } // nose
+  rig.lids=[-1,1].map(sx=>{ const l=part(sph(.019),C.skin,rig.head,sx*.045,.163,-.112,null,[1.25,.2,.5],0); return l; });
+  rig.eyes=[-1,1].map(sx=>{ const e=grp(rig.head,sx*.045,.148,-.113); part(sph(.0165),0xe9e4dc,e,0,0,0,null,[1.2,.72,.4],0); part(sph(.0095),0x3b2a1e,e,0,0,-.006,null,[1,1,.55],0); return e; });
+  rig.brows=[-1,1].map(sx=>part(rbox(.046,.008,.012,.004),C.hair,rig.head,sx*.047,.182,-.121,[0,0,sx*-.12],null,0));
+  rig.mouth=part(rbox(.04,.006,.008,.003),0x8a4a40,rig.head,0,.058,-.118,null,null,0);
   rig.tuft=grp(rig.head,0,.28,.02);
-  const covered=headwear==='helmet'||headwear==='knight'||headwear==='hood'||headwear==='cathood';
+  function hairCap(lift){ // the crown down to the hairline at the front, and further down the back of the head
+    const top=new THREE.SphereGeometry(1,24,10,0,Math.PI*2,0,Math.PI*0.36), back=new THREE.SphereGeometry(1,16,10,0,Math.PI,Math.PI*0.3,Math.PI*0.38);
+    const g=mergeGeos([top,back]), p=g.attributes.position;
+    for(let i=0;i<p.count;i++){ const x=p.getX(i), y=p.getY(i), z=p.getZ(i); p.setXYZ(i,x*0.121,y*(0.146+lift*0.18)+.006,z*(z>0?0.131:0.127)); }
+    g.computeVertexNormals(); return g; }
+  const covered=headwear==='helmet'||headwear==='knight'||headwear==='hood'||headwear==='cathood'||(headwear==='tophat'&&hairStyle==='afro');
   if(!covered){
-    if(hairStyle==='spiky'){
-      part(rbox(.27,.11,.27,.06),C.hair,rig.head,0,.245,.005);
-      [[0,.06,.0,-.3,0],[-.07,.04,.04,-.5,.4],[.07,.04,.04,-.5,-.4],[0,.03,.09,-1,0],[-.09,.0,-.06,.2,.5],[.08,.01,-.07,.2,-.45]].forEach(([x,y,z,rx,rz])=>part(rbox(.07,.12,.06,.025),C.hair,rig.tuft,x,y,z,[rx,0,rz]));
-      part(rbox(.24,.05,.06,.02),C.hair,rig.head,0,.215,-.115,[.25,0,0]);
-      [[-.04,.07,-.05,-.6,.2],[.05,.075,-.03,-.7,-.3],[0,.09,.05,-1.2,0]].forEach(([x,y,z,rx,rz])=>part(rbox(.05,.1,.05,.02),C.hair,rig.tuft,x,y,z,[rx,0,rz]));
+    if(hairStyle==='spiky'){ // textured crop: a close cap with a swept, tousled top
+      part(hairCap(.1),C.hair,rig.head,0,.135,0);
+      [[0,.035,-.04,-.5,0,.07],[-.05,.03,.0,-.35,.35,.06],[.05,.03,.0,-.35,-.35,.06],[0,.04,.04,-.9,0,.065],[-.03,.025,-.075,.15,.25,.05],[.035,.025,-.07,.2,-.3,.05]].forEach(([x,y,z,rx,rz,len])=>{ const c=new THREE.ConeGeometry(.032,len,8); part(c,C.hair,rig.tuft,x,y-.035,z,[rx,0,rz],[1,1,.7]); });
     } else if(hairStyle==='mohawk'){
-      part(rbox(.262,.05,.262,.03),new THREE.Color(C.hair).multiplyScalar(.55).getHex(),rig.head,0,.24,.005,null,null,0.006); // shaved sides
-      for(let q=0;q<6;q++) part(rbox(.05,.13+.04*Math.sin(q*.6+.4),.07,.022),C.hair,rig.tuft,0,.02+.02*Math.sin(q*.6+.4),-.12+q*.05,[-.25+q*.12,0,0]);
+      part(hairCap(.04),new THREE.Color(C.hair).multiplyScalar(.55).getHex(),rig.head,0,.135,0); // shaved sides
+      for(let q=0;q<6;q++){ const c=new THREE.ConeGeometry(.026,.1+.035*Math.sin(q*.6+.4),8); part(c,C.hair,rig.tuft,0,-.005+.02*Math.sin(q*.6+.4),-.1+q*.042,[-.25+q*.12,0,0],[.7,1,1.2]); }
     } else if(hairStyle==='ponytail'){
-      part(rbox(.27,.1,.27,.06),C.hair,rig.head,0,.24,.005);
-      part(rbox(.26,.13,.06,.03),C.hair,rig.head,0,.17,.115);
+      part(hairCap(.09),C.hair,rig.head,0,.135,0);
       part(sph(.045),C.accent,rig.tuft,0,-.08,.12,null,null,0.005);
       part(limbGeo(.05,.025,.26),C.hair,rig.tuft,0,-.08,.15,[-.5,0,0]);
+    } else if(hairStyle==='bun'){ part(hairCap(.06),C.hair,rig.head,0,.135,0); part(sph(.05),C.hair,rig.tuft,0,-.02,.1,null,[1,.9,1]); part(limbGeo(.03,.03,.015),C.accent,rig.tuft,0,-.045,.085,[1.1,0,0],null,0);
+    } else if(hairStyle==='long'){ part(hairCap(.08),C.hair,rig.head,0,.135,0); part(limbGeo(.11,.085,.26),C.hair,rig.head,0,.2,.05,null,[1,1,.58]);
+      [-1,1].forEach(sx=>part(limbGeo(.03,.02,.2),C.hair,rig.head,sx*.1,.17,-.03,[0,0,sx*-.08]));
+    } else if(hairStyle==='buzz'){ part(hairCap(-.02),C.hair,rig.head,0,.135,0);
+    } else if(hairStyle==='afro'){ part(sph(.16),C.hair,rig.head,0,.215,.015,null,[1,.85,1]);
+    } else if(hairStyle==='swept'){ part(hairCap(.06),C.hair,rig.head,0,.135,0); const sw=new THREE.SphereGeometry(.075,16,10); part(sw,C.hair,rig.tuft,.02,-.02,-.08,[.2,0,-.5],[1.5,.6,1]);
     }
   }
   if(headwear==='goggles'){
@@ -2527,24 +2595,48 @@ function createHero(jacketHex,opts){
     part(rbox(.03,.16,.296,.012),C.accent,rig.head,0,.22,0,null,null,0);
     for(let q=0;q<6;q++) part(rbox(.04,.1-q*.008,.06,.018),C.accent,rig.tuft,0,.05+q*.006,-.12+q*.055,[-.3+q*.15,0,0]);
   }
+  else if(headwear==='cap'||headwear==='capb'){
+    const back=headwear==='capb'?1:-1; part(new THREE.SphereGeometry(.13,20,10,0,Math.PI*2,0,Math.PI*.5),C.accent,rig.head,0,.185,.004,null,[.98,.8,1.02]);
+    const br=new THREE.CylinderGeometry(.075,.075,.012,18,1,false,0,Math.PI); br.rotateY(back<0?Math.PI/2:-Math.PI/2); part(br,new THREE.Color(C.accent).multiplyScalar(.8).getHex(),rig.head,0,.19,back*.11,null,[1.05,1,1.5]);
+    part(sph(.014),new THREE.Color(C.accent).multiplyScalar(.7).getHex(),rig.head,0,.29,.0,null,[1,.5,1],0);
+  } else if(headwear==='bandana'){
+    part(new THREE.CylinderGeometry(.118,.106,.075,20,1,true,Math.PI*.5,Math.PI),C.accent,rig.head,0,.07,-.008,null,[1,1,1.05],0);
+    part(new THREE.ConeGeometry(.05,.07,10),C.accent,rig.head,0,.03,-.11,[Math.PI,0,0],[1.6,1,.4],0); part(sph(.025),C.accent,rig.head,0,.09,.115,null,null,0);
+  } else if(headwear==='crown'){
+    part(new THREE.CylinderGeometry(.118,.112,.05,10,1,true),0xffc94a,rig.head,0,.265,0,null,null,0);
+    for(let k=0;k<10;k++){ const a=k/10*Math.PI*2; part(new THREE.ConeGeometry(.018,.05,4),0xffc94a,rig.head,Math.cos(a)*.115,.31,Math.sin(a)*.112,null,null,0); if(k%2===0) part(sph(.012),k%4?0xe0115f:0x2fc7ff,rig.head,Math.cos(a)*.12,.265,Math.sin(a)*.117,null,null,0); }
+  } else if(headwear==='headset'){
+    part(new THREE.TorusGeometry(.125,.012,8,24,Math.PI),0x2a2f38,rig.head,0,.15,.0,[0,Math.PI/2,0],null,0);
+    [-1,1].forEach(sx=>{ const cup=new THREE.CylinderGeometry(.04,.04,.03,16); cup.rotateZ(Math.PI/2); part(cup,0x2a2f38,rig.head,sx*.118,.13,.0); part(new THREE.CircleGeometry(.03,14),toon(C.accent),rig.head,sx*.134,.13,0,[0,sx*Math.PI/2,0],null,0); });
+    part(limbGeo(.006,.006,.12),0x2a2f38,rig.head,-.12,.11,-.0,[1.2,0,.2],null,0); part(sph(.012),C.accent,rig.head,-.075,.06,-.1,null,null,0);
+  } else if(headwear==='visor'){
+    part(new THREE.CylinderGeometry(.122,.122,.03,20,1,true),C.accent,rig.head,0,.19,0,null,null,0);
+    part(rbox(.21,.045,.02,.012),0x1f3b5a,rig.head,0,.15,-.122,[-.1,0,0],null,0); part(rbox(.06,.008,.004,.002),0xbfe6ff,rig.head,-.05,.162,-.134,null,null,0);
+  } else if(headwear==='tophat'){
+    part(new THREE.CylinderGeometry(.165,.165,.012,24),0x15161b,rig.head,0,.265,0); part(new THREE.CylinderGeometry(.095,.1,.17,22),0x15161b,rig.head,0,.36,0);
+    part(new THREE.CylinderGeometry(.101,.101,.03,22,1,true),C.accent,rig.head,0,.29,0,null,null,0);
+  } else if(headwear==='hardhat'){
+    part(new THREE.SphereGeometry(.14,20,10,0,Math.PI*2,0,Math.PI*.5),C.accent,rig.head,0,.19,0,null,[1,.85,1.05]);
+    part(new THREE.CylinderGeometry(.16,.16,.012,22),C.accent,rig.head,0,.19,-.01,null,[1,1,1.12]); part(rbox(.018,.11,.2,.008),new THREE.Color(C.accent).multiplyScalar(.8).getHex(),rig.head,0,.28,0,[Math.PI/2,0,0],null,0);
+  }
   // ink lines on the face look odd under helmets and hoods that cover it
   if(headwear==='helmet'||headwear==='knight'){ rig.eyes.forEach(e=>e.visible=false); rig.lids.forEach(e=>e.visible=false); rig.brows.forEach(e=>e.visible=false); rig.mouth.visible=false; }
   // arms
   const arm=sx=>{
     const sh=grp(rig.chest,sx*.19,.21,0); sh.rotation.order='XZY';
-    part(sph(.058),C.jacket,sh,0,-.01,0);
-    part(limbGeo(.048,.041,.25),C.jacket,sh);
+    part(sph(.062),C.jacket,sh,0,-.005,0,null,[1,1.05,1.1]);
+    part(limbGeo(.046,.038,.25),C.jacket,sh);
     if(top==='armor') part(sph(.095),C.jacketL,sh,0,.0,0,null,[1.1,.75,1.1]);
     if(top==='suit') part(new THREE.TorusGeometry(.06,.014,8,16),C.accent,sh,0,-.12,0,[Math.PI/2,0,0],null,0);
-    const el=grp(sh,0,-.25,0);
-    part(sph(.042),C.jacket,el,0,0,0,null,null,0.008);
-    part(limbGeo(.042,.033,.21),C.jacket,el);
+    const el=grp(sh,0,-.25,0), fc=top==='tee'?C.skin:C.jacket;
+    part(sph(.039),fc,el,0,0,0,null,null,0.008);
+    part(limbGeo(.04,.03,.21),fc,el);
     part(new THREE.TorusGeometry(.043,.009,8,18),C.jacketD,el,0,-.02,0,[Math.PI/2,0,0],null,0);
     part(limbGeo(.039,.039,.04),C.jacketD,el,0,-.18,0,null,null,0.006);
     const wr=grp(el,0,-.23,0);
-    part(rbox(.062,.078,.044,.016),C.glove,wr,0,-.035,0,null,null,0.007);
+    part(rbox(.056,.074,.036,.016),C.glove,wr,0,-.035,0,null,null,0.007);
     const fing=grp(wr,0,-.075,0);
-    for(let f=0;f<4;f++) part(rbox(.0135,.055,.017,.006),C.glove,fing,-.021+f*.014,-.026+(f===0||f===3?.005:0),-.002,null,null,0.004);
+    for(let f=0;f<4;f++) part(limbGeo(.0072,.0062,.05+(f===1||f===2?.006:0)),C.glove,fing,-.019+f*.0127,0,-.002,null,null,0.004);
     part(rbox(.062,.011,.04,.004),C.packD,wr,0,-.072,-.002,null,null,0);
     part(rbox(.019,.05,.022,.008),C.glove,wr,-sx*.034,-.048,-.016,[0,0,sx*.4],null,0.006);
     const hand=grp(wr,0,-.06,0);
@@ -2554,18 +2646,18 @@ function createHero(jacketHex,opts){
   // legs
   const leg=sx=>{
     const hp=grp(rig.hips,sx*.08,-.05,0); hp.rotation.order='XZY';
-    part(limbGeo(.079,.06,.4),C.pants,hp);
+    part(limbGeo(.076,.056,.4),C.pants,hp); part(sph(.074),C.pants,hp,0,-.02,0,null,[1,.7,1]);
     part(rbox(.022,.1,.08,.008),C.pantsD,hp,sx*.074,-.19,0,null,null,0.005);
     const kn=grp(hp,0,-.4,0);
     part(sph(.058),C.pants,kn,0,0,0,null,null,0.008);
     part(rbox(.08,.1,.035,.016),C.pantsD,kn,0,-.02,-.05,null,null,0.006);
-    part(limbGeo(.058,.045,.36),C.pants,kn);
+    part(limbGeo(.056,.04,.36),C.pants,kn); part(sph(.052),C.pants,kn,0,-.1,.008,null,[.95,1.6,1],0); // calf
     const an=grp(kn,0,-.37,0);
-    part(rbox(.098,.13,.11,.03),C.boot,an,0,-.035,0);
-    for(let q=0;q<3;q++) part(rbox(.055,.006,.008,.002),0xe9e2d0,an,0,-.005-q*.025,-.057-q*.006,null,null,0);
-    part(rbox(.022,.016,.01,.003),C.steel,an,sx*.05,.0,0,null,null,0);
-    part(rbox(.096,.072,.125,.03),C.boot,an,0,-.078,-.085);
-    part(rbox(.104,.022,.25,.008),C.sole,an,0,-.12,-.045,null,null,0.006);
+    part(limbGeo(.047,.05,.1),C.boot,an,0,.02,0);                                           // ankle collar
+    part(sph(.052),C.boot,an,0,-.075,.0,null,[.95,.85,1.15]);                              // heel
+    part(sph(.05),C.boot,an,0,-.088,-.11,null,[.95,.7,1.5]);                               // toe box
+    for(let q=0;q<3;q++) part(rbox(.045,.005,.007,.002),0xe9e2d0,an,0,-.04-q*.018,-.075-q*.016,[.55,0,0],null,0); // laces
+    part(rbox(.098,.02,.25,.009),C.sole,an,0,-.12,-.05,null,null,0.006);
     part(limbGeo(.055,.055,.035),C.packD,an,0,.04,0,null,null,0.005);
     const foot=grp(an,0,-.13,-.06);
     return {hp,kn,an,foot,side:sx};
@@ -2667,6 +2759,36 @@ function createHero(jacketHex,opts){
     const rim=new THREE.CylinderGeometry(.135,.135,.012,6); rim.rotateZ(Math.PI/2); part(rim,0xd4af37,ph,.0,0,-.12,null,null,0);
     part(rbox(.05,.09,.09,.02),0xd4af37,ph,0,0,0);
     part(sph(.03),glow(0xc59bff),ph,0,0,-.12,null,[.9,1,1],0); part(sph(.022),glow(0xc59bff),ph,0,0,.1,null,null,0);
+  } else if(pk==='sledge'){ // Sledge: long ash handle, square steel head
+    part(limbGeo(.02,.025,.74),0xb98a52,rig.pick,0,.13,0,null,null,0.006);
+    part(limbGeo(.026,.026,.16),0x2a2f38,rig.pick,0,.1,0,null,null,0);
+    part(rbox(.085,.11,.28,.025),0x4d5560,ph,0,-.01,0); [-1,1].forEach(sz=>part(rbox(.09,.115,.02,.006),0x7d8792,ph,0,-.01,sz*.145,null,null,0));
+    part(limbGeo(.03,.03,.04),0x2a2f38,rig.pick,0,-.47,0,null,null,0);
+  } else if(pk==='icepick'){ // Summit Axe: alpine pick with a curved tooth and a small adze
+    part(limbGeo(.017,.021,.7),0x2b6fd6,rig.pick,0,.12,0,null,null,0.006); part(limbGeo(.022,.022,.18),0x15181d,rig.pick,0,.08,0,null,null,0);
+    part(new THREE.ConeGeometry(.02,.06,8),0x9aa3ad,rig.pick,0,.155,0,null,null,0); // spike at the butt
+    part(rbox(.04,.07,.07,.012),0x9aa3ad,ph,0,0,0);
+    for(let q=0;q<5;q++) part(rbox(.016,.035-q*.003,.07,.006),0xc9d2dc,ph,0,.015*q*q-.005,-.06-.06*q,[-.12-q*.17,0,0]);
+    part(rbox(.012,.06,.09,.004),0xc9d2dc,ph,0,.01,.07,[.3,0,0]); part(rbox(.014,.01,.06,.003),0xff6a3d,ph,0,.04,0,null,null,0);
+  } else if(pk==='shovel'){ // Trench Shovel: D-grip, ash shaft, steel spade in line with the handle
+    part(new THREE.TorusGeometry(.045,.01,8,16,Math.PI),0x2a2f38,rig.pick,0,.17,0,[0,Math.PI/2,0],null,0); part(limbGeo(.01,.01,.09),0x2a2f38,rig.pick,0,.17,0,[0,0,Math.PI/2],null,0);
+    part(limbGeo(.02,.022,.66),0xb98a52,rig.pick,0,.13,0,null,null,0.006); part(limbGeo(.026,.03,.09),0x4d5560,rig.pick,0,-.48,0,null,null,0);
+    const sp=new THREE.BoxGeometry(.18,.22,.012); const pa=sp.attributes.position; for(let i=0;i<pa.count;i++){ const y=pa.getY(i); if(y<0) pa.setX(i,pa.getX(i)*(1+y*1.6)); } sp.computeVertexNormals();
+    part(sp,0x7d8792,ph,0,-.12,0,[0,Math.PI/2,0],[1,1,1]); part(rbox(.03,.12,.02,.006),0x4d5560,ph,0,.02,0,[0,Math.PI/2,0],null,0);
+  } else if(pk==='crowbar'){ // Crowbar: one bent bar of red steel with a split claw
+    part(limbGeo(.017,.017,.74),0xc0392b,rig.pick,0,.13,0,null,null,0.006); part(limbGeo(.02,.02,.16),0x15181d,rig.pick,0,.08,0,null,null,0);
+    part(new THREE.TorusGeometry(.07,.017,8,14,Math.PI*0.9),0xc0392b,ph,0,.06,-.07,[0,Math.PI/2,0],null,0);
+    [-1,1].forEach(sx=>part(rbox(.012,.02,.06,.004),0x9aa3ad,ph,sx*.009,.12,-.13,[.5,0,0],null,0));
+    part(rbox(.03,.012,.07,.004),0x9aa3ad,ph,0,-.01,.05,[-.3,0,0],null,0);
+  } else if(pk==='bone'){ // Bone Breaker: knobbly bone handle, twin horns
+    part(limbGeo(.022,.026,.7),0xe8dfc8,rig.pick,0,.12,0,null,null,0.006); [0,-.2,-.42].forEach(y=>part(sph(.034),0xe8dfc8,rig.pick,0,y,0,null,[1,.7,1]));
+    part(sph(.065),0xd9cfb4,ph,0,0,0,null,[1,1.1,1.1]);
+    [[-1,.32],[1,.2]].forEach(([d,len])=>{ const c=new THREE.ConeGeometry(.035,len,10); c.rotateX(d<0?-Math.PI/2:Math.PI/2); part(c,0xf2ead6,ph,0,.02,d*(len/2+.04),[d*-.25,0,0]); });
+    [-1,1].forEach(sx=>part(sph(.012),0x1a1410,ph,sx*.045,.02,-.035,null,null,0));
+  } else if(pk==='candy'){ // Sweet Swing: candy-stripe handle and a twisted peppermint head
+    for(let q=0;q<8;q++) part(limbGeo(.021,.021,.09),q%2?0xffffff:0xd62839,rig.pick,0,.13-q*.09,0,null,null,0.005);
+    part(sph(.06),0xffffff,ph,0,0,0); for(let q=0;q<4;q++) part(new THREE.TorusGeometry(.061,.008,6,20),0xd62839,ph,0,0,0,[q*.8,q*.5,0],null,0);
+    [[-1,.28],[1,.16]].forEach(([d,len])=>{ for(let q=0;q<3;q++){ const c=new THREE.CylinderGeometry(.03-q*.008,.034-q*.008,len/3,10); c.rotateX(Math.PI/2); part(c,q%2?0xffffff:0xd62839,ph,0,0,d*(.05+len/6+q*len/3)); } });
   }
   // hammer + blueprint (build mode)
   rig.hammer=grp(rig.armR.hand,0,0,0);
@@ -3058,10 +3180,12 @@ function animateRig(H,S,dt){
     // overhead chop: wind up over the right shoulder, whip down across the body, settle back
     const t=Math.min(1,1-S.swingT/SWING_T), sw=pickSwing(t,S.pitch);
     T.shR=sw.sh; T.shRz=sw.shz; T.elR=sw.el; T.chY+=sw.ch; T.spX+=sw.sp; T.wrR=sw.wr;
-    T.shL=0.35+0.45*sw.k; T.elL=0.9; T.shLz=-0.05;
+    // the whole body throws the swing: hips turn with the chest, knees dip at impact, the free arm pulls back
+    T.hipsY+=sw.ch*0.35; T.hipY-=0.035*sw.k; T.knL-=0.12*sw.k; T.knR-=0.12*sw.k; T.nkY-=sw.ch*0.5;
+    T.shL=-0.25-0.35*sw.k+0.6*Math.max(0,-sw.ch); T.elL=0.7+0.3*sw.k; T.shLz=-0.18;
   } else if(S.gun===false&&!building){
-    // pickaxe carried at the side, head forward
-    T.shR=T.shR*0.5+0.3; T.elR=Math.max(0.5,T.elR*0.6); T.shRz=0.14; T.wrR=-0.3;
+    // pickaxe carried ready: forearm up, handle angled up past the shoulder, the head just above and in front of it
+    T.shR=T.shR*0.35+0.12; T.elR=1.25+0.15*k; T.shRz=0.2; T.wrR=0.55;
   }
   // ----- apply (smoothed) -----
   const set=(o,ax,v,f)=>{ o.rotation[ax]=lerp(o.rotation[ax],v,f||sm); };
@@ -5257,15 +5381,33 @@ syncBot();
   const pbox=$('picks');
   const mark=(el,id)=>el.querySelectorAll('.ofit').forEach(b=>{ const on=b.dataset.id===id; b.classList.toggle('on',on); b.setAttribute('aria-selected',on); });
   const wear=()=>reskin(localHero,OUTFITS[outfitIdx(settings.outfit)],PICKAXES[pickIdx(settings.pickaxe)].id);
-  const pick=id=>{ settings.outfit=id; saveSettings(); wear(); mark(box,id);
-    if(B&&B.h.outfit===id){ const others=OUTFITS.filter(o=>o.id!==id); reskin(B.h,others[Math.floor(Math.random()*others.length)],B.h.pickaxe); } }; // the bot never dresses like you
-  const pickPk=id=>{ settings.pickaxe=id; saveSettings(); wear(); mark(pbox,id); };
+  // shop: items marked `shop` cost points; everything else is yours from the start
+  const PRICE={o:{common:150,uncommon:300,rare:600,epic:1000,legendary:1600},p:{common:100,uncommon:200,rare:400,epic:700,legendary:1100}};
+  const owned=(k,it)=>!it.shop||wallet.owned.includes(k+':'+it.id), price=(k,it)=>PRICE[k][it.rarity]||500;
+  if(!owned('o',OUTFITS[outfitIdx(settings.outfit)])){ settings.outfit='rook'; saveSettings(); }
+  if(!owned('p',PICKAXES[pickIdx(settings.pickaxe)])){ settings.pickaxe='steel'; saveSettings(); }
+  const buy=$('buyBox');
+  let offer=null;
+  const offerBuy=(k,it)=>{ offer={k,it}; const c=price(k,it), can=wallet.pts>=c;
+    buy.hidden=false; buy.querySelector('p').innerHTML=`<b>${it.name}</b> · ${RNAME[it.rarity]} ${k==='o'?'outfit':'pickaxe'} · <b>${c.toLocaleString()} pts</b>`+(can?'':`<br><small>You need ${(c-wallet.pts).toLocaleString()} more. Take down zombies in Zombie horde to earn points.</small>`);
+    $('buyOk').disabled=!can; $('buyOk').textContent=can?'Buy for '+c.toLocaleString():'Not enough points'; };
+  $('buyOk').addEventListener('click',()=>{ if(!offer) return; const {k,it}=offer, c=price(k,it); if(owned(k,it)||wallet.pts<c) return;
+    wallet.pts-=c; wallet.owned.push(k+':'+it.id); saveWallet(); renderWallet(); buy.hidden=true; offer=null; sfx('win'); toast('Unlocked '+it.name);
+    if(k==='o') pick(it.id); else pickPk(it.id); });
+  $('buyNo').addEventListener('click',()=>{ buy.hidden=true; offer=null; });
+  window.renderShop=()=>{ [['o',box,OUTFITS],['p',pbox,PICKAXES]].forEach(([k,el,list])=>list.forEach(it=>{ const b=el.querySelector(`[data-id="${it.id}"]`); if(!b) return;
+      const own=owned(k,it); b.classList.toggle('locked',!own); b.classList.toggle('afford',!own&&wallet.pts>=price(k,it));
+      let pr=b.querySelector('.price'); if(own){ if(pr) pr.remove(); } else { if(!pr){ pr=document.createElement('i'); pr.className='price'; b.appendChild(pr); } pr.textContent=price(k,it).toLocaleString(); } }));
+    if(offer) offerBuy(offer.k,offer.it); };
+  const pick=id=>{ const it=OUTFITS[outfitIdx(id)]; if(!owned('o',it)){ offerBuy('o',it); return; } buy.hidden=true; settings.outfit=id; saveSettings(); wear(); mark(box,id);
+    if(B&&B.h.outfit===id){ const others=OUTFITS.filter(o=>o.id!==id&&!o.shop); reskin(B.h,others[Math.floor(Math.random()*others.length)],B.h.pickaxe); } }; // the bot never dresses like you
+  const pickPk=id=>{ const it=PICKAXES[pickIdx(id)]; if(!owned('p',it)){ offerBuy('p',it); return; } buy.hidden=true; settings.pickaxe=id; saveSettings(); wear(); mark(pbox,id); };
   PICKAXES.forEach(p=>{ const b=document.createElement('button'); b.type='button'; b.className='ofit '+p.rarity; b.dataset.id=p.id; b.setAttribute('role','option');
     b.innerHTML=`<span>${p.name}<small>${p.rarity}</small></span>`; b.addEventListener('click',()=>pickPk(p.id)); pbox.appendChild(b); });
   mark(pbox,PICKAXES[pickIdx(settings.pickaxe)].id);
   OUTFITS.forEach(o=>{ const b=document.createElement('button'); b.type='button'; b.className='ofit '+o.rarity; b.dataset.id=o.id; b.setAttribute('role','option');
     b.innerHTML=`<span>${o.name}<small>${o.rarity}</small></span>`; b.addEventListener('click',()=>pick(o.id)); box.appendChild(b); });
-  pick(OUTFITS[outfitIdx(settings.outfit)].id);
+  pick(OUTFITS[outfitIdx(settings.outfit)].id); renderShop();
   setTimeout(()=>{ try{
     const W=168, Hh=224, r=new THREE.WebGLRenderer({antialias:true,alpha:true,preserveDrawingBuffer:true}); r.setPixelRatio(1); r.setSize(W,Hh); r.setClearColor(0,0);
     const sc=new THREE.Scene(); sc.add(new THREE.HemisphereLight(0xffffff,0x5a6a80,0.95)); const kl=new THREE.DirectionalLight(0xffffff,0.75); kl.position.set(2,4,-5); sc.add(kl);
