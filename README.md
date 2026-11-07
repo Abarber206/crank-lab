@@ -18,7 +18,7 @@ The island is about 800 m across, ringed by mountains you can't climb past. The 
   - Characters and zombies are batched: each joint is one mesh instead of dozens. A player went from about 200 draw calls to about 30.
   - Dust and smoke puffs are pooled.
   - **Auto resolution** (on by default) lowers sharpness a little when the frame rate drops and raises it again when there's headroom.
-  - **Grass and flowers** and **Shadows** can be turned off in Settings on slower devices.
+  - **Grass detail** (Off, Low, Medium, High or Ultra) sets how far and how thick the grass grows. It defaults to High on computers and Medium on phones. Turn it down, or turn off **Shadows**, on slower devices.
 
 ## Zombie horde
 Pick **Zombie horde** next to Play. You get 20 seconds to build a fort, then waves of zombies walk in from every side. The horde is pale, rotting, bloodied zombies: Walkers, fast Runners (from wave 2) and big bloated Brutes (from wave 4). Their groans fade out quickly with distance. They have to be right next to you to hit you and can't claw through walls. Zombies claw through anything built in their way, and if you're up on a tower they go for the piece holding it up. Clearing a wave gives you a 15-second break, 50 shield, 30 health, 3 bandages and 2 small shields. In a room the host picks the mode and runs the zombies for everyone; zombies get tougher and waves bigger with more players, and anyone who goes down is back in 3 seconds.
