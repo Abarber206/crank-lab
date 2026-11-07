@@ -10,14 +10,30 @@ Pick an outfit in the menu: Rook, Nova, Ember, Sprig, Volt, Glacier or Whisk. Ea
 ## The map and materials
 The island is about 800 m across, ringed by mountains you can't climb past. The middle (about 40 m around spawn) is flat for build fights, and rolling hills rise all around it, getting taller toward the edge. You can walk and build anywhere: builds that touch the hillside count as supported, and on a slope a piece drops a level to meet the ground. Trees, pines, rocks and junk cars are scattered around the range, the same for everyone in a room. Pickaxe trees for wood, rocks for brick and cars for metal; they grow back 35–80 seconds after they're gone. Materials are infinite by default. Turn off **Infinite materials** in Settings and every piece costs 10 of the selected material: you start with 30 wood, your counts show on the right, and clearing a horde wave gives a bonus.
 
+## Look and performance
+- **Build materials** are painted with real relief: grain, knots and nail heads in wood; chipped, bevelled stone blocks in recessed mortar; and corrugated steel with rivets, scratches and rust streaks. A normal map makes each one catch the light, and metal has a soft sheen.
+- **Models** are smoothly shaded, with no cartoon bands or black outlines.
+- **The world** has wind-blown grass and little flowers around you that stay out from under builds. Bushes are scattered across the island. Trees have lumpy leaf clusters and branches, pines have ragged tiers, and boulders are chipped with moss on top. Shadows no longer crawl as you move.
+- **Performance:**
+  - Characters and zombies are batched: each joint is one mesh instead of dozens. A player went from about 200 draw calls to about 30.
+  - Dust and smoke puffs are pooled.
+  - **Auto resolution** (on by default) lowers sharpness a little when the frame rate drops and raises it again when there's headroom.
+  - **Grass and flowers** and **Shadows** can be turned off in Settings on slower devices.
+
 ## Zombie horde
 Pick **Zombie horde** next to Play. You get 20 seconds to build a fort, then waves of zombies walk in from every side. The horde is pale, rotting, bloodied zombies: Walkers, fast Runners (from wave 2) and big bloated Brutes (from wave 4). Their groans fade out quickly with distance. They have to be right next to you to hit you and can't claw through walls. Zombies claw through anything built in their way, and if you're up on a tower they go for the piece holding it up. Clearing a wave gives you a 15-second break, 50 shield, 30 health, 3 bandages and 2 small shields. In a room the host picks the mode and runs the zombies for everyone; zombies get tougher and waves bigger with more players, and anyone who goes down is back in 3 seconds.
 
-## The map and materials
+## Trees, rocks and cars
 Trees, pine trees, rocks and old cars are scattered around the map. They're solid, so you, the bot and zombies have to go around them. Materials are infinite by default. Turn off **Infinite materials** in Settings and every build costs 10 of its material: pickaxe trees for wood, rocks for brick and cars for metal (your stock shows on the right). You start each life with 30 wood. Anything you harvest grows back in its spot after 35–80 seconds. In a room everyone sees the same map, and the host decides when things grow back.
 
 ## Inventory, weapons and loot
-You carry a pickaxe plus 5 slots (keys 2–6) that hold any weapon or item. Press **Tab** (bindable) to open the inventory: pick a slot, **Move** it to another slot or **Drop** it, see your ammo and materials, and take loot lying near you (swapping it into the picked slot if you're full). On phones, the bag button opens it.
+You carry a pickaxe plus 5 slots (keys 2–6) that hold any weapon or item. Press **Tab** (bindable) to open the inventory. Everything is drag and drop:
+- Drag a slot onto another slot to move it there, or swap the two.
+- Drag a slot onto the drop area, or anywhere outside the panel, to drop it on the ground. Ammo works the same way.
+- Drag loot from the *On the ground nearby* list straight onto a slot. Whatever was in that slot is dropped in its place.
+- Click a slot to select it; click it again to equip it.
+
+On phones, the bag button opens the inventory. You can also hold a weapon in the hotbar for a moment and drag it onto another slot (empty ones show up while you drag).
 
 Weapons: Assault Rifle, Pump Shotgun, Submachine Gun, Machine Gun, Minigun (spins up before it fires), Rocket Launcher (explosive, wrecks builds) and Grenades (bounce, then explode after 2 s). Guns use light, medium, shells or rocket ammo; reloads come out of your reserves.
 
@@ -61,7 +77,7 @@ Every bind can be changed in the menu.
 ## Building rules
 - **Preview.** Green outline: it will build. Red outline plus the reason underneath: *Already built*, *Nothing to attach to*, *Out of reach*, *Wall in the way*, *Player in the way*, *Build height limit* or *Edge of the map*. A grey outline means the spot is taken. Every placement (yours, the bot's, a joining player's) goes through the same validator, and in a room the host checks it again.
 - **Materials.** Wood 150/140, brick 300/280, metal 500/460 max health (wall / other pieces). Builds start weaker and gain health while they finish. Start health, build-up times, damage resistance, crack thresholds and debris are all in `MATERIALS` and `BUILD_CFG` near the top of the script.
-- **Construction.** A piece appears as a blue blueprint with a material-coloured frame, then fills in section by section: wood plank by plank, brick course by course, metal in a few big panels. Walls rise from the bottom, floors grow out from the side they're attached to, stairs build from the low end up and roofs from the base. A faint frame stays until the piece reaches full health.
+- **Construction.** A piece appears as a blue blueprint with a material-coloured frame, then fills in section by section: wood plank by plank, brick course by course, metal in a few big panels. Walls rise from the bottom, floors grow out from the side they're attached to, stairs build from the low end up and roofs from the base.
 - **Support.** Pieces hold each other up only through a shared edge or face; floors that only touch at a corner don't count. Anything resting on the ground is *anchored*; anything with a chain of connections down to the ground is *supported*. Aim at a build with the pickaxe or in build mode to see its health, whether it's anchored, and how many pieces it's holding up. When a piece is destroyed, only the pieces it touched are re-checked: a group that still has another way down stays up, and a group with none left collapses.
 - **Damage and collapse.** Builds crack in three stages as they take damage (splits and splinters in wood, cracked and chipped brick, dents and scratches in metal) and shudder when hit. A destroyed piece bursts into its own material: planks, bricks, or metal panels and sparks. A piece that loses its support does something different: it darkens, shudders, tips away from the break, falls and crumbles into dust and debris, with pieces farther from the break going a moment later. It stops blocking you the instant it loses support.
 - **Edits.** Edits are named live (Window, Door, Wide window, Arch, Half wall, Ridge, Ramp roof…). Editing never changes what a piece holds up. Reset puts it back exactly as placed, rotated stairs included. In Settings, **Who can edit builds** lets you choose between only the builder, the builder and teammates, or anyone. In a room the host's choice counts and the host re-checks every edit. When a player leaves, their builds become editable by everyone.
