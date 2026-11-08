@@ -78,6 +78,9 @@ Ten towns sit on the flattest lowland spots around the island (Rustwood, Pebble 
 ## Trees, rocks and cars
 Trees, pine trees, rocks and old cars are scattered around the map. They're solid, so you, the bot and zombies have to go around them. Materials are infinite by default. Turn off **Infinite materials** in Settings and every build costs 10 of its material: pickaxe trees for wood, rocks for brick and cars for metal (your stock shows on the right). You start each life with 30 wood. Anything you harvest grows back in its spot after 35–80 seconds. In a party everyone sees the same map, and the host decides when things grow back.
 
+## Sound
+Footsteps match what you're walking on: grass, bare dirt, road, sidewalk, rock or snow outside; wood, brick or metal on builds; wooden floors in houses. Gunfire and explosions roll back off the hills a moment later. A quiet wind blows all the time and gets stronger the higher you climb; birds call now and then in the day, and crickets chirp at dusk while the horde is on. Chests give off a soft shimmer when you're near, and doors latch, creak and thud.
+
 ## Inventory, weapons and loot
 Every weapon's icon on the hotbar and in the inventory is a picture of the gun you actually hold, with its stock, magazine, sights, muzzle device and rarity trim. Bandages and shield potions have their own models too, on the ground and in your slots.
 You carry a pickaxe plus 5 slots (keys 2–6 by default) that hold any weapon or item. Ammo is picked up just by walking over it; guns, heals and grenades wait for **Interact** (V), and the prompt says what you'll pick up. Press **Tab** (bindable) to open the inventory; you keep moving while it's open. Its slots show the same keys as your hotbar, and guns show just their picture and name (no ammo text). Everything is drag and drop:
