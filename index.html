@@ -1008,15 +1008,22 @@ for(const t of TOWNS){ for(let dj=-5;dj<=5;dj++) for(let di=-5;di<=5;di++){ cons
       const d=Math.hypot(SPAWN[0]+p[0]-t.x,SPAWN[2]+p[1]-t.z); if(d<best&&d<4){ best=d; ax=Math.abs(q[0]-p[0])>=Math.abs(q[1]-p[1])?'x':'z'; } }
     t.axis=ax; t.streetL=Math.floor((t.R-4)/CELL)*CELL; const Ls=t.streetL;
     t.ends=[[t.x-Ls,t.z],[t.x+Ls,t.z],[t.x,t.z-Ls],[t.x,t.z+Ls]];
-    // reroute: cut each road where it enters the flat town ground, then run straight to the nearest street end
-    const cut=t.R-2;
+    // reroute: each road coming in is cut some way outside town and joined to the nearest street end by a smooth curve.
+    // The curve leaves the street end straight along the street and meets the road along its own direction, and its
+    // height eases from the town's level to the road's, so the road keeps its hills and still meets the street cleanly.
+    const cut=t.R+12;
     for(const rd of WORLD.roads){ if(rd.street) continue;
       for(const end of [0,1]){ const P=end?rd.pts.slice().reverse():rd.pts.slice();
         if(Math.hypot(SPAWN[0]+P[0][0]-t.x,SPAWN[2]+P[0][1]-t.z)>4) continue; // this end isn't at this town
-        let k=0; while(k<P.length-1&&Math.hypot(SPAWN[0]+P[k][0]-t.x,SPAWN[2]+P[k][1]-t.z)<cut) k++;
+        let k=0; while(k<P.length-8&&Math.hypot(SPAWN[0]+P[k][0]-t.x,SPAWN[2]+P[k][1]-t.z)<cut) k++;
         const at=[SPAWN[0]+P[k][0],SPAWN[2]+P[k][1]], e=t.ends.reduce((a,b)=>Math.hypot(b[0]-at[0],b[1]-at[1])<Math.hypot(a[0]-at[0],a[1]-at[1])?b:a);
-        const L=Math.hypot(at[0]-e[0],at[1]-e[1]), n=Math.max(1,Math.round(L/2)), conn=[];
-        for(let q=0;q<n;q++){ const f=q/n; conn.push([e[0]+(at[0]-e[0])*f-SPAWN[0],e[1]+(at[1]-e[1])*f-SPAWN[2],t.h]); }
+        const L=Math.hypot(at[0]-e[0],at[1]-e[1]), ax_=[(e[0]-t.x)/Ls,(e[1]-t.z)/Ls];
+        const q2=P[Math.min(P.length-1,k+3)], dx=SPAWN[0]+q2[0]-at[0], dz=SPAWN[2]+q2[1]-at[1], dl=Math.hypot(dx,dz)||1, dout=[dx/dl,dz/dl];
+        const C1=[e[0]+ax_[0]*L*0.42,e[1]+ax_[1]*L*0.42], C2=[at[0]-dout[0]*L*0.42,at[1]-dout[1]*L*0.42], y0=t.h, y1=P[k][2];
+        const n=Math.max(3,Math.round(L/1.8)), conn=[];
+        for(let q=0;q<n;q++){ const f=q/n, g=1-f, w0=g*g*g, w1=3*g*g*f, w2=3*g*f*f, w3=f*f*f;
+          const cx=w0*e[0]+w1*C1[0]+w2*C2[0]+w3*at[0], cz=w0*e[1]+w1*C1[1]+w2*C2[1]+w3*at[1], rr=Math.hypot(cx-t.x,cz-t.z), fr=Math.max(0,Math.min(1,(rr-t.R-1)/Math.max(1,cut-t.R-1))), ey=fr*fr*(3-2*fr);
+          conn.push([cx-SPAWN[0],cz-SPAWN[2],y0+(y1-y0)*ey]); } // level through town, easing to the road's height outside it
         let NP=conn.concat(P.slice(k)); if(end) NP=NP.reverse();
         rd.pts=NP; rd.skip=new Uint8Array(NP.length); } }
     // clear the old road traces inside town: no dirt, grass back
@@ -1028,9 +1035,28 @@ for(const t of TOWNS){ for(let dj=-5;dj<=5;dj++) for(let di=-5;di<=5;di++){ cons
       for(let s=-Ls;s<=Ls+0.01;s+=2) pts.push(X?[t.x+s-SPAWN[0],t.z-SPAWN[2],t.h]:[t.x-SPAWN[0],t.z+s-SPAWN[2],t.h]);
       WORLD.roads.push({pts,skip:new Uint8Array(pts.length),street:true,town:t}); }
   }
-  // put the remaining road traces back into the road-distance grid near towns, and keep grass off every road
-  for(const rd of WORLD.roads){ for(const p of rd.pts){ const x=SPAWN[0]+p[0], z=SPAWN[2]+p[1];
-      for(let dj=-4;dj<=4;dj++) for(let di=-4;di<=4;di++){ const c=worldCell(x+di*WHS,z+dj*WHS); if(c<0) continue; const d=Math.hypot(di*WHS,dj*WHS); if(d<WRD[c]) WRD[c]=d; if(d<4.8) WORLD.GRASS[c]=0; } } }
+  // the ground under and beside the roads, cut again for the roads as they now are. Where two roads come close (a
+  // junction or a fork), the ground blends smoothly between their heights instead of stepping at the halfway line,
+  // so roads at different heights still meet in one smooth surface. Road distance and bare ground follow too.
+  { const N=WN, RW=6, BM=34, R2=RW+BM, H0=WORLD.H0, sumW=new Float32Array(N*N), sumY=new Float32Array(N*N), minD=new Float32Array(N*N).fill(1e4), minD2=new Float32Array(N*N).fill(1e4);
+    const dk=new Float32Array(N*N).fill(1e4), yk=new Float32Array(N*N), touched=[];
+    for(const rd of WORLD.roads){ const p=rd.pts; touched.length=0;
+      for(let q=0;q<p.length-1;q++){ const x0=SPAWN[0]+p[q][0], z0=SPAWN[2]+p[q][1], x1=SPAWN[0]+p[q+1][0], z1=SPAWN[2]+p[q+1][1], y0=p[q][2], y1=p[q+1][2], ex=x1-x0, ez=z1-z0, el=ex*ex+ez*ez||1e-6;
+        const i0=Math.max(0,Math.floor((Math.min(x0,x1)-R2-SPAWN[0]+WHALF)/WHS)), i1=Math.min(N-1,Math.ceil((Math.max(x0,x1)+R2-SPAWN[0]+WHALF)/WHS));
+        const j0=Math.max(0,Math.floor((Math.min(z0,z1)-R2-SPAWN[2]+WHALF)/WHS)), j1=Math.min(N-1,Math.ceil((Math.max(z0,z1)+R2-SPAWN[2]+WHALF)/WHS));
+        for(let j=j0;j<=j1;j++){ const pz=SPAWN[2]-WHALF+j*WHS; for(let i=i0;i<=i1;i++){ const px=SPAWN[0]-WHALF+i*WHS; let f=((px-x0)*ex+(pz-z0)*ez)/el; f=f<0?0:f>1?1:f;
+          const qx=px-(x0+ex*f), qz=pz-(z0+ez*f), d=Math.sqrt(qx*qx+qz*qz); if(d>=R2) continue; const c=j*N+i; if(dk[c]>=1e4) touched.push(c); if(d<dk[c]){ dk[c]=d; yk[c]=y0+(y1-y0)*f; } } } }
+      for(const c of touched){ const d=dk[c], u=d/2.5, w=1/(1+u*u*u*u); sumW[c]+=w; sumY[c]+=w*yk[c]; if(d<minD[c]){ minD2[c]=minD[c]; minD[c]=d; } else if(d<minD2[c]) minD2[c]=d; dk[c]=1e4; } }
+    const {ROCK,SNOW,GRASS}=WORLD, DIRT=WORLD.DIRT=new Uint8Array(N*N);
+    for(let c=0;c<N*N;c++){ const dd=minD[c], h0=H0[c]; let h=h0;
+      if(dd<R2){ const y=sumY[c]/sumW[c], diff=Math.abs(h0-y);
+        if(dd<=RW) h=y; else { const B=Math.max(6,Math.min(BM,diff*1.6)); if(dd<RW+B){ let t=(dd-RW)/B; t=t*t*(3-2*t); h=y+(h0-y)*t; } } }
+      WH[c]=h; const was=WRD[c]; WRD[c]=dd;
+      // a worn dirt edge beside the asphalt, but not in the strip between two roads at a fork: that stays grass
+      const gore=minD2[c]<dd+6, edge=gore?(dd<3.9?0:1e4):dd; DIRT[c]=gore&&dd>=3.9?0:dd<5?Math.round(255*(1-sstep(3.8,5.0,dd))):0;
+      if(edge<4.8) GRASS[c]=0; else if(was<4.8||gore) GRASS[c]=Math.round((1-ROCK[c]/255)*(1-SNOW[c]/255)*255); } } // grass back where a road used to run
+  for(const t of TOWNS){ const r2=(t.R-1)*(t.R-1); // the town ground stays level; no road shoulders inside town (the streets have sidewalks)
+    for(let j=-Math.ceil(t.R/WHS);j<=Math.ceil(t.R/WHS);j++) for(let i=-Math.ceil(t.R/WHS);i<=Math.ceil(t.R/WHS);i++){ const x=t.x+i*WHS, z=t.z+j*WHS; if((x-t.x)*(x-t.x)+(z-t.z)*(z-t.z)>r2) continue; const c=worldCell(x,z); if(c<0) continue; WH[c]=WORLD.H0[c]; if(WRD[c]>3.6){ WRD[c]=1e4; WORLD.DIRT[c]=0; } } }
   for(const t of TOWNS) for(const X of [true,false]) for(let s=-t.streetL;s<=t.streetL;s+=1) for(let c=-6;c<=6;c+=1){ const cc=worldCell(X?t.x+s:t.x+c,X?t.z+c:t.z+s); if(cc>=0) WORLD.GRASS[cc]=0; } // sidewalks too
 }
 function townAt(x,z,pad){ for(const t of TOWNS) if(Math.hypot(x-t.x,z-t.z)<t.R+(pad||0)) return t; return null; }
@@ -1087,13 +1113,14 @@ function gridMesh(VA,VB,vert,skirt){
 // a patch of the baked grid: na×nb cells from (i0,j0), every st cells
 function terrainPatch(i0,j0,na,nb,st){
   const {ROCK,SNOW}=WORLD;
-  const m=gridMesh(na/st+1,nb/st+1,(k,a,b,dy,pos,nor,uv,col,cov)=>{ const i=i0+a*st, j=j0+b*st, q=j*WN+i, x=SPAWN[0]-WHALF+i*WHS, z=SPAWN[2]-WHALF+j*WHS, h=WH[q];
+  const m=gridMesh(na/st+1,nb/st+1,(k,a,b,dy,pos,nor,uv,col,cov)=>{ const i=i0+a*st, j=j0+b*st, q=j*WN+i, x=SPAWN[0]-WHALF+i*WHS, z=SPAWN[2]-WHALF+j*WHS; let h=WH[q];
+    if(st>1&&WRD[q]<12+2*st*WHS){ for(let jj=Math.max(0,j-st);jj<=Math.min(WN-1,j+st);jj++) for(let ii=Math.max(0,i-st);ii<=Math.min(WN-1,i+st);ii++){ const v=WH[jj*WN+ii]; if(v<h) h=v; } } // coarse ground near a road sits at the lowest point it spans
     const ia=Math.max(0,i-st), ib=Math.min(WN-1,i+st), ja=Math.max(0,j-st), jb=Math.min(WN-1,j+st);
     const gx=(WH[j*WN+ib]-WH[j*WN+ia])/((ib-ia)*WHS), gz=(WH[jb*WN+i]-WH[ja*WN+i])/((jb-ja)*WHS), ny=1/Math.sqrt(1+gx*gx+gz*gz);
     pos[k*3]=x; pos[k*3+1]=h-dy; pos[k*3+2]=z; nor[k*3]=-gx*ny; nor[k*3+1]=ny; nor[k*3+2]=-gz*ny;
     uv[k*2]=(i-i0)*WHS/16; uv[k*2+1]=(j-j0)*WHS/16; // the grass texture tiles every 16 m, seamlessly across chunks
     const t=terrainTint(x,z,h,ny); col[k*3]=t.r; col[k*3+1]=t.g; col[k*3+2]=t.b;
-    const rd=WRD[q]; cov[k*3]=ROCK[q]/255; cov[k*3+1]=SNOW[q]/255; cov[k*3+2]=rd<6.5?1-sstep(5,6.5,rd):0; },4*st+2);
+    cov[k*3]=ROCK[q]/255; cov[k*3+1]=SNOW[q]/255; cov[k*3+2]=st===1?WORLD.DIRT[q]/255:0; },4*st+2); // a narrow worn edge beside the asphalt, up close only
   m.receiveShadow=true; return m; }
 const chunkMesh=(c,lod)=>terrainPatch(c.ci*TCH,c.cj*TCH,TCH,TCH,1<<lod);
 for(let cj=0;cj<TNC;cj++) for(let ci=0;ci<TNC;ci++){ const x0=SPAWN[0]-WHALF+ci*TCH*WHS, z0=SPAWN[2]-WHALF+cj*TCH*WHS;
@@ -1155,20 +1182,20 @@ function roadOBC(sh){ sh.uniforms.plainMap={value:roadPlainTex};
   sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nattribute float lines; varying float vLines;').replace('#include <begin_vertex>','#include <begin_vertex>\nvLines=lines;');
   sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nuniform sampler2D plainMap; varying float vLines;')
     .replace('#include <map_fragment>','vec4 texelColor=mix(texture2D(plainMap,vUv),texture2D(map,vUv),vLines); texelColor=mapTexelToLinear(texelColor); diffuseColor*=texelColor;'); }
-WORLD.roads.forEach((rd,k)=>{ const p=rd.pts, n=p.length, pos=[], nor=[], uv=[], idx=[], lines=[]; let s=0;
+WORLD.roads.forEach((rd,k)=>{ const p=rd.pts, n=p.length, pos=[], nor=[], uv=[], idx=[], lines=[], AC=[-1,-0.5,0,0.5,1], NC=AC.length; let s=0;
   let bx0=1e9, bz0=1e9, bx1=-1e9, bz1=-1e9;
-  for(let q=0;q<n;q++){ const a=p[Math.max(0,q-1)], b=p[Math.min(n-1,q+1)]; let tx=b[0]-a[0], ty=b[2]-a[2], tz=b[1]-a[1]; const tl=Math.hypot(tx,tz)||1, sx=-tz/tl, sz=tx/tl;
-    if(q>0) s+=Math.hypot(p[q][0]-p[q-1][0],p[q][2]-p[q-1][2],p[q][1]-p[q-1][1]);
-    const x=SPAWN[0]+p[q][0], z=SPAWN[2]+p[q][1], y=p[q][2]+0.07;
-    // normal: across the road is level, along it follows the grade
-    let nx=-tx*ty, ny=tx*tx+tz*tz, nz=-tz*ty; const nl=Math.hypot(nx,ny,nz)||1;
+  for(let q=0;q<n;q++){ const a=p[Math.max(0,q-2)], b=p[Math.min(n-1,q+2)]; let tx=b[0]-a[0], tz=b[1]-a[1]; const tl=Math.hypot(tx,tz)||1, sx=-tz/tl, sz=tx/tl;
+    if(q>0) s+=Math.hypot(p[q][0]-p[q-1][0],p[q][1]-p[q-1][1]);
+    const x=SPAWN[0]+p[q][0], z=SPAWN[2]+p[q][1];
     const ln=Math.min(1,Math.max(0,(nearOther(k,x,z)-8)/8)); // 0 at a junction, fading back to full markings 16 m out
-    const xl=x+sx*ROAD_HW, zl=z+sz*ROAD_HW, xr=x-sx*ROAD_HW, zr=z-sz*ROAD_HW; // each edge sits on the ground under it: no floating, no sinking
-    pos.push(xl,terrainH(xl,zl)+0.07,zl, xr,terrainH(xr,zr)+0.07,zr); nor.push(nx/nl,ny/nl,nz/nl,nx/nl,ny/nl,nz/nl); uv.push(0,s/12,1,s/12); lines.push(ln,ln);
+    // every point across the road sits on the ground under it, so the road follows the cut ground exactly: no
+    // floating, no sinking, and where two roads at different heights meet the asphalt runs smoothly from one to the other
+    for(const c of AC){ const px=x+sx*ROAD_HW*c, pz=z+sz*ROAD_HW*c, h=terrainH(px,pz), e=0.6, gx=(terrainH(px+e,pz)-terrainH(px-e,pz))/(2*e), gz=(terrainH(px,pz+e)-terrainH(px,pz-e))/(2*e), nl=Math.hypot(gx,1,gz);
+      pos.push(px,h+0.07,pz); nor.push(-gx/nl,1/nl,-gz/nl); uv.push((c+1)/2,s/12); lines.push(ln); }
     bx0=Math.min(bx0,x); bx1=Math.max(bx1,x); bz0=Math.min(bz0,z); bz1=Math.max(bz1,z); }
-  for(let q=0;q<n-1;q++){
-    const L0=q*2, R0=q*2+1, L1=q*2+2, R1=q*2+3;
-    const up=(A,B,C)=>{ const ax=pos[B*3]-pos[A*3], az=pos[B*3+2]-pos[A*3+2], cx=pos[C*3]-pos[A*3], cz=pos[C*3+2]-pos[A*3+2]; return az*cx-ax*cz>0; };
+  const up=(A,B,C)=>{ const ax=pos[B*3]-pos[A*3], az=pos[B*3+2]-pos[A*3+2], cx=pos[C*3]-pos[A*3], cz=pos[C*3+2]-pos[A*3+2]; return az*cx-ax*cz>0; };
+  for(let q=0;q<n-1;q++) for(let c=0;c<NC-1;c++){
+    const L0=q*NC+c, R0=L0+1, L1=L0+NC, R1=L1+1;
     if(up(L0,L1,R0)) idx.push(L0,L1,R0); else idx.push(L0,R0,L1);
     if(up(R0,L1,R1)) idx.push(R0,L1,R1); else idx.push(R0,R1,L1); }
   const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3)); g.setAttribute('normal',new THREE.Float32BufferAttribute(nor,3)); g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2)); g.setAttribute('lines',new THREE.Float32BufferAttribute(lines,1)); g.setIndex(idx); g.computeBoundingSphere();
@@ -1177,6 +1204,23 @@ WORLD.roads.forEach((rd,k)=>{ const p=rd.pts, n=p.length, pos=[], nor=[], uv=[],
   m.receiveShadow=true; m.matrixAutoUpdate=false; scene.add(m); roadMeshes.push(m);
   rd.box=[bx0-6,bz0-6,bx1+6,bz1+6]; });
 // (no round town squares: each town has a main street instead)
+/* Where two roads run close (a fork, or one road meeting another at a shallow angle) the ground between them is paved
+   too, up to where they are about 8 m apart, so a fork is one stretch of asphalt that splits, ending in a blunt
+   grass nose, not two strips with a sliver of dirt between them. The paving lies on the ground like the roads. */
+{ const pos=[], uv=[], idx=[], AC=[0,0.25,0.5,0.75,1], NC=AC.length, S=SPAWN, FILL=8.4;
+  const nearestLower=(k,x,z)=>{ let best=null, bd=FILL; const cx=Math.floor(x/8), cz=Math.floor(z/8);
+    for(let a=-2;a<=2;a++) for(let b=-2;b<=2;b++){ const l=roadHash.get((cx+a)+','+(cz+b)); if(l) for(const e of l){ const kk=e[2]; if(kk>=k||WORLD.roads[kk].street) continue; const d=Math.hypot(e[0]-x,e[1]-z); if(d<bd){ bd=d; best=e; } } } return best; };
+  WORLD.roads.forEach((rd,k)=>{ if(rd.street) return; const p=rd.pts; let run=[];
+    const flush=()=>{ if(run.length>=2){ for(let r=0;r<run.length;r++){ const [x,z,o]=run[r]; for(const c of AC){ const px=x+(o[0]-x)*c, pz=z+(o[1]-z)*c; pos.push(px,terrainH(px,pz)+0.06,pz); uv.push(px/7.2,pz/12); } }
+        const base=pos.length/3-run.length*NC; for(let r=0;r<run.length-1;r++) for(let c=0;c<NC-1;c++){ const a=base+r*NC+c, b=a+1, a1=a+NC, b1=a1+1;
+          const up=(A,B,C)=>{ const ax=pos[B*3]-pos[A*3], az=pos[B*3+2]-pos[A*3+2], cx=pos[C*3]-pos[A*3], cz=pos[C*3+2]-pos[A*3+2]; return az*cx-ax*cz>0; };
+          if(up(a,a1,b)) idx.push(a,a1,b); else idx.push(a,b,a1); if(up(b,a1,b1)) idx.push(b,a1,b1); else idx.push(b,b1,a1); } } run=[]; };
+    for(let q=0;q<p.length;q++){ const x=S[0]+p[q][0], z=S[2]+p[q][1]; if(townAt(x,z,-2)){ flush(); continue; }
+      const o=nearestLower(k,x,z); if(o&&Math.hypot(o[0]-x,o[1]-z)>0.4) run.push([x,z,o]); else flush(); }
+    flush(); });
+  if(idx.length){ const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3)); g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2)); g.setIndex(idx); g.computeVertexNormals();
+    const fm=new THREE.Mesh(g,new THREE.MeshLambertMaterial({map:roadPlainTex,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-8}));
+    fm.receiveShadow=true; fm.matrixAutoUpdate=false; scene.add(fm); roadMeshes.push(fm); } }
 
 /* ---------- grass, flowers and bushes ----------
    Tufts of grass and little flowers carpet the ground around you (one instanced mesh each, re-laid on a fixed world
