@@ -4557,11 +4557,12 @@ function raySphere(o,d,c,r){ _c.subVectors(o,c); const b=_c.dot(d), h=b*b-(_c.le
 function rayBody(o,d,E){
   const f=E.pos.y, cr=E.crouch, k=E.sc||1; let best=null;
   // zombies hunch: their head sits lower and further forward
-  const hx=E.isZombie?-Math.sin(E.yaw)*0.17*k:0, hz=E.isZombie?-Math.cos(E.yaw)*0.17*k:0, hy=E.isZombie?1.95:(cr?1.2:1.66);
-  const ht=raySphere(o,d,_d.set(E.pos.x+hx,f+hy*k,E.pos.z+hz),0.19*k);
-  if(ht>0) best={t:ht,head:true};
-  const top=cr?1.0:E.isZombie?1.72:1.42;
-  for(let y=0.25;y<=top+0.001;y+=0.19){ const t=raySphere(o,d,_d.set(E.pos.x,f+y*k,E.pos.z),0.31*k); if(t>0&&(!best||t<best.t)) best={t,head:false}; }
+  const Zt=E.isZombie?ZT[E.type]:null, fx=-Math.sin(E.yaw), fz=-Math.cos(E.yaw);
+  if(Zt){ // the creature's skull, then the base of its flame crown: both count as the head
+    for(const [up,fw,r] of [[2.06,Zt.hf,0.16],[2.34,Zt.hf+0.07,0.11]]){ const ht=raySphere(o,d,_d.set(E.pos.x+fx*fw*k,f+up*k,E.pos.z+fz*fw*k),r*k); if(ht>0&&(!best||ht<best.t)) best={t:ht,head:true}; } }
+  else { const ht=raySphere(o,d,_d.set(E.pos.x,f+(cr?1.2:1.66)*k,E.pos.z),0.19*k); if(ht>0) best={t:ht,head:true}; }
+  const top=cr?1.0:Zt?1.9:1.42, lean=Zt?Math.sin(Zt.lean):0;
+  for(let y=0.25;y<=top+0.001;y+=0.19){ const fw=Math.max(0,y-1.1)*lean; const t=raySphere(o,d,_d.set(E.pos.x+fx*fw*k,f+y*k,E.pos.z+fz*fw*k),0.31*k); if(t>0&&(!best||t<best.t)) best={t,head:false}; }
   return best;
 }
 function piecesNearRay(o,d,range){
@@ -4744,9 +4745,9 @@ function playerHurt(dmg,from){
    Waves of zombies walk in from the edges toward the nearest player, claw through any build in their way and chew
    the bottom out of towers. Build a fort between waves. In a room the host's game runs the zombies for everyone. */
 const ZT={ // the purple creatures: walkers, slim pale runners and huge deep-violet brutes
-  husk:  {name:'Walker',hp:110,spd:0.56,dmg:12,bld:16,sc:1,   body:0x7b52a6,light:0xa47bd4,dark:0x24102f,wound:0x4a1a5c,core:0xc77dff,eye:0xe9b8ff,pts:1},
-  runner:{name:'Runner',hp:70, spd:0.98,dmg:8, bld:10,sc:0.95,body:0x9673c2,light:0xbd9ae6,dark:0x2b1638,wound:0x53206a,core:0xd99bff,eye:0xf3d4ff,pts:1},
-  brute: {name:'Brute', hp:520,spd:0.42,dmg:30,bld:55,sc:1.45,body:0x55327f,light:0x7a52a8,dark:0x1a0a24,wound:0x3d1250,core:0xb35cff,eye:0xffa0f0,pts:3}
+  husk:  {name:'Walker',hf:.2,lean:.16,hp:110,spd:0.56,dmg:12,bld:16,sc:1,   body:0x7b52a6,light:0xa47bd4,dark:0x24102f,wound:0x4a1a5c,core:0xc77dff,eye:0xe9b8ff,pts:1},
+  runner:{name:'Runner',hf:.4,lean:.34,hp:70, spd:0.98,dmg:8, bld:10,sc:0.95,body:0x9673c2,light:0xbd9ae6,dark:0x2b1638,wound:0x53206a,core:0xd99bff,eye:0xf3d4ff,pts:1},
+  brute: {name:'Brute', hf:.24,lean:.2,hp:520,spd:0.42,dmg:30,bld:55,sc:1.45,body:0x55327f,light:0x7a52a8,dark:0x1a0a24,wound:0x3d1250,core:0xb35cff,eye:0xffa0f0,pts:3}
 };
 const ZCODE=['husk','runner','brute'];
 var horde={on:false,wave:0,phase:'idle',t:0,toSpawn:0,spawnT:0,kills:0,zs:new Map(),nextId:1,sendT:0,downT:0,best:0};
