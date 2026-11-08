@@ -117,6 +117,15 @@ Each shot kicks the gun back. Pistol slides blow back, the revolver's cylinder t
 
 In zombie horde, demons sometimes drop loot when they die: about half drop nothing, others drop a random kind of ammo (not necessarily what you use), now and then a gun, heals or grenades, and Behemoths usually drop a gun. Loot falls and lands on the ground or on builds, and you pick it up by walking over it. In build fights ammo reserves are endless.
 
+## Skydiving and the glider
+You drop in from high above the island: the first time you press Play in free play (about 620 m up), when a party match starts (about 520 m), and when you come back after being eliminated in a party (160 m). Bot rounds and the zombie horde start on the ground. **Settings → Drop in from the sky** turns it off.
+
+- **Freefall:** steer with the movement keys. Hold forward while looking down to dive: you fall faster (about 60 m/s instead of 38) and cover more ground. Your character lies belly-down with arms out, and sweeps them back in a dive.
+- **The glider** opens by itself about 85 m above whatever is below you, or earlier when you press Jump (after the first second). It's a delta-wing hang glider with a striped sail in your outfit's accent colour; it unfolds wingtips-first, with a whump and a fabric snap.
+- **Gliding:** you sink slowly (about 6.5 m/s) and fly where you look. Forward speeds you up and sinks a little faster, back slows you down, sideways slips. You bank into turns, and you hear the wind and the sail fluttering.
+- **Landing** on the ground, a roof or a build folds the glider away. A glide never causes fall damage. You can't shoot, build, edit, heal or interact until you land.
+- Friends see you skydive and glide too.
+
 ## Fall damage
 Like Fortnite: drops up to 10 m are free. Past that you take 7 damage for every extra metre, straight to health (shields don't soak it), so a fall of about 24 m or more eliminates you.
 
