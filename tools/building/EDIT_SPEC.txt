@@ -1,0 +1,1028 @@
+FORTNITE BUILDING EDITING — COMPLETE TECHNICAL RULEBOOK
+
+Edit Shapes, Selection Rules, Geometry, Collision, Resetting, Structural Support & Collapse
+
+PURPOSE
+
+This document defines the expected behavior of Fortnite-style building edits.
+
+It is intended to serve as a technical reference for implementing an accurate building-editing system.
+
+The system must reproduce Fortnite’s observable gameplay behavior rather than simply creating visually similar building shapes.
+
+All building edits must account for:
+
+* Valid edit configurations.
+* Grid selection.
+* Geometry generation.
+* Player collision.
+* Projectile obstruction.
+* Visibility and line of sight.
+* Edit confirmation.
+* Edit cancellation.
+* Edit resetting.
+* Structural connectivity.
+* Floating structures.
+* Unsupported structures.
+* Structural collapse.
+* Ownership and editing permissions.
+
+Important distinction: Common Fortnite edit patterns are described below, but they are not an exhaustive official database of every possible edit selection. Support all valid combinations for the chosen Fortnite reference version, and do not invent unsupported configurations.
+
+⸻
+
+PART 1 — GENERAL EDITING RULES
+
+1.1 What an edit actually does
+
+An edit modifies an existing building piece.
+
+It does not create an entirely new building piece.
+
+Every building piece must retain its original:
+
+* Unique identity.
+* Building-piece category.
+* Position.
+* Rotation.
+* Material.
+* Ownership.
+* Current health.
+* Structural connections, except where the edited geometry changes them.
+
+The edited geometry must remain within the original building piece’s permitted boundaries.
+
+1.2 General editing restrictions
+
+1. Only editable building pieces may enter edit mode.
+2. Each piece must use its appropriate editing grid.
+3. Only valid grid cells may be selected.
+4. Selected cells must correspond to the resulting geometry.
+5. Unselected cells must retain their appropriate geometry.
+6. Edits must remain aligned with the original building grid.
+7. Editing cannot arbitrarily stretch or reposition geometry.
+8. Editing cannot change the building piece’s category.
+9. Invalid selections must be rejected.
+10. Edits must not create unintended floating geometry.
+11. Edits must update collision and structural connectivity.
+12. Resetting must restore the original geometry.
+
+An edit must never be considered successful solely because its visual appearance changed.
+
+⸻
+
+PART 2 — EDITING GRIDS
+
+2.1 Wall grid
+
+A standard wall uses a 3 × 3 selection grid.
+
+The nine cells can be individually selected.
+
+Grid layout:
+
+1	2	3
+4	5	6
+7	8	9
+
+Each cell represents a selectable region of the wall.
+
+The system must support combinations of selections that produce valid wall configurations.
+
+2.2 Floor grid
+
+A standard floor uses a 2 × 2 selection grid.
+
+1	2
+3	4
+
+Each cell represents one quarter of the floor’s editable surface.
+
+Removing a cell must remove its actual geometry and collision.
+
+2.3 Cone / pyramid grid
+
+A standard cone uses a 2 × 2 corner-based editing layout.
+
+1	2
+3	4
+
+The selected regions determine the resulting cone configuration.
+
+The resulting surfaces must remain within the original piece boundaries.
+
+2.4 Ramp grid
+
+Ramps must use the correct directional editing representation for the chosen Fortnite version.
+
+Do not assume that a ramp uses identical selection behavior to a wall.
+
+The implementation must account for:
+
+* Ramp orientation.
+* Direction of travel.
+* Selected regions.
+* Remaining slope geometry.
+* Mirrored configurations.
+* Walkable surfaces.
+
+If the exact reference grid is uncertain, verify it against gameplay footage or a controlled reference implementation rather than guessing.
+
+⸻
+
+PART 3 — WALL EDIT CONFIGURATIONS
+
+Walls have the greatest variety of recognizable edit configurations.
+
+3.1 Standard wall
+
+An unedited wall is a complete vertical surface.
+
+It must:
+
+* Block player movement.
+* Block projectiles where appropriate.
+* Obstruct visibility.
+* Retain its original dimensions.
+* Remain structurally connected.
+
+3.2 Window edit
+
+Creates an opening within the wall.
+
+Requirements:
+
+* Remove the selected interior geometry.
+* Preserve the surrounding frame.
+* Allow visibility through the opening.
+* Allow projectile passage where the projectile fits.
+* Permit player passage only when the capsule fits.
+* Preserve the remaining wall collision.
+
+3.3 Double-window edit
+
+Creates two separate window openings.
+
+Requirements:
+
+* Maintain the appropriate center section.
+* Preserve surrounding structural geometry.
+* Generate two independent openings.
+* Ensure each opening has correct collision and visibility.
+
+3.4 Door edit
+
+Creates a doorway through the lower portion of the wall.
+
+Requirements:
+
+* Remove the appropriate lower central geometry.
+* Preserve the upper wall.
+* Preserve surrounding supports.
+* Allow players to walk through.
+* Prevent collision from blocking the doorway.
+
+3.5 Arch edit
+
+Creates a large lower passage.
+
+Requirements:
+
+* Preserve appropriate side supports.
+* Preserve the upper structural section.
+* Allow movement beneath the opening.
+* Ensure the player does not collide with invisible geometry.
+
+3.6 Half-wall and partial-height configurations
+
+These configurations remove a substantial portion of the wall while retaining a smaller barrier.
+
+Requirements:
+
+* Preserve the correct remaining height.
+* Maintain the original alignment.
+* Update collision to match the remaining geometry.
+* Do not retain collision where geometry was removed.
+
+3.7 Triangular and diagonal configurations
+
+Supported selections may create angled or asymmetric wall boundaries.
+
+Requirements:
+
+* Generate the correct diagonal geometry.
+* Preserve valid connections between remaining sections.
+* Avoid gaps caused by incorrect mesh construction.
+* Ensure collision follows the actual diagonal surface.
+
+3.8 Corner and asymmetric configurations
+
+The system must support valid asymmetric selections.
+
+Do not assume every wall edit is symmetrical.
+
+A selection on the left side must not automatically produce the same geometry on the right side unless the selection itself is mirrored.
+
+3.9 Wall restrictions
+
+* Walls cannot become floors, ramps, or cones through editing.
+* Walls cannot gain additional height.
+* Walls cannot extend beyond their original boundaries.
+* Removed wall sections cannot retain collision.
+* Remaining wall sections must preserve their actual dimensions.
+* Invalid selections must not create arbitrary geometry.
+
+⸻
+
+PART 4 — FLOOR EDIT CONFIGURATIONS
+
+4.1 Standard floor
+
+A complete floor provides a horizontal supporting surface.
+
+It must support players standing on it.
+
+4.2 Single-corner removal
+
+Removes one quarter of the floor.
+
+Requirements:
+
+* Remove the selected quarter.
+* Preserve the other three quarters.
+* Remove collision from the opening.
+* Allow players to fall through the opening.
+
+4.3 Multiple-corner removal
+
+Removes multiple selected sections.
+
+Requirements:
+
+* Preserve all unselected sections.
+* Generate accurate boundaries.
+* Avoid overlapping or disconnected duplicate geometry.
+
+4.4 Half-floor configuration
+
+Removes approximately half the floor.
+
+Requirements:
+
+* Preserve the remaining half.
+* Maintain its original elevation.
+* Support players standing on the remaining surface.
+
+4.5 Diagonal or wedge configurations
+
+Create angled boundaries where supported by the edit-selection rules.
+
+Requirements:
+
+* Generate the correct diagonal boundary.
+* Preserve the remaining surface.
+* Update player collision accurately.
+
+4.6 Large openings
+
+A floor may be edited to create an opening through which a player can fall.
+
+Requirements:
+
+* No invisible collision across the opening.
+* No unintended supporting surfaces.
+* Correct ground detection.
+* Correct falling behavior.
+* No accidental snapping onto removed geometry.
+
+4.7 Floor restrictions
+
+* Floors cannot gain additional dimensions.
+* Floors cannot arbitrarily change elevation.
+* Removed sections cannot continue supporting players.
+* Remaining sections must retain collision.
+* Geometry must remain aligned with the original grid.
+
+⸻
+
+PART 5 — RAMP / STAIR EDIT CONFIGURATIONS
+
+Ramp editing must change the actual ramp geometry, not merely its texture or appearance.
+
+5.1 Standard ramp
+
+A standard ramp provides an inclined walking surface.
+
+It must:
+
+* Support players walking uphill.
+* Support players moving downhill.
+* Provide appropriate collision.
+* Maintain its original orientation.
+
+5.2 Directional configurations
+
+Where supported, editing may change the remaining usable ramp surface.
+
+Requirements:
+
+* Preserve the correct slope.
+* Maintain original grid alignment.
+* Update collision to match the resulting configuration.
+
+5.3 Partial ramp configurations
+
+Removed portions must no longer obstruct movement.
+
+Remaining sections must preserve their correct shape and collision.
+
+5.4 Mirrored configurations
+
+Mirrored ramp configurations must use the correct orientation and direction.
+
+Do not accidentally rotate the entire building piece when only its internal geometry should change.
+
+5.5 Ramp restrictions
+
+* Do not arbitrarily increase ramp height.
+* Do not stretch the ramp outside its original boundaries.
+* Do not retain collision from removed surfaces.
+* Do not create unintended walkable surfaces.
+* Do not trap players inside the ramp.
+* Maintain accurate head clearance.
+
+⸻
+
+PART 6 — CONE / PYRAMID EDIT CONFIGURATIONS
+
+Cones must support the appropriate corner-based edit combinations.
+
+6.1 Standard cone
+
+The original pyramid has four sloped sides.
+
+Each side must have appropriate collision and geometry.
+
+6.2 Single-corner configurations
+
+Modifying one corner may create an asymmetric slope.
+
+Requirements:
+
+* Preserve the remaining sides.
+* Maintain original boundaries.
+* Generate correct collision.
+
+6.3 Multiple-corner configurations
+
+Multiple selected corners must be handled independently.
+
+Requirements:
+
+* Preserve the correct remaining surfaces.
+* Avoid overlapping geometry.
+* Maintain valid connections.
+
+6.4 Opposing-corner configurations
+
+When supported, opposing corners can produce different directional configurations.
+
+The result must reflect the actual selected regions.
+
+6.5 Ramp-like configurations
+
+Some cone edits create a usable sloped surface.
+
+Requirements:
+
+* Generate the correct slope.
+* Permit appropriate player movement.
+* Remove collision from eliminated surfaces.
+* Prevent players from colliding with the original unedited pyramid.
+
+6.6 Mirrored configurations
+
+The same selection pattern may produce a different orientation when mirrored.
+
+The system must preserve the intended orientation.
+
+6.7 Cone restrictions
+
+* Cannot exceed the original piece boundaries.
+* Cannot arbitrarily increase height.
+* Must retain correct grid alignment.
+* Must not leave collision from removed surfaces.
+* Must not create unintended floating geometry.
+
+⸻
+
+PART 7 — VALID AND INVALID EDIT SELECTIONS
+
+7.1 Valid selections
+
+A valid selection must:
+
+1. Use existing grid cells.
+2. Belong to the correct building-piece type.
+3. Follow supported editing rules.
+4. Produce a valid geometry configuration.
+5. Preserve the original piece boundaries.
+6. Generate appropriate collision.
+7. Preserve the building piece’s identity.
+
+The implementation should support every valid selection pattern, not merely a short list of hardcoded presets.
+
+7.2 Invalid selections
+
+Reject selections that:
+
+* Reference nonexistent grid cells.
+* Attempt to modify an unsupported building-piece type.
+* Attempt to create geometry outside the original piece.
+* Attempt to change the piece into another category.
+* Attempt to modify a destroyed piece.
+* Violate editing permissions.
+* Produce an unsupported configuration.
+
+Do not silently transform an invalid selection into a different edit.
+
+7.3 Ownership restrictions
+
+A player must only be able to edit structures they are permitted to edit.
+
+Editing permissions must account for:
+
+* Ownership.
+* Team membership.
+* Party or shared-building permissions, if supported.
+* Current game mode.
+* Building-piece destruction state.
+
+Never assume that every player can edit every structure.
+
+⸻
+
+PART 8 — EDIT MODE AND SELECTION BEHAVIOR
+
+Entering edit mode must not immediately modify the building piece.
+
+Enter edit mode
+
+1. Verify that the piece exists.
+2. Verify that the piece is editable.
+3. Verify player permissions.
+4. Display the correct editing grid.
+5. Preserve the original geometry.
+6. Allow grid selections.
+
+Selecting cells
+
+* Highlight selected cells.
+* Allow selections to be changed before confirmation.
+* Maintain accurate selection state.
+* Prevent selections outside the grid.
+* Do not modify the actual building geometry during ordinary selection.
+
+Confirming an edit
+
+1. Validate the selection.
+2. Generate the resulting geometry.
+3. Update rendering.
+4. Update collision.
+5. Update structural connectivity.
+6. Apply the edit to the existing building piece.
+7. Exit edit mode.
+
+Canceling an edit
+
+Cancellation must:
+
+* Discard unconfirmed selections.
+* Restore the previous geometry state.
+* Preserve collision.
+* Preserve health.
+* Preserve ownership.
+* Leave structural connections unchanged.
+
+⸻
+
+PART 9 — RESET RULES
+
+Resetting restores the original unedited geometry.
+
+9.1 Reset behavior
+
+1. Retrieve the original geometry definition.
+2. Clear the edited selection.
+3. Restore the original mesh.
+4. Restore the original collision.
+5. Remove previous openings.
+6. Restore original walkable surfaces.
+7. Recalculate structural connectivity.
+8. Preserve the building-piece identity.
+9. Exit edit mode.
+
+9.2 Properties that must survive resetting
+
+* Unique piece ID.
+* Ownership.
+* Material.
+* Current health.
+* Position.
+* Rotation.
+* Original building category.
+
+9.3 Reset restrictions
+
+Resetting must not:
+
+* Create a duplicate building piece.
+* Restore destroyed health.
+* Change ownership.
+* Change material.
+* Move the piece.
+* Leave behind old collision.
+* Produce temporary invisible barriers.
+* Automatically resurrect previously destroyed pieces.
+
+9.4 Repeated edits and resets
+
+The system must support:
+
+* Original → Edited.
+* Edited → Reset.
+* Reset → Edited again.
+* Edited → Different valid edit.
+* Different edit → Reset.
+
+Repeated operations must not accumulate geometry, collision, or state errors.
+
+⸻
+
+PART 10 — PLAYER COLLISION
+
+Player collision is one of the most important parts of the entire system.
+
+Use an appropriately sized capsule collider for the player rather than relying on a single point or an oversized rectangular collision box.
+
+10.1 Player movement collision
+
+* Solid geometry blocks movement.
+* Valid openings allow passage when the capsule fits.
+* Players cannot pass through remaining wall sections.
+* Players cannot walk through solid floor sections.
+* Players must fall through genuine floor openings.
+* Players must collide with remaining ramp and cone geometry appropriately.
+
+10.2 Capsule clearance
+
+Opening dimensions must be compared against the actual player capsule.
+
+Consider:
+
+* Capsule radius.
+* Capsule height.
+* Player crouching state, if supported.
+* Player standing state.
+* Jumping movement.
+* Movement direction.
+* Available clearance.
+
+An opening that looks large enough visually must not automatically permit passage.
+
+The capsule must physically fit.
+
+10.3 Ground detection
+
+The player must correctly detect:
+
+* Remaining floor sections.
+* Ramp surfaces.
+* Cone slopes.
+* Other valid walkable building surfaces.
+
+Removed geometry must not register as ground.
+
+10.4 Head collision
+
+Players jumping into the underside of remaining geometry must collide appropriately.
+
+Openings must provide genuine head clearance.
+
+10.5 Collision channels
+
+Keep different types of interaction separate:
+
+Player movement collision
+Determines whether players can walk through or stand on geometry.
+
+Projectile collision
+Determines whether bullets and other projectiles are obstructed.
+
+Visibility collision
+Determines whether the geometry blocks line of sight.
+
+Camera collision
+Prevents the camera from clipping through solid geometry.
+
+Interaction collision
+Determines whether a player can target or interact with a building piece.
+
+Do not use one simplified collision system for every interaction.
+
+10.6 Collision synchronization
+
+Whenever an edit is confirmed:
+
+* Update the collision representation.
+* Remove collision from deleted geometry.
+* Preserve collision on remaining geometry.
+* Update walkable surfaces.
+* Update projectile obstruction.
+* Update visibility obstruction.
+
+Whenever an edit is reset:
+
+* Restore original collision.
+* Restore original walkable surfaces.
+* Remove stale edited collision.
+
+Never allow the visual mesh and authoritative collision representation to disagree.
+
+⸻
+
+PART 11 — EDIT ANIMATIONS
+
+Editing should have three distinct stages.
+
+11.1 Entering edit mode
+
+* Show the selection grid.
+* Highlight available cells.
+* Show selected cells clearly.
+* Keep the original structure visible.
+
+11.2 Confirming an edit
+
+* Transition the original geometry into its new configuration.
+* Remove or modify selected geometry.
+* Preserve remaining geometry.
+* Update collision at the authoritative edit transition.
+* Play appropriate confirmation feedback.
+
+11.3 Resetting
+
+* Restore the original geometry.
+* Restore original collision.
+* Remove previous openings.
+* Play appropriate reset feedback.
+
+Animations are visual presentation, not the source of truth.
+
+Never wait for an animation to finish before validating whether the edit is legal.
+
+⸻
+
+PART 12 — STRUCTURAL SUPPORT AND FLOATING GEOMETRY
+
+This system must be independent from the geometry and player collision systems.
+
+A piece can look like it is floating without actually being structurally disconnected.
+
+12.1 Structural connectivity
+
+Every building piece must have a valid structural connection to an anchor.
+
+Anchors may include:
+
+* Valid terrain.
+* Permanent supporting world geometry.
+* Other valid anchored structures.
+
+Building pieces may receive support indirectly through other building pieces.
+
+A piece does not need to touch the ground directly if a valid structural support path remains.
+
+12.2 Legitimately floating structures
+
+The following structures must not automatically collapse:
+
+* A horizontal platform connected to an anchored wall.
+* An elevated floor supported by another floor.
+* A bridge extending from an anchored platform.
+* A tower connected through multiple building pieces.
+* A platform with multiple independent support paths.
+
+Never use a simplistic ground-contact test.
+
+A building piece not touching the ground is not automatically unsupported.
+
+12.3 Structural connections
+
+Support must be determined through actual structural connectivity.
+
+Do not assume two pieces support each other simply because their meshes visually overlap.
+
+The implementation must establish valid attachment relationships using the game’s building grid and structural rules.
+
+12.4 Multiple support paths
+
+A structure may have more than one valid support path.
+
+For example:
+
+A platform is connected to two separate supporting walls.
+
+If one wall is destroyed:
+
+* Recalculate the platform’s support.
+* Check whether the second wall still provides a valid path.
+* Preserve the platform if that path remains valid.
+
+Removing one support must not automatically destroy every connected piece.
+
+12.5 Removing the final support
+
+When a piece loses its final valid structural connection:
+
+1. Mark it as unsupported.
+2. Identify dependent structures.
+3. Recalculate their support.
+4. Identify pieces that also become unsupported.
+5. Begin the appropriate collapse behavior.
+
+Unsupported structures must not remain permanently suspended.
+
+⸻
+
+PART 13 — COLLAPSE BEHAVIOR
+
+Collapse is a consequence of structural disconnection.
+
+It is not simply a visual animation.
+
+13.1 Collapse initiation
+
+Collapse may occur after:
+
+* Destroying a supporting wall.
+* Destroying a supporting floor.
+* Removing a structural connection through editing.
+* Destroying a supporting ramp.
+* Removing the final valid support path.
+
+Only affected structures should be evaluated.
+
+13.2 Collapse propagation
+
+When a piece becomes unsupported:
+
+1. Remove its structural support contribution.
+2. Recalculate the dependent pieces.
+3. Determine which pieces have lost all valid support.
+4. Continue evaluating the affected network.
+5. Mark disconnected pieces for collapse.
+6. Remove them from the valid building network.
+
+Do not allow unsupported pieces to continue supporting other pieces.
+
+13.3 Collapse restrictions
+
+* Do not collapse pieces that retain valid support.
+* Do not destroy an entire structure because one support was removed if another remains.
+* Do not leave invisible collision behind.
+* Do not leave unsupported pieces suspended indefinitely.
+* Do not treat visual proximity as structural support.
+* Do not confuse player collision with structural connectivity.
+
+13.4 Collapse and editing interaction
+
+An edit that causes another structure to become unsupported is not automatically invalid.
+
+If the edit is valid:
+
+* Allow it.
+* Apply the geometry change.
+* Recalculate structural connectivity.
+* Collapse only the pieces that have genuinely lost all valid support.
+
+A legitimate edit must not be rejected simply because it causes a structural collapse.
+
+13.5 Resetting after collapse
+
+Resetting a piece must restore that piece’s original geometry if it still exists and is eligible for editing.
+
+It must not automatically resurrect other pieces that already collapsed and were destroyed.
+
+Previously destroyed pieces must follow the game’s normal rebuilding rules.
+
+⸻
+
+PART 14 — THREE INDEPENDENT BUT CONNECTED SYSTEMS
+
+The implementation must maintain three distinct systems.
+
+1. Geometry system
+
+Responsible for:
+
+* Original building-piece shapes.
+* Edit selection.
+* Mesh generation.
+* Removed sections.
+* Remaining sections.
+* Reset geometry.
+
+2. Collision system
+
+Responsible for:
+
+* Player movement.
+* Capsule clearance.
+* Standing surfaces.
+* Falling.
+* Head collision.
+* Projectile obstruction.
+* Visibility.
+* Camera interaction.
+
+3. Structural support system
+
+Responsible for:
+
+* Valid structural connections.
+* Support paths.
+* Floating structures.
+* Unsupported pieces.
+* Collapse propagation.
+* Recalculation after editing and destruction.
+
+These systems must communicate but must never substitute for one another.
+
+For example:
+
+* A visually floating piece may have valid structural support.
+* A visually solid wall opening may have no player collision.
+* A remaining floor section may provide player collision while depending on another piece for structural support.
+
+Do not assume that one system can determine the behavior of another.
+
+⸻
+
+PART 15 — BUILDING PIECE STATE MANAGEMENT
+
+Every building piece must maintain a consistent state.
+
+Suggested state properties:
+
+* Unique ID.
+* Piece type.
+* Position.
+* Rotation.
+* Material.
+* Owner.
+* Health.
+* Original geometry definition.
+* Current edit selection.
+* Current geometry configuration.
+* Current collision configuration.
+* Structural connections.
+* Structural support state.
+* Destruction state.
+* Edit permissions.
+
+Editing must update only the properties affected by the edit.
+
+Health, ownership, material, and identity must remain unchanged.
+
+A destroyed piece must no longer provide structural support.
+
+A piece in the process of collapsing must not be treated as a stable support anchor.
+
+⸻
+
+PART 16 — AUTOMATED VALIDATION AND TESTING
+
+The editing system must be tested systematically.
+
+16.1 Edit configuration tests
+
+Test every supported configuration for:
+
+* Walls.
+* Floors.
+* Ramps.
+* Cones.
+
+Test mirrored and asymmetric variations wherever supported.
+
+Do not test only the most common configurations.
+
+16.2 Collision tests
+
+Test:
+
+1. Player walking into a solid wall.
+2. Player walking through a doorway.
+3. Player jumping through an appropriately sized opening.
+4. Player attempting to enter an opening that is too small.
+5. Player standing on a remaining floor section.
+6. Player falling through a removed floor section.
+7. Player walking up an edited ramp.
+8. Player interacting with an edited cone.
+9. Player jumping into remaining ceiling geometry.
+10. Player encountering removed geometry.
+
+16.3 Reset tests
+
+Test:
+
+* Original to edited.
+* Edited to original.
+* Repeated editing.
+* Repeated resetting.
+* Switching between valid configurations.
+* Resetting after player movement.
+* Resetting after structural changes.
+
+Verify that no old geometry or collision remains.
+
+16.4 Structural tests
+
+Test:
+
+1. Floor supported directly by terrain.
+2. Floor supported by a wall.
+3. Platform extending from an anchored structure.
+4. Tower supported through multiple connected pieces.
+5. Bridge with two support paths.
+6. Bridge with one remaining support path.
+7. Removal of one support.
+8. Removal of the final support.
+9. Editing a floor that disconnects another piece.
+10. Editing a wall that disconnects an elevated platform.
+11. Destroying a supporting ramp.
+12. Restoring an edited piece after a structural change.
+
+16.5 Ownership tests
+
+Test:
+
+* Owner editing their own structure.
+* Unauthorized player attempting to edit.
+* Teammate editing where permissions allow it.
+* Destroyed structure entering edit mode.
+* Edit cancellation.
+* Reset permissions.
+
+⸻
+
+PART 17 — IMPLEMENTATION AND ACCURACY REQUIREMENTS
+
+The following are non-negotiable:
+
+1. Do not hardcode only a handful of visual edit presets.
+2. Do not accept every mathematically possible selection as a valid Fortnite edit.
+3. Implement the actual supported selection rules.
+4. Keep geometry and collision synchronized.
+5. Keep structural support independent from player collision.
+6. Support legitimate floating structures.
+7. Collapse genuinely disconnected structures.
+8. Preserve building-piece identity and health.
+9. Implement reliable reset behavior.
+10. Prevent invisible walls and floors.
+11. Prevent unintended floating collision.
+12. Prevent unsupported structures from remaining suspended.
+13. Prevent valid structures from collapsing unnecessarily.
+14. Test all supported configurations.
+15. Distinguish actual Fortnite behavior from custom implementation decisions.
+
+Where exact Fortnite behavior is uncertain, do not fabricate a rule. Record the uncertainty and verify it against the selected reference version.
+
+The system should prioritize functional accuracy over superficial visual similarity.
+
+⸻
+
+FINAL DEVELOPMENT OBJECTIVE
+
+The finished building-editing system should behave consistently across all supported building pieces.
+
+A player should be able to:
+
+* Enter edit mode.
+* Select valid grid sections.
+* Create the appropriate shape.
+* Confirm the edit.
+* Walk through valid openings.
+* Collide with remaining solid geometry.
+* Stand on remaining floor surfaces.
+* Walk along edited ramps.
+* Interact with edited cones.
+* Reset the piece.
+* Restore the original geometry.
+* Cause structural collapse through legitimate support removal.
+* Preserve structures that retain valid support paths.
+
+Every resulting shape must have correct geometry, collision, and structural behavior.
+
+The ultimate requirement is that the building system must be mechanically believable and consistent with Fortnite’s observable gameplay, not merely resemble Fortnite visually.
