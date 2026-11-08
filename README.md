@@ -65,7 +65,8 @@ Ten towns sit on the flattest lowland spots around the island (Rustwood, Pebble 
 - **Sidewalks.** Concrete sidewalks run down both sides of every street, and a path runs from each front door out to the sidewalk.
 - **Stairs.** Two-storey houses have a real staircase: 20 steps along an inside wall up to a landing, under a stairwell with a railing round it. You walk up it step by step.
 - **Farming.** Underneath, every house is still wood, brick or metal (siding is wood, stucco is brick, panels are metal). Pickaxe a house to farm that material, 4–8 a hit, and aim at a piece to see its health.
-- **Houses** are made of real build pieces, so you can shoot, pickaxe, crack and collapse them. **Clear builds**, or the start of a new round, puts them back.
+- **Houses** are made of real build pieces, so you can shoot, pickaxe, crack and collapse them, but you can't edit them (whatever the edit setting). **Clear builds**, or the start of a new round, puts them back.
+- **Garages.** Some houses have a one-car garage beside them, facing the same street: a concrete floor with an oil stain, the overhead door rolled up under a flat roof, a workbench with a pegboard of tools and a shelf of crates. A concrete driveway runs out to the street. Now and then a dune buggy is parked inside (at most two per town).
 - **Chests.** Gold-banded chests sit in houses (some upstairs) and out in the wild. They glow, give off a soft shimmering hum when you're within about 9 m, and show as gold squares on the minimap. Hold **Interact** (V, bindable) next to one for half a second and it bursts open, throwing out:
   - a gun (any rarity, with rarer ones less likely)
   - ammo for that gun
@@ -74,6 +75,14 @@ Ten towns sit on the flattest lowland spots around the island (Rustwood, Pebble 
   Opened chests refill after a couple of minutes.
 - **Floor loot.** Guns and ammo lie on the floors of houses from the start.
 - **In a party**, the host opens every chest, so two players can never loot the same one. Damage to houses and opened chests stay in sync, including for players who join later.
+
+## Dune buggies
+A small two-seat buggy: a tube roll cage, bucket seats, knobbly tyres on long-travel springs, a light bar, an engine at the back with the exhaust, a spare wheel, a safety flag and a racing number. Eight paint colours.
+- **Get in:** walk up to it and press **Interact** (V): the left side says *Drive*, the right side *Ride as passenger*. **Interact** again gets you out beside it.
+- **Driving:** forward and back to drive, brake and reverse; left and right steer; **Jump** is the handbrake, which lets the back slide out. It's slower than a car: about 47 km/h on asphalt, a bit less on grass. The camera sits further back and you look around freely; your speed shows above the hotbar.
+- **It feels like a buggy:** it squats under power and dives under braking, leans in corners, follows every bump on its springs, climbs kerbs and ramps, flies off jumps, and stops with a bump against walls and trees. Dust kicks up off grass and dirt, the exhaust puffs, and the single-cylinder engine putters at idle and revs as you go, with tyre squeal when you slide.
+- **Fighting:** the driver can't shoot, build or edit. The passenger can shoot (guns only). Running into zombies hurts them.
+- **In a party** everyone sees the buggy move and who's in it, and a friend can ride along. A buggy left somewhere stays there, also for players who join later. A new match puts every buggy back in its garage.
 
 ## Trees, rocks and cars
 Trees, pine trees, rocks and old cars are scattered around the map. They're solid, so you, the bot and zombies have to go around them. Materials are infinite by default. Turn off **Infinite materials** in Settings and every build costs 10 of its material: pickaxe trees for wood, rocks for brick and cars for metal (your stock shows on the right). You start each life with 30 wood. Anything you harvest grows back in its spot after 35–80 seconds. In a party everyone sees the same map, and the host decides when things grow back.
@@ -88,6 +97,8 @@ You carry a pickaxe plus 5 slots (keys 2–6 by default) that hold any weapon or
 - Drag a slot onto the drop area, or anywhere outside the panel, to drop it on the ground. Ammo works the same way.
 - Drag loot from the *On the ground nearby* list straight onto a slot. Whatever was in that slot is dropped in its place.
 - Click a slot to select it; click it again to equip it.
+
+When your slots are full, press **Interact** on a weapon or item on the ground to swap it for the one in your hands (the prompt says *Swap … for …*); yours drops where you stand.
 
 On phones, the bag button opens the inventory. You can also hold a weapon in the hotbar for a moment and drag it onto another slot (empty ones show up while you drag).
 
@@ -110,7 +121,7 @@ Guns use light, medium, heavy, shell or rocket ammo, and reloads come out of you
 - **The crosshair shows exactly where your shots can land.** Every bullet or pellet lands inside it, spread evenly, with no stray outliers. It grows as you move, jump or keep firing. When your first-shot accuracy is ready, it tightens.
 - **Each kind of gun has its own crosshair.** Rifles, SMGs and pistols have four ticks. Shotguns show the pellet ring with a centre dot. Scoped guns have short ticks and a dot. Launchers and grenades show a dashed ring.
 - **Aiming down sights** tightens the crosshair and adds a centre dot.
-- **The scope view** has a fine crosshair with thick outer posts, range marks and a red centre dot.
+- **The scope view** has a fine crosshair with thick outer posts, range marks and a red centre dot. On PC the mouse wheel zooms the scope through three steps (the magnification shows at the bottom of the lens); on phones the scope opens a step closer.
 
 ### Gun animation
 Each shot kicks the gun back. Pistol slides blow back, the revolver's cylinder turns one chamber per shot, and the pump fore-end racks. Bolt-action rifles lift, pull and push the bolt after every shot, and the double barrel breaks open to reload.
