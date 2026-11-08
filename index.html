@@ -2647,7 +2647,7 @@ function swing(fromImpact){
     if(hp_&&hp_.owner==='world') giveMats(hp_.mat,Math.round(HOUSE_FARM[hp_.mat][0]+Math.random()*(HOUSE_FARM[hp_.mat][1]-HOUSE_FARM[hp_.mat][0])),hit.point); } // houses farm like the map does
 }
 function toggleEdit(){ if(edit) exitEdit(true); else enterEdit(); }
-function respawn(){ animEvent(localHero,'revive'); P.pos.set(...SPAWN); P.vel.set(0,0,0); P.onGround=true; P.hp=100; P.sh=100; defaultLoadout(); P.reloadT=0; P.useT=0; syncItems(); P.mats={wood:30,brick:0,metal:0}; if(typeof syncMats==='function'&&document.getElementById('matStock')) syncMats(); }
+function respawn(){ animEvent(localHero,'revive'); P.pos.set(...SPAWN); P.vel.set(0,0,0); P.onGround=true; P.fallTop=null; P.hp=100; P.sh=100; defaultLoadout(); P.reloadT=0; P.useT=0; syncItems(); P.mats={wood:30,brick:0,metal:0}; if(typeof syncMats==='function'&&document.getElementById('matStock')) syncMats(); }
 
 /* ---------- audio ---------- */
 let AC=null, noiseBuf=null, sfxGain=1, sfxLP=20000, sfxVerb=0, master=null, verb=null, cur=null;
@@ -4273,6 +4273,8 @@ function onHit(m){
 }
 function onElim(m){
   const nm=id=>id===net.id?'You':id==='bot'?'Bot':id==='zombie'?'A zombie':(net.players.get(id)||{}).name||'Player', w=(WEAPONS[m.w]||{name:m.w==='zombie'?'Claws':'Pickaxe'}).name;
+  if(m.w==='fall'){ feed(`<b>${nm(m.id)}</b> fell too far`,m.id===net.id); if(m.id===net.id){ banner('Eliminated','by the fall',2.6); sfx('lose'); }
+    const pl=net.players.get(m.id); if(pl){ pl.alive=false; animEvent(pl.h,'die'); setTimeout(()=>{ if(!pl.alive) pl.h.group.visible=false; },900); } return; }
   if(m.by===net.id){ net.kills++; feed(`You eliminated <b>${nm(m.id)}</b> · ${w}`); banner('Eliminated',nm(m.id),1.6); sfx('win'); }
   else if(m.id===net.id){ feed(`<b>${nm(m.by)}</b> eliminated you · ${w}`,true); banner('Eliminated','by '+nm(m.by),2.6); sfx('lose'); }
   else feed(`<b>${nm(m.by)}</b> eliminated ${nm(m.id)} · ${w}`);
@@ -4749,101 +4751,109 @@ const ZT={ // the purple creatures: walkers, slim pale runners and huge deep-vio
 const ZCODE=['husk','runner','brute'];
 var horde={on:false,wave:0,phase:'idle',t:0,toSpawn:0,spawnT:0,kills:0,zs:new Map(),nextId:1,sendT:0,downT:0,best:0};
 const zEye=new THREE.MeshBasicMaterial({color:0xff2a14}), zGlow=new THREE.MeshBasicMaterial({color:0xff3a1a,transparent:true,opacity:.28,blending:THREE.AdditiveBlending,depthWrite:false}), zVein=new THREE.MeshBasicMaterial({color:0xff4a1a}), zHorn=toon(0x2b1d1a), zMouth=toon(0x2a1414), zBone=toon(0xd9d2bd), goreMat=new THREE.MeshLambertMaterial({color:0x6a2c8c});
-function makeZombie(type){
-  /* The horde: tall, thin purple creatures. One flowing body runs from needle-pointed legs up a narrow waist and
-     broad shoulders into a head that rises into a flickering flame crown. Blade fins hang from the shoulders down the
-     sides, and the body is torn by dark wounds with a violet glow inside. Walkers are the base shape, Runners are
-     slimmer, paler and hunched, Brutes are huge and deep violet with a bigger crown and heavy fins. The joints
-     (hips, legs, spine, head, jaw, arms) are the same as before, so walking, swiping, twitching and dying animate
-     the same way. */
-  const T=ZT[type], g=new THREE.Group(); g.rotation.order='YXZ';
+function makeZombie(type,variant){
+  /* The horde, after Austin's drawing: tall, thin purple creatures. One flowing body runs from needle-pointed legs up
+     a narrow waist and sloping shoulders into a head that becomes the flames themselves: no eyes, just a dark hollow
+     torn in the face and licks of flame rising off it. Slim blade fins hang from the shoulders down the sides. Every
+     creature is torn by its own random set of wounds (dark, ragged holes with a violet glow deep inside). Walkers are
+     the base shape, Runners are slimmer, paler and hunched, Brutes are huge and deep violet with a bigger crown.
+     The joints (hips, legs, spine, head, jaw, arms) are the same as before, so walking, swiping, twitching and
+     dying animate the same way. */
+  const T=ZT[type], g=new THREE.Group(); g.rotation.order='YXZ'; variant=(variant|0)%8;
   const part=(geo,mat,parent,x=0,y=0,z=0,w=0.012)=>{ const m=new THREE.Mesh(geo,typeof mat==='number'?toon(mat):mat); m.position.set(x,y,z); parent.add(m);
     if(w>0) m.add(new THREE.Mesh(inkGeo(geo,w),inkMat)); return m; };
   const grp=(parent,x=0,y=0,z=0)=>{ const q=new THREE.Group(); q.position.set(x,y,z); parent.add(q); return q; };
   const aux=[], sub=(parent,x,y,z)=>{ const q=grp(parent,x,y,z); aux.push(q); return q; }; // helper groups, folded into their joint before baking
   const R={}, brute=type==='brute', thin=type==='runner', body=T.body, light=T.light, dark=T.dark, wound=T.wound, core=T.core;
-  // a smooth body of revolution, flattened front to back, with an optional sideways curve
+  const ls=makeZombie.ls||(makeZombie.ls=new THREE.SphereGeometry(.5,10,7)); // small details don't need a smooth sphere
+  const rnd=seeded(7919*(variant+1)+ZCODE.indexOf(type)*104729); // this creature's own wounds
+  // a smooth body of revolution, flattened front to back, with an optional curve
   const lathe=(prof,sz,seg,bend)=>{ const gg=new THREE.LatheGeometry(prof.map(([r,y])=>new THREE.Vector2(Math.max(r,0.0005),y)),seg||18); gg.scale(1,1,sz||1);
     if(bend){ const pa=gg.attributes.position; for(let i=0;i<pa.count;i++){ const y=pa.getY(i); pa.setZ(i,pa.getZ(i)+bend[0]*y*y); pa.setX(i,pa.getX(i)+bend[1]*y*y); } }
     gg.computeVertexNormals(); return gg; };
-  // a wound: a torn dark hole with a ragged rim and a glowing violet slit deep inside
+  // radius of a lathe profile at height y
+  const rAt=(prof,y)=>{ for(let i=1;i<prof.length;i++){ const [r0,y0]=prof[i-1], [r1,y1]=prof[i]; if((y>=y0&&y<=y1)||(y<=y0&&y>=y1)){ const t=(y-y0)/((y1-y0)||1); return r0+(r1-r0)*t; } } return prof[prof.length-1][0]; };
+  // a wound: a ragged dark hole with a glowing violet slit deep inside; its front (-z) faces out of the body
   const gash=(parent,x,y,z,w,h,ry,rz)=>{ const o=sub(parent,x,y,z); o.rotation.set(0,ry||0,rz||0);
-    w*=1.45; h*=1.35;
-    const rim=part(ls,dark,o,0,0,0,0); rim.scale.set(w,h,w*0.3);                         // two overlapping dark tears make a ragged hole
-    const rim2=part(ls,dark,o,w*0.12,-h*0.1,0,0); rim2.scale.set(w*0.7,h*0.85,w*0.3); rim2.rotation.z=0.55;
+    const rim=part(ls,dark,o,0,0,0,0); rim.scale.set(w,h,w*0.3);
+    const rim2=part(ls,dark,o,w*0.14*(rnd()-.5)*2,-h*0.12,0,0); rim2.scale.set(w*(0.6+rnd()*0.3),h*(0.7+rnd()*0.3),w*0.3); rim2.rotation.z=(rnd()-.5)*1.4;
     const inner=part(ls,wound,o,0,0,-w*0.04,0); inner.scale.set(w*0.55,h*0.72,w*0.28);
-    const slit=part(ls,core,o,0,-h*0.04,-w*0.08,0); slit.scale.set(w*0.16,h*0.58,w*0.24); slit.rotation.z=0.12; };
+    const slit=part(ls,core,o,0,-h*0.04,-w*0.08,0); slit.scale.set(w*0.15,h*0.58,w*0.24); slit.rotation.z=(rnd()-.5)*0.5; };
+  // a wound on a lathe surface at height y, angle a around it (0 = straight out the front)
+  const gashOn=(parent,prof,sz,y,a,w,h,ox=0)=>{ const r=rAt(prof,y), nx=Math.sin(a), nz=-Math.cos(a)*sz, nl=Math.hypot(nx,nz)||1;
+    gash(parent,ox+nx*r*0.97,y,nz*r*0.97,w,h,Math.atan2(-nx/nl,-nz/nl),(rnd()-.5)*1.2); };
   // mirror a non-indexed geometry across x and put its triangles back the right way round
   const mirrorX=gg=>{ gg.scale(-1,1,1); const sw=(a,n)=>{ const A=a.array; for(let i=0;i<a.count;i+=3) for(let k=0;k<n;k++){ const t=A[(i+1)*n+k]; A[(i+1)*n+k]=A[(i+2)*n+k]; A[(i+2)*n+k]=t; } };
     for(const k of ['position','normal','uv']) if(gg.attributes[k]) sw(gg.attributes[k],gg.attributes[k].itemSize); gg.computeVertexNormals(); return gg; };
-  const ls=makeZombie.ls||(makeZombie.ls=new THREE.SphereGeometry(.5,10,7)); // small details don't need a smooth sphere
-  const G=brute?1.55:thin?0.84:1;                              // girth
-  R.hipY=1.06; R.armL0=0.06; R.armR0=0.02;                       // fins hang straight down the sides
+  const G=brute?1.5:thin?0.84:1;                              // girth
+  R.hipY=1.06; R.armL0=0.05; R.armR0=0.02;                      // fins hang close down the sides
   R.hips=grp(g,0,1.06,0);
-  // pelvis flows straight into the waist above it: no joint ring
-  part(lathe([[0,-.13],[.07*G,-.12],[.125*G,-.04],[.13*G,.06],[.118*G,.14]],.7),body,R.hips,0,0,0,0.01);
-  // legs: one long spike each, curving slightly in, ending in a needle point; a paler stroke down the front
-  R.legL=grp(R.hips,-.072*G,-.06,0); R.legR=grp(R.hips,.072*G,-.06,0);
+  part(lathe([[0,-.13],[.07*G,-.12],[.122*G,-.04],[.126*G,.06],[.115*G,.14]],.7),body,R.hips,0,0,0,0.01); // pelvis flows into the waist
+  // legs: one long spike each, bowing slightly, ending in a needle point; a thin pale stroke down the front
+  R.legL=grp(R.hips,-.07*G,-.06,0); R.legR=grp(R.hips,.07*G,-.06,0);
+  const lprof=[[0,0.04],[.082*G,0.02],[.085*G,-.12],[.072*G,-.38],[.058*G,-.62],[.038*G,-.82],[.018*G,-.94],[.004,-1.02]];
   for(const [L,s] of [[R.legL,-1],[R.legR,1]]){
-    const prof=[[0,0.04],[.085*G,0.02],[.088*G,-.12],[.075*G,-.38],[.06*G,-.62],[.04*G,-.82],[.02*G,-.94],[.004,-1.02]];
-    part(lathe(prof,.86,14,[0.035,s*-0.03]),body,L,0,0,0,0.01);
-    part(lathe([[.0,-.1],[.016*G,-.25],[.014*G,-.55],[.007*G,-.8],[.001,-.9]],.35,6,[0.035,s*-0.03]),light,L,s*.012,0,-.07*G,0); } // a thin pale stroke down the front
-  gash(R.legR,.0,-.42,-.07*G,.07*G,.17,0,.15);
-  // torso: narrow waist, long chest, broad sloping shoulders, up into the neck; it leans forward, always hunting
+    part(lathe(lprof,.86,14,[0.035,s*-0.03]),body,L,0,0,0,0.01);
+    part(lathe([[.0,-.1],[.014*G,-.25],[.012*G,-.55],[.006*G,-.8],[.001,-.9]],.35,6,[0.035,s*-0.03]),light,L,s*.012,0,-.068*G,0); }
+  // torso: narrow waist, a long chest, sloping shoulders, into the neck; it leans forward, always hunting
   R.spine=grp(R.hips,0,.12,0); R.spine.rotation.x=thin?-0.34:brute?-0.2:-0.16;
-  const tprof=[[.112*G,-.1],[.118*G,0],[.125*G,.1],[.16*G,.26],[.2*G,.42],[.215*G,.52],[.19*G,.6],[.12*G,.68],[.07*G,.74],[.062*G,.8]];
+  const tprof=[[.112*G,-.1],[.118*G,0],[.125*G,.1],[.155*G,.26],[.19*G,.42],[.2*G,.52],[.175*G,.6],[.11*G,.68],[.068*G,.74],[.06*G,.8]];
   part(lathe(tprof,.62,20),body,R.spine,0,0,0,0.012).castShadow=true;
-  part(lathe([[0,.1],[.03*G,.2],[.04*G,.34],[.028*G,.48],[0,.58]],.3,8),light,R.spine,.05*G,0,-.1*G,0).rotation.z=-0.12; // a pale brush stroke across the chest
-  gash(R.spine,-.1*G,.5,-.115*G,.14*G,.12,-.25,.5);  // torn hole at the left shoulder
-  gash(R.spine,.01,.27,-.105*G,.08*G,.24,0,-.05);    // a long slit down the belly
-  gash(R.spine,.165*G,.2,-.035,.07*G,.14,1.25,0);     // one in the right flank
-  if(brute){ gash(R.spine,.1*G,.4,-.12*G,.08*G,.11,.2,-.5); gash(R.spine,-.06*G,.12,-.1*G,.07*G,.12,-.1,.3); }
-  // head: an elongated skull that narrows upward into the central flame; two glowing slits for eyes under a dark brow
+  part(lathe([[0,.1],[.028*G,.2],[.036*G,.34],[.025*G,.48],[0,.58]],.3,8),light,R.spine,(rnd()-.5)*.08*G,0,-.1*G,0).rotation.z=(rnd()-.5)*0.4; // a pale brush stroke
+  // head: rises from the neck and narrows into the central flame; a dark hollow torn in the face instead of eyes
   R.head=grp(R.spine,0,.8,-.01); R.head.rotation.z=0.06;
-  part(lathe([[.06*G,-.02],[.085,.04],[.095,.12],[.085,.2],[.06,.28],[.035,.36],[.012,.44],[.002,.5]],.85,16,[0,0.06]),body,R.head,0,0,0,0.01);
-  const eyeMat=new THREE.MeshBasicMaterial({color:T.eye});
-  part(ls,dark,R.head,0,.13,-.07,0).scale.set(.15,.06,.04);
-  [-1,1].forEach(sx=>{ const e=new THREE.Mesh(ls,eyeMat); e.scale.set(.048,.014,.02); e.position.set(sx*.037,.13,-.084); e.rotation.z=-sx*0.38; R.head.add(e); });
-  R.jaw=grp(R.head,0,.05,-.02); part(ls,dark,R.jaw,0,0,-.066,0).scale.set(.055,.018,.02);
-  // the flame crown: licks of flame rising off the skull, curling and uneven, lighter towards bright tips
-  R.crown=grp(R.head,0,.3,0);
-  const fl=brute?[[0,.7,.07,0,-.12],[.05,.55,.06,.32,.06],[-.055,.58,.06,-.36,.1],[.04,.4,.045,.6,-.04],[-.045,.42,.045,-.66,-.08],[.0,.32,.05,.15,.22],[.02,.28,.04,-.2,-.25]]
-               :[[0,.62,.055,0,-.1],[.045,.47,.045,.3,.05],[-.05,.5,.045,-.36,.08],[.035,.33,.035,.62,-.05],[-.035,.34,.035,-.66,-.06],[0,.26,.04,.18,.2]];
-  fl.forEach(([x,h,r,lz,lx],q)=>{ const f=sub(R.crown,x,-.06,q%2?.015:-.01); f.rotation.set(lx,0,lz);
-    const n=8, prof=[]; for(let i=0;i<=n;i++){ const t=i/n; prof.push([r*(1-t)*(1+0.35*Math.sin(t*Math.PI)),h*t]); }
-    const cg=lathe(prof,.75,9,[0,0]); const pa=cg.attributes.position;
-    for(let i=0;i<pa.count;i++){ const t=pa.getY(i)/h; pa.setX(i,pa.getX(i)+Math.sin(t*4.5+q*1.7)*0.035*t*t*h/.5); pa.setZ(i,pa.getZ(i)+Math.cos(t*3.5+q)*0.02*t*t); } // each lick curls its own way
-    cg.computeVertexNormals(); part(cg,q===0?body:light,f,0,0,0,0.006);
-    const tp=[]; for(let i=0;i<=5;i++){ const t=i/5; tp.push([r*.45*(1-t),h*(0.62+0.38*t)]); }
-    const tg=lathe(tp,.75,7,[0,0]); const tpa=tg.attributes.position; for(let i=0;i<tpa.count;i++){ const t=tpa.getY(i)/h; tpa.setX(i,tpa.getX(i)+Math.sin(t*4.5+q*1.7)*0.035*t*t*h/.5); } tg.computeVertexNormals();
+  const hprof=[[.062*G,-.02],[.085*G,.05],[.096*G,.14],[.088*G,.25],[.07*G,.36],[.048*G,.48],[.026*G,.6],[.008,.72],[.001,.78]];
+  part(lathe(hprof,.85,16,[0.05,0.07]),body,R.head,0,0,0,0.01);
+  gashOn(R.head,hprof,.85,.17+rnd()*.06,(rnd()-.5)*0.9,.1,.08+rnd()*.04);   // the hole in the face
+  R.jaw=grp(R.head,0,.05,-.02);                                                   // no mouth to show; kept for the animation
+  // the flame crown: big curling licks rising off the head, uneven, lighter towards bright tips
+  R.crown=grp(R.head,0,.12,0);
+  const fl=brute?[[0,.78,.085,0,-.12],[.06,.62,.07,.34,.06],[-.065,.66,.07,-.38,.1],[.05,.46,.055,.66,-.04],[-.055,.48,.055,-.7,-.08],[.02,.4,.06,.18,.26],[-.02,.36,.05,-.22,-.3],[.0,.3,.05,.05,.4]]
+               :[[0,.7,.07,0,-.1],[.05,.55,.06,.32,.05],[-.055,.58,.06,-.38,.08],[.04,.4,.045,.64,-.04],[-.045,.42,.045,-.68,-.06],[0,.34,.05,.16,.24],[.0,.3,.045,-.1,-.32]];
+  fl.forEach(([x,h,r,lz,lx],q)=>{ const f=sub(R.crown,x*G,.0,q%2?.015:-.01); f.rotation.set(lx,0,lz);
+    const n=8, prof=[]; for(let i=0;i<=n;i++){ const t=i/n; prof.push([r*G*(1-t)*(1+0.4*Math.sin(t*Math.PI)),h*t]); }
+    const cg=lathe(prof,.72,9); const pa=cg.attributes.position, ph=rnd()*6;
+    for(let i=0;i<pa.count;i++){ const t=pa.getY(i)/h; pa.setX(i,pa.getX(i)+Math.sin(t*4.5+ph)*0.05*t*t*h/.5); pa.setZ(i,pa.getZ(i)+Math.cos(t*3.5+ph)*0.025*t*t); } // each lick curls its own way
+    cg.computeVertexNormals(); part(cg,q===0?body:q%3===1?light:body,f,0,0,0,0.006);
+    const tp=[]; for(let i=0;i<=5;i++){ const t=i/5; tp.push([r*G*.42*(1-t),h*(0.66+0.34*t)]); }
+    const tg=lathe(tp,.72,7); const tpa=tg.attributes.position; for(let i=0;i<tpa.count;i++){ const t=tpa.getY(i)/h; tpa.setX(i,tpa.getX(i)+Math.sin(t*4.5+ph)*0.05*t*t*h/.5); } tg.computeVertexNormals();
     part(tg,core,f,0,0,0,0); });
   const glow=new THREE.Mesh(new THREE.SphereGeometry(.5,12,8),new THREE.MeshBasicMaterial({color:T.core,transparent:true,opacity:.14,blending:THREE.AdditiveBlending,depthWrite:false}));
-  glow.scale.set(.16,.3,.14); glow.position.y=.12; glow.renderOrder=3; R.crown.add(glow); R.crownGlow=glow;
-  // fins: hang from the shoulders down the sides, flaring out past the elbow and ending in a hooked point at the hip
-  R.armL=grp(R.spine,-.2*G,.6,0); R.armR=grp(R.spine,.2*G,.6,0);
+  glow.scale.set(.18,.34,.15); glow.position.y=.16; glow.renderOrder=3; R.crown.add(glow); R.crownGlow=glow;
+  // fins: slim blades hanging from the shoulders down the sides, a notch in the outer edge, ending in a hooked point
+  R.armL=grp(R.spine,-.19*G,.6,0); R.armR=grp(R.spine,.19*G,.6,0);
+  const L=brute?1.12:thin?0.96:1.04, Wd=brute?.19:thin?.1:.13, th=brute?.022:.014;
   for(const [A,s] of [[R.armL,-1],[R.armR,1]]){
-    const L=brute?1.12:thin?0.92:1.0, Wd=brute?.34:thin?.18:.24, sh=new THREE.Shape();
-    sh.moveTo(-.02,.06); sh.quadraticCurveTo(Wd*.35,.04,Wd*.55,-.12);   // shoulder cap
-    sh.lineTo(Wd*.95,-L*.5); sh.lineTo(Wd*.78,-L*.58); sh.lineTo(Wd*.9,-L*.66); // a notch in the outer edge
-    sh.quadraticCurveTo(Wd*.7,-L*.88,Wd*.2,-L);                        // sweeping down to a hooked point
-    sh.lineTo(Wd*.12,-L*.86); sh.quadraticCurveTo(-.02,-L*.55,-.06,-.1); sh.lineTo(-.02,.06); // inner edge back up along the body
-    const th=brute?.035:.022, bg=new THREE.ExtrudeGeometry(sh,{depth:th,bevelEnabled:true,bevelThickness:.018,bevelSize:.016,bevelSegments:2,curveSegments:8}); bg.translate(0,0,-th/2);
-    const vein=new THREE.Shape(); vein.moveTo(0,-.1); vein.quadraticCurveTo(Wd*.45,-L*.4,Wd*.32,-L*.82); vein.lineTo(Wd*.28,-L*.82); vein.quadraticCurveTo(Wd*.38,-L*.4,-.012,-.1);
-    const vg=new THREE.ExtrudeGeometry(vein,{depth:.004,bevelEnabled:false});
-    if(s<0){ mirrorX(bg); mirrorX(vg); }                             // a true mirror for the left side, faces kept outward
+    const sh=new THREE.Shape();
+    sh.moveTo(-.02,.05); sh.quadraticCurveTo(Wd*.4,.03,Wd*.6,-.1);
+    sh.lineTo(Wd,-L*.48); sh.lineTo(Wd*.72,-L*.56); sh.lineTo(Wd*.86,-L*.64);
+    sh.quadraticCurveTo(Wd*.66,-L*.88,Wd*.18,-L);
+    sh.lineTo(Wd*.1,-L*.86); sh.quadraticCurveTo(-.02,-L*.55,-.045,-.1); sh.lineTo(-.02,.05);
+    const bg=new THREE.ExtrudeGeometry(sh,{depth:th,bevelEnabled:true,bevelThickness:.01,bevelSize:.009,bevelSegments:2,curveSegments:8}); bg.translate(0,0,-th/2);
+    const vein=new THREE.Shape(); vein.moveTo(0,-.1); vein.quadraticCurveTo(Wd*.45,-L*.4,Wd*.3,-L*.82); vein.lineTo(Wd*.27,-L*.82); vein.quadraticCurveTo(Wd*.37,-L*.4,-.01,-.1);
+    const vg=new THREE.ExtrudeGeometry(vein,{depth:.003,bevelEnabled:false});
+    if(s<0){ mirrorX(bg); mirrorX(vg); }
     const fg=sub(A,0,0,0); fg.rotation.y=s*0.28;
-    part(bg,body,fg,0,0,0,0.01); part(vg,light,fg,0,0,-(th/2+.02),0);
-    gash(fg,s*Wd*.5,-L*.45,-(th/2+.016),.05,.12,0,0); }
+    part(bg,body,fg,0,0,0,0.008); part(vg,light,fg,0,0,-(th/2+.012),0);
+    if(rnd()<(brute?0.9:0.6)) gash(fg,s*Wd*(.3+rnd()*.3),-L*(.25+rnd()*.45),-(th/2+.01),.055*G,.12+rnd()*.06,0,(rnd()-.5)); }
+  // the body's own random wounds: a few on the chest and flanks, one or two on the legs
+  const nT=brute?5:thin?3:4;
+  for(let k=0;k<nT;k++){ const front=rnd()<0.75, a=front?(rnd()-.5)*1.6:(rnd()<.5?-1:1)*(1.3+rnd()*0.6), y=.12+rnd()*.52;
+    gashOn(R.spine,tprof,.62,y,a,(.09+rnd()*.08)*G,.14+rnd()*.18); }
+  const nL=rnd()<0.6?1:2;
+  for(let k=0;k<nL;k++){ const Lg=rnd()<.5?R.legL:R.legR, y=-.2-rnd()*.5, a=(rnd()-.5)*1.6; gashOn(Lg,lprof,.86,y,a,.07*G,.16+rnd()*.12); }
   // fold every helper group's meshes into the joint above it (innermost first), so each joint bakes to one mesh
   for(let i=aux.length-1;i>=0;i--){ const q=aux[i], P_=q.parent; q.updateMatrix();
     [...q.children].forEach(c=>{ c.updateMatrix(); c.matrix.premultiply(q.matrix); c.matrix.decompose(c.position,c.quaternion,c.scale); P_.add(c); }); P_.remove(q); }
-  bakeStatic(g,R,'creature:'+type); g.scale.setScalar(T.sc); scene.add(g);
+  bakeStatic(g,R,'creature:'+type+':'+variant);
+  g.scale.setScalar(T.sc); scene.add(g);
   return {g,R};
 }
 function newZombie(type,x,z,id){
   const T=ZT[type], hpMul=1+0.12*Math.max(0,horde.wave-1)+0.25*net.players.size;
   const z0={id:id||horde.nextId++,type,isZombie:true,pos:new THREE.Vector3(x,terrainUnder(x,z),z),vel:new THREE.Vector3(),tgt:new THREE.Vector3(x,0,z),yaw:0,pitch:0,onGround:true,groundSlab:null,crouch:false,
-    hp:Math.round(T.hp*hpMul),maxHp:Math.round(T.hp*hpMul),sc:T.sc,alive:true,atkT:0.5+Math.random(),atk:0,walk:Math.random()*6,target:null,tT:0,chewT:0,stuckT:0,sideT:0,side:0,deadT:0,groanT:2+Math.random()*6,m:makeZombie(type)};
+    hp:Math.round(T.hp*hpMul),maxHp:Math.round(T.hp*hpMul),sc:T.sc,alive:true,atkT:0.5+Math.random(),atk:0,walk:Math.random()*6,target:null,tT:0,chewT:0,stuckT:0,sideT:0,side:0,deadT:0,groanT:2+Math.random()*6,m:null};
+  z0.m=makeZombie(type,z0.id); // the id picks its wounds, the same on every screen
   z0.m.g.position.copy(z0.pos); horde.zs.set(z0.id,z0); return z0;
 }
 function dropZombie(z){ scene.remove(z.m.g); horde.zs.delete(z.id); }
@@ -4862,6 +4872,23 @@ function hordeHurtMe(dmg,from){
   dmgDirFrom(from); const f=$('hurtfx'); f.classList.add('on'); void f.offsetWidth; f.classList.remove('on'); sfx('hurt'); animEvent(localHero,'hurt');
   if(hurt(P,dmg)){ animEvent(localHero,'die'); horde.phase='over'; horde.t=6; horde.best=Math.max(horde.best,horde.wave-1);
     banner('Overrun!','You survived '+(horde.wave-1)+(horde.wave-1===1?' wave':' waves')+' · '+horde.kills+' zombies',5); sfx('lose'); }
+}
+/* Fall damage, like Fortnite: short drops are free; past FALL_SAFE metres you take damage that grows with the
+   height, straight to health (shields don't soak it). A big enough drop eliminates you. */
+const FALL_SAFE=10, FALL_PER=7;
+function stepFall(){
+  if(P.onGround||isDead()){ if(P.fallTop!=null&&P.onGround&&!isDead()){ const drop=P.fallTop-P.pos.y; if(drop>FALL_SAFE) fallHurt(drop); } P.fallTop=null; return; }
+  P.fallTop=Math.max(P.fallTop??P.pos.y,P.pos.y); }
+function fallHurt(drop){
+  if(!playing) return; const dmg=Math.round((drop-FALL_SAFE)*FALL_PER); if(dmg<=0) return;
+  dmgNum(P.pos.clone().setY(P.pos.y+1.9),dmg,'hp'); const f=$('hurtfx'); f.classList.add('on'); void f.offsetWidth; f.classList.remove('on'); sfx('hurt'); animEvent(localHero,'hurt');
+  P.hp=Math.max(0,P.hp-dmg); if(P.hp>0) return;
+  animEvent(localHero,'die');
+  if(net.role){ net.dead=true; net.deaths++; const e={type:'elim',id:net.id,by:net.id,w:'fall'}; onElim(e); netSend(e);
+    setTimeout(()=>{ net.dead=false; const a=Math.random()*Math.PI*2, r=8+Math.random()*20; respawn(); P.pos.set(SPAWN[0]+Math.cos(a)*r,0,SPAWN[2]+Math.sin(a)*r); banner('Back in','',1); },3000); }
+  else if(horde.on){ horde.phase='over'; horde.t=6; horde.best=Math.max(horde.best,horde.wave-1); banner('Fell!','You survived '+(horde.wave-1)+(horde.wave-1===1?' wave':' waves')+' · '+horde.kills+' zombies',5); sfx('lose'); }
+  else if(B&&B.active&&round.state==='fight') endRound(false);
+  else { net.dead=true; feed('<b>You</b> fell too far',true); banner('Eliminated','by the fall',2); sfx('lose'); setTimeout(()=>{ net.dead=false; respawn(); },2500); }
 }
 const zReach=z=>0.75*z.sc+0.45; // husk ~1.2 m, brute ~1.5 m from its centre to yours
 function zombieCanHit(z,who){
@@ -6194,7 +6221,7 @@ function frame(now){
   if(playing){
     if(isDead()){ P.vel.x=0; P.vel.z=0; fireHeld=false; heldPiece=null; if(edit) exitEdit(false); } else moveInput(dt);
     if(B&&B.active) botUpdate(dt);
-    const n=Math.max(1,Math.ceil(dt/0.008)); for(let k=0;k<n;k++){ physStep(dt/n,P); if(B&&B.active) physStep(dt/n,B); }
+    const n=Math.max(1,Math.ceil(dt/0.008)); stepFall(); for(let k=0;k<n;k++){ physStep(dt/n,P); if(B&&B.active) physStep(dt/n,B); }
     combatTick(dt);
     if(P.pos.y<-20) respawn();
     if(edit){
