@@ -58,4 +58,4 @@ Goal: an island about 1.6 km across (MAP_R 800, up from 392), more realistic mou
    - t43, t46, t30, t36, t44, t63, t66 and the mp_* tests, run one at a time. Swiftshader is slow, so use waitForFunction.
    - Check the load time.
    - Update the README map and towns sections.
-   - Commit and push main, run `mkart.py` (artifact transform), then publish.
+   - Commit and push main, run `mkart.py` (tools/mkart.py: index.html -> claude.ai artifact copy; artifact https://claude.ai/artifact/3w1XJmNK2yJCcbJomBBPTs), then publish.
