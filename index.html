@@ -634,7 +634,22 @@ renderer.localClippingEnabled=true;
 const scene=new THREE.Scene();
 const SKY=0x8ec4e8, HAZE=0xcfe2ec;
 scene.background=new THREE.Color(SKY);
-scene.fog=new THREE.Fog(HAZE,250,2600); // distance fades into a pale horizon haze, like real air
+const HAZE_DENS=0.00095, HAZE_H=210;
+scene.fog=new THREE.Fog(HAZE,HAZE_DENS,HAZE_H); // near = density, far = scale height (see the fog chunks below)
+THREE.ShaderChunk.fog_pars_vertex='#ifdef USE_FOG\n\tvarying float fogDepth;\n\tvarying float vFogY;\n#endif';
+THREE.ShaderChunk.fog_vertex='#ifdef USE_FOG\n\tfogDepth = - mvPosition.z;\n\tvFogY = ( ( mvPosition.xyz - viewMatrix[ 3 ].xyz ) * mat3( viewMatrix ) ).y;\n#endif';
+THREE.ShaderChunk.fog_pars_fragment='#ifdef USE_FOG\n\tuniform vec3 fogColor;\n\tvarying float fogDepth;\n\tvarying float vFogY;\n\t#ifdef FOG_EXP2\n\t\tuniform float fogDensity;\n\t#else\n\t\tuniform float fogNear;\n\t\tuniform float fogFar;\n\t#endif\n#endif';
+THREE.ShaderChunk.fog_fragment=`#ifdef USE_FOG
+	#ifdef FOG_EXP2
+		float fogFactor = 1.0 - exp( - fogDensity * fogDensity * fogDepth * fogDepth );
+	#else
+		// exponential height haze: the amount of air along the view ray, thinning with height
+		float fH = max( fogFar, 1.0 ), fy0 = clamp( cameraPosition.y, -40.0, 4000.0 ), fq = ( vFogY - fy0 ) / fH;
+		float fk = abs( fq ) > 1e-3 ? ( 1.0 - exp( - fq ) ) / fq : 1.0;
+		float fogFactor = clamp( 1.0 - exp( - fogNear * exp( - fy0 / fH ) * fk * fogDepth ), 0.0, 0.93 );
+	#endif
+	gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, fogFactor );
+#endif`;
 // sky dome: deep blue overhead fading to haze at the horizon, with a warm glow around the sun
 const SUN_DIR=new THREE.Vector3(30,55,18).normalize();
 const skyDome=(()=>{ const g=new THREE.SphereGeometry(950,40,20), p=g.attributes.position, col=new Float32Array(p.count*3);
@@ -2400,7 +2415,7 @@ function buildWorld(){
   buildSidewalks();
 }
 
-function clearBuilds(){ resetKarts(); if(edit) exitEdit(false); [...order].forEach(p=>removePiece(p)); buildWorld(); } // the map's houses come back fresh
+function clearBuilds(){ resetKarts(); if(typeof chests!=='undefined') chests.forEach(closeChest); if(edit) exitEdit(false); [...order].forEach(p=>removePiece(p)); buildWorld(); } // the map's houses come back fresh
 /* Who may edit a build. Owner = whoever placed it. The rule is the host's setting in a room (sent on join and when it
    changes) and the host re-checks every edit, so a client can't edit around it. A player who leaves hands their
    builds over to everyone ('public'). */
@@ -2702,13 +2717,13 @@ function moveBody(E,fw,st,jump,dt){ if(E.kart){ if(E.kart.seat===0) E.kart.k.inp
 /* ---------- the dune buggy ----------
    A small two-seat buggy, found in some garages. Walk up to it and press Interact to drive (left seat) or ride
    (right seat); Interact again gets you out. W/S drive and brake (and reverse), A/D steer, Jump is the handbrake (it
-   lets the back slide out). It's slower than a car: about 47 km/h on asphalt, a bit less on grass. It climbs kerbs
+   lets the back slide out). It does about 63 km/h on asphalt and a bit less on grass, and it pulls up hills well. It climbs kerbs
    and ramps, flies off jumps, and stops dead on walls and trees. The driver can't fight; the passenger can shoot.
    The driver's game runs the buggy and sends where it is with their state; everyone else follows it smoothly. */
 var karts=null;
 const KART_PAINT=[0xe8521e,0x2f9e44,0xd62828,0x1f6fd1,0xf2c014,0xc9a66b,0x1fa2a0,0x8b3fd1], KWR=0.34, KWB=1.78, KTRACK=1.46;
 const KART_SEATS=[[-0.32,0.68,0.12],[0.32,0.68,0.12]], KART_WHEELS=[[-0.73,-0.92,1],[0.73,-0.92,1],[-0.75,0.86,0],[0.75,0.86,0]];
-const KMAX=13, KMAX_OFF=10.8, KREV=5, KACC=7.2, KBRK=15;
+const KMAX=17.5, KMAX_OFF=15.5, KREV=6, KACC=10, KBRK=17;
 const ME=()=>net.role?net.id:'me';
 let kartGeo=null; const kartMats={};
 function kMat(k,make){ return kartMats[k]||(kartMats[k]=make()); }
@@ -2809,7 +2824,7 @@ function simKart(k,inp,dt){ const fx=-Math.sin(k.yaw), fz=-Math.cos(k.yaw), rx=M
     else if(inp.fw<-0.1){ if(vf>0.3) vf-=KBRK*(-inp.fw)*dt; else vf=Math.max(-KREV,vf-KACC*0.7*(-inp.fw)*dt); }
     else { const c=(1.3+0.06*Math.abs(vf))*dt; vf=Math.abs(vf)<=c?0:vf-Math.sign(vf)*c; }
     if(vf>vmax) vf-=Math.min(vf-vmax,5*dt);
-    vf-=GRAV*Math.sin(k.pitch)*dt*0.8; // hills slow you going up and speed you up going down
+    vf-=GRAV*Math.sin(k.pitch)*dt*(Math.sin(k.pitch)>0&&inp.fw>0.1?0.28:0.6); // big tyres and low gearing: it pulls up hills well, and rolls back down them
     if(inp.hb){ const c=KBRK*0.5*dt; vf=Math.abs(vf)<=c?0:vf-Math.sign(vf)*c; }
     vl*=Math.exp(-(inp.hb?1.4:9)*dt); }
   k.slip=Math.abs(vl); k.vf=vf; k.thr=inp.fw; k.brk=(inp.fw<-0.1&&vf>0.5)||inp.hb;
@@ -5068,7 +5083,7 @@ function onElim(m){
 }
 function clientData(m){
   if(!m||typeof m!=='object') return; net.hostSeen=performance.now();
-  if(m.type==='welcome'){ net.id=m.you; clearBuilds(); (m.wx||[]).forEach(k=>{ const p=pieces.get(k); if(p&&p.owner==='world') removePiece(p); }); (m.wd||[]).forEach(([k,hp,dt])=>{ const p=pieces.get(k); if(p){ p.hp=hp; p.dmgTaken=dt; applyDamageLook(p); } }); chests.forEach(c=>{ c.open=(m.co||[]).includes(c.id); c.lidA=c.open?1.95:0; }); [...drops.keys()].forEach(removeDrop); (m.dr||[]).forEach(d=>spawnDrop(d.item,d.n,new THREE.Vector3(...d.p),new THREE.Vector3(),d.id)); (m.pd||[]).forEach(i=>{ const p=props[i]; if(p&&p.alive){ propBreak(p,true); p.dying=0; p.g.visible=false; } }); m.pieces.forEach(t=>{ const p=addPiece(t); p.mask=t.mask??p.mask; p.half=t.half; p.path=t.path||null; p.dmgTaken=t.dt||0; if(t.hp!=null){ p.hp=t.hp; if(p.hp>=p.maxHp) growing.delete(p); } buildPiece(p); }); applyDoorSnapshot(m.ds); applyKartSnapshot(m.ks); rules.editRule=m.er||'owner'; respawn(); syncBot(); toast('Joined room '+net.code); updateRoomUI(); }
+  if(m.type==='welcome'){ net.id=m.you; clearBuilds(); (m.wx||[]).forEach(k=>{ const p=pieces.get(k); if(p&&p.owner==='world') removePiece(p); }); (m.wd||[]).forEach(([k,hp,dt])=>{ const p=pieces.get(k); if(p){ p.hp=hp; p.dmgTaken=dt; applyDamageLook(p); } }); chests.forEach(c=>{ closeChest(c); c.open=(m.co||[]).includes(c.id); c.lidA=c.open?1.95:0; if(c.open){ c.goneT=9; c.poofed=true; } }); [...drops.keys()].forEach(removeDrop); (m.dr||[]).forEach(d=>spawnDrop(d.item,d.n,new THREE.Vector3(...d.p),new THREE.Vector3(),d.id)); (m.pd||[]).forEach(i=>{ const p=props[i]; if(p&&p.alive){ propBreak(p,true); p.dying=0; p.g.visible=false; } }); m.pieces.forEach(t=>{ const p=addPiece(t); p.mask=t.mask??p.mask; p.half=t.half; p.path=t.path||null; p.dmgTaken=t.dt||0; if(t.hp!=null){ p.hp=t.hp; if(p.hp>=p.maxHp) growing.delete(p); } buildPiece(p); }); applyDoorSnapshot(m.ds); applyKartSnapshot(m.ks); rules.editRule=m.er||'owner'; respawn(); syncBot(); toast('Joined room '+net.code); updateRoomUI(); }
   else if(m.type==='st') onState(m);
   else if(m.type==='op'){ if(m.id!==net.id) applyOp(m.o); }
   else if(m.type==='ping'){ if(net.host&&net.host.open) net.host.send({type:'pong',t:m.t}); }
@@ -5961,7 +5976,7 @@ const DAY={sky:new THREE.Color(SKY)}, DUSK=new THREE.Color(0x4d4466); let duskK=
 function stepDusk(dt){
   const want=horde.on?1:0; if(Math.abs(duskK-want)<0.001) return;
   duskK+=Math.sign(want-duskK)*Math.min(Math.abs(want-duskK),dt*0.6);
-  scene.background.copy(DAY.sky).lerp(DUSK,duskK); scene.fog.color.setHex(HAZE).lerp(DUSK,duskK); scene.fog.near=250-190*duskK; scene.fog.far=2600-2360*duskK;
+  scene.background.copy(DAY.sky).lerp(DUSK,duskK); scene.fog.color.setHex(HAZE).lerp(DUSK,duskK); scene.fog.near=HAZE_DENS+(0.0042-HAZE_DENS)*duskK; scene.fog.far=HAZE_H-90*duskK;
   skyDome.material.color.setRGB(1,1,1).lerp(new THREE.Color(0x8a6f9a),duskK);
   if(cloudMat){ cloudMat.uniforms.tint.value.setRGB(1,1,1).lerp(new THREE.Color(0xc89aa8),duskK); cloudMat.uniforms.haze.value.setHex(HAZE).lerp(DUSK,duskK); }
   hemi.intensity=0.68-0.22*duskK; sun.intensity=1.12-0.45*duskK; sun.color.setHex(duskK>0.5?0xffb27a:0xfff0d4);
@@ -6173,7 +6188,7 @@ function openChest(c,authority){
   rollChestLoot().forEach(([item,n],q)=>{ const sp=(q-1)*0.9; netDrop(item,n,new THREE.Vector3(c.x+fx*0.5,c.y+0.9,c.z+fz*0.5),new THREE.Vector3(fx*2.6-fz*sp,4.2+q*0.4,fz*2.6+fx*sp)); });
   if(net.role==='host') netSend({type:'chestOpen',id:c.id});
 }
-function closeChest(c){ c.open=false; c.prog=0; c.respawnT=0; }
+function closeChest(c){ c.open=false; c.prog=0; c.respawnT=0; c.goneT=0; c.poofed=false; c.g.scale.setScalar(1); c.lidA=0; }
 function requestChest(c){
   if(net.role==='client'){ if(!c.pending){ c.pending=true; netSend({type:'chest',d:c.id}); setTimeout(()=>{ c.pending=false; },1500); } return; }
   openChest(c,true);
@@ -6210,7 +6225,7 @@ function stepChests(dt){
     c.glow.visible=!c.open; if(!c.open){ c.glow.material.opacity=0.38+0.14*Math.sin(performance.now()/260+c.id); if(d<bd){ bd=d; best=c; } }
     if(!c.open&&useTgt&&useTgt.c===c&&useHeld){ c.prog+=dt/CHEST_OPEN_T; if(c.prog>=1) requestChest(c); }
     else c.prog=Math.max(0,c.prog-dt*3);
-    if(c.open&&net.role!=='client'){ c.respawnT-=dt; if(c.respawnT<=0&&d>12){ closeChest(c); if(net.role==='host') netSend({type:'chestReset',id:c.id}); } }
+    if(c.open){ c.goneT=(c.goneT||0)+dt; const f=Math.max(0,Math.min(1,(c.goneT-1.6)/0.6)); if(f>0){ c.g.scale.setScalar(1-0.85*f); c.g.position.y=c.y-0.5*f; if(f>=1) c.g.visible=false; if(!c.poofed){ c.poofed=true; if(d<60) burst(new THREE.Vector3(c.x,c.y+0.4,c.z),8,2.5,0.06,chestMats.gold); } } }
   }
   // the prompt: what Interact would do here (and how far along opening a chest is)
   showing=!!useTgt; if(showing){ const lt=useTgt.kind==='chest'&&useTgt.c.prog>0?'Opening chest':useTgt.label; if($('useT').textContent!==lt) $('useT').textContent=lt; const kl=codeName(settings.binds.interact||'KeyV'); if($('useK').textContent!==kl) $('useK').textContent=kl;

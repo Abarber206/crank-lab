@@ -30,5 +30,5 @@ const {sleep,page,launch,open}=require('./h.js');
    T.enterKart(k,1); out.passenger=T.P.kart&&T.P.kart.seat===1; T.exitKart(true);
    return out; });
  console.log(JSON.stringify(r));
- const ok=r.karts>=4&&r.onFloor&&r.prompt==='Drive'&&r.inside&&r.prompt2==='Get out'&&r.moved>4&&r.top>=40&&r.top<=52&&r.turnRight&&r.reverse&&r.backWall<1.4&&r.out&&r.free&&r.exitDist>1&&r.passenger;
+ const ok=r.karts>=4&&r.onFloor&&r.prompt==='Drive'&&r.inside&&r.prompt2==='Get out'&&r.moved>4&&r.top>=50&&r.top<=66&&r.turnRight&&r.reverse&&r.backWall<1.4&&r.out&&r.free&&r.exitDist>1&&r.passenger;
  console.log(ok?'PASS':'FAIL'); console.log(errs.join('\n')||'no errors'); await b.close(); })();
