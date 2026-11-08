@@ -1834,6 +1834,8 @@ function toggleDoor(p,c,fromNet,open,side){ const d=p.doors&&p.doors[c]; if(!d||
   p.boxes=makeBoxes(p); if(!open) popPlayerOut();
   const q=doorCenter(p,c); if(q.distanceTo(P.pos)<40) sfxAt(open?'door_open':'door_close',q);
   if(!fromNet) netOp({op:'door',key:p.key,c,open,side}); }
+function doorSnapshot(){ const out=[]; doorPieces.forEach(p=>{ if(pieces.has(p.key)) p.doors.forEach((d,c)=>{ if(d&&d.open) out.push([p.key,c,+d.to.toFixed(3)]); }); }); return out; }
+function applyDoorSnapshot(list){ (list||[]).forEach(([k,c,to])=>{ const p=pieces.get(k), d=p&&p.doors&&p.doors[c]; if(!d) return; d.open=true; d.to=d.ang=to; d.pv.rotation.y=to; p.boxes=makeBoxes(p); }); }
 function stepDoors(dt){ doorPieces.forEach(p=>{ if(!pieces.has(p.key)){ dropDoors(p); return; } const vis=p.doorG.position.distanceTo(camera.position)<120; p.doorG.visible=vis;
   p.doors.forEach(d=>{ if(!d||Math.abs(d.to-d.ang)<1e-3) return; d.ang+=(d.to-d.ang)*Math.min(1,dt*10); d.pv.rotation.y=d.ang; }); }); }
 function buildPiece(p){
@@ -4542,7 +4544,7 @@ function onElim(m){
 }
 function clientData(m){
   if(!m||typeof m!=='object') return; net.hostSeen=performance.now();
-  if(m.type==='welcome'){ net.id=m.you; clearBuilds(); (m.wx||[]).forEach(k=>{ const p=pieces.get(k); if(p&&p.owner==='world') removePiece(p); }); (m.wd||[]).forEach(([k,hp,dt])=>{ const p=pieces.get(k); if(p){ p.hp=hp; p.dmgTaken=dt; applyDamageLook(p); } }); chests.forEach(c=>{ c.open=(m.co||[]).includes(c.id); c.lidA=c.open?1.95:0; }); [...drops.keys()].forEach(removeDrop); (m.dr||[]).forEach(d=>spawnDrop(d.item,d.n,new THREE.Vector3(...d.p),new THREE.Vector3(),d.id)); (m.pd||[]).forEach(i=>{ const p=props[i]; if(p&&p.alive){ propBreak(p,true); p.dying=0; p.g.visible=false; } }); m.pieces.forEach(t=>{ const p=addPiece(t); p.mask=t.mask??p.mask; p.half=t.half; p.path=t.path||null; p.dmgTaken=t.dt||0; if(t.hp!=null){ p.hp=t.hp; if(p.hp>=p.maxHp) growing.delete(p); } buildPiece(p); }); rules.editRule=m.er||'owner'; respawn(); syncBot(); toast('Joined room '+net.code); updateRoomUI(); }
+  if(m.type==='welcome'){ net.id=m.you; clearBuilds(); (m.wx||[]).forEach(k=>{ const p=pieces.get(k); if(p&&p.owner==='world') removePiece(p); }); (m.wd||[]).forEach(([k,hp,dt])=>{ const p=pieces.get(k); if(p){ p.hp=hp; p.dmgTaken=dt; applyDamageLook(p); } }); chests.forEach(c=>{ c.open=(m.co||[]).includes(c.id); c.lidA=c.open?1.95:0; }); [...drops.keys()].forEach(removeDrop); (m.dr||[]).forEach(d=>spawnDrop(d.item,d.n,new THREE.Vector3(...d.p),new THREE.Vector3(),d.id)); (m.pd||[]).forEach(i=>{ const p=props[i]; if(p&&p.alive){ propBreak(p,true); p.dying=0; p.g.visible=false; } }); m.pieces.forEach(t=>{ const p=addPiece(t); p.mask=t.mask??p.mask; p.half=t.half; p.path=t.path||null; p.dmgTaken=t.dt||0; if(t.hp!=null){ p.hp=t.hp; if(p.hp>=p.maxHp) growing.delete(p); } buildPiece(p); }); applyDoorSnapshot(m.ds); rules.editRule=m.er||'owner'; respawn(); syncBot(); toast('Joined room '+net.code); updateRoomUI(); }
   else if(m.type==='st') onState(m);
   else if(m.type==='op'){ if(m.id!==net.id) applyOp(m.o); }
   else if(m.type==='ping'){ if(net.host&&net.host.open) net.host.send({type:'pong',t:m.t}); }
@@ -4576,7 +4578,7 @@ function hostGame(){
     conn.on('open',()=>{
       if(net.conns.size>=7){ try{conn.send({type:'full'});}catch(e){} setTimeout(()=>conn.close(),300); return; }
       net.conns.set(conn.peer,conn);
-      conn.send(Object.assign({type:'welcome',you:conn.peer,dr:dropSnapshot(),pieces:snapshot(),pd:props.filter(p=>!p.alive&&!p.gone).map(p=>p.id),er:settings.editRule,co:chests.filter(c=>c.open).map(c=>c.id)},worldDiff()));
+      conn.send(Object.assign({type:'welcome',you:conn.peer,dr:dropSnapshot(),pieces:snapshot(),ds:doorSnapshot(),pd:props.filter(p=>!p.alive&&!p.gone).map(p=>p.id),er:settings.editRule,co:chests.filter(c=>c.open).map(c=>c.id)},worldDiff()));
       conn.send(myState()); net.players.forEach(pl=>conn.send({type:'st',id:pl.id,n:pl.name,s:[pl.tgt.x,pl.tgt.y,pl.tgt.z,0,0,0,pl.yaw,pl.pitch,pl.flags,0]}));
       updateRoomUI(); partySync();
     });
