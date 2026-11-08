@@ -958,9 +958,9 @@ function bakeWorld(o){
 }
 const FLAT_R=42, MAP_R=800, WHALF=832, WHS=2; // you can walk up to the foot of the outer range, no further
 const WGEN=makeWorldGen({FLAT_R,MAP_R,massifs:4,rng:seeded}), genH=WGEN.genH;
-const WORLD=bakeWorld({gen:WGEN,HS:WHS,HALF:WHALF,FLAT_R,MAP_R,rng:seeded,towns:10,townGap:210,LVL,townR:40,loops:3,loopMax:520,maxGrade:0.1,roadW:6,blendMax:34,
+const WORLD=bakeWorld({gen:WGEN,HS:WHS,HALF:WHALF,FLAT_R,MAP_R,rng:seeded,towns:10,townGap:210,LVL,townR:46,loops:3,loopMax:520,maxGrade:0.1,roadW:6,blendMax:34,
   snap:(u,v)=>[Math.round((SPAWN[0]+u)/CELL)*CELL-SPAWN[0],Math.round((SPAWN[2]+v)/CELL)*CELL-SPAWN[2]]});
-const WN=WORLD.N, WH=WORLD.H, WRD=WORLD.RD, PLAZA_R=6.5;
+const WN=WORLD.N, WH=WORLD.H, WRD=WORLD.RD, PLAZA_R=3.6;
 // height anywhere: the baked 2 m grid inside the island, the generator itself out beyond it
 function terrainH(x,z){ const fx=(x-SPAWN[0]+WHALF)/WHS, fz=(z-SPAWN[2]+WHALF)/WHS;
   if(!(fx>=0&&fz>=0&&fx<WN-1&&fz<WN-1)) return genH(x-SPAWN[0],z-SPAWN[2]);
@@ -978,6 +978,43 @@ const TOWN_NAMES=['Rustwood','Pebble Point','Kettle Creek','Lantern Row','Mossy 
 var TOWNS=WORLD.towns.map((t,k)=>{ const r=seeded(9000+k); return {x:SPAWN[0]+t.u,z:SPAWN[2]+t.v,R:t.R,h:t.h,name:TOWN_NAMES[k]||('Town '+(k+1)),seed:1+Math.floor(r()*1e9),houses:[]}; });
 // no grass pokes through the town squares
 for(const t of TOWNS){ for(let dj=-5;dj<=5;dj++) for(let di=-5;di<=5;di++){ const c=worldCell(t.x+di*WHS,t.z+dj*WHS); if(c>=0&&Math.hypot(di*WHS,dj*WHS)<PLAZA_R+1) WORLD.GRASS[c]=0; } }
+/* ---------- town streets: each town on a grid ----------
+   A main street and a cross street through the middle of town make four blocks; the houses stand in rows along
+   them. The main street lines up with the first road coming in. Roads from outside no longer cut through town to
+   its centre: each one now stops at the edge of the flat town ground and joins the end of the nearest street.
+   Old road traces inside towns (dirt, bare ground) are cleared. */
+{ const rdPts=[];
+  for(const t of TOWNS){
+    let ax='x', best=1e9;
+    for(const rd of WORLD.roads) for(const end of [0,1]){ const p=end?rd.pts[rd.pts.length-1]:rd.pts[0], q=end?rd.pts[Math.max(0,rd.pts.length-12)]:rd.pts[Math.min(rd.pts.length-1,11)];
+      const d=Math.hypot(SPAWN[0]+p[0]-t.x,SPAWN[2]+p[1]-t.z); if(d<best&&d<4){ best=d; ax=Math.abs(q[0]-p[0])>=Math.abs(q[1]-p[1])?'x':'z'; } }
+    t.axis=ax; t.streetL=Math.floor((t.R-4)/CELL)*CELL; const Ls=t.streetL;
+    t.ends=[[t.x-Ls,t.z],[t.x+Ls,t.z],[t.x,t.z-Ls],[t.x,t.z+Ls]];
+    // reroute: cut each road where it enters the flat town ground, then run straight to the nearest street end
+    const cut=t.R-2;
+    for(const rd of WORLD.roads){ if(rd.street) continue;
+      for(const end of [0,1]){ const P=end?rd.pts.slice().reverse():rd.pts.slice();
+        if(Math.hypot(SPAWN[0]+P[0][0]-t.x,SPAWN[2]+P[0][1]-t.z)>4) continue; // this end isn't at this town
+        let k=0; while(k<P.length-1&&Math.hypot(SPAWN[0]+P[k][0]-t.x,SPAWN[2]+P[k][1]-t.z)<cut) k++;
+        const at=[SPAWN[0]+P[k][0],SPAWN[2]+P[k][1]], e=t.ends.reduce((a,b)=>Math.hypot(b[0]-at[0],b[1]-at[1])<Math.hypot(a[0]-at[0],a[1]-at[1])?b:a);
+        const L=Math.hypot(at[0]-e[0],at[1]-e[1]), n=Math.max(1,Math.round(L/2)), conn=[];
+        for(let q=0;q<n;q++){ const f=q/n; conn.push([e[0]+(at[0]-e[0])*f-SPAWN[0],e[1]+(at[1]-e[1])*f-SPAWN[2],t.h]); }
+        let NP=conn.concat(P.slice(k)); if(end) NP=NP.reverse();
+        rd.pts=NP; rd.skip=new Uint8Array(NP.length); } }
+    // clear the old road traces inside town: no dirt, grass back
+    const r2=(t.R-1)*(t.R-1);
+    for(let j=-Math.ceil(t.R/WHS);j<=Math.ceil(t.R/WHS);j++) for(let i=-Math.ceil(t.R/WHS);i<=Math.ceil(t.R/WHS);i++){
+      const x=t.x+i*WHS, z=t.z+j*WHS; if((x-t.x)*(x-t.x)+(z-t.z)*(z-t.z)>r2) continue; const c=worldCell(x,z); if(c>=0){ WRD[c]=1e4; WORLD.GRASS[c]=255; } }
+    // the two streets
+    for(const X of [true,false]){ const pts=[];
+      for(let s=-Ls;s<=Ls+0.01;s+=2) pts.push(X?[t.x+s-SPAWN[0],t.z-SPAWN[2],t.h]:[t.x-SPAWN[0],t.z+s-SPAWN[2],t.h]);
+      WORLD.roads.push({pts,skip:new Uint8Array(pts.length),street:true,town:t}); }
+  }
+  // put the remaining road traces back into the road-distance grid near towns, and keep grass off every road
+  for(const rd of WORLD.roads){ for(const p of rd.pts){ const x=SPAWN[0]+p[0], z=SPAWN[2]+p[1];
+      for(let dj=-4;dj<=4;dj++) for(let di=-4;di<=4;di++){ const c=worldCell(x+di*WHS,z+dj*WHS); if(c<0) continue; const d=Math.hypot(di*WHS,dj*WHS); if(d<WRD[c]) WRD[c]=d; if(d<4.8) WORLD.GRASS[c]=0; } } }
+  for(const t of TOWNS) for(const X of [true,false]) for(let s=-t.streetL;s<=t.streetL;s+=1) for(let c=-6;c<=6;c+=1){ const cc=worldCell(X?t.x+s:t.x+c,X?t.z+c:t.z+s); if(cc>=0) WORLD.GRASS[cc]=0; } // sidewalks too
+}
 function townAt(x,z,pad){ for(const t of TOWNS) if(Math.hypot(x-t.x,z-t.z)<t.R+(pad||0)) return t; return null; }
 // highest ground under a body (centre and the four corners), so you never sink into a slope
 function terrainUnder(x,z){ let m=terrainH(x,z); for(const s of SAMP){ const t=terrainH(x+s[0],z+s[1]); if(t>m) m=t; } return m; }
@@ -1088,6 +1125,10 @@ const roadTex=(()=>{ const W=128, Hh=512, c=document.createElement('canvas'); c.
   g.fillStyle='#e6c23c'; g.fillRect(W/2-2,0,4,Hh*0.5);                                // centre dash: half of every 12 m
   const t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy()); return t; })();
 const ROAD_HW=3.6, roadMeshes=[];
+// how close a point is to any other road's centreline (for leaving markings out of junctions)
+const roadHash=new Map(); WORLD.roads.forEach((rd,k)=>rd.pts.forEach(p=>{ const x=SPAWN[0]+p[0], z=SPAWN[2]+p[1], key=Math.floor(x/8)+','+Math.floor(z/8); let l=roadHash.get(key); if(!l){ l=[]; roadHash.set(key,l); } l.push([x,z,k]); }));
+function nearOther(k,x,z){ let best=1e9; const cx=Math.floor(x/8), cz=Math.floor(z/8);
+  for(let a=-2;a<=2;a++) for(let b=-2;b<=2;b++){ const l=roadHash.get((cx+a)+','+(cz+b)); if(l) for(const [px,pz,kk] of l) if(kk!==k){ const d=Math.hypot(px-x,pz-z); if(d<best) best=d; } } return best; }
 WORLD.roads.forEach((rd,k)=>{ const p=rd.pts, n=p.length, pos=[], nor=[], uv=[], idx=[]; let s=0;
   let bx0=1e9, bz0=1e9, bx1=-1e9, bz1=-1e9;
   for(let q=0;q<n;q++){ const a=p[Math.max(0,q-1)], b=p[Math.min(n-1,q+1)]; let tx=b[0]-a[0], ty=b[2]-a[2], tz=b[1]-a[1]; const tl=Math.hypot(tx,tz)||1, sx=-tz/tl, sz=tx/tl;
@@ -1095,9 +1136,10 @@ WORLD.roads.forEach((rd,k)=>{ const p=rd.pts, n=p.length, pos=[], nor=[], uv=[],
     const x=SPAWN[0]+p[q][0], z=SPAWN[2]+p[q][1], y=p[q][2]+0.07;
     // normal: across the road is level, along it follows the grade
     let nx=-tx*ty, ny=tx*tx+tz*tz, nz=-tz*ty; const nl=Math.hypot(nx,ny,nz)||1;
-    pos.push(x+sx*ROAD_HW,y,z+sz*ROAD_HW, x-sx*ROAD_HW,y,z-sz*ROAD_HW); nor.push(nx/nl,ny/nl,nz/nl,nx/nl,ny/nl,nz/nl); uv.push(0,s/12,1,s/12);
+    const plain=nearOther(k,x,z)<10; // a junction or a shared stretch: plain asphalt, no lines
+    pos.push(x+sx*ROAD_HW,y,z+sz*ROAD_HW, x-sx*ROAD_HW,y,z-sz*ROAD_HW); nor.push(nx/nl,ny/nl,nz/nl,nx/nl,ny/nl,nz/nl); uv.push(plain?0.3:0,s/12,plain?0.3:1,s/12);
     bx0=Math.min(bx0,x); bx1=Math.max(bx1,x); bz0=Math.min(bz0,z); bz1=Math.max(bz1,z); }
-  for(let q=0;q<n-1;q++){ if(rd.skip[q]&&rd.skip[q+1]) continue; // already paved by an earlier road
+  for(let q=0;q<n-1;q++){
     const L0=q*2, R0=q*2+1, L1=q*2+2, R1=q*2+3;
     const up=(A,B,C)=>{ const ax=pos[B*3]-pos[A*3], az=pos[B*3+2]-pos[A*3+2], cx=pos[C*3]-pos[A*3], cz=pos[C*3+2]-pos[A*3+2]; return az*cx-ax*cz>0; };
     if(up(L0,L1,R0)) idx.push(L0,L1,R0); else idx.push(L0,R0,L1);
@@ -1106,11 +1148,7 @@ WORLD.roads.forEach((rd,k)=>{ const p=rd.pts, n=p.length, pos=[], nor=[], uv=[],
   const m=new THREE.Mesh(g,new THREE.MeshLambertMaterial({map:roadTex,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-4*(4+k)}));
   m.receiveShadow=true; m.matrixAutoUpdate=false; scene.add(m); roadMeshes.push(m);
   rd.box=[bx0-6,bz0-6,bx1+6,bz1+6]; });
-(function plazas(){ const pos=[], nor=[], uv=[], idx=[], SEG=28;
-  for(const t of TOWNS){ const o=pos.length/3; pos.push(t.x,t.h+0.07,t.z); nor.push(0,1,0); uv.push(0.3,t.x/12);
-    for(let k=0;k<=SEG;k++){ const a=k/SEG*Math.PI*2, x=t.x+Math.cos(a)*PLAZA_R, z=t.z+Math.sin(a)*PLAZA_R; pos.push(x,t.h+0.07,z); nor.push(0,1,0); uv.push(0.3,x/12+z/17); if(k<SEG) idx.push(o,o+2+k,o+1+k); } }
-  const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3)); g.setAttribute('normal',new THREE.Float32BufferAttribute(nor,3)); g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2)); g.setIndex(idx); g.computeBoundingSphere();
-  const m=new THREE.Mesh(g,new THREE.MeshLambertMaterial({map:roadTex,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-10})); m.receiveShadow=true; m.matrixAutoUpdate=false; scene.add(m); })();
+// (no round town squares: each town has a main street instead)
 
 /* ---------- grass, flowers and bushes ----------
    Tufts of grass and little flowers carpet the ground around you (one instanced mesh each, re-laid on a fixed world
@@ -1975,16 +2013,12 @@ function buildSidewalks(){
     const t1=[o,o+2,o+1], t2=[o+1,o+2,o+3]; [t1,t2].forEach(tr=>{ if(!up(...tr)) tr.reverse(); idx.push(...tr); });
     for(let s=0;s<=L;s+=1) for(const off of [-0.8,0,0.8]){ const c=worldCell(a[0]+dx*s/L-dz/L*off,a[1]+dz*s/L+dx/L*off); if(c>=0) GR[c]=0; } // no grass on the path
     return v1; };
-  for(const t of TOWNS) for(const h of t.houses){ const D=doorOf(h), y=t.h+0.045;
-    const a=[D.x+D.nx*0.14,D.z+D.nz*0.14], p1=[D.x+D.nx*2.6,D.z+D.nz*2.6];
-    const toC=[t.x-p1[0],t.z-p1[1]], lc=Math.hypot(...toC)||1, end=[t.x-toC[0]/lc*(PLAZA_R-0.4),t.z-toC[1]/lc*(PLAZA_R-0.4)];
-    let path=[a,p1];
-    if(lc>PLAZA_R){ if(clear(t,p1,end)) path.push(end);
-      else { const k1=[end[0],p1[1]], k2=[p1[0],end[1]]; if(clear(t,p1,k1)&&clear(t,k1,end)) path.push(k1,end); else if(clear(t,p1,k2)&&clear(t,k2,end)) path.push(k2,end); } }
-    let v=0; for(let q=0;q<path.length-1;q++){ const A=path[q], B=path[q+1]; // run each leg a half-width past the corner, so turns are filled
-      const dx=B[0]-A[0], dz=B[1]-A[1], L=Math.hypot(dx,dz)||1, ext=q<path.length-2?WALK_W/2:0;
-      v=quad(A,[B[0]+dx/L*ext,B[1]+dz/L*ext],y,v); }
-    SIDEWALKS.push(path); }
+  for(const t of TOWNS){ const Ls=t.streetL, y=t.h+0.045;
+    // a sidewalk down each side of both streets
+    for(const X of [true,false]) for(const sd of [-1,1]){ const off=sd*(ROAD_HW+WALK_W/2), a=X?[t.x-Ls,t.z+off]:[t.x+off,t.z-Ls], b=X?[t.x+Ls,t.z+off]:[t.x+off,t.z+Ls]; quad(a,b,y,0); SIDEWALKS.push([a,b]); }
+    // and a front path from every door straight out to the sidewalk of the street it faces
+    for(const h of t.houses){ const D=doorOf(h), a=[D.x+D.nx*0.14,D.z+D.nz*0.14], X=h.side==='n'||h.side==='s', across=X?a[1]-t.z:a[0]-t.x, edge=Math.sign(across)*(ROAD_HW+WALK_W-0.1);
+      const b=X?[a[0],t.z+edge]:[t.x+edge,a[1]]; quad(a,b,y+0.002,0); SIDEWALKS.push([a,b]); } }
   const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3)); g.setAttribute('normal',new THREE.Float32BufferAttribute(nor,3)); g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2)); g.setIndex(idx); g.computeBoundingSphere();
   sidewalkMesh=new THREE.Mesh(g,new THREE.MeshLambertMaterial({map:walkTex,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-7})); sidewalkMesh.receiveShadow=true; sidewalkMesh.matrixAutoUpdate=false; scene.add(sidewalkMesh);
 }
@@ -1994,23 +2028,29 @@ function buildSidewalks(){
    stair to the upper floor, and a pitched roof made of roof pieces. They take damage, crack and collapse like your
    own builds. Layout is seeded per town. */
 function planHouses(t){
+  /* The town is a grid: a main street and a cross street through the middle make four blocks. Houses stand in rows
+     along both streets, facing them, each with a front yard and a path to the sidewalk and a gap to its neighbours.
+     Lots in the way of a road coming into town are skipped. */
   const r=seeded(t.seed), L=Math.round(t.h/LVL), ci=Math.round(t.x/CELL), cj=Math.round(t.z/CELL), used=new Set(), out=[];
-  for(let a=-9;a<=9;a++) for(let b=-9;b<=9;b++){ const x=(ci+a+0.5)*CELL, z=(cj+b+0.5)*CELL; if(roadDistAt(x,z)<7.5||Math.hypot(x-t.x,z-t.z)<PLAZA_R+3) used.add((ci+a)+','+(cj+b)); }
-  const shapes=[[2,2],[3,2],[2,3],[2,2],[3,2]], n=5+Math.floor(r()*3);
-  const free=(i0,j0,w,d)=>{ for(let a=-1;a<=w;a++) for(let b=-1;b<=d;b++) if(used.has((i0+a)+','+(j0+b))) return false; return true; };
-  for(let k=0;k<n;k++){
-    const [w,d]=shapes[Math.floor(r()*shapes.length)]; let i0=0, j0=0, ok=false;
-    for(let tries=0;tries<40&&!ok;tries++){ const a=(k+r()*0.8)/n*Math.PI*2+tries*0.9, rad=12+r()*17; // around the town square
-      i0=Math.round(ci+Math.cos(a)*rad/CELL-w/2); j0=Math.round(cj+Math.sin(a)*rad/CELL-d/2);
-      ok=free(i0,j0,w,d)&&Math.hypot((i0+w/2)*CELL-t.x,(j0+d/2)*CELL-t.z)+Math.max(w,d)*CELL*0.75<t.R; }
-    if(!ok) continue;
-    for(let p=0;p<w;p++) for(let q=0;q<d;q++) used.add((i0+p)+','+(j0+q));
-    // the door faces the middle of town
-    const hx=(i0+w/2)*CELL, hz=(j0+d/2)*CELL, vx=t.x-hx, vz=t.z-hz, side=Math.abs(vx)>Math.abs(vz)?(vx>0?'e':'w'):(vz>0?'s':'n');
-    const m=r(), mat=m<0.5?'wood':m<0.85?'brick':'metal', roof=r()<0.6?'brick':'wood', floors=r()<0.55?2:1;
-    const rs=seeded(t.seed+977*(k+1)), style=HOUSE_STYLE[mat]; // looks come from their own stream, so the layout doesn't shift
-    out.push({i0,j0,w,d,L,side,mat,roof,floors,id:t.houses.length+out.length,skin:{style,paint:Math.floor(rs()*HOUSE_PAINT[style].length),roof:Math.floor(rs()*4)}});
-  }
+  const key=(i,j)=>i+','+j;
+  for(let a=-12;a<=12;a++) for(let b=-12;b<=12;b++) if(a===-1||a===0||b===-1||b===0) used.add(key(ci+a,cj+b)); // the two streets
+  for(const rd of WORLD.roads){ if(rd.street) continue; // roads coming in
+    for(const p of rd.pts){ const x=SPAWN[0]+p[0], z=SPAWN[2]+p[1]; if(Math.hypot(x-t.x,z-t.z)>t.R+12) continue;
+      for(let a=-2;a<=2;a++) for(let b=-2;b<=2;b++){ const i=Math.floor(x/CELL)+a, j=Math.floor(z/CELL)+b; if(Math.hypot((i+.5)*CELL-x,(j+.5)*CELL-z)<7.5) used.add(key(i,j)); } } }
+  const free=(i0,j0,w,d)=>{ for(let a=-1;a<=w;a++) for(let b=-1;b<=d;b++) if(used.has(key(i0+a,j0+b))) return false; return true; };
+  const inTown=(i0,j0,w,d)=>[[i0,j0],[i0+w,j0],[i0,j0+d],[i0+w,j0+d]].every(([i,j])=>Math.hypot(i*CELL-t.x,j*CELL-t.z)<t.R-1);
+  const shapes=[[2,2],[3,2],[2,3]]; let k=0;
+  const order=t.axis==='z'?[false,true]:[true,false];
+  for(const X of order) for(const sd of [1,-1]){ let s=-11;
+    while(s<11){ const [along,deep]=shapes[Math.floor(r()*shapes.length)], front=sd>0?2:-2-deep; // a front-yard row between the street and the house
+      const i0=X?ci+s:ci+front, j0=X?cj+front:cj+s, w=X?along:deep, d=X?deep:along;
+      if(!free(i0,j0,w,d)||!inTown(i0,j0,w,d)){ s++; continue; }
+      for(let p=0;p<w;p++) for(let q=0;q<d;q++) used.add(key(i0+p,j0+q));
+      const side=X?(sd>0?'n':'s'):(sd>0?'w':'e'); // the door faces its street
+      const m=r(), mat=m<0.5?'wood':m<0.85?'brick':'metal', roof=r()<0.6?'brick':'wood', floors=r()<0.55?2:1;
+      const rs=seeded(t.seed+977*(k+1)), style=HOUSE_STYLE[mat]; k++;
+      out.push({i0,j0,w,d,L,side,mat,roof,floors,id:t.houses.length+out.length,skin:{style,paint:Math.floor(rs()*HOUSE_PAINT[style].length),roof:Math.floor(rs()*4)}});
+      s+=along+1; } }
   t.houses=out; return out;
 }
 // the piece list for one house: [{type,i,j,l,axis,dir,mask,mat}]
