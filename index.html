@@ -1432,7 +1432,7 @@ function makeGroup(p,mat,real){
     const sg=stairGeoFor(p.dir,p.half==null?-1:p.half); add(sg.t,0,0,0,0,0,M.tread); add(sg.s,0,0,0,0,0,M.beam);
   } else { const m=new THREE.Mesh(coneGeo(p.mask||0),mat||M.cone); if(real){m.castShadow=m.receiveShadow=true;m.userData.piece=p;} g.add(m);
     if(!mat&&!p.skin) add(coneFrame(p.mask||0),0,0,0,0,0,M.beam); // house roofs go without the build-piece frame
-    if(p.skin&&p.gable) p.gable.forEach(([side,out])=>{ const gg=gableGeo(p.mask||0,side,out); if(gg) add(gg,0,0,0,0,0,mat||houseMat('w'+p.skin.style+'plain'+p.skin.paint,()=>{ const t=houseWallSet(p.skin.style,'plain'); return new THREE.MeshPhongMaterial({map:t.map,normalMap:t.normal,color:HOUSE_PAINT[p.skin.style][p.skin.paint],shininess:p.skin.style==='panel'?18:6,specular:0x111111}); },'HOUSE_PAINT')); }); }
+    if(p.skin&&p.gable) p.gable.forEach(([side,out])=>{ const gg=gableGeo(p.mask||0,side,out); if(gg) add(gg,0,0,0,0,0,mat||housePlainMat(p.skin)); }); }
   return g;
 }
 function makeBoxes(p){
@@ -1845,17 +1845,17 @@ const roofTexs={wood:roofTex('wood'),brick:roofTex('brick')};
 // that follow the slope (rows run along the eaves) with bare boards underneath
 function houseOBC(sh){
   // only wall geometry carries the 'inside' flag, so only the wall shader reads it (a missing attribute breaks the draw)
-  sh.vertexShader='#ifdef HOUSE_PAINT\nattribute float inside;\n#endif\nvarying float vIn;\nvarying vec3 vON;\n'+sh.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\n  vON=objectNormal;\n#ifdef HOUSE_PAINT\n  vIn=inside;\n#else\n  vIn=0.0;\n#endif');
-  sh.fragmentShader='varying float vIn;\nvarying vec3 vON;\n'+sh.fragmentShader
+  sh.vertexShader='#ifdef HOUSE_PAINT\nattribute float inside;\n#endif\n#ifdef HOUSE_VPAINT\nattribute vec3 paint;\nvarying vec3 vPaint;\n#endif\nvarying float vIn;\nvarying vec3 vON;\n'+sh.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\n  vON=objectNormal;\n#ifdef HOUSE_VPAINT\n  vPaint=paint;\n#endif\n#ifdef HOUSE_PAINT\n  vIn=inside;\n#else\n  vIn=0.0;\n#endif');
+  sh.fragmentShader='#ifdef HOUSE_VPAINT\nvarying vec3 vPaint;\n#define PCOL vPaint\n#else\n#define PCOL diffuse\n#endif\nvarying float vIn;\nvarying vec3 vON;\n'+sh.fragmentShader
     .replace('#include <map_fragment>',`#ifdef HOUSE_ROOF
   vec2 ruv=abs(vON.x)>abs(vON.z)?vec2(vUv.y,vUv.x*sign(vON.x)):vec2(vUv.x,vUv.y*sign(vON.z));
-  vec4 texelColor=mapTexelToLinear(texture2D(map,ruv*1.5)); diffuseColor*=texelColor;
+  vec4 texelColor=mapTexelToLinear(texture2D(map,ruv*1.5)); diffuseColor*=texelColor;\n#ifdef HOUSE_VPAINT\n  diffuseColor.rgb*=vPaint;\n#endif
   if(!gl_FrontFacing) diffuseColor.rgb=vec3(0.56,0.45,0.33);
 #else
 #include <map_fragment>
 #endif
 #ifdef HOUSE_PAINT
-  { float pa=clamp((texelColor.a-0.5)*2.0,0.0,1.0); diffuseColor=vec4(texelColor.rgb*mix(vec3(1.0),diffuse,pa),opacity);
+  { float pa=clamp((texelColor.a-0.5)*2.0,0.0,1.0); diffuseColor=vec4(texelColor.rgb*mix(vec3(1.0),PCOL,pa),opacity);
     if(vIn>0.5) diffuseColor.rgb=mix(vec3(0.85,0.81,0.73)*(0.96+0.06*texelColor.g),vec3(0.95,0.94,0.9),step(vUv.y,0.045)); }
 #endif
 #ifdef HOUSE_CEIL
@@ -1866,16 +1866,18 @@ function houseOBC(sh){
     .replace('#include <emissivemap_fragment>','#include <emissivemap_fragment>\n#ifdef HOUSE_PAINT\n  if(vIn>0.5) totalEmissiveRadiance+=diffuseColor.rgb*0.32;\n#endif\n#ifdef HOUSE_CEIL\n  totalEmissiveRadiance+=diffuseColor.rgb*(vON.y<-0.5?0.4:0.08);\n#endif\n#ifdef HOUSE_ROOF\n  if(!gl_FrontFacing) totalEmissiveRadiance+=diffuseColor.rgb*0.45;\n#endif');
 }
 const houseMatCache=new Map();
-function houseMat(key,make,def){ let m=houseMatCache.get(key); if(!m){ m=make(); m.defines=Object.assign({},m.defines||{},{[def]:''}); m.onBeforeCompile=houseOBC; houseMatCache.set(key,m); } return m; }
+function houseMat(key,make,def,batchKey){ let m=houseMatCache.get(key); if(!m){ m=make(); m.defines=Object.assign({},m.defines||{},{[def]:''}); m.onBeforeCompile=houseOBC; houseMatCache.set(key,m);
+    if(batchKey){ let b=houseMatCache.get('batch:'+batchKey); if(!b){ b=m.clone(); b.color.setRGB(1,1,1); b.defines=Object.assign({},m.defines,{HOUSE_VPAINT:''}); b.onBeforeCompile=houseOBC; houseMatCache.set('batch:'+batchKey,b); } m.userData.batch=b; } }
+  return m; }
 const wallKind=mask=>!(mask&2)?'door':!(mask&16)?'win':'plain';
 function houseSkin(p){
   const s=p.skin;
   return {
-    wall:houseMat('w'+s.style+wallKind(p.mask==null?511:p.mask)+s.paint,()=>{ const t=houseWallSet(s.style,wallKind(p.mask==null?511:p.mask)); return new THREE.MeshPhongMaterial({map:t.map,normalMap:t.normal,color:HOUSE_PAINT[s.style][s.paint],shininess:s.style==='panel'?18:6,specular:0x111111}); },'HOUSE_PAINT'),
+    wall:houseMat('w'+s.style+wallKind(p.mask==null?511:p.mask)+s.paint,()=>{ const t=houseWallSet(s.style,wallKind(p.mask==null?511:p.mask)); return new THREE.MeshPhongMaterial({map:t.map,normalMap:t.normal,color:HOUSE_PAINT[s.style][s.paint],shininess:s.style==='panel'?18:6,specular:0x111111}); },'HOUSE_PAINT','w'+s.style+wallKind(p.mask==null?511:p.mask)),
     floor:houseMat('floor',()=>new THREE.MeshPhongMaterial({map:hardwood.map,normalMap:hardwood.normal,shininess:22,specular:0x2a2016,polygonOffset:true,polygonOffsetFactor:1,polygonOffsetUnits:1}),'HOUSE_CEIL'),
     tread:houseMat('tread',()=>new THREE.MeshPhongMaterial({map:hardwood.map,normalMap:hardwood.normal,shininess:22,specular:0x2a2016}),'HOUSE_CEIL'),
     beam:houseMat('trim'+(s.style==='panel'?'d':'w'),()=>new THREE.MeshPhongMaterial({color:s.style==='panel'?0x2c2f34:0xf2efe8,shininess:10,specular:0x111111}),'HOUSE_TRIM'),
-    cone:houseMat('roof'+p.mat+s.roof,()=>{ const t=roofTexs[p.mat==='brick'?'brick':'wood']; return new THREE.MeshPhongMaterial({map:t.map,color:ROOF_COL[p.mat==='brick'?'brick':'wood'][s.roof],shininess:4,specular:0x080808,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:1,polygonOffsetUnits:1}); },'HOUSE_ROOF')
+    cone:houseMat('roof'+p.mat+s.roof,()=>{ const t=roofTexs[p.mat==='brick'?'brick':'wood']; return new THREE.MeshPhongMaterial({map:t.map,color:ROOF_COL[p.mat==='brick'?'brick':'wood'][s.roof],shininess:4,specular:0x080808,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:1,polygonOffsetUnits:1}); },'HOUSE_ROOF','roof'+(p.mat==='brick'?'brick':'wood'))
   };
 }
 // wall geometry with an 'inside' flag on the faces that look into the house
@@ -1905,7 +1907,7 @@ function gableGeo(mask,side,out){ const key=mask+side+out; let g=gableCache.get(
    end wall, under an opening cut in the upper floor (a stairwell) with a railing round it. The steps are solid boxes
    you walk up step by step, not a ramp. The stairs belong to the ground-floor piece of the top cell and the railing to
    the upper floor there, so they break and come back with those pieces. */
-function housePlainMat(s){ return houseMat('w'+s.style+'plain'+s.paint,()=>{ const t=houseWallSet(s.style,'plain'); return new THREE.MeshPhongMaterial({map:t.map,normalMap:t.normal,color:HOUSE_PAINT[s.style][s.paint],shininess:s.style==='panel'?18:6,specular:0x111111}); },'HOUSE_PAINT'); }
+function housePlainMat(s){ return houseMat('w'+s.style+'plain'+s.paint,()=>{ const t=houseWallSet(s.style,'plain'); return new THREE.MeshPhongMaterial({map:t.map,normalMap:t.normal,color:HOUSE_PAINT[s.style][s.paint],shininess:s.style==='panel'?18:6,specular:0x111111}); },'HOUSE_PAINT','w'+s.style+'plain'); }
 function houseStair(h){
   if(h._stair) return h._stair;
   const {i0,j0,w,d,L}=h, C=CELL, Y0=L*LVL, IN=WT/2, X=w>=d, masks={};
@@ -1955,7 +1957,7 @@ function houseStair(h){
 /* ---------- sidewalks: a concrete path from every front door to the town square ---------- */
 const WALK_W=1.7, SIDEWALKS=[]; let sidewalkMesh=null;
 const walkTex=(()=>{ const W=128, Hh=128, c=document.createElement('canvas'); c.width=W; c.height=Hh; const g=c.getContext('2d');
-  g.fillStyle='#bdbab2'; g.fillRect(0,0,W,Hh);
+  g.fillStyle='#a3a098'; g.fillRect(0,0,W,Hh);
   for(let i=0;i<2500;i++){ const v=Math.random(); g.fillStyle=v<.5?'rgba(70,66,60,.16)':'rgba(255,255,250,.2)'; g.fillRect(Math.random()*W,Math.random()*Hh,1+Math.random()*1.5,1+Math.random()*1.5); }
   g.fillStyle='rgba(60,56,50,.55)'; g.fillRect(0,0,W,2);                       // expansion joint, every slab
   g.fillStyle='rgba(90,86,78,.35)'; g.fillRect(0,0,4,Hh); g.fillRect(W-4,0,4,Hh); // worn edges
@@ -2046,16 +2048,16 @@ function houseSpots(h){ const {i0,j0,w,d,L}=h, c=(i,j,l)=>({x:(i+0.5)*CELL,y:l*L
   if(h.floors>1) spots.chest.push(c(cells[Math.floor(cells.length/2)][0],cells[Math.floor(cells.length/2)][1],L+1));
   return spots; }
 const worldKeys=new Set(), townBatch=new Map();
-function mergeWorld(ms){ let n=0; const parts=ms.map(m=>{ const g=m.geometry.index?m.geometry.toNonIndexed():m.geometry; n+=g.attributes.position.count; return [g,m.matrixWorld]; }), hasIn=!!parts[0][0].attributes.inside, IN=hasIn?new Float32Array(n):null;
+function mergeWorld(ms){ let n=0; const parts=ms.map(m=>{ const g=m.geometry.index?m.geometry.toNonIndexed():m.geometry; n+=g.attributes.position.count; return [g,m.matrixWorld,m.material.color]; }), hasIn=!!parts[0][0].attributes.inside, IN=hasIn?new Float32Array(n):null, hasPaint=!!ms[0].material.userData.batch, PA=hasPaint?new Float32Array(n*3):null;
   const P=new Float32Array(n*3), N=new Float32Array(n*3), U=new Float32Array(n*2), v=new THREE.Vector3(), nm=new THREE.Matrix3(); let o=0;
-  for(const [g,M] of parts){ const pa=g.attributes.position, na=g.attributes.normal, ua=g.attributes.uv; nm.getNormalMatrix(M);
-    for(let i=0;i<pa.count;i++){ v.fromBufferAttribute(pa,i).applyMatrix4(M); P.set([v.x,v.y,v.z],(o+i)*3); if(na){ v.fromBufferAttribute(na,i).applyMatrix3(nm).normalize(); N.set([v.x,v.y,v.z],(o+i)*3); } if(ua) U.set([ua.getX(i),ua.getY(i)],(o+i)*2); if(hasIn&&g.attributes.inside) IN[o+i]=g.attributes.inside.getX(i); }
+  for(const [g,M,PC] of parts){ const pa=g.attributes.position, na=g.attributes.normal, ua=g.attributes.uv; nm.getNormalMatrix(M);
+    for(let i=0;i<pa.count;i++){ v.fromBufferAttribute(pa,i).applyMatrix4(M); P.set([v.x,v.y,v.z],(o+i)*3); if(na){ v.fromBufferAttribute(na,i).applyMatrix3(nm).normalize(); N.set([v.x,v.y,v.z],(o+i)*3); } if(ua) U.set([ua.getX(i),ua.getY(i)],(o+i)*2); if(hasIn&&g.attributes.inside) IN[o+i]=g.attributes.inside.getX(i); if(hasPaint){ const c=PC; PA[(o+i)*3]=c.r; PA[(o+i)*3+1]=c.g; PA[(o+i)*3+2]=c.b; } }
     o+=pa.count; }
-  const out=new THREE.BufferGeometry(); out.setAttribute('position',new THREE.BufferAttribute(P,3)); out.setAttribute('normal',new THREE.BufferAttribute(N,3)); out.setAttribute('uv',new THREE.BufferAttribute(U,2)); if(hasIn) out.setAttribute('inside',new THREE.BufferAttribute(IN,1)); out.computeBoundingSphere(); return out; }
+  const out=new THREE.BufferGeometry(); out.setAttribute('position',new THREE.BufferAttribute(P,3)); out.setAttribute('normal',new THREE.BufferAttribute(N,3)); out.setAttribute('uv',new THREE.BufferAttribute(U,2)); if(hasIn) out.setAttribute('inside',new THREE.BufferAttribute(IN,1)); if(hasPaint) out.setAttribute('paint',new THREE.BufferAttribute(PA,3)); out.computeBoundingSphere(); return out; }
 function batchTown(t){
   unbatchTown(t); const list=[], byMat=new Map();
   pieces.forEach(p=>{ if(p.owner==='world'&&p.town===t&&!p.anim&&!damageStage(p)) list.push(p); });
-  for(const p of list){ p.group.updateMatrixWorld(true); for(const m of p.group.children){ if(!m.isMesh) continue; let a=byMat.get(m.material); if(!a){ a=[]; byMat.set(m.material,a); } a.push(m); } }
+  for(const p of list){ p.group.updateMatrixWorld(true); for(const m of p.group.children){ if(!m.isMesh) continue; const k=m.material.userData.batch||m.material; let a=byMat.get(k); if(!a){ a=[]; byMat.set(k,a); } a.push(m); } }
   const meshes=[]; byMat.forEach((ms,mat)=>{ const mm=new THREE.Mesh(mergeWorld(ms),mat); mm.castShadow=mm.receiveShadow=true; scene.add(mm); meshes.push(mm); });
   list.forEach(p=>{ p.group.visible=false; p.batched=true; }); townBatch.set(t,{meshes,list});
 }
@@ -5145,7 +5147,7 @@ function stepChests(dt){
   chestHumT-=dt; let best=null, bd=16;
   const bar=$('chestBar'); let showing=false;
   for(const c of chests){
-    const dx=c.x-P.pos.x, dz=c.z-P.pos.z, d=Math.hypot(dx,dz); if(d>90){ c.g.visible=d<200; continue; } c.g.visible=true;
+    const dx=c.x-P.pos.x, dz=c.z-P.pos.z, d=Math.hypot(dx,dz); if(d>90){ c.g.visible=d<130; continue; } c.g.visible=true;
     // falls if what it stood on is gone
     const [gy]=groundAt(c.x,c.z,c.y+0.3,near(c.x,c.z)); if(gy<c.y-0.01){ c.vy-=22*dt; c.y=Math.max(gy,c.y+c.vy*dt); } else { c.vy=0; c.y=gy; } c.g.position.y=c.y;
     c.lidA+=((c.open?1.95:0)-c.lidA)*Math.min(1,dt*9); c.lid.rotation.x=c.lidA;
@@ -5223,7 +5225,8 @@ function propRevive(p){ p.alive=true; p.hp=p.maxHp; p.grow=0; p.dying=0; p.g.vis
 let propCullT=0;
 function stepProps(dt){
   propCullT-=dt; if(propCullT<=0){ propCullT=0.25; const cx=camera.position.x, cz=camera.position.z;
-    for(const p of props){ const far=(p.x-cx)*(p.x-cx)+(p.z-cz)*(p.z-cz)>400*400; p.g.visible=!far&&(p.alive||p.dying>0); } }
+    for(const p of props){ const far=(p.x-cx)*(p.x-cx)+(p.z-cz)*(p.z-cz)>400*400; p.g.visible=!far&&(p.alive||p.dying>0); }
+    townBatch.forEach((b,t)=>{ const on=Math.hypot(t.x-cx,t.z-cz)<700; b.meshes.forEach(m=>{ m.visible=on; }); }); } // far towns are a few pixels in the haze
   for(const p of props){
     if(p.wob>0){ p.wob=Math.max(0,p.wob-dt*4); const w=Math.sin(p.wob*22)*p.wob*0.04; p.g.rotation.z=w; p.g.rotation.x=w*0.6; }
     if(p.dying>0){ p.dying-=dt; const k=Math.max(0.01,p.dying/0.35); p.g.scale.setScalar(p.s*k); if(p.dying<=0) p.g.visible=false; }
