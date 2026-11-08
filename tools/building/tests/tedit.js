@@ -1,6 +1,6 @@
 // Edit / collision / structural validation suite, following Part 16 of the editing rulebook.
 const {sleep,page,launch,open}=require('./h.js');
-const EXPOSE='P,pieces,conn,addPiece,removePiece,destroyPiece,clearBuilds,physStep,beginEdit,exitEdit,resetEdit,paintTile,editValid,editShapeName,wallMaskValid,stairEditResult,shapeValid,slabTop,makeBoxes,pbox,findUnsupported,grounded,canEdit,settings,net,WALL_SHAPES,stairSegs,coneHeight,wallTiles,castShot,CELL,LVL,WT,FT,R,get edit(){return edit}';
+const EXPOSE='toggleDoor,doorSlots,P,pieces,conn,addPiece,removePiece,destroyPiece,clearBuilds,physStep,beginEdit,exitEdit,resetEdit,paintTile,editValid,editShapeName,wallMaskValid,stairEditResult,shapeValid,slabTop,makeBoxes,pbox,findUnsupported,grounded,canEdit,settings,net,WALL_SHAPES,stairSegs,coneHeight,wallTiles,castShot,CELL,LVL,WT,FT,R,get edit(){return edit}';
 (async()=>{ const b=await launch(); const {pg,errs}=await open(b,page('/home/claude/crank-lab/index.html',EXPOSE),{fast:true});
  await pg.waitForFunction(()=>window.T&&T.pieces,null,{timeout:120000});
  // shared helpers inside the page
@@ -27,7 +27,7 @@ const EXPOSE='P,pieces,conn,addPiece,removePiece,destroyPiece,clearBuilds,physSt
      const p=H.wall('x',2,0,0); const removed=[]; for(let i=0;i<9;i++) if(!(m>>i&1)) removed.push(i);
      const r=H.edit(p,removed); const q=T.pieces.get(p.key);
      if(!r.ok||!q||q.mask!==m){ out.bad.push(m+' not applied '+JSON.stringify(r)); T.removePiece(p); continue; }
-     const boxes=T.makeBoxes(q), X=10;
+     if(q.doors) q.doors.forEach((d,c)=>{ if(d&&!d.open) T.toggleDoor(q,c,true,true,1); }); const boxes=T.makeBoxes(q), X=10;
      // no collision where tiles were removed
      for(const t of removed){ const r0=(t/3)|0, c0=t%3, za=c0*tw, zb=za+tw, ya=r0*th, yb=ya+th;
        for(const bx of boxes){ const oz=Math.min(bx[5],zb)-Math.max(bx[2],za), oy=Math.min(bx[4],yb)-Math.max(bx[1],ya); if(oz>0.02&&oy>0.02){ out.bad.push(m+' collision in removed tile '+t); break; } } }
@@ -39,11 +39,11 @@ const EXPOSE='P,pieces,conn,addPiece,removePiece,destroyPiece,clearBuilds,physSt
      T.removePiece(q); }
    for(const [k,name] of Object.entries(T.WALL_SHAPES)){ if(!k) continue; let m=511; k.split(',').forEach(i=>m&=~(1<<+i)); if(T.wallMaskValid(m)) out.named++; else out.namedBad.push(name+' '+k); }
    out.bad=out.bad.slice(0,8); return out; });
- ok('walls: every connected selection applies, with collision only on what is left and one attachment per tile',walls.bad.length===0,`${walls.valid} valid, ${walls.invalid} refused`+(walls.bad.length?' '+walls.bad.join(' | '):''));
+ ok('walls: every Fortnite wall edit applies, with collision only on what is left and one attachment per tile',walls.bad.length===0,`${walls.valid} valid, ${walls.invalid} refused`+(walls.bad.length?' '+walls.bad.join(' | '):''));
  ok('walls: every named Fortnite edit (windows, doors, arches, window door, half walls, columns, cuts, triangles) is valid',walls.namedBad.length===0,walls.named+' named'+(walls.namedBad.length?' bad: '+walls.namedBad.join(','):''));
  const wallRules=await ev(()=>{ const v=k=>{ let m=511; k.forEach(i=>m&=~(1<<i)); return T.wallMaskValid(m); };
-   return {midRow:v([3,4,5]),all:v([0,1,2,3,4,5,6,7,8]),centreCol:v([1,4,7]),topOnly:v([0,1,2,3,4,5]),diag:v([0,4,8])}; });
- ok('walls: selections that would leave a part hanging loose are refused (middle row, centre column, diagonal, everything)',!wallRules.midRow&&!wallRules.all&&!wallRules.centreCol&&!wallRules.diag&&wallRules.topOnly,wallRules);
+   return {midRow:v([3,4,5]),all:v([0,1,2,3,4,5,6,7,8]),centreCol:v([1,4,7]),topOnly:v([0,1,2,3,4,5]),diag:v([0,4,8]),wideSide:v([3,4]),wideSide2:v([4,5]),cornerOnly:v([0]),arch:v([0,1,2,4]),lrWindow:v([3,5])}; });
+ ok('walls: only real Fortnite edits are accepted (the wide side window, a lone corner, the middle row, everything are refused; arch and L+R window work)',!wallRules.midRow&&!wallRules.all&&!wallRules.centreCol&&!wallRules.diag&&!wallRules.topOnly&&!wallRules.wideSide&&!wallRules.wideSide2&&!wallRules.cornerOnly&&wallRules.arch&&wallRules.lrWindow,wallRules);
  const floors=await ev(()=>{ H.reset(); const bad=[];
    for(let m=1;m<16;m++){ const p=H.floor(2,0,0); const removed=[0,1,2,3].filter(i=>!(m>>i&1)); const r=H.edit(p,removed); const q=T.pieces.get(p.key);
      if(!q||q.mask!==m){ bad.push(m+' not applied'); continue; } const bx=T.makeBoxes(q); let kept=0; for(let i=0;i<4;i++) kept+=m>>i&1;
@@ -83,7 +83,7 @@ const EXPOSE='P,pieces,conn,addPiece,removePiece,destroyPiece,clearBuilds,physSt
  // ===== 16.2 collision =====
  const col=await ev(()=>{ const o={};
    H.reset(); H.wall('x',4,0,0); H.at(18.5,0,2.5); o.solid=H.sim(6,0,1.2);                                   // 1 solid wall
-   H.reset(); H.edit(H.wall('x',4,0,0),[1,4]); H.at(18.5,0,2.5); o.door=H.sim(6,0,1.2);                      // 2 doorway
+   H.reset(); const dw=H.wall('x',4,0,0); H.edit(dw,[1,4]); H.at(18.5,0,2.5); o.doorShut=H.sim(6,0,1.2); const dq=T.pieces.get(dw.key); T.toggleDoor(dq,1,true,true,-1); H.at(18.5,0,2.5); o.door=H.sim(6,0,1.2); // 2 doorway: shut, then open
    H.reset(); H.edit(H.wall('x',4,0,0),[3,4,5,6,7,8]); H.at(18.5,0,2.5); o.jumpLow=H.sim(6,0,1.6,true);      // 3 jump over a low wall (an opening open to the top)
    H.reset(); H.edit(H.wall('x',4,0,0),[4]); H.at(18.5,0,2.5); o.window=H.sim(6,0,2.5,true);                 // 4 window: too small for the player
    H.reset(); H.wall('x',4,0,0); H.edit(H.floor(4,0,1),[0]); H.at(22.0,6,3.75); o.standKept=H.sim(0,0,1.2);                     // 5 stand on a remaining quarter
@@ -95,7 +95,7 @@ const EXPOSE='P,pieces,conn,addPiece,removePiece,destroyPiece,clearBuilds,physSt
    H.reset(); const r2=H.ramp(4,0,0,0); H.edit(r2,[2,3]); H.at(23.4,0,1.25); o.underRemoved=H.sim(0,0,1.2,true); // 10 the same spot after that half is removed
    return o; });
  ok('collision 1: walking into a solid wall stops you',col.solid.x<20-0.3,col.solid);
- ok('collision 2: you walk straight through a doorway',col.door.x>21,col.door);
+ ok('collision 2: a closed door stops you; open, you walk straight through the doorway',col.doorShut.x<20&&col.door.x>21,{shut:col.doorShut,open:col.door});
  ok('collision 3: you can jump through an opening big enough (over a low wall)',col.jumpLow.x>21,col.jumpLow);
  ok('collision 4: a window is too small to get through, even jumping',col.window.x<20,col.window);
  ok('collision 5: you stand on a remaining floor quarter',Math.abs(col.standKept.y-4)<0.05,col.standKept);
@@ -105,9 +105,11 @@ const EXPOSE='P,pieces,conn,addPiece,removePiece,destroyPiece,clearBuilds,physSt
  ok('collision 8: you stand on an edited cone at its real surface (the highest point under your feet)',Math.abs(col.cone.stoodAt-col.cone.surface)<0.08,col.cone);
  ok('collision 9: jumping under a stair, the underside stops your head',col.underRamp.maxY<1.0,col.underRamp);
  ok('collision 10: after that half of the stair is removed, nothing stops the jump',col.underRemoved.maxY>1.2,col.underRemoved);
- const chan=await ev(()=>{ H.reset(); H.edit(H.wall('x',4,0,0),[1,4]); const o={};
+ const chan=await ev(()=>{ H.reset(); const cw=H.wall('x',4,0,0); H.edit(cw,[1,4]); const o={}; o.closedDoor=H.shot([18,1.2,2.5],[1,0,0]); T.toggleDoor(T.pieces.get(cw.key),1,true,true,-1);
    o.throughDoor=H.shot([18,1.2,2.5],[1,0,0]); o.intoWall=H.shot([18,1.2,0.6],[1,0,0]); o.overDoor=H.shot([18,3.4,2.5],[1,0,0]); return o; });
- ok('shots and sight: pass through the doorway, hit the wall beside it and above it',chan.throughDoor==='none'&&chan.intoWall==='piece'&&chan.overDoor==='piece',chan);
+ ok('shots: a closed door stops them; through the open doorway they pass; the wall beside and above stops them',chan.closedDoor==='piece'&&chan.throughDoor==='none'&&chan.intoWall==='piece'&&chan.overDoor==='piece',chan);
+ const seam=await ev(()=>{ H.reset(); H.wall('x',4,0,0); H.wall('x',4,1,0); H.floor(4,0,1); H.wall('z',4,1,0); const o={}; o.wallSeam=H.shot([18,1.5,5.0],[1,0,0]); o.wallSeam2=H.shot([18,1.5,4.995],[1,0,0.002]); o.corner=H.shot([17,4.0,5],[1,0,0]); return o; });
+ ok('shots: no slipping through the hairline seams where builds meet',seam.wallSeam==='piece'&&seam.wallSeam2==='piece'&&seam.corner==='piece',seam);
 
  // ===== 16.3 reset =====
  const rs=await ev(()=>{ H.reset(); const p=H.wall('x',3,0,0); const f=H.floor(3,0,1); const box0=JSON.stringify(T.makeBoxes(p)), nb0=H.keys(p); p.hp=97; const id0=p.key, n0=T.pieces.size, out={};
@@ -117,13 +119,13 @@ const EXPOSE='P,pieces,conn,addPiece,removePiece,destroyPiece,clearBuilds,physSt
    out.wall=ok;
    // edited -> different edit -> reset, stairs
    const r=H.ramp(5,0,0,0); H.edit(r,[0,1,3]); H.edit(T.pieces.get(r.key),[6,7]); H.edit(T.pieces.get(r.key),[0,2]); T.beginEdit(T.pieces.get(r.key)); T.resetEdit();
-   const q=T.pieces.get(r.key); out.stair=q.dir===0&&q.half===-1&&!q.path&&T.slabTop(q,26,2.5)!=null;
+   const q=T.pieces.get(r.key); out.stair=q.dir===1&&q.half===-1&&!q.path&&T.slabTop(q,26,2.5)!=null; // last edit faced +z: reset keeps that way, as a full stair
    // reset after moving and after a structural change nearby
    H.edit(T.pieces.get(id0),[4]); H.at(14,0,2.5); H.sim(3,0,0.5); T.destroyPiece(T.pieces.get(f.key)); T.beginEdit(T.pieces.get(id0)); T.resetEdit();
    const w=T.pieces.get(id0); out.afterChanges=!!w&&w.mask===511&&w.hp===97&&!T.pieces.has(f.key);
    return out; });
  ok('reset: walls edited, reset and edited again keep identity, health, owner, material and connections, with no leftover collision',rs.wall,rs);
- ok('reset: a stair edited to an L, turned, halved and reset is back as placed',rs.stair,rs);
+ ok('reset: a stair edited to an L, turned, halved and reset becomes a full stair facing the way it last faced',rs.stair,rs);
  ok('reset: works after moving around and after a neighbour was destroyed, and never brings the neighbour back',rs.afterChanges,rs);
 
  // ===== 16.4 structural =====

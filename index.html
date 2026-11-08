@@ -127,6 +127,8 @@ body.m-edit #cross i{background:var(--edit)}
 body.touch .mats .k{display:none}
 #buildReason{left:50%;top:calc(50% + 26px);transform:translateX(-50%);font:800 italic 15px/1 var(--font-hud);text-transform:uppercase;letter-spacing:.04em;color:#ff8a78;text-shadow:0 1px 3px #000;white-space:nowrap}
 #chestBar{left:50%;top:calc(50% + 92px);transform:translateX(-50%);display:grid;justify-items:center;gap:4px;font:800 italic 14px/1 var(--font-hud);color:#ffe08a;text-shadow:0 1px 3px #000}
+#chestBar .usek{display:inline-block;min-width:22px;padding:2px 6px;border-radius:4px;background:rgba(255,255,255,.92);color:#10151c;font-style:normal;text-align:center}
+body.touch #chestBar .usek{display:none}
 #chestBar .pb{width:150px;height:8px;background:rgba(10,18,30,.6);border:1px solid rgba(255,220,140,.6)} #chestBar .pb i{display:block;height:100%;width:0;background:#ffc84a}
 #useBar{left:50%;top:calc(50% + 64px);transform:translateX(-50%);display:grid;justify-items:center;gap:4px;font:800 italic 15px/1 var(--font-hud);text-shadow:0 1px 3px #000}
 #useBar .pb{width:150px;height:8px;background:rgba(10,18,30,.6);border:1px solid rgba(255,255,255,.45)}
@@ -417,7 +419,7 @@ body.touch #stickHint{width:100px;height:100px;opacity:.6}
     </div>
   </div>
 </div>
-<div class="hud" id="chestBar" hidden><span>Opening chest</span><span class="pb"><i id="chestB"></i></span></div>
+<div class="hud" id="chestBar" hidden><span><b id="useK" class="usek"></b> <span id="useT"></span></span><span class="pb" id="usePB"><i id="chestB"></i></span></div>
 <div class="hud" id="useBar" hidden><span id="useT"></span><span class="pb"><i id="useB"></i></span></div>
 <div class="hud" id="pieceHp" hidden><span id="pieceHpT"></span><span class="pb"><i id="pieceHpB"></i></span><span id="pieceHpS"></span></div>
 <div class="hud" id="waveHud"><div class="wt"><b id="whT"></b><span id="whS"></span></div><div class="wb"><i id="whF"></i></div></div>
@@ -459,6 +461,7 @@ body.touch #stickHint{width:100px;height:100px;opacity:.6}
   <button class="tb" id="tBag" data-act="inventory" aria-label="Inventory"><svg viewBox="0 0 24 24"><path d="M6 8h12l1 12H5z" fill="none" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"/><path d="M9 8V6a3 3 0 0 1 6 0v2" fill="none" stroke="#fff" stroke-width="2.2"/></svg></button>
   <button class="tb" id="tBuild" data-act="build" aria-label="Build mode"><svg viewBox="0 0 24 24"><path d="M4 9l6-5 3 3-2 2 9 9-2 2-9-9-2 2z" fill="#fff"/></svg></button>
   <button class="tb" id="tEdit" data-act="edit">Edit</button>
+  <button class="tb" id="tUse" data-act="use" hidden>Use</button>
   <button class="tb" id="tAim" data-act="aim" aria-label="Aim"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="#fff" stroke-width="2"/><circle cx="12" cy="12" r="2.2" fill="#fff"/><path d="M12 1v5M12 18v5M1 12h5M18 12h5" stroke="#fff" stroke-width="2"/></svg></button>
   <button class="tb" id="tReload" data-act="reload" aria-label="Reload"><svg viewBox="0 0 24 24"><path d="M19 12a7 7 0 1 1-2-5" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><path d="M18 3v5h-5" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
 </div>
@@ -476,7 +479,7 @@ body.touch #stickHint{width:100px;height:100px;opacity:.6}
       <button type="button" role="tab" data-tab="controls">Controls</button>
     </nav>
     <section class="mtab" data-tab="play">
-      <p class="sub" id="verTag" style="opacity:.55;font-size:12px;margin:0 0 4px">Update: Nov 8 · big edit update, volumetric clouds, new cars, grid towns, Hurlers</p>
+      <p class="sub" id="verTag" style="opacity:.55;font-size:12px;margin:0 0 4px">Update: Nov 8 · doors, interact key, elbows, big edit update, volumetric clouds</p>
       <p class="sub">A build-fight practice range. Snappy Chapter 1-style running and jumping, turbo build on a 5&nbsp;m by 4&nbsp;m grid, and wall, floor, ramp and cone edits. Ramp rush, crank 90s, and chase your best height.</p>
       <div class="modes" id="modeCards" role="radiogroup" aria-label="Mode">
         <button type="button" class="mode" data-mode="fight" role="radio"><b>Build fight</b><small>Fight the bot or your friends: box up, edit, crank 90s.</small></button>
@@ -584,9 +587,9 @@ const SPAWN=[2.5,0,2.5];
 
 /* ---------- settings ---------- */
 const DEFAULT_BINDS={forward:'KeyW',back:'KeyS',left:'KeyA',right:'KeyD',jump:'Space',crouch:'ShiftLeft',fire:'Mouse0',
-  wall:'KeyQ',floor:'KeyF',ramp:'KeyE',cone:'KeyC',edit:'KeyG',reset:'Mouse2',rotate:'KeyR',pick:'Digit1',gun:'Digit2',pump:'Digit3',bandage:'Digit4',mini:'Digit5',slot6:'Digit6',inventory:'Tab',reload:'KeyT',material:'KeyX',aim:'Mouse2',emote:'KeyB',map:'KeyM'};
+  wall:'KeyQ',floor:'KeyF',ramp:'KeyE',cone:'KeyC',edit:'KeyG',reset:'Mouse2',rotate:'KeyR',pick:'Digit1',gun:'Digit2',pump:'Digit3',bandage:'Digit4',mini:'Digit5',slot6:'Digit6',inventory:'Tab',reload:'KeyT',material:'KeyX',aim:'Mouse2',emote:'KeyB',map:'KeyM',interact:'KeyV'};
 const BIND_LABELS={forward:'Move forward',back:'Move back',left:'Move left',right:'Move right',jump:'Jump',crouch:'Crouch (hold)',
-  fire:'Place / select tiles',wall:'Wall',floor:'Floor',ramp:'Ramp',cone:'Cone',edit:'Edit / confirm',reset:'Reset edit',rotate:'Rotate ramp',pick:'Pickaxe',gun:'Slot 2',pump:'Slot 3',bandage:'Slot 4',mini:'Slot 5',slot6:'Slot 6',inventory:'Inventory',reload:'Reload',material:'Switch material',aim:'Aim down sights',emote:'Emote',map:'Full map'};
+  fire:'Place / select tiles',wall:'Wall',floor:'Floor',ramp:'Ramp',cone:'Cone',edit:'Edit / confirm',reset:'Reset edit',rotate:'Rotate ramp',pick:'Pickaxe',gun:'Slot 2',pump:'Slot 3',bandage:'Slot 4',mini:'Slot 5',slot6:'Slot 6',inventory:'Inventory',reload:'Reload',material:'Switch material',aim:'Aim down sights',emote:'Emote',map:'Full map',interact:'Interact (open, pick up, doors)'};
 const settings={team:0, editRule:'owner', infMats:true, outfit:'rook', pickaxe:'steel', mode:'fight', bot:'adaptive', btnSize:1, btnOpacity:0.7, leftFire:true, emote:'dance', autoRes:true, grassLevel:null, autoFire:false, aimAssist:true, editSens:1, sens:1, fov:78, turbo:0.05, editRelease:true, instantBuild:false, shadows:!isTouch, binds:{}};
 try{ Object.assign(settings, JSON.parse(localStorage.getItem('cranklab.settings')||'{}')); }catch(e){}
 settings.binds=Object.assign({},DEFAULT_BINDS,settings.binds||{});
@@ -1602,6 +1605,7 @@ function makeBoxes(p){
     else for(let r=0;r<2;r++)for(let c=0;c<2;c++) if(p.mask>>(r*2+c)&1) out.push([x0+c*CELL/2,y0-FT,z0+r*CELL/2,x0+(c+1)*CELL/2,y0,z0+(r+1)*CELL/2]);
   }
   if(p.fix) out.push(...p.fix.boxes); // a house's staircase or stairwell railing
+  if(p.doors) p.doors.forEach((d,c)=>{ if(!d||d.open) return; const tw=CELL/3, th=LVL/3; if(p.axis==='x'){ const X=p.i*CELL, z0=p.j*CELL+c*tw; out.push([X-WT/2,y0,z0,X+WT/2,y0+2*th,z0+tw]); } else { const Z=p.j*CELL, x0=p.i*CELL+c*tw; out.push([x0,y0,Z-WT/2,x0+tw,y0+2*th,Z+WT/2]); } }); // a closed door
   return out;
 }
 const buildGlowMat=new THREE.MeshBasicMaterial({color:0xbfe8ff,transparent:true,opacity:.55,blending:THREE.AdditiveBlending,depthWrite:false});
@@ -1801,11 +1805,43 @@ function stepFallers(dt){
       scene.remove(f.g); fallers.splice(i,1); }
   }
 }
+/* Doors. A wall whose edit leaves a door opening (two tiles high in one column, wall above it and beside it)
+   gets a door panel hinged at one side. Interact opens it (swinging away from you) or closes it. A closed door
+   blocks players, bots, creatures and shots like the wall; an open one doesn't. Doors are their own small meshes
+   (so they keep moving even when a town's houses are merged into one mesh) and are only drawn within 120 m. */
+const DOOR_ANG=1.5, doorMats={};
+function doorSlots(mask){ const out=[]; if(mask==null||mask===511) return out; const k=i=>!!(mask>>i&1);
+  for(let c=0;c<3;c++) if(!k(c)&&!k(c+3)&&k(c+6)&&[c-1,c+1].every(n=>n<0||n>2||(k(n)&&k(n+3)))) out.push(c); return out; }
+function doorCenter(p,c){ const tw=CELL/3, th=LVL/3, y=p.l*LVL+th; return p.axis==='x'?new THREE.Vector3(p.i*CELL,y,p.j*CELL+(c+.5)*tw):new THREE.Vector3(p.i*CELL+(c+.5)*tw,y,p.j*CELL); }
+function doorGeo(X){ const key=X?'x':'z'; if(doorGeo[key]) return doorGeo[key]; const tw=CELL/3-0.08, h=2*LVL/3-0.06, th=0.09;
+  const panel=X?new THREE.BoxGeometry(th,h,tw):new THREE.BoxGeometry(tw,h,th); X?panel.translate(0,h/2+0.02,tw/2+0.04):panel.translate(tw/2+0.04,h/2+0.02,0);
+  const parts=[{geo:panel,M:new THREE.Matrix4(),col:new THREE.Color(1,1,1)}];
+  for(const s of [-1,1]){ const kb=new THREE.SphereGeometry(0.055,10,8); const off=X?new THREE.Vector3(s*0.07,1.0,tw-0.12):new THREE.Vector3(tw-0.12,1.0,s*0.07); parts.push({geo:kb,M:new THREE.Matrix4().makeTranslation(off.x,off.y,off.z),col:new THREE.Color(0xd8c27a)}); }
+  return doorGeo[key]=bakeGeo(parts,true); }
+function doorMat(p){ const col=p.skin?[0x7a2e2a,0x3b4a5a,0x5a3d26,0x2f5a46][(p.i*7+p.j*3)&3]:{wood:0x8a5a32,brick:0x6e4a36,metal:0x7d8794}[p.mat]||0x8a5a32;
+  return doorMats[col]||(doorMats[col]=new THREE.MeshPhongMaterial({color:col,vertexColors:true,shininess:20,specular:0x222222})); }
+const doorPieces=new Set();
+function makeDoors(p){ dropDoors(p); if(p.type!=='wall') return; const slots=doorSlots(p.mask); if(!slots.length) return;
+  p.doors=[]; p.doorMeshes=[]; const g=new THREE.Group(); g.position.copy(pieceCenter(p)); scene.add(g); p.doorG=g; const X=p.axis==='x', tw=CELL/3;
+  for(const c of slots){ const pv=new THREE.Group(); X?pv.position.set(0,-LVL/2,-CELL/2+c*tw):pv.position.set(-CELL/2+c*tw,-LVL/2,0);
+    const m=new THREE.Mesh(doorGeo(X),doorMat(p)); m.castShadow=m.receiveShadow=true; m.userData.piece=p; pv.add(m); g.add(pv); p.doorMeshes.push(m);
+    p.doors[c]={open:false,ang:0,to:0,pv}; }
+  doorPieces.add(p); }
+function dropDoors(p){ if(p.doorG){ if(p.doorG.parent) p.doorG.parent.remove(p.doorG); } p.doorG=null; p.doors=null; p.doorMeshes=null; doorPieces.delete(p); }
+function toggleDoor(p,c,fromNet,open,side){ const d=p.doors&&p.doors[c]; if(!d||!pieces.has(p.key)) return;
+  if(!fromNet){ open=!d.open; const q=doorCenter(p,c); side=p.axis==='x'?Math.sign(P.pos.x-q.x)||1:Math.sign(P.pos.z-q.z)||1; }
+  d.open=open; d.to=open?(p.axis==='x'?(side<0?DOOR_ANG:-DOOR_ANG):(side<0?-DOOR_ANG:DOOR_ANG)):0;
+  p.boxes=makeBoxes(p); if(!open) popPlayerOut();
+  const q=doorCenter(p,c); if(q.distanceTo(P.pos)<40) sfxAt(open?'door_open':'door_close',q);
+  if(!fromNet) netOp({op:'door',key:p.key,c,open,side}); }
+function stepDoors(dt){ doorPieces.forEach(p=>{ if(!pieces.has(p.key)){ dropDoors(p); return; } const vis=p.doorG.position.distanceTo(camera.position)<120; p.doorG.visible=vis;
+  p.doors.forEach(d=>{ if(!d||Math.abs(d.to-d.ang)<1e-3) return; d.ang+=(d.to-d.ang)*Math.min(1,dt*10); d.pv.rotation.y=d.ang; }); }); }
 function buildPiece(p){
   touchWorld(p);
   if(p.anim){ finishAnim(p); anims.delete(p); }
   if(p.group) scene.remove(p.group);
   p.scaf=null; p.group=makeGroup(p,null,true); scene.add(p.group);
+  if(p.type==='wall'){ const keep=p.doors&&String(doorSlots(p.mask))===String(p.doors.map((d,c)=>d?c:null).filter(c=>c!=null))?p.doors.map(d=>d&&{open:d.open,to:d.to}):null; makeDoors(p); if(keep&&p.doors) keep.forEach((k,c)=>{ if(k&&p.doors[c]){ p.doors[c].open=k.open; p.doors[c].to=p.doors[c].ang=k.to; p.doors[c].pv.rotation.y=k.to; } }); }
   p.boxes=makeBoxes(p); p.slab=(p.type==='ramp'||p.type==='cone'); p.bb=null; p.bb=pbox(p);
   if(pieces.get(p.key)===p) relinkPiece(p);
   applyDamageLook(p);
@@ -1832,7 +1868,8 @@ function removePiece(p,keepMesh){ // keepMesh: a collapsing piece leaves the str
   if(p.anim){ finishAnim(p); anims.delete(p); }
   pieces.delete(p.key); unlinkPiece(p);
   for(const [a,b] of cellsOf(p)){ const s=cellIndex.get(a+','+b); if(s) s.delete(p); }
-  if(!keepMesh){ dropScaffold(p); scene.remove(p.group); }
+  if(!keepMesh){ dropScaffold(p); scene.remove(p.group); dropDoors(p); }
+  else if(p.doorG){ p.doorG.position.set(0,0,0); p.group.add(p.doorG); doorPieces.delete(p); } // the door falls with its wall
   const i=order.indexOf(p); if(i>=0) order.splice(i,1);
 }
 /* Structural support: a piece needs the ground or a touching piece. Breaking one drops anything left floating. */
@@ -2259,7 +2296,7 @@ function near(x,z,rad=1){
   for(let a=-rad;a<=rad;a++)for(let b=-rad;b<=rad;b++){ const s=cellIndex.get((ci+a)+','+(cj+b)); if(s) s.forEach(p=>out.add(p)); }
   return out;
 }
-function nearMeshes(x,z,rad){ const out=[]; near(x,z,rad).forEach(p=>{ for(const m of p.group.children) out.push(m); }); return out; }
+function nearMeshes(x,z,rad){ const out=[]; near(x,z,rad).forEach(p=>{ for(const m of p.group.children) out.push(m); if(p.doorMeshes) out.push(...p.doorMeshes); }); return out; }
 function slabTop(p,x,z){
   const lx=x-p.i*CELL, lz=z-p.j*CELL;
   if(lx<0||lx>CELL||lz<0||lz>CELL) return null;
@@ -2502,8 +2539,8 @@ function lookTarget(type){
     const hx=_ld.x, hz=_ld.z, hl=Math.hypot(hx,hz); if(hl<0.15) return null;
     const ux=hx/hl, uz=hz/hl, lx=x+ux*REACH, lz=z+uz*REACH;
     let axis,i,j,t;
-    if(Math.abs(ux)>=Math.abs(uz)){ axis='x'; i=Math.round(lx/CELL); if((i*CELL-x)*Math.sign(ux)<0.4) i+=Math.sign(ux); j=cellOf(z+uz*Math.abs((i*CELL-x)/ux)); t=Math.abs((i*CELL-x)/ux); }
-    else { axis='z'; j=Math.round(lz/CELL); if((j*CELL-z)*Math.sign(uz)<0.4) j+=Math.sign(uz); i=cellOf(x+ux*Math.abs((j*CELL-z)/uz)); t=Math.abs((j*CELL-z)/uz); }
+    if(Math.abs(ux)>=Math.abs(uz)){ axis='x'; i=ux>0?ci+1:ci; t=Math.abs((i*CELL-x)/ux); j=cellOf(z+uz*t); }
+    else { axis='z'; j=uz>0?cj+1:cj; t=Math.abs((j*CELL-z)/uz); i=cellOf(x+ux*t); }
     t/=hl;
     const eyeY=fy+1.6, yAt=eyeY+_ld.y*t;
     // your own level unless you clearly aim above it, or steeply down past the floor you stand on
@@ -2519,7 +2556,7 @@ function lookTarget(type){
   if(!pt&&_ld.y<-0.01){ const tg=(terrainH(P.pos.x,P.pos.z)-_lo.y)/_ld.y; if(tg>0&&tg<camDist+6) pt=_lo.clone().addScaledVector(_ld,tg); }
   if(!pt) pt=_lo.clone().addScaledVector(_ld,camDist+5);
   // the tile ~3.6 m out along your view, unless you're looking down at something closer
-  const hl2=Math.hypot(_ld.x,_ld.z)||1, far={x:x+_ld.x/hl2*REACH,z:z+_ld.z/hl2*REACH};
+  const hl2=Math.hypot(_ld.x,_ld.z)||1, far={x:x+_ld.x/hl2*2.6,z:z+_ld.z/hl2*2.6};
   const usePt=Math.hypot(pt.x-x,pt.z-z)<REACH&&_ld.y<-0.35;
   let i=cellOf(usePt?pt.x:far.x), j=cellOf(usePt?pt.z:far.z);
   i=Math.max(ci-1,Math.min(ci+1,i)); j=Math.max(cj-1,Math.min(cj+1,j));
@@ -2972,7 +3009,8 @@ function sfx(k){
     case 'shot_sup': noise(5200,0.02,0.2,0.6,0,'highpass'); noise(1900*r(),0.05,0.16,1); click(2600,0.08,0.012); break;
     case 'gl': noise(420,0.13,0.5,0.7,0,'lowpass',120); knock(150,0.12,0.42,3); tone('sine',150,62,0.14,0.32); break;
     case 'bolt': click(2000,0.2); noise(1400,0.06,0.12,1.2,0.08); click(1500,0.25,0.2); click(2300,0.18,0.3); break;
-    case 'chest_hum': [880,1109,1319,1760].forEach((f,q)=>tone('sine',f,f*1.003,1.1,0.018,q*0.07)); break;
+    case 'chest_hum': { const t=AC.currentTime, g=AC.createGain(); g.gain.setValueAtTime(0.0001,t); g.gain.linearRampToValueAtTime(0.016,t+0.9); g.gain.linearRampToValueAtTime(0.0001,t+2.5); g.connect(cur); // a soft, swelling shimmer: no attack, so it never dings
+      [392,494,587,784].forEach((f,q)=>{ const o=AC.createOscillator(), l=AC.createOscillator(), lg=AC.createGain(); o.type='sine'; o.frequency.value=f*(1+q*0.0015); l.frequency.value=4.5+q*0.7; lg.gain.value=f*0.005; l.connect(lg).connect(o.frequency); o.connect(g); o.start(t); o.stop(t+2.6); l.start(t); l.stop(t+2.6); }); break; }
     case 'chest_open': knock(220,0.12,0.35,4); [523,659,784,1047,1319].forEach((f,q)=>tone('triangle',f,f,0.4,0.06,0.05+q*0.06)); noise(4200,0.5,0.1,1,0.08,'highpass'); break;
     case 'throw': noise(600,0.18,0.25,1.2,0,'bandpass',1800); click(2600,0.15,0); break;
     case 'clink': knock(1900*r(),0.05,0.3,10); knock(2800*r(),0.04,0.15,10,0.01); break;
@@ -2983,6 +3021,8 @@ function sfx(k){
     case 'stone': noise(3400*r(),0.035,0.45,1.2); knock(1250*r(),0.05,0.3,9); noise(420,0.14,0.28,0.7,0.01,'lowpass',160); for(let q=0;q<4;q++) noise(2500+Math.random()*3000,0.015,0.08,3,0.04+q*0.025); break;
     case 'clang': [880,1320,1870].forEach((fq,q)=>tone('sine',fq*r(),fq*0.97,0.35-q*0.08,0.08)); noise(4200,0.04,0.2,1,0,'highpass'); break;
     case 'groan': zombieGroan(0.34); break;
+    case 'door_open': knock(180*r(),0.06,0.3,4); noise(500,0.35,0.12,2,0.04,'bandpass',300); tone('sawtooth',90*r(),70,0.3,0.012,0.05); break; // latch, then a creak
+    case 'door_close': knock(140*r(),0.1,0.45,4,0.05); knock(900,0.03,0.15,8); break;
     case 'screech': voice({f0:560*r(),f1:300,dur:0.8,vol:0.4,vowel:VOW.HAH,vowel2:VOW.AH,breath:0.9,fry:0.85,jitter:0.12,attack:0.02}); voice({f0:880*r(),f1:470,dur:0.6,vol:0.18,vowel:VOW.HAH,vowel2:VOW.ER,breath:0.8,fry:0.6,jitter:0.15,attack:0.02,delay:0.03}); noise(2600,0.55,0.16,1.2,0,'bandpass',3800); break;
     case 'zthrow': noise(700,0.22,0.3,1,0,'lowpass',260); voice({f0:140*r(),f1:95,dur:0.35,vol:0.3,vowel:VOW.HUH,vowel2:VOW.UH,breath:0.7,fry:0.8,jitter:0.07,attack:0.02,delay:0.3}); break;
     case 'splat': noise(420,0.22,0.5,0.9,0,'lowpass',120); knock(150*r(),0.08,0.3,3); for(let q=0;q<3;q++) noise(1800+Math.random()*1500,0.04,0.08,2,0.04+q*0.04); break;
@@ -4167,8 +4207,10 @@ function pressAction(a){
   else if(a==='crouch') P.crouch=true;
   else if(a==='emote') startEmote(settings.emote);
   else if(a==='map') toggleMap();
+  else if(a==='interact') useDown();
 }
 function releaseAction(a){
+  if(a==='interact') useUp();
   if(a==='aim') adsHeld=false;
   if(a==='fire') fireUp('desk');
   else if(a==='crouch') P.crouch=false;
@@ -4225,7 +4267,7 @@ addEventListener('contextmenu',e=>e.preventDefault());
 addEventListener('mousemove',e=>{
   if(isTouch||!playing||(!locked&&!lockFailed)) return;
   const s=0.0022*settings.sens*(1-0.4*adsK)*(scopeOn?0.45:1)*(edit?settings.editSens:1);
-  P.yaw-=e.movementX*s; P.pitch=Math.max(-1.45,Math.min(1.45,P.pitch-e.movementY*s));
+  if(isDead()) return; P.yaw-=e.movementX*s; P.pitch=Math.max(-1.45,Math.min(1.45,P.pitch-e.movementY*s));
 });
 addEventListener('blur',releaseAll);
 
@@ -4276,7 +4318,7 @@ canvas.addEventListener('pointerdown',e=>{
 canvas.addEventListener('pointermove',e=>{
   const t=tps.get(e.pointerId); if(!t) return; e.preventDefault();
   if(t.role==='look'){
-    const s=0.0058*settings.sens*(1-0.4*adsK)*(scopeOn?0.45:1)*(edit?settings.editSens:1); P.yaw-=(e.clientX-t.x)*s; P.pitch=Math.max(-1.45,Math.min(1.45,P.pitch-(e.clientY-t.y)*s)); t.x=e.clientX; t.y=e.clientY;
+    const s=isDead()?0:0.0058*settings.sens*(1-0.4*adsK)*(scopeOn?0.45:1)*(edit?settings.editSens:1); P.yaw-=(e.clientX-t.x)*s; P.pitch=Math.max(-1.45,Math.min(1.45,P.pitch-(e.clientY-t.y)*s)); t.x=e.clientX; t.y=e.clientY;
   } else if(t.role==='stick'){
     let dx=e.clientX-t.x0, dy=e.clientY-t.y0; const m=Math.hypot(dx,dy), max=52;
     if(m>max){ dx=dx/m*max; dy=dy/m*max; }
@@ -4307,9 +4349,11 @@ document.querySelectorAll('.tb').forEach(b=>{
     else if(act==='inventory') toggleInv();
     else if(act==='fire') fireDown('touch');
     else if(act==='emote') startEmote(settings.emote);
+    else if(act==='use') useDown();
   });
   const up=()=>{ b.classList.remove('down'); const act=b.dataset.act;
     if(act==='jump') touchJump=false;
+    else if(act==='use') useUp();
     else if(act==='fire') fireUp('touch'); };
   b.addEventListener('pointerup',up); b.addEventListener('pointercancel',up);
 });
@@ -4423,6 +4467,7 @@ function applyOp(o,quiet){
   else if(o.op==='hp'){ const p=pieces.get(o.key); if(p){ const d=o.d!=null?o.d:Math.max(0,p.hp-o.hp); p.dmgTaken=(p.dmgTaken||0)+d; p.hp=Math.min(p.hp,o.hp); if(d>0) hitLook(p); } }
   else if(o.op==='break'){ const p=pieces.get(o.key); if(p) destroyPiece(p,o.pt?new THREE.Vector3(o.pt[0],o.pt[1],o.pt[2]):null); }
   else if(o.op==='collapse'){ const list=(o.keys||[]).map(k=>pieces.get(k)).filter(Boolean); if(list.length) collapsePieces(list,o.c?new THREE.Vector3(o.c[0],o.c[1],o.c[2]):null); }
+  else if(o.op==='door'){ const p=pieces.get(o.key); if(p) toggleDoor(p,o.c,true,!!o.open,o.side||1); }
   else if(o.op==='shape'){ const p=pieces.get(o.key); if(p){ if(edit&&edit.piece===p) exitEdit(false); const nb0=[...(conn.get(p)||[])]; p.mask=o.mask; p.dir=o.dir; p.half=o.half; p.path=o.path||null; buildPiece(p); startAnim(p,140); popPlayerOut(); reshaped(p,nb0); } }
   else if(o.op==='clear') clearBuilds();
   else if(o.op==='pv'){ const p=props[o.id]; if(p&&p.alive){ p.hp=Math.min(p.hp,o.hp); p.wob=1; if(p.hp<=0) propBreak(p); } }
@@ -4785,9 +4830,16 @@ function rayBody(o,d,E){
 function piecesNearRay(o,d,range){
   const out=[];
   for(const p of order){ _c.subVectors(p.group.position,o); const t=_c.dot(d); if(t<-4||t>range+4) continue;
-    if(_c.addScaledVector(d,-t).lengthSq()<36) for(const m of p.group.children) out.push(m); }
+    if(_c.addScaledVector(d,-t).lengthSq()<36){ for(const m of p.group.children) out.push(m); if(p.doorMeshes) out.push(...p.doorMeshes); } }
   return out;
 }
+function rayBox(o,d,b){ let t0=-1e9, t1=1e9; const O=[o.x,o.y,o.z], D=[d.x,d.y,d.z];
+  for(let a=0;a<3;a++){ const lo=b[a], hi=b[a+3]; if(Math.abs(D[a])<1e-9){ if(O[a]<lo||O[a]>hi) return -1; continue; } let ta=(lo-O[a])/D[a], tb=(hi-O[a])/D[a]; if(ta>tb){ const s_=ta; ta=tb; tb=s_; } if(ta>t0) t0=ta; if(tb<t1) t1=tb; if(t0>t1) return -1; }
+  return t0; }
+function boxShot(o,d,range,nearT){ let best=null;
+  for(const p of order){ if(!p.boxes||!p.boxes.length) continue; _c.subVectors(p.group.position,o); const t=_c.dot(d); if(t<-4||t>range+4||_c.addScaledVector(d,-t).lengthSq()>36) continue;
+    for(const b of p.boxes){ const tb=rayBox(o,d,b); if(tb>=nearT&&tb<=range&&(!best||tb<best.t)) best={t:tb,p}; } }
+  return best; }
 function castShot(o,d,range,nearT,target){
   ray.set(o,d); ray.near=nearT; ray.far=range;
   const hits=ray.intersectObjects(piecesNearRay(o,d,range),false);
@@ -4795,8 +4847,10 @@ function castShot(o,d,range,nearT,target){
   const ph=hits.length?hits[0]:null;
   let bh=null, who=null;
   for(const tg of (Array.isArray(target)?target:target?[target]:[])){ const h=rayBody(o,d,tg); if(h&&h.t>=nearT&&(!bh||h.t<bh.t)){ bh=h; who=tg; } }
-  if(bh&&bh.t<=range&&(!ph||bh.t<ph.distance)) return {kind:'body',t:bh.t,head:bh.head,who,point:o.clone().addScaledVector(d,bh.t)};
-  if(ph) return {kind:'piece',t:ph.distance,piece:ph.object.userData.piece,point:ph.point.clone()};
+  const bx=boxShot(o,d,range,nearT); let pt=ph?ph.distance:Infinity, pp=ph?ph.object.userData.piece:null;
+  if(bx&&bx.t<pt-0.02){ pt=bx.t; pp=bx.p; }
+  if(bh&&bh.t<=range&&bh.t<pt) return {kind:'body',t:bh.t,head:bh.head,who,point:o.clone().addScaledVector(d,bh.t)};
+  if(pp) return {kind:'piece',t:pt,piece:pp,point:o.clone().addScaledVector(d,pt)};
   return {kind:'none',t:range,point:o.clone().addScaledVector(d,range)};
 }
 function damagePiece(p,dmg,point){
@@ -4962,10 +5016,10 @@ function playerHurt(dmg,from){
    Waves of zombies walk in from the edges toward the nearest player, claw through any build in their way and chew
    the bottom out of towers. Build a fort between waves. In a room the host's game runs the zombies for everyone. */
 const ZT={ // the purple creatures: lurching Walkers, skinny crawling Runners, huge Brutes and Hurlers that throw pieces of themselves
-  husk:  {name:'Walker',hp:110,spd:0.56,dmg:12,bld:16,sc:1,   body:0x6c4a8f,light:0x9a77c4,dark:0x1c0b26,vein:0x341444,wound:0xd0287e,core:0xff6ad2,claw:0xe9ddf4,pts:1},
-  runner:{name:'Runner',hp:70, spd:0.98,dmg:8, bld:10,sc:0.95,body:0x8a68b5,light:0xb998e0,dark:0x221030,vein:0x3d1a52,wound:0xc23aa8,core:0xffa6f4,claw:0xf2e8fa,pts:1},
-  brute: {name:'Brute', hp:520,spd:0.42,dmg:30,bld:55,sc:1.45,body:0x4b2a70,light:0x6f4a9c,dark:0x13071c,vein:0x26103a,wound:0xd2401e,core:0xff9a3c,claw:0xd8c8e8,pts:3},
-  hurler:{name:'Hurler',hp:95, spd:0.5, dmg:10,bld:14,sc:1.05,body:0x5f4a86,light:0x8f78b8,dark:0x170b22,vein:0x2c1a40,wound:0x6fd62a,core:0xc8ff5a,claw:0xe4f2d0,pts:2,throwDmg:20,throwBld:60}
+  husk:  {name:'Walker',hp:110,spd:0.56,dmg:12,bld:10,sc:1,   body:0x6c4a8f,light:0x9a77c4,dark:0x1c0b26,vein:0x341444,wound:0xd0287e,core:0xff6ad2,claw:0xe9ddf4,pts:1},
+  runner:{name:'Runner',hp:70, spd:0.98,dmg:8, bld:6, sc:0.95,body:0x8a68b5,light:0xb998e0,dark:0x221030,vein:0x3d1a52,wound:0xc23aa8,core:0xffa6f4,claw:0xf2e8fa,pts:1},
+  brute: {name:'Brute', hp:520,spd:0.42,dmg:30,bld:32,sc:1.45,body:0x4b2a70,light:0x6f4a9c,dark:0x13071c,vein:0x26103a,wound:0xd2401e,core:0xff9a3c,claw:0xd8c8e8,pts:3},
+  hurler:{name:'Hurler',hp:95, spd:0.5, dmg:10,bld:8, sc:1.05,body:0x5f4a86,light:0x8f78b8,dark:0x170b22,vein:0x2c1a40,wound:0x6fd62a,core:0xc8ff5a,claw:0xe4f2d0,pts:2,throwDmg:20,throwBld:35}
 };
 const ZCODE=['husk','runner','brute','hurler'];
 var horde={on:false,wave:0,phase:'idle',t:0,toSpawn:0,spawnT:0,kills:0,zs:new Map(),nextId:1,sendT:0,downT:0,best:0};
@@ -5078,42 +5132,44 @@ function makeZombie(type,variant){
   // arms: long slim blades hanging low from the shoulders, a notch in the edge, three hooked claws at the end
   R.armL=grp(R.spine,-.19*G*S,.6,0); R.armR=grp(R.spine,.19*G*S,.6,0);
   R.armL0=R.armR0=-K.tilt*0.92+(thin?0.15:0.12); // hang down (a little forward) whatever the hunch
-  const L=K.L, Wd=K.W, th=brute?.026:.016;
-  for(const [A,s] of [[R.armL,-1],[R.armR,1]]){
-    const sh=new THREE.Shape();
-    sh.moveTo(-.02,.05); sh.quadraticCurveTo(Wd*.4,.03,Wd*.6,-.1);
-    sh.lineTo(Wd,-L*.48); sh.lineTo(Wd*.72,-L*.56); sh.lineTo(Wd*.86,-L*.64);
-    sh.quadraticCurveTo(Wd*.66,-L*.88,Wd*.22,-L*.97);
-    sh.lineTo(Wd*.05,-L*.9); sh.quadraticCurveTo(-.02,-L*.55,-.045,-.1); sh.lineTo(-.02,.05);
-    const bg=new THREE.ExtrudeGeometry(sh,{depth:th,bevelEnabled:true,bevelThickness:.01,bevelSize:.009,bevelSegments:2,curveSegments:8}); bg.translate(0,0,-th/2);
-    const vs=new THREE.Shape(); vs.moveTo(0,-.1); vs.quadraticCurveTo(Wd*.45,-L*.4,Wd*.3,-L*.82); vs.lineTo(Wd*.26,-L*.82); vs.quadraticCurveTo(Wd*.36,-L*.4,-.012,-.1);
-    const vg=new THREE.ExtrudeGeometry(vs,{depth:.003,bevelEnabled:false});
-    if(s<0){ mirrorX(bg); mirrorX(vg); }
-    tint(bg,(x,y)=>1-0.5*Math.pow(Math.min(1,Math.max(0,-y/L)),1.3));
-    const fg=sub(A,0,0,0); fg.rotation.y=s*0.28;
-    part(bg,body,fg); part(vg,vein,fg,0,0,-(th/2+.012));
-    for(let q=0;q<3;q++){ const c=sub(fg,s*Wd*(.08+q*.07),-L*(.92+q*.015),0); c.rotation.set(-0.5-q*.1,0,s*(q-1)*.25);
+  const L=K.L, Wd=K.W, th=brute?.026:.016, U=L*0.48, F=L-U;
+  // each arm: an upper blade from the shoulder to the elbow, and a forearm blade (its own joint) down to the hooked claws
+  R.foreL=grp(R.armL,0,-U,0); R.foreR=grp(R.armR,0,-U,0); R.elbow0=thin?0.25:0.32;
+  const ex=sh=>{ const g_=new THREE.ExtrudeGeometry(sh,{depth:th,bevelEnabled:true,bevelThickness:.01,bevelSize:.009,bevelSegments:2,curveSegments:8}); g_.translate(0,0,-th/2); return g_; };
+  for(const [A,Fo,s] of [[R.armL,R.foreL,-1],[R.armR,R.foreR,1]]){
+    const su=new THREE.Shape(); su.moveTo(-.02,.05); su.quadraticCurveTo(Wd*.4,.03,Wd*.6,-.1); su.lineTo(Wd*.92,-U-.04); su.lineTo(-.04,-U-.04); su.lineTo(-.045,-.1); su.lineTo(-.02,.05);
+    const sf=new THREE.Shape(); sf.moveTo(-.04,.04); sf.lineTo(Wd*.92,.04); sf.lineTo(Wd,-F*.02); sf.lineTo(Wd*.72,-F*.15); sf.lineTo(Wd*.86,-F*.31);
+    sf.quadraticCurveTo(Wd*.66,-F*.77,Wd*.22,-F*.94); sf.lineTo(Wd*.05,-F*.8); sf.quadraticCurveTo(-.02,-F*.4,-.04,.04);
+    const vu=new THREE.Shape(); vu.moveTo(0,-.1); vu.quadraticCurveTo(Wd*.45,-U*.6,Wd*.4,-U); vu.lineTo(Wd*.36,-U); vu.quadraticCurveTo(Wd*.37,-U*.6,-.012,-.1);
+    const vf=new THREE.Shape(); vf.moveTo(Wd*.4,0); vf.quadraticCurveTo(Wd*.46,-F*.4,Wd*.3,-F*.72); vf.lineTo(Wd*.27,-F*.72); vf.quadraticCurveTo(Wd*.38,-F*.4,Wd*.36,0);
+    const bu=ex(su), bf=ex(sf), gu=new THREE.ExtrudeGeometry(vu,{depth:.003,bevelEnabled:false}), gf=new THREE.ExtrudeGeometry(vf,{depth:.003,bevelEnabled:false});
+    if(s<0){ mirrorX(bu); mirrorX(bf); mirrorX(gu); mirrorX(gf); }
+    tint(bu,(x,y)=>1-0.2*Math.min(1,Math.max(0,-y/U))); tint(bf,(x,y)=>0.8-0.32*Math.pow(Math.min(1,Math.max(0,-y/F)),1.3));
+    const fu=sub(A,0,0,0); fu.rotation.y=s*0.28; part(bu,body,fu); part(gu,vein,fu,0,0,-(th/2+.012));
+    const ff=sub(Fo,0,0,0); ff.rotation.y=s*0.28; part(bf,body,ff); part(gf,vein,ff,0,0,-(th/2+.012));
+    part(ls,body,Fo,s*Wd*.42,0,0).scale.set(Wd*1.05+.04,.12*G,.09*G); // the elbow knuckle, covering the joint
+    for(let q=0;q<3;q++){ const c=sub(ff,s*Wd*(.08+q*.07),-F*(.84+q*.03),0); c.rotation.set(-0.5-q*.1,0,s*(q-1)*.25);
       part(lathe([[.016*G,0],[.012*G,-.06],[.006*G,-.13],[.001,-.19-q*.02]],1,6,[-0.9,0],false),claw,c); }
-    if(rnd()<(brute?0.9:0.6)) gash(fg,s*Wd*(.3+rnd()*.3),-L*(.25+rnd()*.4),-(th/2+.01),.06*G,.13+rnd()*.06,0,(rnd()-.5)); }
-  if(hurl){ // the chunk it is about to throw, shown in its right hand while it winds up
-    const lump=new THREE.Mesh(makeZombie.ls,new THREE.MeshBasicMaterial({color:T.core})); lump.scale.setScalar(.2*G); lump.position.set(Wd*.15,-L*.86,-.06); lump.visible=false; R.armR.add(lump); R.lump=lump; }
+    if(rnd()<(brute?0.9:0.6)){ const up_=rnd()<.5; gash(up_?fu:ff,s*Wd*(.3+rnd()*.3),up_?-U*(.3+rnd()*.5):-F*(.2+rnd()*.45),-(th/2+.01),.06*G,.13+rnd()*.06,0,(rnd()-.5)); } }
   // its own random holes: on the chest and flanks, through the back, and one or two on the legs
   const nT=brute?6:thin?3:4;
   for(let k=0;k<nT;k++){ const front=rnd()<0.7, a=front?(rnd()-.5)*1.6:(rnd()<.5?-1:1)*(1.3+rnd()*1.2), y=.1+rnd()*.5;
     gashOn(R.spine,tprof,.62,y,a,(.09+rnd()*.09)*G,.14+rnd()*.2); }
   for(let k=0,n=rnd()<0.6?1:2;k<n;k++){ const Lg=rnd()<.5?R.legL:R.legR, tp=Lg.children.find(c=>c.rotation&&c.rotation.x>0)||Lg; gashOn(tp,thP,.86,-lt*(.3+rnd()*.4),(rnd()-.5)*1.4,.07*G,.13+rnd()*.08); }
+  if(hurl){ // the chunk it is about to throw, shown in its right hand while it winds up
+    const lump=new THREE.Mesh(makeZombie.ls,new THREE.MeshBasicMaterial({color:T.core})); lump.scale.setScalar(.2*G); lump.position.set(Wd*.15,-F*.76,-.06); lump.visible=false; R.foreR.add(lump); R.lump=lump; }
   // fold every helper group's meshes into the joint above it (innermost first), so each joint bakes to one mesh
   for(let i=aux.length-1;i>=0;i--){ const q=aux[i], P_=q.parent; q.updateMatrix();
     [...q.children].forEach(c=>{ c.updateMatrix(); c.matrix.premultiply(q.matrix); c.matrix.decompose(c.position,c.quaternion,c.scale); P_.add(c); }); P_.remove(q); }
   // the hitbox, measured from the model at rest (per kind, unscaled): skull, flame base, and spheres up the legs and spine
-  if(!T.hit){ R.armL.rotation.set(R.armL0,0,-.12); R.armR.rotation.set(R.armR0,0,.12); g.updateMatrixWorld(true); // the idle pose
+  if(!T.hit){ R.armL.rotation.set(R.armL0,0,-.12); R.armR.rotation.set(R.armR0,0,.12); R.foreL.rotation.x=R.foreR.rotation.x=R.elbow0; g.updateMatrixWorld(true); // the idle pose
     const head=[], body=[], add=(L,o,x,y,z,r)=>{ const p=o.localToWorld(new THREE.Vector3(x,y,z)); L.push([+p.y.toFixed(3),+(-p.z).toFixed(3),+r.toFixed(3),+p.x.toFixed(3)]); };
     // head: the skull, up the long head, into the flames
     for(const [y,r] of [[.12,.1],[.28,.09],[.46,.095],[.66,.095],[.86,.075]]) add(head,R.head,0,y,0,r*G*K.hs+.02);
     // body: each bent leg, the spine (as wide as the torso there), each arm blade
     for(const Lg of [R.legL,R.legR]) for(let k=0;k<=6;k++){ const t=k/6, y=t<.5?footY+(kneeY-footY)*t*2:kneeY*(1-(t-.5)*2), zz=t<.5?-K.knee*t*2:-K.knee*(1-(t-.5)*2); add(body,Lg,0,y,zz,.1*G); }
     for(let y=-.1;y<=.76;y+=.11) add(body,R.spine,0,y,0,rAt(tprof,y)*.88+.02);
-    for(const [A,s_] of [[R.armL,-1],[R.armR,1]]) for(let k=1;k<=6;k++) add(body,A,s_*Wd*.45,-L*k/6.4,0,Math.max(.075,Wd*.7));
+    for(const [A,Fo,s_] of [[R.armL,R.foreL,-1],[R.armR,R.foreR,1]]){ for(let k=1;k<=3;k++) add(body,A,s_*Wd*.45,-U*k/3,0,Math.max(.075,Wd*.7)); for(let k=1;k<=3;k++) add(body,Fo,s_*Wd*.45,-F*k/3.2,0,Math.max(.075,Wd*.7)); }
     if(brute) add(body,R.spine,0,.55,.1*G,.27*G);
     if(hurl) add(body,R.spine,.15*G,.55,0,.15*G);
     T.hit={head,body,top:Math.max(...head.map(h=>h[0]))}; }
@@ -5344,18 +5400,23 @@ function animateZombie(z,dt){
     if(z.throwQ&&z.thr<=0.3){ const hp=new THREE.Vector3(); R.lump.getWorldPosition(hp); spawnGoo(hp,z.throwQ.v,z.throwQ.real); z.throwQ=null; } }
   if(R.lump) R.lump.visible=z.thr>0.3;
   // legs: Walkers drag the right leg, Runners gallop, Brutes stomp
-  if(ty==='husk'){ R.legL.rotation.x=s*0.55*mv; R.legR.rotation.x=-0.22*mv-s*0.16*mv; R.hips.position.y=R.hipY-0.07*Math.max(0,-s)*mv; R.hips.rotation.z=s*0.15*mv; }
-  else if(run){ R.legL.rotation.x=s*0.8*mv; R.legR.rotation.x=-s*0.8*mv; R.hips.position.y=R.hipY+Math.abs(c)*0.07*mv; R.hips.rotation.z=s*0.05*mv; }
-  else { const a=ty==='brute'?0.42:0.5; R.legL.rotation.x=s*a*mv; R.legR.rotation.x=-s*a*mv; R.hips.position.y=R.hipY+Math.abs(c)*(ty==='brute'?0.06:0.04)*mv; R.hips.rotation.z=s*0.1*mv; }
+  if(ty==='husk'){ R.legL.rotation.x=s*0.55*mv; R.legR.rotation.x=-0.22*mv-s*0.16*mv; R.hips.position.y=R.hipY-0.07*Math.max(0,-s)*mv; }
+  else if(run){ R.legL.rotation.x=s*0.8*mv; R.legR.rotation.x=-s*0.8*mv; R.hips.position.y=R.hipY+Math.abs(c)*0.07*mv; }
+  else { const a=ty==='brute'?0.42:0.5; R.legL.rotation.x=s*a*mv; R.legR.rotation.x=-s*a*mv; R.hips.position.y=R.hipY+Math.abs(c)*(ty==='brute'?0.06:0.04)*mv; }
+  // weight shift: the hips slide over the leg that's down and tip a little; the legs stay planted (they counter the tip)
+  // and the spine leans back the other way, so the body stays over the feet instead of rocking side to side
+  const roll=(ty==='husk'?0.07:ty==='brute'?0.06:run?0.025:0.05)*s*mv; R.hips.rotation.z=roll; R.legL.rotation.z=-roll; R.legR.rotation.z=-roll; R.hips.position.x=-s*(ty==='brute'?0.06:0.04)*mv;
   // spine: the hunch, a lurch on each step, rearing back to strike, snapping forward, rearing up to screech
   const lurch=ty==='husk'?0.14*Math.max(0,s)*mv:ty==='brute'?0.08*Math.abs(s)*mv:run?0.06*c*mv:0.05*Math.max(0,s)*mv;
   R.spine.rotation.x=R.tilt-lurch+raise*0.32-strike*0.42+scr*(run?0.7:0.4)+thW*0.25-thF*0.35;
-  R.spine.rotation.y=(ty==='brute'?s*0.12*mv:0)-thW*0.45+thF*0.35; R.spine.rotation.z=Math.sin(z.walk*0.5)*0.08;
+  R.spine.rotation.y=(ty==='brute'?s*0.12*mv:0)-thW*0.45+thF*0.35; R.spine.rotation.z=-roll*0.85;
   // arms: hang and sway (Runners paw the ground like front legs), go up on the wind-up, rake down on the strike, fling out to screech
   const aB=R.armL0, sw=run?0.9*mv:0.14+0.12*mv;
   R.armL.rotation.x=aB+(run?-s*sw:Math.sin(z.walk*0.9)*sw)+raise*2.3-strike*0.3;
   R.armR.rotation.x=aB+(run?s*sw:-Math.sin(z.walk*0.9+0.6)*sw)+raise*2.0-strike*0.3-thW*2.7+thF*1.4;
   R.armL.rotation.z=-0.12-raise*0.25-scr*0.9; R.armR.rotation.z=0.12+raise*0.25+scr*0.9+thW*0.3;
+  if(R.foreL){ const lag=run?0.5*Math.max(0,s)*mv:0.18*Math.max(0,Math.sin(z.walk*0.9-0.8))+0.12*mv, lagR=run?0.5*Math.max(0,-s)*mv:0.18*Math.max(0,-Math.sin(z.walk*0.9+0.6-0.8))+0.12*mv;
+    R.foreL.rotation.x=R.elbow0+lag+raise*0.9-strike*0.55+scr*0.3; R.foreR.rotation.x=R.elbow0+lagR+raise*0.9-strike*0.55+scr*0.3+thW*1.3-thF*0.8; }
   // lunge: the whole body thrusts toward you on the strike
   const lg=strike*(run?0.6:0.35)*z.sc; g.position.x-=Math.sin(z.yaw)*lg; g.position.z-=Math.cos(z.yaw)*lg;
   // head: jutting forward, twitching; thrown back to screech
@@ -5551,11 +5612,11 @@ function chestMesh(){
     put(body,rbox(1.03,.06,.645,.02),Au,0,.04,0); put(body,rbox(1.03,.05,.645,.02),Au,0,.47,0); [-.36,.36].forEach(x=>put(body,rbox(.07,.52,.65,.02),Au,x,.25,0));
     const top=new THREE.CylinderGeometry(.31,.31,1.0,18,1,false,0,Math.PI); top.rotateZ(Math.PI/2); put(lid,top,W,0,0,-.31);
     [-.36,.36].forEach(x=>{ const g=new THREE.CylinderGeometry(.325,.325,.07,18,1,false,0,Math.PI); g.rotateZ(Math.PI/2); put(lid,g,Au,x,0,-.31); });
-    put(lid,rbox(.16,.18,.05,.02),Au,0,-.02,-.63); put(lid,rbox(.05,.06,.06,.01),Dk,0,-.06,-.65);
+    put(lid,rbox(.16,.18,.05,.02),Au,0,-.02,-.63); put(lid,rbox(.98,.025,.6,.008),Dk,0,.012,-.31); put(lid,rbox(.05,.06,.06,.01),Dk,0,-.06,-.65);
     chestMats.bodyGeo=bakeGeo(body,true); chestMats.lidGeo=bakeGeo(lid,true); }
   const M=chestMats, g=new THREE.Group();
   const b=new THREE.Mesh(M.bodyGeo,M.body); b.castShadow=b.receiveShadow=true; g.add(b);
-  const lid=new THREE.Group(); lid.position.set(0,.5,.31); g.add(lid); const l=new THREE.Mesh(M.lidGeo,M.body); l.castShadow=true; lid.add(l); // hinged at the back
+  const lid=new THREE.Group(); lid.position.set(0,.5,.31); g.add(lid); if(!M.lidMat){ M.lidMat=M.body.clone(); M.lidMat.side=THREE.DoubleSide; } const l=new THREE.Mesh(M.lidGeo,M.lidMat); l.castShadow=true; lid.add(l); // hinged at the back
   const glow=new THREE.Sprite(M.glow.clone()); glow.scale.setScalar(2.4); glow.position.y=.55; g.add(glow);
   return {g,lid,glow};
 }
@@ -5589,9 +5650,21 @@ function requestChest(c){
   if(net.role==='client'){ if(!c.pending){ c.pending=true; netSend({type:'chest',d:c.id}); setTimeout(()=>{ c.pending=false; },1500); } return; }
   openChest(c,true);
 }
-let chestHumT=0, chestNear=null;
+let chestHumT=0, chestNear=null, useHeld=false, useTgt=null;
+function useDown(){ useHeld=true; const t=useTgt; if(!t||isDead()) return;
+  if(t.kind==='drop'){ const d=t.d; if(!canTake(d)){ if(performance.now()-fullToastT>1500){ fullToastT=performance.now(); toast('Inventory full – press '+codeName(settings.binds.inventory||'Tab')+' to swap'); } return; } takeDrop(d,null); }
+  else if(t.kind==='door') toggleDoor(t.p,t.c,false); }
+function useUp(){ useHeld=false; }
+function findUseTarget(){
+  if(!playing||isDead()||edit||invOpen) return null;
+  const fx=-Math.sin(P.yaw), fz=-Math.cos(P.yaw); let best=null, bs=1e9;
+  const consider=(x,y,z,r,o)=>{ const dx=x-P.pos.x, dz=z-P.pos.z, d=Math.hypot(dx,dz); if(d>r||Math.abs(y-P.pos.y)>1.8) return; const face=d>0.05?(dx*fx+dz*fz)/d:1, s=d-face*0.9; if(s<bs){ bs=s; best=o; } };
+  for(const c of chests) if(!c.open&&c.g.visible) consider(c.x,c.y,c.z,2.4,{kind:'chest',c,label:'Open chest'});
+  drops.forEach(d=>{ if(AMMO_T[d.item]||d.pending||(!d.landed&&d.t<0.4)) return; consider(d.pos.x,d.pos.y,d.pos.z,1.9,{kind:'drop',d,label:'Pick up '+itemInfo(d.item).name+(isWeapon(d.item)&&d.item!=='nade'?'':' ×'+d.n)}); });
+  near(P.pos.x,P.pos.z,1).forEach(p=>{ if(!p.doors) return; p.doors.forEach((dr,c)=>{ if(!dr) return; const q=doorCenter(p,c); consider(q.x,q.y-1.2,q.z,2.4,{kind:'door',p,c,label:dr.open?'Close door':'Open door'}); }); });
+  return best; }
 function stepChests(dt){
-  chestHumT-=dt; let best=null, bd=16;
+  chestHumT-=dt; let best=null, bd=9; useTgt=findUseTarget();
   const bar=$('chestBar'); let showing=false;
   for(const c of chests){
     const dx=c.x-P.pos.x, dz=c.z-P.pos.z, d=Math.hypot(dx,dz); if(d>90){ c.g.visible=d<130; continue; } c.g.visible=true;
@@ -5599,12 +5672,15 @@ function stepChests(dt){
     const [gy]=groundAt(c.x,c.z,c.y+0.3,near(c.x,c.z)); if(gy<c.y-0.01){ c.vy-=22*dt; c.y=Math.max(gy,c.y+c.vy*dt); } else { c.vy=0; c.y=gy; } c.g.position.y=c.y;
     c.lidA+=((c.open?1.95:0)-c.lidA)*Math.min(1,dt*9); c.lid.rotation.x=c.lidA;
     c.glow.visible=!c.open; if(!c.open){ c.glow.material.opacity=0.38+0.14*Math.sin(performance.now()/260+c.id); if(d<bd){ bd=d; best=c; } }
-    if(!c.open&&playing&&!isDead()&&d<2.1&&Math.abs(c.y-P.pos.y)<1.7){ c.prog+=dt/CHEST_OPEN_T; showing=true; $('chestB').style.width=Math.min(100,c.prog*100).toFixed(0)+'%'; if(c.prog>=1) requestChest(c); }
+    if(!c.open&&useTgt&&useTgt.c===c&&useHeld){ c.prog+=dt/CHEST_OPEN_T; if(c.prog>=1) requestChest(c); }
     else c.prog=Math.max(0,c.prog-dt*3);
     if(c.open&&net.role!=='client'){ c.respawnT-=dt; if(c.respawnT<=0&&d>12){ closeChest(c); if(net.role==='host') netSend({type:'chestReset',id:c.id}); } }
   }
-  if(bar.hidden===showing) bar.hidden=!showing;
-  if(best&&chestHumT<=0){ chestHumT=1.5; sfxAt('chest_hum',new THREE.Vector3(best.x,best.y+0.5,best.z)); }
+  // the prompt: what Interact would do here (and how far along opening a chest is)
+  showing=!!useTgt; if(showing){ const lt=useTgt.kind==='chest'&&useTgt.c.prog>0?'Opening chest':useTgt.label; if($('useT').textContent!==lt) $('useT').textContent=lt; const kl=codeName(settings.binds.interact||'KeyV'); if($('useK').textContent!==kl) $('useK').textContent=kl;
+    const pr=useTgt.kind==='chest'; $('usePB').hidden=!pr; if(pr) $('chestB').style.width=Math.min(100,useTgt.c.prog*100).toFixed(0)+'%'; }
+  if(bar.hidden===showing) bar.hidden=!showing; const tu=$('tUse'); if(tu&&tu.hidden===showing) tu.hidden=!showing;
+  if(best&&chestHumT<=0){ chestHumT=2.1; sfxAt('chest_hum',new THREE.Vector3(best.x,best.y+0.5,best.z)); }
   chestNear=best;
   // say where you are when you walk into a town
   const t=townAt(P.pos.x,P.pos.z,0); if(t!==P.town){ P.town=t; if(t&&playing) toast(t.name); }
@@ -5957,6 +6033,7 @@ function grant(item,n,swapSlot){
 let fullToastT=0;
 function autoPickup(){
   drops.forEach(d=>{ if(!d.landed&&d.t<0.4) return; if(d.pending) return;
+    if(!AMMO_T[d.item]) return; // guns, heals and grenades wait for Interact
     const dx=d.pos.x-P.pos.x, dz=d.pos.z-P.pos.z; if(dx*dx+dz*dz>1.5*1.5||Math.abs(d.pos.y-P.pos.y)>1.8) return;
     if(!canTake(d)){ if(isWeapon(d.item)&&performance.now()-fullToastT>3000){ fullToastT=performance.now(); toast('Inventory full – press '+codeName(settings.binds.inventory||'Tab')+' to swap'); } return; }
     takeDrop(d,null);
@@ -6008,7 +6085,7 @@ function zombieLoot(z){
 /* ---------- Tab inventory screen ---------- */
 var invOpen=false, invSel=0;
 function openInv(){
-  if(invOpen||!playing) return; invOpen=true; releaseAll(); fireHeld=false; adsHeld=false; P.vel.x*=0.3; P.vel.z*=0.3;
+  if(invOpen||!playing) return; invOpen=true; if(fireHeld) fireUp('desk'); fireHeld=false; adsHeld=false; heldPiece=null; // movement keys stay held: you keep moving
   $('inv').hidden=false; invSel=P.slot>=0?P.slot:0; renderInv();
   if(document.pointerLockElement) { invUnlocking=true; document.exitPointerLock(); }
 }
@@ -6016,13 +6093,14 @@ var invUnlocking=false;
 function closeInv(){ if(!invOpen) return; invOpen=false; cancelDrag(); $('inv').hidden=true; if(!isTouch&&!lockFailed){ try{ const r=canvas.requestPointerLock(); if(r&&r.catch) r.catch(()=>{}); }catch(e){} } }
 function toggleInv(){ invOpen?closeInv():openInv(); }
 function nearbyDrops(){ const a=[]; drops.forEach(d=>{ if(Math.hypot(d.pos.x-P.pos.x,d.pos.z-P.pos.z)<5&&Math.abs(d.pos.y-P.pos.y)<3) a.push(d); }); return a; }
+function slotKeyLabel(i){ return codeName(settings.binds[SLOT_BINDS[i]]||'').replace(' mouse','').replace(/ \((back|fwd)\)/,''); } // the same key label the hotbar shows
 function renderInv(){
   if(!invOpen) return;
   const slots=$('invSlots'); slots.innerHTML='';
   P.inv.forEach((id,i)=>{ const I=itemInfo(id), b=document.createElement('button'); b.type='button'; b.className='islot '+(id?'r-'+I.rarity:'empty')+(i===invSel?' sel':'')+(P.slot===i&&id?' eq':'');
     b.dataset.drop='slot'; b.dataset.i=i;
-    const sub=id?(isItem(id)||id==='nade'?'×'+countOf(id):RNAME[I.rarity]+' · '+(P.ammo[id]|0)+' / '+WEAPONS[id].mag+(WEAPONS[id].ammo?' · '+AMMO_T[WEAPONS[id].ammo].name:'')):'Empty';
-    b.innerHTML=`<span class="key">${i+2}</span>`+(id?`<svg viewBox="0 0 48 48">${iconOf(id)}</svg>`:'<span class="plus">+</span>')+`<b>${id?I.name:'Slot '+(i+2)}</b><small>${sub}</small>`;
+    const sub=id?(isItem(id)||id==='nade'?'×'+countOf(id):''):'Empty', kl=slotKeyLabel(i);
+    b.innerHTML=`<span class="key">${kl}</span>`+(id?`<svg viewBox="0 0 48 48">${iconOf(id)}</svg>`:'<span class="plus">+</span>')+`<b>${id?I.name:'Slot '+kl}</b>`+(sub?`<small>${sub}</small>`:'');
     b.addEventListener('pointerdown',e=>dragStart(e,{kind:'slot',i,where:'inv',el:b,click:()=>{ if(invSel===i&&P.inv[i]){ selectSlot(i); sfx('equip'); } invSel=i; renderInv(); }}));
     slots.appendChild(b); });
   $('invDrop').disabled=!P.inv[invSel];
@@ -6037,7 +6115,7 @@ function renderInv(){
   nb.forEach(d=>{ const lab=AMMO_T[d.item]?AMMO_T[d.item].name+' ammo ×'+d.n:itemInfo(d.item).name+(isWeapon(d.item)&&d.item!=='nade'?'':' ×'+d.n);
     const row=document.createElement('div'); row.className='nrow r-'+(AMMO_T[d.item]?'common':lootRarity(d.item));
     row.innerHTML=`<svg viewBox="0 0 48 48">${iconOf(d.item)||'<rect x="10" y="16" width="28" height="18" rx="3" fill="#'+(AMMO_T[d.item]?AMMO_T[d.item].col:0x888888).toString(16).padStart(6,'0')+'"/>'}</svg><span>${lab}</span>`;
-    const bt=document.createElement('button'); bt.type='button'; bt.className='btn'; bt.textContent=canTake(d)?'Take':'Swap into slot '+(invSel+2);
+    const bt=document.createElement('button'); bt.type='button'; bt.className='btn'; bt.textContent=canTake(d)?'Take':'Swap into slot '+slotKeyLabel(invSel);
     bt.addEventListener('click',()=>{ takeInto(d,canTake(d)?null:invSel); });
     row.addEventListener('pointerdown',e=>{ if(e.target.closest('button')) return; dragStart(e,{kind:'loot',d,el:row}); });
     row.appendChild(bt); nl.appendChild(row); });
@@ -6499,6 +6577,15 @@ $('bigmap').addEventListener('pointerdown',e=>{ e.preventDefault(); e.stopPropag
   syncModeCards();
 })();
 setTimeout(()=>queueIcons([...Object.keys(WEAPONS),...Object.keys(ITEMS),...Object.keys(AMMO_T)]),400); // icon pictures, a few a frame
+// Every material building and editing can show (the preview, edit tiles, all three materials, cracks, scaffold
+// lines, sparks, doors) is compiled once while you're on the menu, so the first wall or edit doesn't pause the game.
+function warmBuildShaders(){ try{ const g=new THREE.Group(), geo=new THREE.BoxGeometry(0.01,0.01,0.01), lg=new THREE.EdgesGeometry(geo), mats=[ghostMat,ghostBad,ghostDim,editPieceMat,tileMat,tileBadMat,tileHoverMat,tileSelMat,blueprintMat,buildGlowMat,sparkMat,hotSparkMat];
+  MAT_ORDER.forEach(m=>{ const M=matFor[m]; mats.push(M.wall,M.floor,M.tread,M.beam,M.cone,M.chip,...(crackMats[m]||[])); });
+  mats.forEach(m=>{ if(!m) return; const x=new THREE.Mesh(geo,m); x.castShadow=x.receiveShadow=true; g.add(x); });
+  [ghostLine.ok,ghostLine.bad,ghostLine.occ,...Object.values(scaffoldMat)].forEach(m=>g.add(new THREE.LineSegments(lg,m)));
+  const dm=new THREE.Mesh(doorGeo(true),doorMat({mat:'wood'})); g.add(dm);
+  g.position.copy(camera.position); scene.add(g); renderer.compile(scene,camera); scene.remove(g); }catch(e){ console.warn('shader warm-up skipped',e); } }
+setTimeout(warmBuildShaders,1500);
 initProps(); props.forEach(p=>{ if(townAt(p.x,p.z,6)){ p.gone=true; p.alive=false; p.g.visible=false; } }); syncMats();
 buildWorld(); initChests(); spawnFloorLoot();
 syncBot();
@@ -6570,7 +6657,7 @@ function pollPad(dt){
   if(playing){
     pad.lx=dz(gp.axes[0]||0); pad.ly=dz(gp.axes[1]||0);
     const rx=dz(gp.axes[2]||0), ry=dz(gp.axes[3]||0), curve=v=>v*Math.abs(v);
-    const am=(1-0.45*adsK)*(edit?settings.editSens:1); P.yaw-=curve(rx)*dt*3.6*settings.sens*am; P.pitch=Math.max(-1.45,Math.min(1.45,P.pitch-curve(ry)*dt*2.6*settings.sens*am));
+    const am=isDead()?0:(1-0.45*adsK)*(edit?settings.editSens:1); P.yaw-=curve(rx)*dt*3.6*settings.sens*am; P.pitch=Math.max(-1.45,Math.min(1.45,P.pitch-curve(ry)*dt*2.6*settings.sens*am));
     touchJump=btn(0)||(touchJump&&!up(0)&&false);
     if(down(10)||down(11)) P.crouch=!P.crouch;
     if(down(15)) cycleMaterial();
@@ -6588,7 +6675,7 @@ function pollPad(dt){
       const order=[-1].concat([0,1,2,3,4].filter(i=>P.inv[i])), cur=Math.max(0,order.indexOf(mode==='pick'?-1:P.slot));
       const go=i=>{ const sl=order[(i+order.length)%order.length]; if(sl<0) selectPick(); else selectSlot(sl); };
       if(down(5)) go(cur+1); if(down(4)) go(cur-1);
-      if(down(2)) startReload(); if(down(3)) toggleEdit(); if(down(1)) toggleBuild();
+      if(down(2)){ if(useTgt) useDown(); else startReload(); } if(up(2)) useUp(); if(down(3)) toggleEdit(); if(down(1)) toggleBuild();
     }
   }
   pad.prev=gp.buttons.map((b,i)=>btn(i));
@@ -6619,7 +6706,7 @@ function frame(now){
     }
   } else { P.vel.x*=0.8; P.vel.z*=0.8; }
   if(swingT>0) swingT-=dt;
-  stepClouds(dt); stepPick(dt); stepSpin(dt); stepProjs(dt); stepDrops(dt); stepProps(dt); if(playing||net.role) hordeUpdate(dt); stepDusk(dt); updateHordeHUD(); stepUse(dt); updateUseBar();
+  stepClouds(dt); stepDoors(dt); stepPick(dt); stepSpin(dt); stepProjs(dt); stepDrops(dt); stepProps(dt); if(playing||net.role) hordeUpdate(dt); stepDusk(dt); updateHordeHUD(); stepUse(dt); updateUseBar();
   stepGrass(dt); stepChests(dt); stepAnims(now); stepChunks(dt); stepFallers(dt); stepShakes(dt); stepPlayers(dt); stepTracers(dt); if(B&&B.active) animateBot(dt);
   if(!playing&&net.role==='host'&&B&&B.active){ botUpdate(dt); const n=Math.max(1,Math.ceil(dt/0.008)); for(let k=0;k<n;k++) physStep(dt/n,B); }
   if(net.role){ net.sendT-=dt; if(net.sendT<=0){ net.sendT=0.05; netSend(myState()); if(net.role==='host'&&B&&B.active) netSend(botState()); }

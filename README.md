@@ -54,10 +54,10 @@ Pick **Zombie horde** next to Play. You get 20 seconds to build a fort, then wav
 
 - **Walkers** lurch forward in surges, dragging their right leg.
 - **Runners** (from wave 2) are skinny and crouch almost on all fours, galloping with their arms like front legs.
-- **Hurlers** (from wave 3) have glowing growths on the right shoulder. They hang back 7–20 m, tear off a chunk and lob it at you: 20 damage on a direct hit, a bit less from the splash, and 60 to any build it hits, so walls protect you but get worn down.
+- **Hurlers** (from wave 3) have glowing growths on the right shoulder. They hang back 7–20 m, tear off a chunk and lob it at you: 20 damage on a direct hit, a bit less from the splash, and 35 to any build it hits, so walls protect you but get worn down.
 - **Brutes** (from wave 4) are huge, with a humped back, spiked shoulders and a small head.
 
-The first time one gets close it rears up and screeches. Before a swipe it rears back with its arms up, then lunges forward and rakes down, so you can see it coming. Hits are measured from the real models: the head and flames count as headshots, and the legs, body and arms are body shots. Hits splash purple. Their groans fade out quickly with distance. They have to be right next to you to hit you and can't claw through walls. Zombies claw through anything built in their way, and if you're up on a tower they go for the piece holding it up. A wave bar under the compass shows the wave and how many creatures are left, draining as you kill them, or the countdown to the next wave. It appears when something changes and fades out after a few seconds, then stays up and pulses orange in the last 5 seconds of a break. Clearing a wave gives you a 15-second break, 50 shield, 30 health, 3 bandages and 2 small shields. In a party the leader picks the mode and runs the zombies for everyone, and each player gets the points for their own kills; zombies get tougher and waves bigger with more players, and anyone who goes down is back in 3 seconds.
+Their arms bend at the elbow, and they waddle from the hips over whichever leg is down, so the body stays over the feet. They claw at builds and houses more weakly than before. The first time one gets close it rears up and screeches. Before a swipe it rears back with its arms up, then lunges forward and rakes down, so you can see it coming. Hits are measured from the real models: the head and flames count as headshots, and the legs, body and arms are body shots. Hits splash purple. Their groans fade out quickly with distance. They have to be right next to you to hit you and can't claw through walls. Zombies claw through anything built in their way, and if you're up on a tower they go for the piece holding it up. A wave bar under the compass shows the wave and how many creatures are left, draining as you kill them, or the countdown to the next wave. It appears when something changes and fades out after a few seconds, then stays up and pulses orange in the last 5 seconds of a break. Clearing a wave gives you a 15-second break, 50 shield, 30 health, 3 bandages and 2 small shields. In a party the leader picks the mode and runs the zombies for everyone, and each player gets the points for their own kills; zombies get tougher and waves bigger with more players, and anyone who goes down is back in 3 seconds.
 
 ## Towns, houses and chests
 Ten towns sit on the flattest lowland spots around the island (Rustwood, Pebble Point, Kettle Creek, Lantern Row, Mossy Mill, Hollow Hill, Cinder Flats, Brambleford, Copper Ridge and Willow Bend). Each is laid out on a grid: a main street and a cross street meet in the middle and split the town into four blocks. Six to eleven houses stand in rows along both streets on levelled ground, each facing its street with a front yard and a gap to its neighbours. The roads from other towns run in to the ends of the streets. A town's name pops up when you walk in.
@@ -66,7 +66,7 @@ Ten towns sit on the flattest lowland spots around the island (Rustwood, Pebble 
 - **Stairs.** Two-storey houses have a real staircase: 20 steps along an inside wall up to a landing, under a stairwell with a railing round it. You walk up it step by step.
 - **Farming.** Underneath, every house is still wood, brick or metal (siding is wood, stucco is brick, panels are metal). Pickaxe a house to farm that material, 4–8 a hit, and aim at a piece to see its health.
 - **Houses** are made of real build pieces, so you can shoot, pickaxe, crack and collapse them. **Clear builds**, or the start of a new round, puts them back.
-- **Chests.** Gold-banded chests sit in houses (some upstairs) and out in the wild. They hum and glow when you're close and show as gold squares on the minimap. Stand next to one for half a second and it bursts open, throwing out:
+- **Chests.** Gold-banded chests sit in houses (some upstairs) and out in the wild. They glow, give off a soft shimmering hum when you're within about 9 m, and show as gold squares on the minimap. Hold **Interact** (V, bindable) next to one for half a second and it bursts open, throwing out:
   - a gun (any rarity, with rarer ones less likely)
   - ammo for that gun
   - often a bonus: heals, grenades or extra ammo
@@ -80,7 +80,7 @@ Trees, pine trees, rocks and old cars are scattered around the map. They're soli
 
 ## Inventory, weapons and loot
 Every weapon's icon on the hotbar and in the inventory is a picture of the gun you actually hold, with its stock, magazine, sights, muzzle device and rarity trim. Bandages and shield potions have their own models too, on the ground and in your slots.
-You carry a pickaxe plus 5 slots (keys 2–6) that hold any weapon or item. Press **Tab** (bindable) to open the inventory. Everything is drag and drop:
+You carry a pickaxe plus 5 slots (keys 2–6 by default) that hold any weapon or item. Ammo is picked up just by walking over it; guns, heals and grenades wait for **Interact** (V), and the prompt says what you'll pick up. Press **Tab** (bindable) to open the inventory; you keep moving while it's open. Its slots show the same keys as your hotbar, and guns show just their picture and name (no ammo text). Everything is drag and drop:
 - Drag a slot onto another slot to move it there, or swap the two.
 - Drag a slot onto the drop area, or anywhere outside the panel, to drop it on the ground. Ammo works the same way.
 - Drag loot from the *On the ground nearby* list straight onto a slot. Whatever was in that slot is dropped in its place.
@@ -156,8 +156,9 @@ Multiplayer is peer-to-peer (WebRTC via [PeerJS](https://peerjs.com)), no server
 | Reload | T |
 | Switch material | X |
 | Full map | M |
+| Interact (open chests, pick up, open/close doors) | V |
 
-Every bind can be changed in the menu.
+Every bind can be changed in the menu. When there's something to interact with, a prompt shows the key and what it does. On a controller, X interacts when there's something to interact with and reloads otherwise; on touch screens a **Use** button appears.
 
 ## Building rules
 - **Preview.** Green outline: it will build. Red outline plus the reason underneath: *Already built*, *Nothing to attach to*, *Out of reach*, *Wall in the way*, *Player in the way*, *Build height limit* or *Edge of the map*. A grey outline means the spot is taken. Every placement (yours, the bot's, a joining player's) goes through the same validator, and in a party the host checks it again.
@@ -171,6 +172,9 @@ Every bind can be changed in the menu.
 - **Stair edits.** Four big squares plus Fortnite's thin center strip. Drag across two side-by-side squares for a half stair, three in an L for an L stair, or all four in a U for a spiral stair; each rises the way you drag. Drag straight across the center strip to turn the whole stair to rise that way. L and spiral stairs climb to half height, cross a landing at each turn and climb to the top.
 - **Editing.** Edits are named live as you pick tiles, and a pattern that isn't a real edit turns red until you fix it. Reset puts a wall, floor or roof back to its full shape, and turns a stair back into a full stair facing the way it faces now (not the way it was placed). It keeps the piece's health, owner and material, it never brings back pieces that already fell. Cancelling leaves it untouched. An edit that takes away the last support of something else is still allowed; that piece falls (the edited piece too, if it no longer touches anything). In Settings, **Who can edit builds** lets you choose between only the builder, the builder and teammates, or anyone. In a party the host's choice counts, and the host re-checks every edit's permission and shape. When a player leaves, their builds become editable by everyone.
 - **Your collision.** You're an upright capsule (a round footprint 0.68 m across, 1.8 m tall, 1.25 m crouched), so you fit through doors and arches, can't fit through a window even jumping, can jump over a low wall, fall through removed floor tiles, and bump your head on what's above you.
+- **Doors.** A wall edit that leaves a door opening (a door, side door or window door) gets a real door, and every house's front door is one too. Interact opens it (it swings away from you) or closes it. A closed door blocks you, the bot, creatures and shots like the wall around it; an open one doesn't. Doors open and close for everyone in a party.
+- **Reach.** A wall goes on the edge of the tile you're standing on, in the direction you look; floors, stairs and roofs go on the tile in front of you (or your own, looking down), so nothing lands far away.
+- **Shots and builds.** Bullets stop at a build's solid shape, so they can't slip through the hairline seams where pieces meet.
 - **Build limit.** Up to 1,500 of your own builds; past that your oldest build goes. The towns' houses don't count toward it.
 
 ### Where this approximates Fortnite

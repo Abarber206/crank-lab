@@ -1,7 +1,7 @@
 // two players: edits (arch, L stair) sync exactly; an edit that cuts support collapses on both screens; a forged shape is refused
 const {sleep,page,launch,open}=require('./h.js'); const {ExpressPeerServer}=require('peer'); const express=require('express'); const http=require('http');
 const app=express(), srv=http.createServer(app); app.use('/',ExpressPeerServer(srv,{path:'/'})); srv.listen(9102,'127.0.0.1');
-const html=page('/home/claude/crank-lab/index.html','scene,P,net,pieces,addPiece,beginEdit,exitEdit,paintTile,netOp,tryPlace,computeTarget,slabTop,makeBoxes,get edit(){return edit}',
+const html=page('/home/claude/crank-lab/index.html','scene,toggleDoor,P,net,pieces,addPiece,beginEdit,exitEdit,paintTile,netOp,tryPlace,computeTarget,slabTop,makeBoxes,get edit(){return edit}',
   '<script>window.CRANK_PEER_OPTS={host:"127.0.0.1",port:9102,path:"/",secure:false,config:{iceServers:[]}}</script>');
 (async()=>{ const b=await launch(); const R=[]; const ok=(n,p,d)=>R.push((p?'PASS ':'FAIL ')+n+' — '+JSON.stringify(d));
  const H=await open(b,html,{name:'H',fast:true,norender:true}), C=await open(b,html,{name:'C',fast:true,norender:true});
@@ -32,6 +32,12 @@ const html=page('/home/claude/crank-lab/index.html','scene,P,net,pieces,addPiece
  const hw=await edit(C.pg,wk,[6,7,8]);
  const gone=await wait(H.pg,k=>!T.pieces.has(k),fk)&&await wait(C.pg,k=>!T.pieces.has(k),fk);
  ok('a guest\'s edit that cuts the floor\'s support makes it fall on both screens',gone,{edit:hw});
+ // doors: a guest's door edit has a door; opening it on the guest opens it for the host too
+ const dk=await place(C.pg,{type:'wall',axis:'x',i:8,j:0,l:0,key:'wx8_0_0'}); await wait(H.pg,k=>T.pieces.has(k),dk);
+ await edit(C.pg,dk,[1,4]); await wait(H.pg,k=>T.pieces.get(k).doors&&T.pieces.get(k).doors[1],dk);
+ await C.pg.evaluate(k=>{ T.P.pos.set(38,0,2.5); T.toggleDoor(T.pieces.get(k),1,false); },dk);
+ const dopen=await wait(H.pg,k=>{ const p=T.pieces.get(k); return p&&p.doors&&p.doors[1]&&p.doors[1].open; },dk);
+ ok('a guest opens a door and it opens for the host too',dopen,{});
  // a forged impossible shape (top row hanging) is refused by the host and put back on the guest
  await C.pg.evaluate(k=>{ T.netOp({op:'shape',key:k,mask:0b111000111,dir:0,half:-1,path:null}); },wk);
  await sleep(3000);
