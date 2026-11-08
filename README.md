@@ -30,7 +30,13 @@ Your points and what you own are saved in this browser. Everyone in a party sees
 Characters have realistic proportions: an oval head with ears, nose, brows and natural eyes; a shaped torso; slim arms, hands and legs; and sneakers. Hair and headwear sit on the head properly. A pickaxe is carried angled up past the shoulder, and a swing throws the whole body: the hips turn with the chest, the knees dip on impact and the free arm pulls back.
 
 ## The map and materials
-The island is about 800 m across, ringed by mountains you can't climb past. The middle (about 40 m around spawn) is flat for build fights, and rolling hills rise all around it, getting taller toward the edge. You can walk and build anywhere: builds that touch the hillside count as supported, and on a slope a piece drops a level to meet the ground. Trees, pines, rocks and junk cars are scattered around the range, the same for everyone in a party. Pickaxe trees for wood, rocks for brick and cars for metal; they grow back 35–80 seconds after they're gone. Materials are infinite by default. Turn off **Infinite materials** in Settings and every piece costs 10 of the selected material: you start with 30 wood, your counts show on the right, and clearing a horde wave gives a bonus.
+The island is about 1.6 km across, closed in by a ring of big snow-capped mountains you can't climb past. The middle (about 40 m around spawn) is flat for build fights. Rolling hills spread out from it, four rocky mountain ranges (95–170 m high) rise inside the island, and the outer range climbs to about 450 m. Ten towns are joined by asphalt roads with white edge lines and a dashed yellow centre line, and one road runs from the build field to the nearest town. Hillsides turn to bare rock where they get steep, snow sits above the snowline, and the road shoulders are dirt. The map is generated from integer maths only, so every player in a party builds exactly the same mountains, towns, roads, trees and chests.
+
+You can walk and build anywhere: builds that touch the hillside count as supported, and on a slope a piece drops a level to meet the ground. About 520 trees, 520 pines (higher up), 220 rocks (on rocky ground) and 40 cars (25 parked along the roads) are scattered around. They keep off roads, towns and snow. Pickaxe trees for wood, rocks for brick and cars for metal; they grow back 35–80 seconds after they're gone. Materials are infinite by default. Turn off **Infinite materials** in Settings and every piece costs 10 of the selected material: you start with 30 wood, your counts show on the right, and clearing a horde wave gives a bonus.
+
+- **Minimap.** Shows the roads, sidewalks, town squares, builds, trees, chests and players around you, plus an arrow toward every town.
+- **Full map.** Press **M** (bindable) or tap the minimap for the whole island: hillshaded terrain, roads, towns, players and your arrow. Press M again, click or tap to close it.
+- **Terrain detail** is drawn in 128 m chunks at three levels of detail that follow the camera, so the whole island stays in view without slowing down.
 
 ## Look and performance
 - **Build materials** are painted with real relief: grain, knots and nail heads in wood; chipped, bevelled stone blocks in recessed mortar; and corrugated steel with rivets, scratches and rust streaks. A normal map makes each one catch the light, and metal has a soft sheen.
@@ -47,8 +53,12 @@ The island is about 800 m across, ringed by mountains you can't climb past. The 
 Pick **Zombie horde** next to Play. You get 20 seconds to build a fort, then waves of zombies walk in from every side. The horde is pale, rotting, bloodied zombies: Walkers, fast Runners (from wave 2) and big bloated Brutes (from wave 4). Their groans fade out quickly with distance. They have to be right next to you to hit you and can't claw through walls. Zombies claw through anything built in their way, and if you're up on a tower they go for the piece holding it up. Clearing a wave gives you a 15-second break, 50 shield, 30 health, 3 bandages and 2 small shields. In a party the leader picks the mode and runs the zombies for everyone, and each player gets the points for their own kills; zombies get tougher and waves bigger with more players, and anyone who goes down is back in 3 seconds.
 
 ## Towns, houses and chests
-Six small towns sit around the island (Rustwood, Pebble Point, Kettle Creek, Lantern Row, Mossy Mill and Hollow Hill), each with four to six houses on levelled ground. The minimap shows which way each town is, and its name pops up when you walk in.
-- **Houses.** They have doors, windows and pitched roofs, and many have a staircase up to a second floor. They're made of real build pieces, so you can shoot, pickaxe, crack and collapse them. **Clear builds**, or the start of a new round, puts them back.
+Ten towns sit on the flattest lowland spots around the island (Rustwood, Pebble Point, Kettle Creek, Lantern Row, Mossy Mill, Hollow Hill, Cinder Flats, Brambleford, Copper Ridge and Willow Bend). Each has three to six houses on levelled ground around a paved town square, with roads running in. The minimap shows which way each town is, and its name pops up when you walk in.
+- **Houses look like houses.** Outside they're painted lap siding, stucco with a stone plinth, or modern board-and-batten panels, in a range of colours, with trim round the windows and doors, shutters, a porch lamp and closed gable ends. Roofs are asphalt shingles or clay tiles. Inside there are painted walls with baseboards, hardwood floors and white ceilings.
+- **Sidewalks.** A concrete path runs from every front door to the town square.
+- **Stairs.** Two-storey houses have a real staircase: 20 steps along an inside wall up to a landing, under a stairwell with a railing round it. You walk up it step by step.
+- **Farming.** Underneath, every house is still wood, brick or metal (siding is wood, stucco is brick, panels are metal). Pickaxe a house to farm that material, 4–8 a hit, and aim at a piece to see its health.
+- **Houses** are made of real build pieces, so you can shoot, pickaxe, crack and collapse them. **Clear builds**, or the start of a new round, puts them back.
 - **Chests.** Gold-banded chests sit in houses (some upstairs) and out in the wild. They hum and glow when you're close and show as gold squares on the minimap. Stand next to one for half a second and it bursts open, throwing out:
   - a gun (any rarity, with rarer ones less likely)
   - ammo for that gun
@@ -134,6 +144,7 @@ Multiplayer is peer-to-peer (WebRTC via [PeerJS](https://peerjs.com)), no server
 | Pump shotgun | 3 |
 | Reload | T |
 | Switch material | X |
+| Full map | M |
 
 Every bind can be changed in the menu.
 
