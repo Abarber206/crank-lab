@@ -1131,10 +1131,13 @@ stepTerrain(SPAWN[0],SPAWN[2],true);
 })();
 
 /* ---------- roads: asphalt with white edge lines and a dashed yellow centre, plus a paved square in each town ---------- */
+let roadPlainTex=null;
 const roadTex=(()=>{ const W=128, Hh=512, c=document.createElement('canvas'); c.width=W; c.height=Hh; const g=c.getContext('2d');
   g.fillStyle='#4b4e53'; g.fillRect(0,0,W,Hh);
   for(let i=0;i<9000;i++){ const v=Math.random(); g.fillStyle=v<.5?'rgba(22,24,28,.35)':v<.9?'rgba(140,140,138,.22)':'rgba(200,196,186,.3)'; g.fillRect(Math.random()*W,Math.random()*Hh,1+Math.random(),1+Math.random()); }
   for(let i=0;i<14;i++){ const x=Math.random()*W, y=Math.random()*Hh, r=8+Math.random()*24, gr=g.createRadialGradient(x,y,0,x,y,r); gr.addColorStop(0,'rgba(30,30,32,.18)'); gr.addColorStop(1,'rgba(0,0,0,0)'); g.fillStyle=gr; g.fillRect(x-r,y-r,r*2,r*2); }
+  const pc=document.createElement('canvas'); pc.width=W; pc.height=Hh; pc.getContext('2d').drawImage(c,0,0); // the same asphalt without markings, for junctions
+  roadPlainTex=new THREE.CanvasTexture(pc); roadPlainTex.wrapS=roadPlainTex.wrapT=THREE.RepeatWrapping; roadPlainTex.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());
   g.fillStyle='rgba(236,236,230,.92)'; g.fillRect(6,0,3,Hh); g.fillRect(W-9,0,3,Hh);   // edge lines
   g.fillStyle='#e6c23c'; g.fillRect(W/2-2,0,4,Hh*0.5);                                // centre dash: half of every 12 m
   const t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy()); return t; })();
@@ -1143,23 +1146,30 @@ const ROAD_HW=3.6, roadMeshes=[];
 const roadHash=new Map(); WORLD.roads.forEach((rd,k)=>rd.pts.forEach(p=>{ const x=SPAWN[0]+p[0], z=SPAWN[2]+p[1], key=Math.floor(x/8)+','+Math.floor(z/8); let l=roadHash.get(key); if(!l){ l=[]; roadHash.set(key,l); } l.push([x,z,k]); }));
 function nearOther(k,x,z){ let best=1e9; const cx=Math.floor(x/8), cz=Math.floor(z/8);
   for(let a=-2;a<=2;a++) for(let b=-2;b<=2;b++){ const l=roadHash.get((cx+a)+','+(cz+b)); if(l) for(const [px,pz,kk] of l) if(kk!==k){ const d=Math.hypot(px-x,pz-z); if(d<best) best=d; } } return best; }
-WORLD.roads.forEach((rd,k)=>{ const p=rd.pts, n=p.length, pos=[], nor=[], uv=[], idx=[]; let s=0;
+// near a junction the lane markings fade out into plain asphalt (same texture, no lines), so crossings stay clean
+function roadOBC(sh){ sh.uniforms.plainMap={value:roadPlainTex};
+  sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nattribute float lines; varying float vLines;').replace('#include <begin_vertex>','#include <begin_vertex>\nvLines=lines;');
+  sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nuniform sampler2D plainMap; varying float vLines;')
+    .replace('#include <map_fragment>','vec4 texelColor=mix(texture2D(plainMap,vUv),texture2D(map,vUv),vLines); texelColor=mapTexelToLinear(texelColor); diffuseColor*=texelColor;'); }
+WORLD.roads.forEach((rd,k)=>{ const p=rd.pts, n=p.length, pos=[], nor=[], uv=[], idx=[], lines=[]; let s=0;
   let bx0=1e9, bz0=1e9, bx1=-1e9, bz1=-1e9;
   for(let q=0;q<n;q++){ const a=p[Math.max(0,q-1)], b=p[Math.min(n-1,q+1)]; let tx=b[0]-a[0], ty=b[2]-a[2], tz=b[1]-a[1]; const tl=Math.hypot(tx,tz)||1, sx=-tz/tl, sz=tx/tl;
     if(q>0) s+=Math.hypot(p[q][0]-p[q-1][0],p[q][2]-p[q-1][2],p[q][1]-p[q-1][1]);
     const x=SPAWN[0]+p[q][0], z=SPAWN[2]+p[q][1], y=p[q][2]+0.07;
     // normal: across the road is level, along it follows the grade
     let nx=-tx*ty, ny=tx*tx+tz*tz, nz=-tz*ty; const nl=Math.hypot(nx,ny,nz)||1;
-    const plain=nearOther(k,x,z)<10; // a junction or a shared stretch: plain asphalt, no lines
-    pos.push(x+sx*ROAD_HW,y,z+sz*ROAD_HW, x-sx*ROAD_HW,y,z-sz*ROAD_HW); nor.push(nx/nl,ny/nl,nz/nl,nx/nl,ny/nl,nz/nl); uv.push(plain?0.3:0,s/12,plain?0.3:1,s/12);
+    const ln=Math.min(1,Math.max(0,(nearOther(k,x,z)-8)/8)); // 0 at a junction, fading back to full markings 16 m out
+    const xl=x+sx*ROAD_HW, zl=z+sz*ROAD_HW, xr=x-sx*ROAD_HW, zr=z-sz*ROAD_HW; // each edge sits on the ground under it: no floating, no sinking
+    pos.push(xl,terrainH(xl,zl)+0.07,zl, xr,terrainH(xr,zr)+0.07,zr); nor.push(nx/nl,ny/nl,nz/nl,nx/nl,ny/nl,nz/nl); uv.push(0,s/12,1,s/12); lines.push(ln,ln);
     bx0=Math.min(bx0,x); bx1=Math.max(bx1,x); bz0=Math.min(bz0,z); bz1=Math.max(bz1,z); }
   for(let q=0;q<n-1;q++){
     const L0=q*2, R0=q*2+1, L1=q*2+2, R1=q*2+3;
     const up=(A,B,C)=>{ const ax=pos[B*3]-pos[A*3], az=pos[B*3+2]-pos[A*3+2], cx=pos[C*3]-pos[A*3], cz=pos[C*3+2]-pos[A*3+2]; return az*cx-ax*cz>0; };
     if(up(L0,L1,R0)) idx.push(L0,L1,R0); else idx.push(L0,R0,L1);
     if(up(R0,L1,R1)) idx.push(R0,L1,R1); else idx.push(R0,R1,L1); }
-  const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3)); g.setAttribute('normal',new THREE.Float32BufferAttribute(nor,3)); g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2)); g.setIndex(idx); g.computeBoundingSphere();
-  const m=new THREE.Mesh(g,new THREE.MeshLambertMaterial({map:roadTex,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-4*(4+k)}));
+  const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3)); g.setAttribute('normal',new THREE.Float32BufferAttribute(nor,3)); g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2)); g.setAttribute('lines',new THREE.Float32BufferAttribute(lines,1)); g.setIndex(idx); g.computeBoundingSphere();
+  const rm=new THREE.MeshLambertMaterial({map:roadTex,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-4*(4+k)}); rm.onBeforeCompile=roadOBC;
+  const m=new THREE.Mesh(g,rm);
   m.receiveShadow=true; m.matrixAutoUpdate=false; scene.add(m); roadMeshes.push(m);
   rd.box=[bx0-6,bz0-6,bx1+6,bz1+6]; });
 // (no round town squares: each town has a main street instead)
@@ -2672,20 +2682,16 @@ function beginEdit(p){
 function refreshTiles(){ edit.tiles.forEach(m=>{ const i=m.userData.idx; m.material=edit.sel.has(i)?(edit.bad?tileBadMat:tileSelMat):i===edit.hover?tileHoverMat:tileMat; }); updateEditLabel(); }
 // Is the current tile pattern a real edit? (walls/floors need one tile left, cones one corner down, ramps two tiles on one side)
 // Wall edit tiles: idx = row*3 + col, row 0 is the bottom. Only these shapes (and their mirror images) are allowed.
-/* Wall edits (tiles removed; idx = row*3 + col, row 0 is the bottom). Every Fortnite wall edit on the reference
-   sheets (windows, doors, arches, window-door, half walls, columns, 45-degree cuts, triangles...) leaves the
-   remaining tiles as one connected piece, and the selections Fortnite refuses (e.g. the whole middle row, which
-   would leave the top row hanging) don't. So that is the rule: keep at least one tile, and everything kept must
-   stay joined side to side. Known shapes get their names; any other valid one is a custom edit. */
-const WALL_SHAPES={'':'No change','4':'Window','3':'Side window','5':'Side window','3,5':'Double window','1,4':'Door','0,3':'Side door','2,5':'Side door','0,2,3,5':'Double door',
-  '0,1,2,4':'Arch','0,1,3,4':'Side arch','1,2,4,5':'Side arch','0,1,2,3,4,5':'Big arch','2,3,5':'Window door','0,3,5':'Window door',
-  '6,7,8':'Half wall','3,4,5,6,7,8':'Low wall','2,5,6,7,8':'Half wall door','0,3,6,7,8':'Half wall door','1,2,4,5,7,8':'Column','0,1,3,4,6,7':'Column','0,2,3,5,6,8':'Centre column',
-  '1,2,5':'45° cut','0,1,3':'45° cut','5,7,8':'Triangle','3,6,7':'Triangle','0,1,2':'Raised wall','0,2':'Door frame','4,7':'Notch','0':'Corner cut','2':'Corner cut','6':'Corner cut','8':'Corner cut'};
+/* Wall edits (tiles removed; idx = row*3 + col, row 0 is the bottom). Only the edits Fortnite really has (from the
+   reference sheets) and their mirror images; any other selection is refused, even if it would hold together. */
+const WALL_SHAPES={'':'No change','4':'Window','3':'Side window','5':'Side window','3,5':'Double window','1,4':'Door','0,3':'Side door','2,5':'Side door',
+  '0,1,2,4':'Arch','0,1,3,4':'Side arch','1,2,4,5':'Side arch','2,3,5':'Window door','0,3,5':'Window door',
+  '6,7,8':'Half wall','3,4,5,6,7,8':'Low wall','2,5,6,7,8':'Half wall door','0,3,6,7,8':'Half wall door','1,2,4,5,7,8':'Column','0,1,3,4,6,7':'Column',
+  '1,2,5':'45° cut','0,1,3':'45° cut','5,7,8':'Triangle','3,6,7':'Triangle',
+  '0,3,4,5,6,7,8':'Partial low wall','2,3,4,5,6,7,8':'Partial low wall','0,1,3,4,6,7,8':'Partial half wall','1,2,4,5,6,7,8':'Partial half wall'};
 const SLICED=new Set(['1,2,5','0,1,3','5,7,8','3,6,7']);
-function wallMaskValid(m){ if(!(m>0&&m<512)) return false;
-  let s=0; while(!(m>>s&1)) s++; const seen=new Set([s]), st=[s];
-  while(st.length){ const t=st.pop(), r=(t/3)|0, c=t%3; for(const [dr,dc] of [[1,0],[-1,0],[0,1],[0,-1]]){ const rr=r+dr, cc=c+dc, u=rr*3+cc; if(rr<0||rr>2||cc<0||cc>2||!(m>>u&1)||seen.has(u)) continue; seen.add(u); st.push(u); } }
-  let n=0; for(let i=0;i<9;i++) n+=m>>i&1; return seen.size===n; }
+const WALL_OK=new Set(Object.keys(WALL_SHAPES).filter(k=>k));
+function wallMaskValid(m){ if(!(m>0&&m<512)) return false; const r=[]; for(let i=0;i<9;i++) if(!(m>>i&1)) r.push(i); return r.length===0||WALL_OK.has(r.join(',')); }
 const selMask=(sel,full)=>{ let m=full; sel.forEach(i=>{ if(i<9) m&=~(1<<i); }); return m; };
 /* Stair edits: 2x2 big squares (idx = row*2 + col, row along +z, col along +x) and, as in Fortnite, a thin centre
    strip between them (4: between 0 and 1, 5: between 2 and 3, 6: between 0 and 2, 7: between 1 and 3).
@@ -2720,8 +2726,8 @@ function shapeValid(p,o){
   return o.half==null||o.half===-1||o.half===0||o.half===1; }
 function editShapeName(){
   const p=edit.piece, key=[...edit.sel].sort((a,b)=>a-b).join(','), n=edit.sel.size;
-  if(!editValid()) return p.type==='ramp'?'Drag 2 side-by-side squares, an L, a U, or across the centre':p.type==='wall'?'Not a valid edit: the rest must stay joined':'Keep at least one tile';
-  if(p.type==='wall') return WALL_SHAPES[key]||'Custom edit';
+  if(!editValid()) return p.type==='ramp'?'Drag 2 side-by-side squares, an L, a U, or across the centre':p.type==='wall'?'Not a valid edit':'Keep at least one tile';
+  if(p.type==='wall') return WALL_SHAPES[key]||'Not a valid edit';
   if(p.type==='floor') return n===0?'No change':n===1?'Corner cut':n===3?'Single tile':(key==='0,3'||key==='1,2')?'Diagonal':'Half floor';
   if(p.type==='cone') return n===0?'Pyramid':n===1?'Corner roof':n===3?'Pocket':(key==='0,3'||key==='1,2')?'Ridge':'Ramp roof';
   const r=stairEditResult(edit.sel,edit.order); if(r==='none') return 'No change';
@@ -2779,7 +2785,7 @@ function exitEdit(apply){
 }
 function resetEdit(){
   if(!edit) return; const p=edit.piece;
-  if(p.type==='wall') p.mask=511; else if(p.type==='floor') p.mask=15; else if(p.type==='cone') p.mask=0; else { p.half=-1; p.path=null; p.dir=p.sdir??p.dir; }
+  if(p.type==='wall') p.mask=511; else if(p.type==='floor') p.mask=15; else if(p.type==='cone') p.mask=0; else { p.half=-1; p.path=null; } // a stair resets to a full stair facing the way it faces now
   edit.sel.clear(); exitEdit(false);
 }
 
@@ -4757,7 +4763,7 @@ function stepTracers(dt){
     if(t.t<=0){ scene.remove(t.l); t.l.geometry.dispose(); t.l.material.dispose(); tracers.splice(i,1); } }
 }
 const flashGeo=new THREE.BoxGeometry(.13,.13,.13), flashMat=new THREE.MeshBasicMaterial({color:0xffd060});
-function muzzleFlash(H){ const f=new THREE.Mesh(flashGeo,flashMat); f.scale.setScalar(.7+Math.random()*.9); f.rotation.set(Math.random()*3,Math.random()*3,0); H.rig.muzzle.add(f); setTimeout(()=>H.rig.muzzle.remove(f),45); }
+function muzzleFlash(H){ const f=new THREE.Mesh(flashGeo,flashMat); f.scale.setScalar(.7+Math.random()*.9); f.rotation.set(Math.random()*3,Math.random()*3,0); H.rig.muzzle.add(f); setTimeout(()=>{ if(f.parent) f.parent.remove(f); },45); }
 function gauss(){ let u=0,v=0; while(!u)u=Math.random(); while(!v)v=Math.random(); return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v); }
 
 function raySphere(o,d,c,r){ _c.subVectors(o,c); const b=_c.dot(d), h=b*b-(_c.lengthSq()-r*r); return h<0?-1:-b-Math.sqrt(h); }
