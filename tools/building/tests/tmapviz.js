@@ -1,0 +1,10 @@
+const {sleep,page,launch,open}=require('./h.js');
+(async()=>{ const b=await launch(); const {pg,errs}=await open(b,page('/home/claude/crank-lab/index.html','scene,P,renderer,settings,toggleMap,TOWNS,houseStair'),{vp:{width:1100,height:640}});
+ await pg.waitForFunction(()=>window.T&&T.renderer,null,{timeout:180000});
+ await pg.evaluate(()=>{ T.settings.skyDrop=false; const s=document.querySelector('#botSel'); s.value='off'; s.dispatchEvent(new Event('change')); document.getElementById('play').click(); });
+ await pg.waitForFunction(()=>T.renderer.info.render.frame>5,null,{timeout:120000}); await sleep(1000);
+ await pg.evaluate(()=>{ const t=T.TOWNS[2], h=t.houses.find(h=>h.floors>1), S=T.houseStair(h), C=5; const tc=S.top; T.P.pos.set((h.i0+h.w/2)*C,(h.L+1)*4+0.3,(h.j0+h.d/2)*C); T.P.vel.set(0,0,0); T.P.yaw=Math.atan2(-((tc[0]+.5)*C-T.P.pos.x),-((tc[1]+.5)*C-T.P.pos.z)); T.P.pitch=-0.35; });
+ await sleep(4000); await pg.screenshot({path:'mv_stair.png'});
+ await pg.evaluate(()=>T.toggleMap(true)); await sleep(2500); const cv=await pg.$('#bigmapC'); const bx=await cv.boundingBox();
+ await pg.mouse.move(bx.x+bx.width*0.42,bx.y+bx.height*0.28); for(let i=0;i<6;i++){ await pg.mouse.wheel(0,-400); await sleep(150); } await sleep(1500); await pg.screenshot({path:'mv_map.png'});
+ console.log(await pg.evaluate(()=>document.getElementById('bigmap').hidden?'closed':'open'), errs.join('\n')||'no errors'); await b.close(); })();

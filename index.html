@@ -2396,7 +2396,7 @@ function houseStair(h){
   const V3=(s,t,y)=>{ const p=P2(s,t); return new THREE.Vector3(p[0],Y0+y,p[1]); };
   const N=20, RISE=LVL/(N+1), SW=1.25, TW=2.5-IN, LAND=1.4, S1=7.5-IN, TR=(S1-LAND)/N;
   const geo=b=>{ const g=new THREE.BoxGeometry(b[3]-b[0],b[4]-b[1],b[5]-b[2]); g.translate((b[0]+b[3])/2,(b[1]+b[4])/2,(b[2]+b[5])/2); return g; };
-  const stairs={boxes:[],parts:{tread:[],inner:[],beam:[]}}, rail={boxes:[],parts:{beam:[]}};
+  const stairs={boxes:[],parts:{tread:[],inner:[],beam:[]}}, rail={boxes:[],parts:{beam:[],tread:[]}}, RT=SW+0.14;
   // landing, level with the upper floor, on a post
   const land=box(0,LAND,0,TW,LVL-0.26,LVL); stairs.boxes.push(land); stairs.parts.tread.push(geo(land));
   stairs.parts.beam.push(geo(box(LAND-0.12,LAND,TW-0.12,TW,0,LVL-0.26)));
@@ -2413,12 +2413,13 @@ function houseStair(h){
   for(let k=2;k<N-1;k+=4){ const s=S1-(k+0.5)*TR, y=(k+1)*RISE; stairs.parts.beam.push(beamGeo(V3(s,SW,y),V3(s,SW,y+0.9),0.035)); } // balusters
   stairs.parts.beam.push(beamGeo(V3(S1-TR/2,SW,RISE+0.95),V3(LAND+TR/2,SW,LVL-RISE+0.95),0.07));
   // railing round the stairwell on the upper floor (the landing side stays open: that's the way off the stairs)
-  rail.boxes.push(box(LAND,S1,TW-0.05,TW+0.05,LVL,LVL+1.0), box(S1-0.05,S1+0.05,0,TW,LVL,LVL+1.0));
-  const posts=[[LAND,TW],[LAND+(S1-LAND)/3,TW],[LAND+2*(S1-LAND)/3,TW],[S1,TW],[S1,TW/2],[S1,0.06]];
+  { const slab=box(LAND,S1,SW+0.08,TW,LVL-0.26,LVL); rail.boxes.push(slab); rail.parts.tread.push(geo(slab)); }
+  rail.boxes.push(box(LAND,S1,RT-0.05,RT+0.05,LVL,LVL+1.0), box(S1-0.05,S1+0.05,0,RT,LVL,LVL+1.0));
+  const posts=[[LAND,RT],[LAND+(S1-LAND)/3,RT],[LAND+2*(S1-LAND)/3,RT],[S1,RT],[S1,RT/2],[S1,0.06]];
   posts.forEach(([s,t])=>rail.parts.beam.push(geo(box(s-0.05,s+0.05,t-0.05,t+0.05,LVL,LVL+1.0))));
-  for(const y of [0.5,0.97]){ rail.parts.beam.push(beamGeo(V3(LAND,TW,LVL+y),V3(S1,TW,LVL+y),y>0.9?0.07:0.04), beamGeo(V3(S1,TW,LVL+y),V3(S1,0.06,LVL+y),y>0.9?0.07:0.04)); }
-  for(let s=LAND+0.3;s<S1-0.1;s+=0.32) rail.parts.beam.push(beamGeo(V3(s,TW,LVL),V3(s,TW,LVL+0.97),0.03));
-  for(let t=0.36;t<TW-0.1;t+=0.32) rail.parts.beam.push(beamGeo(V3(S1,t,LVL),V3(S1,t,LVL+0.97),0.03));
+  for(const y of [0.5,0.97]){ rail.parts.beam.push(beamGeo(V3(LAND,RT,LVL+y),V3(S1,RT,LVL+y),y>0.9?0.07:0.04), beamGeo(V3(S1,RT,LVL+y),V3(S1,0.06,LVL+y),y>0.9?0.07:0.04)); }
+  for(let s=LAND+0.3;s<S1-0.1;s+=0.32) rail.parts.beam.push(beamGeo(V3(s,RT,LVL),V3(s,RT,LVL+0.97),0.03));
+  for(let t=0.36;t<RT-0.1;t+=0.32) rail.parts.beam.push(beamGeo(V3(S1,t,LVL),V3(S1,t,LVL+0.97),0.03));
   // merge each set into one geometry per material, placed relative to the floor piece it belongs to
   const centre=(c,l)=>new THREE.Vector3((c[0]+0.5)*C,l*LVL-FT/2,(c[1]+0.5)*C);
   const pack=(set,c,l)=>{ const o=centre(c,l), out=[];
@@ -2704,7 +2705,8 @@ function bodyOverlaps(E,p){
 // below your feet (a step's height) a new piece lifts you; anything cutting through your body is ghosted for you instead
 function phaseCheck(p){ for(const E of [P,B]){ if(!E||(E===B&&!B.active)) continue; if(!E.phase) E.phase=new Set(); if(bodyOverlaps(E,p)) E.phase.add(p); } }
 function updatePhase(E){ if(!E||!E.phase||!E.phase.size) return; E.phase.forEach(p=>{ if(!pieces.has(p.key)||!bodyOverlaps(E,p)) E.phase.delete(p); }); }
-const solidNear=(E)=>{ const ps=near(E.pos.x,E.pos.z); if(E.phase&&E.phase.size) E.phase.forEach(p=>ps.delete(p)); if(props.length) propsNear(E.pos.x,E.pos.z,ps); if(VANS) for(const v of VANS) if(Math.abs(v.x-E.pos.x)<7&&Math.abs(v.z-E.pos.z)<7) ps.add(v.solid); if(typeof chests!=='undefined') for(const c of chests) if(Math.abs(c.x-E.pos.x)<3&&Math.abs(c.z-E.pos.z)<3&&c.g.visible&&!(c.open&&(c.goneT||0)>1.2)){ const s=c.solid||(c.solid={boxes:[[0,0,0,0,0,0]],key:'chest'+c.id,isChest:true}), X=Math.abs(Math.sin(c.yaw))<0.7, hx=X?0.5:0.34, hz=X?0.34:0.5, b=s.boxes[0]; b[0]=c.x-hx; b[1]=c.y; b[2]=c.z-hz; b[3]=c.x+hx; b[4]=c.y+0.62; b[5]=c.z+hz; ps.add(s); } if(karts) for(const k of karts) if(!k.dead&&Math.abs(k.x-E.pos.x)<5&&Math.abs(k.z-E.pos.z)<5&&!(E.kart&&E.kart.k===k)) ps.add(k.solid); return ps; };
+var STATICS=[];
+const solidNear=(E)=>{ const ps=near(E.pos.x,E.pos.z); if(E.phase&&E.phase.size) E.phase.forEach(p=>ps.delete(p)); if(props.length) propsNear(E.pos.x,E.pos.z,ps); for(const q of STATICS) if(Math.abs(q.x-E.pos.x)<3&&Math.abs(q.z-E.pos.z)<3) ps.add(q.solid); if(VANS) for(const v of VANS) if(Math.abs(v.x-E.pos.x)<7&&Math.abs(v.z-E.pos.z)<7) ps.add(v.solid); if(typeof chests!=='undefined') for(const c of chests) if(Math.abs(c.x-E.pos.x)<3&&Math.abs(c.z-E.pos.z)<3&&c.g.visible&&!(c.open&&(c.goneT||0)>1.2)){ const s=c.solid||(c.solid={boxes:[[0,0,0,0,0,0]],key:'chest'+c.id,isChest:true}), X=Math.abs(Math.sin(c.yaw))<0.7, hx=X?0.5:0.34, hz=X?0.34:0.5, b=s.boxes[0]; b[0]=c.x-hx; b[1]=c.y; b[2]=c.z-hz; b[3]=c.x+hx; b[4]=c.y+0.62; b[5]=c.z+hz; ps.add(s); } if(karts) for(const k of karts) if(!k.dead&&Math.abs(k.x-E.pos.x)<5&&Math.abs(k.z-E.pos.z)<5&&!(E.kart&&E.kart.k===k)) ps.add(k.solid); return ps; };
 function popPlayerOut(){ depen(solidNear(P),P); if(B&&B.active) depen(solidNear(B),B); }
 // a floor, stair or cone cutting through you pushes you up on top of it whenever there's room above it;
 // walls (and pieces with no headroom over them) stay ghosted until you walk out
@@ -2919,7 +2921,7 @@ function animateSky(H,S,dt){ const G=H.group, r=H.rig, A=H.anim, gl=S.sky==='gli
     set(r.armL.sh,'x',-2.7+yr*0.12); set(r.armR.sh,'x',-2.7-yr*0.12); set(r.armL.sh,'z',-0.3); set(r.armR.sh,'z',0.3); set(r.armL.el,'x',0.35+Math.max(0,yr)*0.5); set(r.armR.el,'x',0.35+Math.max(0,-yr)*0.5);
     set(r.legL.hp,'x',0.15-0.35*spd+sw+kick); set(r.legR.hp,'x',0.1-0.35*spd-sw-kick*0.7); set(r.legL.hp,'z',-0.06-yr*0.15); set(r.legR.hp,'z',0.06-yr*0.15); set(r.legL.kn,'x',-0.25-0.2*Math.max(0,Math.sin(t*2.3))); set(r.legR.kn,'x',-0.2-0.2*Math.max(0,-Math.sin(t*2.3)));
     set(r.neck,'x',0.1); set(r.neck,'y',yr*0.3); }
-  r.gun.visible=r.pump.visible=r.hammer.visible=r.plan.visible=false; r.pick.visible=false;
+  r.gun.visible=r.pump.visible=r.hammer.visible=r.plan.visible=false; r.pick.visible=false; for(const k of GUN_MODELS) if(r[k]) r[k].visible=false;
   // the glider unfolds (wingtips first) when it opens; its control bar stays in the rider's hands
   if(!H.glider||H.glider.parent!==G||H.gliderFor!==H.outfit){ if(H.glider&&H.glider.parent) H.glider.parent.remove(H.glider); const o=OUTFITS.find(q=>q.id===H.outfit); H.glider=makeGlider((o&&o.accent)||0xff6a3d); H.gliderFor=H.outfit; G.add(H.glider); }
   A.glK=Math.max(0,Math.min(1,(A.glK||0)+(gl?dt*2.6:-dt*4))); const e=1-Math.pow(1-A.glK,3), gd=H.glider;
@@ -3027,7 +3029,7 @@ function kartPoint(k,x,y,z,out){ return (out||_kv).set(x,y,z).applyEuler(k.g.rot
 function kartPose(k){ k.g.position.set(k.x,k.y,k.z); k.g.rotation.set(k.pitch,k.yaw,k.roll); k.g.updateMatrixWorld(true);
   const fx=-Math.sin(k.yaw), fz=-Math.cos(k.yaw); k.solid.boxes=[-0.8,0,0.8].map(a=>{ const cx=k.x-fx*a, cz=k.z-fz*a; return [cx-0.6,k.y+0.3,cz-0.6,cx+0.6,k.y+1.45,cz+0.6]; }); }
 // does the buggy's body (three circles along it) run into anything new at (x,z)?
-function kartHits(k,x,z,yaw,ox,oz){ const fx=-Math.sin(yaw), fz=-Math.cos(yaw), lo=k.y+0.45, hi=k.y+1.4, ps=near(x,z,1); propsNear(x,z,ps); if(VANS) for(const v of VANS) if(Math.abs(v.x-x)<8&&Math.abs(v.z-z)<8) ps.add(v.solid);
+function kartHits(k,x,z,yaw,ox,oz){ const fx=-Math.sin(yaw), fz=-Math.cos(yaw), lo=k.y+0.45, hi=k.y+1.4, ps=near(x,z,1); propsNear(x,z,ps); for(const q of STATICS) if(Math.abs(q.x-x)<4&&Math.abs(q.z-z)<4) ps.add(q.solid); if(VANS) for(const v of VANS) if(Math.abs(v.x-x)<8&&Math.abs(v.z-z)<8) ps.add(v.solid);
   for(const o of karts) if(o!==k&&!o.dead&&Math.abs(o.x-x)<4&&Math.abs(o.z-z)<4) ps.add(o.solid);
   const hit=(cx,cz)=>{ for(const p of ps){ for(const b of p.boxes) if(b[4]>lo&&b[1]<hi&&circBox(b,cx,cz,0.7)) return b; if(p.slab) for(const s of [[0,0],[0.5,0],[-0.5,0],[0,0.5],[0,-0.5]]){ const t=slabTop(p,cx+s[0],cz+s[1]); if(t!==null&&t>lo&&t-ST<hi) return p; } } return null; };
   for(const a of [-0.85,0,0.85]){ const b=hit(x-fx*a,z-fz*a); if(b&&b!==hit(ox-fx*a,oz-fz*a)) return true; } return false; }
@@ -5033,7 +5035,7 @@ $('fs').addEventListener('click',()=>{
 document.addEventListener('fullscreenchange',()=>{ $('fs').textContent=document.fullscreenElement?'Exit fullscreen':'Fullscreen'; setTimeout(fitView,50); });
 document.addEventListener('pointerlockchange',()=>{
   locked=document.pointerLockElement===canvas;
-  if(locked){ menu.hidden=true; playing=true; lockFailed=false; } else if(invUnlocking||invOpen){ invUnlocking=false; } else if(!lockFailed) openMenu();
+  if(locked){ menu.hidden=true; playing=true; lockFailed=false; } else if(invUnlocking||invOpen||mapOpen){ invUnlocking=false; } else if(!lockFailed) openMenu();
 });
 document.addEventListener('pointerlockerror',()=>{ lockFailed=true; menu.hidden=true; playing=true; toast('Mouse lock is blocked here. Move the mouse to look'); });
 if(isTouch){ document.body.classList.add('touch'); $('tui').hidden=false; $('bindsDesk').hidden=true; $('bindsTouch').hidden=false; $('play').textContent='Play'; }
@@ -6878,6 +6880,7 @@ function buildGardens(){ const flowers=[0xe8456b,0xf2c014,0xffffff,0xa45ee5,0xff
       for(const fu of [0.25,f.len-0.25]){ if(h.garage&&fu>mid) continue; const [x,z]=f.p(fu,0.4); const rr=0.45+q()*0.2; put(new THREE.IcosahedronGeometry(rr,1).scale(1,0.85,1),0x3d7a32,x,y0+rr*0.7,z); }
       // a mailbox by the sidewalk, beside the front path
       { const [x,z]=f.p(mid+1.25,(X?Math.abs((h.side==='n'?h.j0*CELL:(h.j0+h.d)*CELL)-t.z):Math.abs((h.side==='w'?h.i0*CELL:(h.i0+h.w)*CELL)-t.x))-(ROAD_HW+WALK_W)-0.45);
+        STATICS.push({x,z,solid:{boxes:[[x-0.16,y0,z-0.16,x+0.16,y0+1.26,z+0.16]],key:'mail'+STATICS.length}});
         put(new THREE.BoxGeometry(0.09,1.05,0.09),0x5a4030,x,y0+0.52,z,ry); put(new THREE.BoxGeometry(0.24,0.24,0.46),[0x2a2d33,0x8a2a2a,0x2f5d8a,0xe0ddd5][Math.floor(q()*4)],x,y0+1.12,z,ry+Math.PI/2);
         put(new THREE.BoxGeometry(0.03,0.16,0.07),0xd23a2a,...[x+(X?0.14:0),y0+1.2,z+(X?0:0.14)],ry); } }
     if(!parts.length) continue;
@@ -7658,7 +7661,7 @@ function drawMini(){
    The hillshade is painted once, the first time the map opens; roads, towns and players go on top. */
 var mapOpen=false, bigMapImg=null;
 function renderBigMapImage(){
-  const S=1024, c=document.createElement('canvas'); c.width=c.height=S; const g=c.getContext('2d'), img=g.createImageData(S,S), d=img.data, {ROCK,SNOW}=WORLD;
+  const S=2048, c=document.createElement('canvas'); c.width=c.height=S; const g=c.getContext('2d'), img=g.createImageData(S,S), d=img.data, {ROCK,SNOW}=WORLD;
   const mpp=2*WHALF/S, LX=-0.5, LY=0.75, LZ=-0.43; // lit from the north-west
   for(let py=0;py<S;py++){ const v=-WHALF+(py+0.5)*mpp, j=Math.min(WN-1,Math.round((v+WHALF)/WHS)), j0=Math.max(0,j-1), j1=Math.min(WN-1,j+1);
     for(let px=0;px<S;px++){ const u=-WHALF+(px+0.5)*mpp, i=Math.min(WN-1,Math.round((u+WHALF)/WHS)), i0=Math.max(0,i-1), i1=Math.min(WN-1,i+1), q=j*WN+i, h=WH[q];
@@ -7671,11 +7674,16 @@ function renderBigMapImage(){
       d[o]=Math.min(255,r*k*out); d[o+1]=Math.min(255,gg*k*out); d[o+2]=Math.min(255,b*k*out*(out<1?1.08:1)); d[o+3]=255; } }
   g.putImageData(img,0,0);
   const X=u=>(u+WHALF)/mpp;
+  // the forest: every tree as a small crown with a lit side (pines darker and pointier)
+  for(const p of props){ if(p.gone||!(p.kind==='tree'||p.kind==='pine')) continue; const x=X(p.x-SPAWN[0]), y=X(p.z-SPAWN[2]), r=(p.kind==='pine'?1.9:2.6)*(p.s||1)/mpp;
+    g.fillStyle='rgba(20,40,22,.35)'; g.beginPath(); g.arc(x+r*0.35,y+r*0.35,r,0,7); g.fill();
+    g.fillStyle=p.kind==='pine'?'#2c5a3c':'#3f7a34'; g.beginPath(); g.arc(x,y,r,0,7); g.fill();
+    g.fillStyle=p.kind==='pine'?'#3f7450':'#5c9a48'; g.beginPath(); g.arc(x-r*0.25,y-r*0.25,r*0.55,0,7); g.fill(); }
   g.lineCap='round'; g.lineJoin='round';
-  for(const [w,col] of [[7,'#26282c'],[3.6,'#9a9ea4']]){ g.strokeStyle=col; g.lineWidth=w;
+  for(const [w,col] of [[14,'#26282c'],[7.2,'#9a9ea4']]){ g.strokeStyle=col; g.lineWidth=w;
     for(const rd of WORLD.roads){ g.beginPath(); rd.pts.forEach((p,k)=>k?g.lineTo(X(p[0]),X(p[1])):g.moveTo(X(p[0]),X(p[1]))); g.stroke(); }
     g.fillStyle=col; WORLD.towns.forEach(t=>{ g.beginPath(); g.arc(X(t.u),X(t.v),(PLAZA_R/mpp)+w/2+1,0,7); g.fill(); }); }
-  g.setLineDash([]); g.strokeStyle='rgba(255,236,190,.8)'; g.lineWidth=2; g.beginPath(); g.arc(X(0),X(0),FLAT_R/mpp,0,7); g.stroke(); // the build field
+  g.setLineDash([]); g.strokeStyle='rgba(255,236,190,.8)'; g.lineWidth=3; g.beginPath(); g.arc(X(0),X(0),FLAT_R/mpp,0,7); g.stroke(); // the build field
   return c;
 }
 function drawBigMap(){
@@ -7712,11 +7720,12 @@ function toggleMap(on){
   const want=on==null?!mapOpen:!!on; if(want===mapOpen) return; mapOpen=want;
   if(mapOpen&&!bigMapImg) bigMapImg=renderBigMapImage();
   $('bigmap').hidden=!mapOpen;
-  if(mapOpen){ $('bigmapHint').textContent=isTouch?'Pinch to zoom · drag to move · tap to close':'Scroll to zoom · drag to move · '+codeName(settings.binds.map||'KeyM')+' or click to close'; drawBigMap(); }
+  if(!isTouch){ if(mapOpen&&document.pointerLockElement){ invUnlocking=true; document.exitPointerLock(); } else if(!mapOpen&&playing&&!lockFailed&&!invOpen){ try{ const r=canvas.requestPointerLock(); if(r&&r.catch) r.catch(()=>{}); }catch(e){} } }
+  if(mapOpen){ $('bigmapHint').textContent=isTouch?'Pinch to zoom · drag to move · tap to close':'Scroll to zoom · drag to move · '+codeName(settings.binds.map||'KeyM')+' or Close to exit'; drawBigMap(); }
 }
 $('miniWrap').addEventListener('pointerdown',e=>{ e.preventDefault(); e.stopPropagation(); if(playing) toggleMap(true); });
 const mapView={zoom:1,cx:0,cz:0,ptrs:new Map(),moved:0,pinch:0};
-function mapClamp(){ mapView.zoom=Math.max(1,Math.min(10,mapView.zoom)); const lim=WHALF*(1-1/mapView.zoom); mapView.cx=Math.max(-lim,Math.min(lim,mapView.cx)); mapView.cz=Math.max(-lim,Math.min(lim,mapView.cz)); }
+function mapClamp(){ mapView.zoom=Math.max(1,Math.min(16,mapView.zoom)); const lim=WHALF*(1-1/mapView.zoom); mapView.cx=Math.max(-lim,Math.min(lim,mapView.cx)); mapView.cz=Math.max(-lim,Math.min(lim,mapView.cz)); }
 function mapZoomAt(f,clientX,clientY){ const cv=$('bigmapC'), r=cv.getBoundingClientRect(), u=(clientX-r.left)/r.width-0.5, v=(clientY-r.top)/r.height-0.5, half=WHALF/mapView.zoom;
   const wx=mapView.cx+u*2*half, wz=mapView.cz+v*2*half; mapView.zoom*=f; mapClamp(); const h2=WHALF/mapView.zoom; mapView.cx=wx-u*2*h2; mapView.cz=wz-v*2*h2; mapClamp(); drawBigMap(); }
 $('bigmapC').addEventListener('wheel',e=>{ e.preventDefault(); e.stopPropagation(); mapZoomAt(Math.exp(-e.deltaY*0.0015),e.clientX,e.clientY); },{passive:false});
@@ -7724,7 +7733,7 @@ $('bigmapC').addEventListener('pointerdown',e=>{ e.preventDefault(); e.stopPropa
 $('bigmapC').addEventListener('pointermove',e=>{ const p=mapView.ptrs.get(e.pointerId); if(!p) return; const r=$('bigmapC').getBoundingClientRect(), dx=e.clientX-p.x, dy=e.clientY-p.y; p.x=e.clientX; p.y=e.clientY; mapView.moved+=Math.abs(dx)+Math.abs(dy);
   if(mapView.ptrs.size===2){ const [a,b]=[...mapView.ptrs.values()], d=Math.hypot(a.x-b.x,a.y-b.y); if(mapView.pinch>0) mapZoomAt(d/mapView.pinch,(a.x+b.x)/2,(a.y+b.y)/2); mapView.pinch=d; return; }
   const m=2*WHALF/mapView.zoom; mapView.cx-=dx/r.width*m; mapView.cz-=dy/r.height*m; mapClamp(); drawBigMap(); });
-const mapUp=e=>{ if(!mapView.ptrs.has(e.pointerId)) return; mapView.ptrs.delete(e.pointerId); mapView.pinch=0; if(mapView.ptrs.size===0&&mapView.moved<6) toggleMap(false); }; // a tap (no drag) closes it
+const mapUp=e=>{ if(!mapView.ptrs.has(e.pointerId)) return; mapView.ptrs.delete(e.pointerId); mapView.pinch=0; if(isTouch&&mapView.ptrs.size===0&&mapView.moved<6) toggleMap(false); }; // a tap (no drag) closes it
 $('bigmapC').addEventListener('pointerup',mapUp); $('bigmapC').addEventListener('pointercancel',mapUp);
 $('bigmap').addEventListener('pointerdown',e=>{ if(e.target===$('bigmapC')||e.target===$('bigmapX')) return; e.preventDefault(); e.stopPropagation(); toggleMap(false); });
 (function(){
