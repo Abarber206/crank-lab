@@ -135,6 +135,9 @@ body.touch .mats .k{display:none}
 #kartHud{left:50%;bottom:150px;transform:translateX(-50%);display:flex;align-items:baseline;gap:5px;font:800 italic 15px/1 var(--font-hud);color:#e9edf2;text-shadow:0 1px 3px #000}
 #kartHud b{font-size:30px;color:#fff;min-width:44px;text-align:right}
 #rbWait{left:50%;top:calc(env(safe-area-inset-top,0px) + 96px);transform:translateX(-50%);width:min(420px,calc(100vw - 32px));box-sizing:border-box;display:grid;justify-items:center;gap:8px;padding:14px 18px 12px;background:rgba(6,16,48,.78);border:1px solid rgba(140,200,255,.35);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.4);text-align:center}
+body.touch #rbWait{padding:8px 12px 8px;gap:4px;width:min(300px,calc(100vw - 24px))} body.touch #rbWait .rbt{font-size:18px} body.touch #rbWait p{font-size:13px} body.touch #rbWait small{font-size:11px}
+@media (orientation:landscape){ body.touch #rbWait{top:calc(env(safe-area-inset-top,0px) + 6px);left:calc(env(safe-area-inset-left,0px) + 110px);transform:none} }
+@media (orientation:portrait){ body.touch #rbWait{top:calc(env(safe-area-inset-top,0px) + 150px)} }
 #rbWait.down{border-color:rgba(255,120,90,.55)} #rbWait.down .rbbar i{background:linear-gradient(90deg,#ff5a3a,#ffb07a)} #rbWait .rbt{font:900 italic 24px/1 var(--font-hud);letter-spacing:.08em;text-transform:uppercase;color:#ff8a6a}
 #rbWait p{margin:0;font:800 italic 17px/1.2 var(--font-hud);letter-spacing:.03em;text-transform:uppercase;color:#fff}
 #rbWait small{font:700 13px/1.2 var(--font-hud);letter-spacing:.1em;text-transform:uppercase;color:#9fc6ff}
@@ -376,7 +379,11 @@ body.touch #stickHint{width:100px;height:100px;opacity:.6}
 .bindbtn.cap{background:var(--build);color:var(--hud);border-color:var(--build)}
 .bindbtn:focus-visible{outline:2px solid var(--ghost)}
 kbd{font-family:var(--font-ui);background:#1c2a40;border-radius:3px;padding:1px 6px;font-size:12px;color:var(--ink)}
-.set{display:grid;gap:10px;font-size:13px}
+.set{display:grid;gap:12px 28px;font-size:14px;padding:16px 18px;border-radius:10px;background:rgba(255,255,255,.04);max-width:980px}
+@media (min-width:900px){ .set{grid-template-columns:1fr 1fr} }
+#menu.lobby .mtab[data-tab=controls]{max-width:980px;background:rgba(4,18,64,.5);border:1px solid rgba(255,255,255,.16);border-radius:10px;padding:16px 18px;backdrop-filter:blur(8px)}
+#menu.lobby .mtab[data-tab=controls] .bindlist{background:none;border:0;backdrop-filter:none;max-height:none}
+@media (max-width:520px){ #menu.lobby .mtabs{flex-wrap:wrap;width:auto} #menu.lobby .mtabs button{flex:1 1 auto;font-size:14px;padding:9px 10px 8px} }
 .set label{display:grid;grid-template-columns:1fr auto;gap:4px 10px;align-items:center;color:var(--ink)}
 .set input[type=range]{grid-column:1/-1;width:100%;accent-color:var(--build)}
 .set .v{color:var(--build);font-variant-numeric:tabular-nums;font-weight:700}
@@ -570,7 +577,7 @@ body.touch #stickHint{width:100px;height:100px;opacity:.6}
     </nav>
     <section class="mtab" data-tab="play">
       <div class="stage" id="stage" aria-hidden="true"><canvas id="stageC"></canvas><div class="plates" id="plates"></div><p class="stagehint">Drag to spin</p></div>
-      <p class="sub" id="verTag" style="opacity:.55;font-size:12px;margin:0 0 4px">Update: Nov 9 · knocked &amp; revive, reboot cards &amp; vans, new lobby &amp; Item Shop, realistic gun sounds</p>
+      <p class="sub" id="verTag" style="opacity:.55;font-size:12px;margin:0 0 4px">Update: Nov 9 · polish pass, bot teammate, dances, knocked &amp; revive, reboot vans, new lobby &amp; shop</p>
       <p class="sub">A build-fight practice range. Snappy Chapter 1-style running and jumping, turbo build on a 5&nbsp;m by 4&nbsp;m grid, and wall, floor, ramp and cone edits. Ramp rush, crank 90s, and chase your best height.</p>
       <div class="modes" id="modeCards" role="radiogroup" aria-label="Mode">
         <button type="button" class="mode" data-mode="fight" role="radio"><b>Build fight</b><small>Fight the bot or your friends: box up, edit, crank 90s.</small></button>
@@ -648,7 +655,6 @@ body.touch #stickHint{width:100px;height:100px;opacity:.6}
           <label for="editRuleSel">Who can edit builds (the host's choice counts in a room) <select id="editRuleSel"><option value="owner">Only the builder</option><option value="team">Builder and teammates</option><option value="anyone">Anyone</option></select></label>
           <label for="infMats">Infinite materials (off: farm trees, rocks and cars for builds) <input type="checkbox" id="infMats"></label>
         </div>
-      </div>
     </section>
     <section class="mtab" data-tab="controls" hidden>
       <h2>Keybinds</h2>
@@ -1329,14 +1335,14 @@ stepTerrain(SPAWN[0],SPAWN[2],true);
 
 /* ---------- roads: asphalt with white edge lines and a dashed yellow centre, plus a paved square in each town ---------- */
 let roadPlainTex=null;
-const roadTex=(()=>{ const W=128, Hh=512, c=document.createElement('canvas'); c.width=W; c.height=Hh; const g=c.getContext('2d');
+const roadTex=(()=>{ const W=256, Hh=1024, c=document.createElement('canvas'); c.width=W; c.height=Hh; const g=c.getContext('2d');
   g.fillStyle='#4b4e53'; g.fillRect(0,0,W,Hh);
-  for(let i=0;i<9000;i++){ const v=Math.random(); g.fillStyle=v<.5?'rgba(22,24,28,.35)':v<.9?'rgba(140,140,138,.22)':'rgba(200,196,186,.3)'; g.fillRect(Math.random()*W,Math.random()*Hh,1+Math.random(),1+Math.random()); }
-  for(let i=0;i<14;i++){ const x=Math.random()*W, y=Math.random()*Hh, r=8+Math.random()*24, gr=g.createRadialGradient(x,y,0,x,y,r); gr.addColorStop(0,'rgba(30,30,32,.18)'); gr.addColorStop(1,'rgba(0,0,0,0)'); g.fillStyle=gr; g.fillRect(x-r,y-r,r*2,r*2); }
+  for(let i=0;i<60000;i++){ const v=Math.random(); g.fillStyle=v<.5?'rgba(22,24,28,.26)':v<.9?'rgba(140,140,138,.16)':'rgba(200,196,186,.22)'; g.fillRect(Math.random()*W,Math.random()*Hh,1+Math.random(),1+Math.random()); }
+  for(let i=0;i<22;i++){ const x=Math.random()*W, y=Math.random()*Hh, r=20+Math.random()*50, gr=g.createRadialGradient(x,y,0,x,y,r); gr.addColorStop(0,'rgba(30,30,32,.18)'); gr.addColorStop(1,'rgba(0,0,0,0)'); g.fillStyle=gr; g.fillRect(x-r,y-r,r*2,r*2); }
   const pc=document.createElement('canvas'); pc.width=W; pc.height=Hh; pc.getContext('2d').drawImage(c,0,0); // the same asphalt without markings, for junctions
   roadPlainTex=new THREE.CanvasTexture(pc); roadPlainTex.wrapS=roadPlainTex.wrapT=THREE.RepeatWrapping; roadPlainTex.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());
-  g.fillStyle='rgba(236,236,230,.92)'; g.fillRect(6,0,3,Hh); g.fillRect(W-9,0,3,Hh);   // edge lines
-  g.fillStyle='#e6c23c'; g.fillRect(W/2-2,0,4,Hh*0.5);                                // centre dash: half of every 12 m
+  g.fillStyle='rgba(236,236,230,.92)'; g.fillRect(12,0,6,Hh); g.fillRect(W-18,0,6,Hh);   // edge lines
+  g.fillStyle='#e6c23c'; g.fillRect(W/2-4,0,8,Hh*0.5);                                // centre dash: half of every 12 m
   const t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy()); return t; })();
 const ROAD_HW=3.6, roadMeshes=[];
 // how close a point is to any other road's centreline (for leaving markings out of junctions)
@@ -2315,7 +2321,7 @@ function houseSkin(p){
   const s=p.skin;
   return {
     wall:houseMat('w'+s.style+wallKind(p.mask==null?511:p.mask)+s.paint,()=>{ const t=houseWallSet(s.style,wallKind(p.mask==null?511:p.mask)); return new THREE.MeshPhongMaterial({map:t.map,normalMap:t.normal,color:HOUSE_PAINT[s.style][s.paint],shininess:s.style==='panel'?18:6,specular:0x111111}); },'HOUSE_PAINT','w'+s.style+wallKind(p.mask==null?511:p.mask)),
-    floor:s.garage?garageFloorMat(s.garage):houseMat('floor',()=>new THREE.MeshPhongMaterial({map:hardwood.map,normalMap:hardwood.normal,shininess:22,specular:0x2a2016,polygonOffset:true,polygonOffsetFactor:1,polygonOffsetUnits:1}),'HOUSE_CEIL'),
+    floor:s.garage?garageFloorMat(s.garage):houseMat('floor',()=>new THREE.MeshPhongMaterial({map:hardwood.map,normalMap:hardwood.normal,shininess:22,specular:0x2a2016,polygonOffset:true,polygonOffsetFactor:0,polygonOffsetUnits:2}),'HOUSE_CEIL'),
     tread:houseMat('tread',()=>new THREE.MeshPhongMaterial({map:hardwood.map,normalMap:hardwood.normal,shininess:22,specular:0x2a2016}),'HOUSE_CEIL'),
     beam:houseMat('trim'+(s.style==='panel'?'d':'w'),()=>new THREE.MeshPhongMaterial({color:s.style==='panel'?0x2c2f34:0xf2efe8,shininess:10,specular:0x111111}),'HOUSE_TRIM'),
     cone:houseMat('roof'+p.mat+s.roof,()=>{ const t=roofTexs[p.mat==='brick'?'brick':'wood']; return new THREE.MeshPhongMaterial({map:t.map,color:ROOF_COL[p.mat==='brick'?'brick':'wood'][s.roof],shininess:4,specular:0x080808,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:1,polygonOffsetUnits:1}); },'HOUSE_ROOF','roof'+(p.mat==='brick'?'brick':'wood'))
@@ -4650,7 +4656,7 @@ function gunStockPush(r,mdl){ if(!mdl) return 0; let b=_gunBack.get(mdl);
 const _p2a=new THREE.Vector3(), _p2b=new THREE.Vector3(), _p2q=new THREE.Quaternion();
 function pickTwoHands(H,S){ const r=H.rig; if(!r.pick||!r.pick.visible||S.gun||S.building||S.editing||(S.emote&&EMOTES[S.emote.id])||S.sky||S.down||S.item) return;
   H.group.updateMatrixWorld(true); const t=r.pick.localToWorld(_p2a.set(0,0.11,0)), pole=H.group.localToWorld(_p2b.set(-0.7,0.6,0.3));
-  r.armR.wr.getWorldQuaternion(_p2q); ikArm(r.armL,t,pole,_p2q); r.armL.fing.rotation.x=0.95; }
+  if(S.bare) return; r.armR.wr.getWorldQuaternion(_p2q); ikArm(r.armL,t,pole,_p2q); r.armL.fing.rotation.x=0.95; }
 function handQuat(out,fwd,up){ _ikY.copy(fwd).negate(); _ikZ.copy(up).addScaledVector(fwd,-up.dot(fwd)).normalize().negate(); _ikX.crossVectors(_ikY,_ikZ).normalize(); _ikM.makeBasis(_ikX,_ikY,_ikZ); return out.setFromRotationMatrix(_ikM); }
 
 // pickaxe swing keyframes (t 0..1): wind-up, strike, recover
@@ -4815,7 +4821,7 @@ function animateRig0(H,S,dt){
     // the whole body throws the swing: hips turn with the chest, knees dip at impact, the free arm pulls back
     T.hipsY+=sw.ch*0.35; T.hipY-=0.035*sw.k; T.knL-=0.12*sw.k; T.knR-=0.12*sw.k; T.nkY-=sw.ch*0.5;
     T.shL=-0.25-0.35*sw.k+0.6*Math.max(0,-sw.ch); T.elL=0.7+0.3*sw.k; T.shLz=-0.18;
-  } else if(S.gun===false&&!building&&!emo){
+  } else if(S.gun===false&&!building&&!emo&&!S.bare){
     // pickaxe carried ready: forearm up, handle angled up past the shoulder, the head just above and in front of it
     T.shR=T.shR*0.35+0.12; T.elR=1.25+0.15*k; T.shRz=0.2; T.wrR=0.55;
   }
@@ -4915,6 +4921,7 @@ function animateHero(dt){
 /* ---------- camera ---------- */
 const tmpA=new THREE.Vector3(), tmpB=new THREE.Vector3();
 let camY=0, camDip=0, skyCamK=0, kartCamK=0;
+var downCamK=0;
 function updateCamera(){
   if(rbSpectate()) return;
   const eye=P.crouch?EYE_CROUCH:EYE_STAND;
@@ -4924,7 +4931,8 @@ function updateCamera(){
   const pivot=tmpA.set(P.pos.x,camY+eye+camDip,P.pos.z), d=aimDir();
   skyCamK+=((P.sky?(P.sky.phase==='fall'?1:0.7):0)-skyCamK)*Math.min(1,lastDt*2.5);
   kartCamK+=((P.kart?(P.kart.seat===0||adsK<0.5?1:0.4):0)-kartCamK)*Math.min(1,lastDt*3);
-  const side=0.6-0.05*adsK-0.3*skyCamK-0.35*kartCamK, back=2.9-1.35*adsK+3.4*skyCamK+1.4*kartCamK, up=0.18+0.08*adsK+1.0*skyCamK+0.45*kartCamK;
+  downCamK+=((P.down?1:0)-downCamK)*Math.min(1,lastDt*3);
+  const side=0.6-0.05*adsK-0.3*skyCamK-0.35*kartCamK-0.4*downCamK, back=2.9-1.35*adsK+3.4*skyCamK+1.4*kartCamK+0.9*downCamK, up=0.18+0.08*adsK+1.0*skyCamK+0.45*kartCamK+0.7*downCamK;
   const want=tmpB.set(Math.cos(P.yaw)*side,up,-Math.sin(P.yaw)*side).addScaledVector(d,-back);
   let dist=want.length(); want.normalize();
   ray.set(pivot,want); ray.far=dist+0.3;
@@ -5808,7 +5816,7 @@ function pieceHpTick(dt){
   const el=$('pieceHp'), show=playing&&(mode==='pick'||mode==='build')&&!edit;
   if(!show){ el.hidden=true; return; }
   const h=aimHit(6); const p=h&&h.object.userData.piece;
-  if(!p||!$('buildReason').hidden){ el.hidden=true; return; }
+  if(!p||!$('buildReason').hidden||(p.owner==='world'&&p.skin&&p.hp>=p.maxHp)){ el.hidden=true; return; }
   el.hidden=false; el.classList.toggle('growing',growing.has(p));
   $('pieceHpT').textContent=(p.skin?'House · farms '+MATERIALS[p.mat].name.toLowerCase():MATERIALS[p.mat].name)+' '+Math.ceil(p.hp)+' / '+p.maxHp;
   $('pieceHpB').style.width=(100*p.hp/p.maxHp).toFixed(1)+'%';
@@ -7749,7 +7757,7 @@ syncBot();
     const cam=new THREE.PerspectiveCamera(27,W/Hh,0.1,20); cam.position.set(0.95,1.3,-3.55); cam.lookAt(0,0.95,0);
     const zero=new THREE.Vector3();
     OUTFITS.forEach(o=>{ const h=heroFor(o); sc.add(h.group);
-      for(let k=0;k<40;k++) animateRig(h,{pos:zero,vel:zero,yaw:0.35,pitch:0,onGround:true,crouch:false,building:false,editing:false,gun:false,ads:0,swingT:0},1/30);
+      for(let k=0;k<40;k++) animateRig(h,{bare:true,pos:zero,vel:zero,yaw:0.35,pitch:0,onGround:true,crouch:false,building:false,editing:false,gun:false,ads:0,swingT:0},1/30);
       h.rig.pick.visible=false;
       r.render(sc,cam); const img=new Image(); img.alt=''; img.src=r.domElement.toDataURL('image/png'); sc.remove(h.group);
       const b=box.querySelector(`[data-id="${o.id}"]`); if(b) b.prepend(img); });
@@ -7802,7 +7810,7 @@ function stageFrame(now){ const S=_stage; if(!S||!S.on) return; if(!stageVisible
   const n=S.heroes.length, wide=n>1?Math.min(1,0.55+n*0.15):0; // pull the camera back a little for a party
   S.cam.position.set(0.2,1.2+wide*0.3,-5.1-wide*3.6); S.cam.lookAt(0,0.78,wide*0.5);
   if(!S.drag){ S.spinV*=Math.exp(-3*dt); S.spin+=S.spinV*dt*0.2; S.spin*=Math.exp(-0.9*dt); }
-  S.heroes.forEach((e,i)=>{ const st={pos:e.pos,vel:_stZ,yaw:e.yaw+(i===0?S.spin:0),pitch:-0.05,onGround:true,crouch:false,building:false,editing:false,gun:false,ads:0,swingT:0,emote:i===0&&window._stagePrev&&EMOTES[_stagePrev.id]&&performance.now()-_stagePrev.t0<EMOTES[_stagePrev.id].dur*1000?{id:_stagePrev.id,t:(performance.now()-_stagePrev.t0)/1000}:null};
+  S.heroes.forEach((e,i)=>{ const st={bare:true,pos:e.pos,vel:_stZ,yaw:e.yaw+(i===0?S.spin:0),pitch:-0.05,onGround:true,crouch:false,building:false,editing:false,gun:false,ads:0,swingT:0,emote:i===0&&window._stagePrev&&EMOTES[_stagePrev.id]&&performance.now()-_stagePrev.t0<EMOTES[_stagePrev.id].dur*1000?{id:_stagePrev.id,t:(performance.now()-_stagePrev.t0)/1000}:null};
     animateRig(e.h,st,dt); e.h.rig.pick.visible=false;
     e.h.group.updateMatrixWorld(true); _stH.copy(e.pos); _stH.y+=2.15; _stH.project(S.cam);
     e.plate.style.left=((_stH.x+1)/2*w)+'px'; e.plate.style.top=Math.max(34,(1-_stH.y)/2*h)+'px'; e.plate.hidden=_stH.z>1; });

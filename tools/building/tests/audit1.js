@@ -1,0 +1,20 @@
+// polish audit, part 1: the world in solo play (desktop)
+const {sleep,page,launch,open}=require('./h.js');
+(async()=>{ const b=await launch(); const {pg,errs}=await open(b,page('/home/claude/crank-lab/index.html','scene,P,renderer,settings,camera,TOWNS,karts,toggleMap,selectGun,selectPiece,tryPlace,houseSpots,VANS,chests,terrainH,houseStair'),{vp:{width:1100,height:640}});
+ await pg.waitForFunction(()=>window.T&&T.renderer,null,{timeout:180000});
+ await pg.evaluate(()=>{ T.settings.skyDrop=false; const s=document.querySelector('#botSel'); s.value='off'; s.dispatchEvent(new Event('change')); document.getElementById('play').click(); });
+ await pg.waitForFunction(()=>T.renderer.info.render.frame>5,null,{timeout:120000}); await sleep(2000);
+ const shot=async(nm,fn,arg)=>{ try{ await pg.evaluate(fn,arg); await sleep(3500); await pg.screenshot({path:'au_'+nm+'.png'}); console.log('shot',nm); }catch(e){ console.log('ERR',nm,String(e).slice(0,200)); } };
+ await shot('01_spawn',()=>{ T.P.yaw=0.6; T.P.pitch=-0.05; });
+ await shot('02_town',()=>{ const t=T.TOWNS[2]; T.P.pos.set(t.x+6,T.terrainH(t.x+6,t.z+2)+0.1,t.z+2); T.P.vel.set(0,0,0); T.P.yaw=1.0; T.P.pitch=0.02; });
+ await shot('03_town2',()=>{ T.P.yaw=-2.0; });
+ await shot('04_house_in',()=>{ const t=T.TOWNS[2], h=t.houses.find(h=>h.floors>1)||t.houses[0]; window.HH=h; const C=5; T.P.pos.set((h.i0+0.5)*C,h.L*4+0.2,(h.j0+0.5)*C); T.P.vel.set(0,0,0); T.P.yaw=Math.atan2(-((h.i0+h.w)*C-T.P.pos.x),-((h.j0+h.d)*C-T.P.pos.z)); T.P.pitch=-0.05; });
+ await shot('05_house_up',()=>{ const h=HH, C=5; T.P.pos.set((h.i0+h.w-0.6)*C,(h.L+1)*4+0.3,(h.j0+h.d-0.6)*C); T.P.vel.set(0,0,0); T.P.yaw=Math.atan2(-((h.i0)*C-T.P.pos.x),-((h.j0)*C-T.P.pos.z)); T.P.pitch=0.12; });
+ await shot('06_house_look_up',()=>{ T.P.pitch=0.9; });
+ await shot('07_garage',()=>{ const k=T.karts[0]; const fx=-Math.sin(k.yaw), fz=-Math.cos(k.yaw); T.P.pos.set(k.x+fx*7,k.y+0.1,k.z+fz*7); T.P.vel.set(0,0,0); T.P.yaw=Math.atan2(-(k.x-T.P.pos.x),-(k.z-T.P.pos.z)); T.P.pitch=-0.05; });
+ await shot('08_van',()=>{ const v=T.VANS[2]; T.P.pos.set(v.tx+(v.tx-v.x)*2.5,v.y+0.1,v.tz+(v.tz-v.z)*2.5); T.P.vel.set(0,0,0); T.P.yaw=Math.atan2(-(v.x-T.P.pos.x),-(v.z-T.P.pos.z))+0.3; T.P.pitch=-0.03; });
+ await shot('09_chest',()=>{ const c=T.chests.find(c=>!c.open); T.P.pos.set(c.x+2.2,c.y+0.1,c.z+0.5); T.P.vel.set(0,0,0); T.P.yaw=Math.atan2(-(c.x-T.P.pos.x),-(c.z-T.P.pos.z)); T.P.pitch=-0.25; });
+ await shot('10_gun',()=>{ T.P.pos.set(2.5,0.1,2.5); T.selectGun('ar'); T.P.yaw=0.6; T.P.pitch=0; });
+ await shot('11_build',()=>{ T.selectPiece('wall'); T.tryPlace('wall'); T.P.yaw+=1.57; T.tryPlace('ramp'); T.P.yaw-=0.8; });
+ await shot('12_map',()=>{ T.toggleMap(true); });
+ console.log(errs.join('\n')||'no errors'); await b.close(); })();
