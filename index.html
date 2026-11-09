@@ -6767,7 +6767,7 @@ function housePartition(h,l){ if(h._part&&h._part[l]!==undefined) return h._part
   return h._part[l]=pick; }
 function partitionFix(h,l){ const P_=housePartition(h,l); if(!P_) return null; const C=CELL, y0=l*LVL, top=(l+1)*LVL-FT-0.01, th=0.14, dw=1.25, dh=2.15, parts={inner:[],beam:[]}, boxes=[];
   const ci=P_.X?Math.floor((P_.a+P_.b)/2/C):Math.floor(P_.x/C-0.5)+0, cj=P_.X?Math.floor(P_.z/C-0.5):Math.floor((P_.a+P_.b)/2/C), o=new THREE.Vector3((ci+.5)*C,y0-FT/2,(cj+.5)*C);
-  const seg=(s0,s1,ya,yb,k,solid)=>{ if(s1-s0<0.02) return; const b=P_.X?[s0,y0+ya,P_.z-th/2,s1,y0+yb,P_.z+th/2]:[P_.x-th/2,y0+ya,s0,P_.x+th/2,y0+yb,s1];
+  const seg=(s0,s1,ya,yb,k,solid)=>{ if(s1-s0<0.02) return; const t2=(k==='beam'?th+0.05:th)/2, b=P_.X?[s0,y0+ya,P_.z-t2,s1,y0+yb,P_.z+t2]:[P_.x-t2,y0+ya,s0,P_.x+t2,y0+yb,s1];
     const g=new THREE.BoxGeometry(b[3]-b[0],b[4]-b[1],b[5]-b[2]); g.translate((b[0]+b[3])/2-o.x,(b[1]+b[4])/2-o.y,(b[2]+b[5])/2-o.z); parts[k].push(g); if(solid) boxes.push(b); };
   const d0=P_.door-dw/2, d1=P_.door+dw/2;
   seg(P_.a,d0,0,top-y0,'inner',true); seg(d1,P_.b,0,top-y0,'inner',true); seg(d0,d1,dh,top-y0,'inner',true); // wall each side of the doorway and the wall over it
