@@ -591,6 +591,7 @@ const R=0.34, H_STAND=1.8, H_CROUCH=1.25, EYE_STAND=1.6, EYE_CROUCH=1.12;
    are always solid footing, so you can still build your way up a cliff. */
 const SLOPE_MAX=1.0;
 function slopeAt(x,z){ const e=0.8, gx=(terrainH(x+e,z)-terrainH(x-e,z))/(2*e), gz=(terrainH(x,z+e)-terrainH(x,z-e))/(2*e); return [Math.hypot(gx,gz),gx,gz]; }
+const WORLD_EDGE=2150; // where the land itself ends (far beyond the climbable ground)
 const RUN=6.0, CROUCH_SPD=3.2, GRAV=25, JUMP=8.4, ACC_G=80, ACC_A=30;
 const DIRS=[[1,0],[0,1],[-1,0],[0,-1]];
 const MAX_BUILDS=1500;
@@ -1026,6 +1027,39 @@ for(const t of TOWNS){ for(let dj=-5;dj<=5;dj++) for(let di=-5;di<=5;di++){ cons
    them. The main street lines up with the first road coming in. Roads from outside no longer cut through town to
    its centre: each one now stops at the edge of the flat town ground and joins the end of the nearest street.
    Old road traces inside towns (dirt, bare ground) are cleared. */
+/* Two more roads: Kettle Creek to Copper Ridge, and Hollow Hill south round the outside of the south-west mountain, along the southern edge, to Brambleford (through waypoints). Each is
+   routed over the ground by a path search on an 8 m grid that prefers gentle grades and keeps off the steep mountain
+   sides and other towns, then smoothed, given a graded height profile, and joined to the towns like every road. */
+{ const AG=8, M=Math.floor(2*WHALF/AG), H0=WORLD.H0, hAt=(u,v)=>{ const i=Math.round((u+WHALF)/WHS), j=Math.round((v+WHALF)/WHS); return H0[Math.max(0,Math.min(WN-1,j))*WN+Math.max(0,Math.min(WN-1,i))]; };
+  const g2u=i=>-WHALF+i*AG, u2g=u=>Math.round((u+WHALF)/AG);
+  const leg=(A,B)=>{ const s0=u2g(A.u)+u2g(A.v)*M, e0=u2g(B.u)+u2g(B.v)*M, G=new Float64Array(M*M).fill(Infinity), from=new Int32Array(M*M).fill(-1), done=new Uint8Array(M*M), heap=[];
+    const push=(f,k)=>{ heap.push([f,k]); let c=heap.length-1; while(c>0){ const q=(c-1)>>1; if(heap[q][0]<=heap[c][0]) break; [heap[q],heap[c]]=[heap[c],heap[q]]; c=q; } };
+    const pop=()=>{ const top=heap[0], last=heap.pop(); if(heap.length){ heap[0]=last; let c=0; for(;;){ const l=2*c+1, r2=l+1; let m=c; if(l<heap.length&&heap[l][0]<heap[m][0]) m=l; if(r2<heap.length&&heap[r2][0]<heap[m][0]) m=r2; if(m===c) break; [heap[m],heap[c]]=[heap[c],heap[m]]; c=m; } } return top; };
+    const ex=e0%M, ez=(e0-ex)/M, hd=(i,j)=>Math.hypot(i-ex,j-ez)*AG*0.9; G[s0]=0; push(0,s0);
+    while(heap.length){ const [,k]=pop(); if(done[k]) continue; done[k]=1; if(k===e0) break; const i=k%M, j=(k-i)/M, hk=hAt(g2u(i),g2u(j));
+      for(let dj=-1;dj<=1;dj++) for(let di=-1;di<=1;di++){ if(!di&&!dj) continue; const ni=i+di, nj=j+dj; if(ni<0||nj<0||ni>=M||nj>=M) continue; const nk=nj*M+ni; if(done[nk]) continue;
+        const u=g2u(ni), v=g2u(nj), d=Math.hypot(u,v); if(d>MAP_R-45) continue; const L=AG*Math.hypot(di,dj), gr=Math.abs(hAt(u,v)-hk)/L;
+        let c=L*(1+60*gr*gr)+(gr>0.12?L*300*(gr-0.12):0)+(d<FLAT_R+20?400:0);
+        for(const t of WORLD.towns){ if(t===A.t||t===B.t||EX.includes(t)) continue; if(Math.hypot(u-t.u,v-t.v)<t.R+20) c+=2000; }
+        for(const rd of WORLD.roads){ /* sharing an existing road is fine but not preferred */ }
+        const ng=G[k]+c; if(ng<G[nk]){ G[nk]=ng; from[nk]=k; push(ng+hd(ni,nj),nk); } } }
+    let pts=[]; for(let k=e0;k>=0;k=from[k]){ const i=k%M, j=(k-i)/M; pts.push([g2u(i),g2u(j)]); if(k===s0) break; } pts.reverse(); pts[0]=[A.u,A.v]; pts[pts.length-1]=[B.u,B.v]; return pts; };
+  // a road through a list of stops (towns at the ends, waypoints between): each leg found by the search, then all smoothed
+  let EX=[];
+  const route=(stops)=>{ EX=[stops[0].t,stops[stops.length-1].t]; let pts=[]; for(let q=0;q<stops.length-1;q++){ const l=stops[q].straight?[[stops[q].u,stops[q].v],[(stops[q].u+stops[q+1].u)/2,(stops[q].v+stops[q+1].v)/2],[stops[q+1].u,stops[q+1].v]]:leg(stops[q],stops[q+1]); if(q&&!stops[q].t){ const W=stops[q], far=p=>Math.hypot(p[0]-W.u,p[1]-W.v)>30; while(pts.length>2&&!far(pts[pts.length-1])) pts.pop(); let i=0; while(i<l.length-2&&!far(l[i])) i++; pts=pts.concat(l.slice(i)); } else pts=pts.concat(q?l.slice(1):l); } // a waypoint is passed near, not hit exactly: no hairpins if(pts.length<3) return null;
+    const A=stops[0], B=stops[stops.length-1];
+    { const th=[pts[0]]; for(let q=3;q<pts.length-2;q+=3) th.push(pts[q]); th.push(pts[pts.length-1]); pts=th; } // thin the grid steps before smoothing
+    for(let it=0;it<5;it++){ const nx=[pts[0]]; for(let q=0;q<pts.length-1;q++){ const a=pts[q], b=pts[q+1]; nx.push([a[0]*.75+b[0]*.25,a[1]*.75+b[1]*.25],[a[0]*.25+b[0]*.75,a[1]*.25+b[1]*.75]); } nx.push(pts[pts.length-1]); pts=nx; }
+    const rs=[pts[0]]; for(let q=1;q<pts.length;q++){ let [x0,z0]=rs[rs.length-1]; const [x1,z1]=pts[q]; let dx=x1-x0, dz=z1-z0, L=Math.hypot(dx,dz); while(L>=2){ x0+=dx/L*2; z0+=dz/L*2; rs.push([x0,z0]); dx=x1-x0; dz=z1-z0; L=Math.hypot(dx,dz); } }
+    const n=rs.length, y=new Float32Array(n), pin=new Int8Array(n), pv=new Float32Array(n);
+    for(let q=0;q<n;q++){ const [u,v]=rs[q]; y[q]=hAt(u,v); for(const t of [A.t,B.t]) if(t&&Math.hypot(u-t.u,v-t.v)<t.R-2){ pin[q]=1; pv[q]=t.h; } }
+    const repin=()=>{ for(let q=0;q<n;q++) if(pin[q]) y[q]=pv[q]; }; repin(); const tmp=new Float32Array(n);
+    for(let pass=0;pass<8;pass++){ for(let q=0;q<n;q++){ let a=0,c=0; for(let w=-10;w<=10;w++){ const z=q+w; if(z<0||z>=n) continue; a+=y[z]; c++; } tmp[q]=a/c; } y.set(tmp); repin(); }
+    for(let pass=0;pass<4;pass++){ const g=0.2; for(let q=1;q<n;q++){ if(y[q]>y[q-1]+g) y[q]=y[q-1]+g; if(y[q]<y[q-1]-g) y[q]=y[q-1]-g; } for(let q=n-2;q>=0;q--){ if(y[q]>y[q+1]+g) y[q]=y[q+1]+g; if(y[q]<y[q+1]-g) y[q]=y[q+1]-g; } repin(); }
+    return {pts:rs.map((p,q)=>[p[0],p[1],y[q]]),skip:new Uint8Array(n)}; };
+  const T_=k=>({u:WORLD.towns[k].u,v:WORLD.towns[k].v,t:WORLD.towns[k]});
+  const W_=(u,v)=>({u,v,t:null});
+  for(const stops of [[2,8],[5,W_(-638,283),W_(-486,557),W_(-300,632),'bw',7]]){ const st=stops.map(x=>x==='bw'?Object.assign(W_(WORLD.towns[7].u-90,WORLD.towns[7].v),{straight:true}):typeof x==='number'?WORLD.towns[x]&&T_(x):x); if(st.some(x=>!x)) continue; const rd=route(st); if(rd){ if(stops.length>2) rd.prefEnd={7:0}; WORLD.roads.push(rd); } } } // the south road comes into Brambleford's west end
 { const rdPts=[];
   for(const t of TOWNS){
     let ax='x', best=1e9;
@@ -1041,7 +1075,7 @@ for(const t of TOWNS){ for(let dj=-5;dj<=5;dj++) for(let di=-5;di<=5;di++){ cons
       for(const end of [0,1]){ const P=end?rd.pts.slice().reverse():rd.pts.slice();
         if(Math.hypot(SPAWN[0]+P[0][0]-t.x,SPAWN[2]+P[0][1]-t.z)>4) continue; // this end isn't at this town
         let k=0; while(k<P.length-8&&Math.hypot(SPAWN[0]+P[k][0]-t.x,SPAWN[2]+P[k][1]-t.z)<cut) k++;
-        const at=[SPAWN[0]+P[k][0],SPAWN[2]+P[k][1]], e=t.ends.reduce((a,b)=>Math.hypot(b[0]-at[0],b[1]-at[1])<Math.hypot(a[0]-at[0],a[1]-at[1])?b:a);
+        const at=[SPAWN[0]+P[k][0],SPAWN[2]+P[k][1]], e=rd.prefEnd&&rd.prefEnd[TOWNS.indexOf(t)]!=null?t.ends[rd.prefEnd[TOWNS.indexOf(t)]]:t.ends.reduce((a,b)=>Math.hypot(b[0]-at[0],b[1]-at[1])<Math.hypot(a[0]-at[0],a[1]-at[1])?b:a);
         const L=Math.hypot(at[0]-e[0],at[1]-e[1]), ax_=[(e[0]-t.x)/Ls,(e[1]-t.z)/Ls];
         const q2=P[Math.min(P.length-1,k+3)], dx=SPAWN[0]+q2[0]-at[0], dz=SPAWN[2]+q2[1]-at[1], dl=Math.hypot(dx,dz)||1, dout=[dx/dl,dz/dl];
         const C1=[e[0]+ax_[0]*L*0.42,e[1]+ax_[1]*L*0.42], C2=[at[0]-dout[0]*L*0.42,at[1]-dout[1]*L*0.42], y0=t.h, y1=P[k][2];
@@ -2531,7 +2565,7 @@ function liftTarget(E,ps){
 const LIFT_SPD=16;
 function physStep(dt,E=P){
   { const dx=E.pos.x-SPAWN[0], dz=E.pos.z-SPAWN[2], d=Math.hypot(dx,dz);
-    if(d>MAP_R){ const nx=dx/d, nz=dz/d; E.pos.x=SPAWN[0]+nx*MAP_R; E.pos.z=SPAWN[2]+nz*MAP_R; const vn=E.vel.x*nx+E.vel.z*nz; if(vn>0){ E.vel.x-=vn*nx; E.vel.z-=vn*nz; } } }
+    if(d>WORLD_EDGE){ const nx=dx/d, nz=dz/d; E.pos.x=SPAWN[0]+nx*WORLD_EDGE; E.pos.z=SPAWN[2]+nz*WORLD_EDGE; const vn=E.vel.x*nx+E.vel.z*nz; if(vn>0){ E.vel.x-=vn*nx; E.vel.z-=vn*nz; } } }
   if(E.kart){ E.onGround=true; return; }
   if(E.sky){ skyPhys(dt,E); return; }
   updatePhase(E);
@@ -2639,7 +2673,7 @@ function moveBody0(E,fw,st,jump,dt){
    back to slow down, sideways to slip. You land on the ground, a roof or a build, and the glider folds away.
    No shooting, building or editing until you land. */
 const SKY_AUTO=85, SKY_FIRST=620, SKY_MATCH=520, SKY_BACK=160;
-function skyDropAllowed(){ return settings.skyDrop!==false&&settings.mode!=='horde'&&!horde.on&&!botOn(); }
+function skyDropAllowed(){ return settings.skyDrop!==false; }
 function skyDrop(x,z,h,E=P){ E.pos.set(x,terrainH(x,z)+h,z); E.vel.set(0,-6,0); E.onGround=false; E.groundSlab=null; E.fallTop=null; E.crouch=false;
   E.sky={phase:'fall',t:0,dive:0,jumpWas:true}; if(E===P){ if(edit) exitEdit(false); fireHeld=false; adsHeld=false; if(mode==='build') selectPick(); sfx('sky_start'); } }
 function skyGround(E){ const [g]=groundAt(E.pos.x,E.pos.z,E.pos.y+0.4,solidNear(E)); return g; }
@@ -2819,7 +2853,11 @@ function kartHits(k,x,z,yaw,ox,oz){ const fx=-Math.sin(yaw), fz=-Math.cos(yaw), 
 function kartGround(k,ps){ const out=k.wh; let i=0; for(const [wx,wz] of KART_WHEELS){ const p=kartPoint(k,wx,0,wz); out[i++]=groundAt(p.x,p.z,k.y+0.55,ps)[0]; } return out; }
 function simKart(k,inp,dt){ const fx=-Math.sin(k.yaw), fz=-Math.cos(k.yaw), rx=Math.cos(k.yaw), rz=-Math.sin(k.yaw);
   let vf=k.vx*fx+k.vz*fz, vl=k.vx*rx+k.vz*rz; const ground=!k.air, paved=roadDistAt(k.x,k.z)<ROAD_HW+0.6||!!townAt(k.x,k.z,0), vmax=paved?KMAX:KMAX_OFF;
-  if(ground){
+  let slick=false;
+  if(ground){ const [ts]=slopeAt(k.x,k.z), onB=KART_WHEELS.some(([wx,wz],i)=>{ const p=kartPoint(k,wx,0,wz,_ku); return k.wh[i]>terrainUnder(p.x,p.z)+0.08; }); slick=!onB&&ts>0.78; }
+  if(ground&&slick){ // too steep: no traction, it slides down the hill
+    vf-=GRAV*Math.sin(k.pitch)*dt; vl-=GRAV*Math.sin(k.roll)*dt*0.8; vl*=Math.exp(-1.2*dt); vf*=Math.exp(-0.4*dt); }
+  else if(ground){
     if(inp.fw>0.1){ if(vf<-0.3) vf+=KBRK*inp.fw*dt; else vf+=KACC*inp.fw*dt*Math.max(0.12,1-vf/vmax); }
     else if(inp.fw<-0.1){ if(vf>0.3) vf-=KBRK*(-inp.fw)*dt; else vf=Math.max(-KREV,vf-KACC*0.7*(-inp.fw)*dt); }
     else { const c=(1.3+0.06*Math.abs(vf))*dt; vf=Math.abs(vf)<=c?0:vf-Math.sign(vf)*c; }
@@ -2837,7 +2875,7 @@ function simKart(k,inp,dt){ const fx=-Math.sin(k.yaw), fz=-Math.cos(k.yaw), rx=M
   else if(!kartHits(k,nx,oz,k.yaw,ox,oz)){ k.x=nx; k.vz*=0.3; }
   else if(!kartHits(k,ox,nz,k.yaw,ox,oz)){ k.z=nz; k.vx*=0.3; }
   else { const sp=Math.hypot(k.vx,k.vz); if(sp>4){ sfxAt('kart_bump',_kz.set(k.x,k.y+0.5,k.z)); if(P.kart&&P.kart.k===k) shake=Math.max(shake,Math.min(0.25,sp*0.02)); k.sqV-=sp*0.15; } k.vx*=-0.2; k.vz*=-0.2; }
-  { const dx=k.x-SPAWN[0], dz=k.z-SPAWN[2], d=Math.hypot(dx,dz); if(d>MAP_R-2){ k.x=SPAWN[0]+dx/d*(MAP_R-2); k.z=SPAWN[2]+dz/d*(MAP_R-2); k.vx*=0.3; k.vz*=0.3; } }
+  { const dx=k.x-SPAWN[0], dz=k.z-SPAWN[2], d=Math.hypot(dx,dz); if(d>WORLD_EDGE){ k.x=SPAWN[0]+dx/d*WORLD_EDGE; k.z=SPAWN[2]+dz/d*WORLD_EDGE; k.vx*=0.3; k.vz*=0.3; } }
   // ground under each wheel: height, nose and side tilt; off a ramp it flies
   k.g.position.set(k.x,k.y,k.z); k.g.rotation.set(k.pitch,k.yaw,k.roll);
   const ps=near(k.x,k.z,1), w=kartGround(k,ps), gC=(w[0]+w[1]+w[2]+w[3])/4;
@@ -3114,7 +3152,7 @@ function validatePlacement(t,E=P){
   if(!t) return {ok:false,reason:'No spot to build'};
   if(pieces.has(t.key)) return {ok:false,reason:'Already built',occupied:true};
   const c=pieceCenter(t);
-  if(Math.hypot(c.x-SPAWN[0],c.z-SPAWN[2])>MAP_R-2) return {ok:false,reason:'Edge of the map'};
+  if(Math.hypot(c.x-SPAWN[0],c.z-SPAWN[2])>WORLD_EDGE-2) return {ok:false,reason:'Edge of the map'};
   if(t.l>BUILD_RULES.maxLevel) return {ok:false,reason:'Build height limit'};
   if(c.distanceTo(_c.set(E.pos.x,E.pos.y+1.2,E.pos.z))>BUILD_RULES.reach) return {ok:false,reason:'Out of reach'};
   if(!supported(t)) return {ok:false,reason:'Nothing to attach to'};
@@ -4665,7 +4703,7 @@ function startPlay(){
   catch(e){ lockFailed=true; menu.hidden=true; playing=true; }
   // If the browser never answers the lock request, start anyway.
   setTimeout(()=>{ if(!playing){ lockFailed=!locked; menu.hidden=true; playing=true; } },700);
-  if(!P.everPlayed){ P.everPlayed=true; if(!net.role&&skyDropAllowed()) skyDrop(SPAWN[0],SPAWN[2],SKY_FIRST); } // the first time in: from the sky
+  if(!P.everPlayed){ P.everPlayed=true; if((!net.role||!party.live)&&skyDropAllowed()) skyDrop(SPAWN[0],SPAWN[2],SKY_FIRST); } // the first time in: from the sky
 }
 $('play').addEventListener('click',startPlay);
 $('invClose').addEventListener('click',closeInv);
@@ -6112,6 +6150,7 @@ function propVariant(kind,variant){ const key=kind+variant; let v=propGeos.get(k
   mergeProp(g,kind==='rock'); const m=g.children[0]; v={geo:m.geometry,mat:m.material}; propGeos.set(key,v); return v;
 }
 function buildPropMesh(p,r){
+  if(p.kind==='tree'||p.kind==='pine'){ const g=new THREE.Group(); g.position.set(p.x,0,p.z); g.rotation.y=r()*Math.PI*2; g.scale.setScalar(p.s); p.lazy=true; return g; } // (not in the scene: see the forest)
   const g=new THREE.Group(); g.position.set(p.x,0,p.z); g.rotation.y=r()*Math.PI*2; const v=propVariant(p.kind,p.id%8);
   const m=new THREE.Mesh(v.geo,v.mat); m.castShadow=m.receiveShadow=true; g.add(m); g.scale.setScalar(p.s); scene.add(g); return g;
 }
@@ -6133,7 +6172,7 @@ function mergeProp(g,flat){
 function propBoxes(p){ return propBoxes0(p).map(b=>[b[0],b[1]+p.base,b[2],b[3],b[4]+p.base,b[5]]); }
 function propBoxes0(p){
   const s=p.s, x=p.x, z=p.z;
-  if(p.kind==='tree'||p.kind==='pine'){ const t=(p.kind==='tree'?.42:.34)*s+0.05; return [[x-t,0,z-t,x+t,3.2*s,z+t]]; }
+  if(p.kind==='tree'||p.kind==='pine'){ const t=(p.kind==='tree'?.42:.34)*s+0.05; return [[x-t,0,z-t,x+t,3.2*s*(p.hs||1),z+t]]; }
   if(p.kind==='rock'){ const a=1.05*s, c=.9*s; return [[x-a,0,z-c,x+a,1.35*s,z+c]]; }
   // car: long side follows its yaw, rounded to the nearest 90 degrees for a simple box
   const along=Math.abs(Math.cos(p.g.rotation.y))>.7; return [along?[x-2,0,z-.95,x+2,1.8,z+.95]:[x-.95,0,z-2,x+.95,1.8,z+2]];
@@ -6172,7 +6211,7 @@ function initChests(){
   const r=seeded(99173), RC=MAP_R-30; let made=0;
   for(let k=0;k<3000&&made<35;k++){ const u=(r()*2-1)*RC, v=(r()*2-1)*RC, d2=u*u+v*v; if(d2<60*60||d2>RC*RC) continue;
     const x=SPAWN[0]+u, z=SPAWN[2]+v, c=worldCell(x,z);
-    if(c<0||townAt(x,z,8)||roadDistAt(x,z)<7||WORLD.SNOW[c]>30||WORLD.ROCK[c]>150||chests.some(q=>Math.hypot(q.x-x,q.z-z)<70)) continue;
+    if(c<0||townAt(x,z,8)||roadDistAt(x,z)<7||WORLD.SNOW[c]>30||WORLD.ROCK[c]>150||chests.some(q=>Math.hypot(q.x-x,q.z-z)<70)||propsNear(x,z,[],1).some(q=>Math.hypot(q.x-x,q.z-z)<2.6)) continue;
     addChest(x,terrainH(x,z),z,r()*6.28); made++; }
 }
 function rollChestLoot(){
@@ -6257,19 +6296,34 @@ function initProps(){
     p.g=buildPropMesh(p,r); if(yaw!=null) p.g.rotation.y=yaw; p.g.position.y=p.base; p.g.traverse(m=>{ if(m.isMesh&&m.material!==inkMat) m.userData.piece=p; }); p.boxes=propBoxes(p);
     props.push(p); byKind[kind].push(p); const k=pkey(x,z); let set=propCells.get(k); if(!set){ set=new Set(); propCells.set(k,set); } set.add(p); return p; };
   const roomy=(x,z,kind)=>!propsNear(x,z,[],1).some(q=>Math.hypot(q.x-x,q.z-z)<(kind==='car'||q.kind==='car'?9:kind==='rock'||q.kind==='rock'?6:8));
-  for(const [kind,n] of [['tree',520],['pine',520],['rock',220],['car',15]]){ let made=0;
+  /* Trees: about 9,000, grown from a noise field of woods and meadows. In the woods they stand close (4 m apart or
+     so); out in the meadows they're scattered and grow bigger. Broadleaf trees fill the valleys, pines take over
+     higher up and climb the rocky mountain faces (not the sheerest cliffs or the snow). Every tree has its own size
+     and height, from saplings to giants. Rocks and junk cars are placed as before. */
+  const woods=(x,z)=>{ const n=0.65*gnoise(x*0.0042,z*0.0042,4411)+0.35*gnoise(x*0.013,z*0.013,4417); return sstep(-0.15,0.45,n); };
+  const roomyT=(x,z,gap)=>!propsNear(x,z,[],1).some(q=>Math.hypot(q.x-x,q.z-z)<(q.kind==='tree'||q.kind==='pine'?gap:q.kind==='car'?7:5));
+  { let made=0; const WANT=9000;
+    for(let k=0;k<160000&&made<WANT;k++){
+      const x=SPAWN[0]+(r()*2-1)*RR, z=SPAWN[2]+(r()*2-1)*RR, u=x-SPAWN[0], v=z-SPAWN[2], d2=u*u+v*v; if(d2>RR*RR||d2<(FLAT_R+14)*(FLAT_R+14)) continue;
+      const c=worldCell(x,z); if(c<0||WORLD.SNOW[c]>60||roadDistAt(x,z)<6.5||townAt(x,z,7)) continue;
+      const w=woods(x,z), rock=WORLD.ROCK[c], h=terrainH(x,z), [sl]=slopeAt(x,z); if(sl>1.55) continue;
+      if(r()>0.1+0.9*w) continue; // meadows keep a few lone trees
+      const high=sstep(25,85,h), rocky=rock>110;
+      const kind=rocky||r()<0.15+0.75*high?'pine':'tree'; if(kind==='tree'&&rocky) continue;
+      if(rocky&&r()<0.35) continue; // thinner on the rock
+      const gap=w>0.55?(kind==='pine'?3.6:4.4):(kind==='pine'?5:6.5); if(!roomyT(x,z,gap)) continue;
+      const big=w>0.55?0:0.35, sz=(r()+r())/2, s=kind==='pine'?0.75+sz*1.7+big:0.7+sz*1.45+big, hs=0.82+r()*0.48;
+      const p=add(kind,x,z,s); p.hs=hs; p.g.scale.set(p.s,p.s*hs,p.s); p.tint=0.88+r()*0.22; p.boxes=propBoxes(p); made++; } }
+  for(const [kind,n] of [['rock',220],['car',15]]){ let made=0;
     while(made<n&&tries<90000){ tries++;
-      let x=SPAWN[0]+(r()*2-1)*RR, z=SPAWN[2]+(r()*2-1)*RR;
-      // trees grow in clumps: most new trees start near an existing one, which makes little woods
-      const own=byKind[kind]; if((kind==='tree'||kind==='pine')&&made>8&&r()<0.6){ const q=own[Math.floor(r()*own.length)]; x=q.x+(r()*2-1)*16; z=q.z+(r()*2-1)*16; }
+      const x=SPAWN[0]+(r()*2-1)*RR, z=SPAWN[2]+(r()*2-1)*RR;
       const u=x-SPAWN[0], v=z-SPAWN[2], d2=u*u+v*v; if(d2>RR*RR||d2<18*18) continue;
       const c=worldCell(x,z); if(c<0||WORLD.SNOW[c]>50||roadDistAt(x,z)<8||townAt(x,z,8)) continue;
-      const rock=WORLD.ROCK[c], h=terrainH(x,z);
+      const rock=WORLD.ROCK[c];
       if(kind==='rock'){ if(rock<90&&r()<0.8) continue; } else if(rock>120) continue;
-      if(kind==='pine'&&h<24&&r()<0.8) continue;  // pines like it higher up
-      if(kind==='tree'&&h>70&&r()<0.8) continue;  // broadleaf trees stay lower
       if(!roomy(x,z,kind)) continue;
-      add(kind,x,z,kind==='rock'?.8+r()*.7:kind==='car'?1:kind==='pine'?1.45+r()*.7:1.35+r()*.6); made++; } } // big, tall trees
+      add(kind,x,z,kind==='rock'?.8+r()*.7:1); made++; } }
+  yardTrees(add,r);
   // parked cars: on a road's shoulder, lined up with it
   const roads=WORLD.roads; let parked=0;
   for(let t=0;t<800&&parked<25&&roads.length;t++){ const rd=roads[Math.floor(r()*roads.length)], n=rd.pts.length; if(n<9) continue;
@@ -6280,7 +6334,7 @@ function initProps(){
 }
 function propsNear(x,z,out,rad=1){ const cx=Math.floor(x/PCELL), cz=Math.floor(z/PCELL);
   for(let i=-rad;i<=rad;i++) for(let j=-rad;j<=rad;j++){ const set=propCells.get((cx+i)+','+(cz+j)); if(set) set.forEach(p=>{ if(p.alive) out.add?out.add(p):out.push(p); }); } return out; }
-function propMeshesNear(x,z){ const out=[]; propsNear(x,z,[]).forEach(p=>p.g.traverse(m=>{ if(m.isMesh&&m.userData.piece) out.push(m); })); return out; }
+function propMeshesNear(x,z){ const out=[]; propsNear(x,z,[]).forEach(p=>{ if(p.lazy){ treeMesh(p); if(!p.g.parent) p.g.updateMatrixWorld(true); } p.g.traverse(m=>{ if(m.isMesh&&m.userData.piece) out.push(m); }); }); return out; }
 // pickaxe (or a shot) hits a prop: it shakes, and the pickaxe pays out materials
 function propHit(p,dmg,point,byPick,quiet){
   if(!p.alive) return;
@@ -6289,19 +6343,22 @@ function propHit(p,dmg,point,byPick,quiet){
   if(!quiet){ sfxAt(T.snd,point); burst(point,4,3,0.08,matFor[p.mat].chip); }
   if(byPick){ const n=Math.round((T.per[0]+Math.random()*(T.per[1]-T.per[0]))*(dmg/50)); giveMats(p.mat,n,point); }
   if(p.hp<=0) propBreak(p,quiet);
+  if(p.lazy) forestDirty=true;
   if(!quiet&&net.role) netOp({op:'pv',id:p.id,hp:Math.round(p.hp)});
 }
 function propBreak(p,quiet){
   if(!p.alive) return; p.alive=false; p.hp=0; p.respawnT=35+Math.random()*45; p.grow=1; p.dying=0.35;
   burst(new THREE.Vector3(p.x,p.base+1.2,p.z),18,6,0.25,matFor[p.mat].chip); if(!quiet) sfxAt('break_'+p.mat,new THREE.Vector3(p.x,p.base+1,p.z));
 }
-function propRevive(p){ p.alive=true; p.hp=p.maxHp; p.grow=0; p.dying=0; p.g.visible=true; p.g.scale.setScalar(p.s*0.01); propCullT=0; }
+function propRevive(p){ p.alive=true; p.hp=p.maxHp; p.grow=0; p.dying=0; p.g.visible=true; p.g.scale.setScalar(p.s*0.01); propCullT=0; forestDirty=true; }
 let propCullT=0;
 function stepProps(dt){
   propCullT-=dt; if(propCullT<=0){ propCullT=0.25; const cx=camera.position.x, cz=camera.position.z;
-    for(const p of props){ const far=(p.x-cx)*(p.x-cx)+(p.z-cz)*(p.z-cz)>400*400; p.g.visible=!far&&(p.alive||p.dying>0); }
-    townBatch.forEach((b,t)=>{ const on=Math.hypot(t.x-cx,t.z-cz)<700; b.meshes.forEach(m=>{ m.visible=on; }); }); } // far towns are a few pixels in the haze
+    for(const p of props){ if(p.lazy) continue; const far=(p.x-cx)*(p.x-cx)+(p.z-cz)*(p.z-cz)>400*400; p.g.visible=!far&&(p.alive||p.dying>0); }
+    townBatch.forEach((b,t)=>{ const on=Math.hypot(t.x-cx,t.z-cz)<700; b.meshes.forEach(m=>{ m.visible=on; }); }); gardenMeshes.forEach(m=>{ m.visible=Math.hypot(m.userData.town.x-cx,m.userData.town.z-cz)<450; }); } // far towns are a few pixels in the haze
+  stepForest(dt);
   for(const p of props){
+    if(p.lazy) treeAnim(p);
     if(p.wob>0){ p.wob=Math.max(0,p.wob-dt*4); const w=Math.sin(p.wob*22)*p.wob*0.04; p.g.rotation.z=w; p.g.rotation.x=w*0.6; }
     if(p.dying>0){ p.dying-=dt; const k=Math.max(0.01,p.dying/0.35); p.g.scale.setScalar(p.s*k); if(p.dying<=0) p.g.visible=false; }
     if(p.alive&&p.grow<1){ p.grow=Math.min(1,p.grow+dt*1.6); const e=p.grow<1?1-Math.pow(1-p.grow,3)*1.0+Math.sin(p.grow*Math.PI)*0.08:1; p.g.scale.setScalar(p.s*e); }
@@ -6311,6 +6368,84 @@ function stepProps(dt){
         if(blocked) p.respawnT=3; else { propRevive(p); if(net.role) netOp({op:'pb',id:p.id}); } } }
   }
 }
+/* ---------- the forest ----------
+   Thousands of trees can't each be their own object, so they're drawn as instanced meshes: within 130 m every tree
+   is the full model (eight broadleaf and eight pine shapes), further out a much simpler one (a few blobs or cones on
+   a trunk), and past 1.5 km the haze has them. Each tree keeps its own turn, size, height and a slightly different
+   green. The lists are rebuilt a few times a second as you move. A tree that's being chopped, falling or growing
+   back gets its own mesh while it moves, then rejoins the forest. */
+const FOREST={near:null,far:null,lastX:1e9,lastZ:1e9,t:0}; let forestDirty=true;
+const NEAR_TREE=130, FAR_TREE=1500;
+function farTreeGeo(kind,v){ const q=seeded(5303+v*977+(kind==='pine'?31:0)), parts=[], put=(g,col)=>{ g=g.index?g.toNonIndexed():g; g.computeVertexNormals(); const n=g.attributes.position.count, c=new Float32Array(n*3), cc=new THREE.Color(col); for(let i=0;i<n;i++){ c[i*3]=cc.r; c[i*3+1]=cc.g; c[i*3+2]=cc.b; } g.setAttribute('color',new THREE.BufferAttribute(c,3)); parts.push(g); };
+  if(kind==='tree'){ put(new THREE.CylinderGeometry(.3,.4,3.4,5).translate(0,1.7,0),0x6e4a2b);
+    for(const [x,y,z,rr,col] of [[0,4.4,0,2.0,0x3f8434],[0.9,4.0,0.4,1.4,0x46903a],[-0.8,4.1,-0.5,1.45,0x4a943d],[0.1,5.3,0.1,1.4,0x58a845]]) put(new THREE.IcosahedronGeometry(rr*(0.9+q()*0.2),0).translate(x,y,z),col); }
+  else { put(new THREE.CylinderGeometry(.22,.34,2.8,5).translate(0,1.4,0),0x5e3e24);
+    for(const [rr,y,hh,col] of [[2.2,3.1,2.4,0x2c6e44],[1.65,4.3,2.1,0x337c4b],[1.05,5.4,1.8,0x3d8f57]]) put(new THREE.ConeGeometry(rr*(0.95+q()*0.1),hh,7).translate(0,y,0),col); }
+  const out=new THREE.BufferGeometry(); for(const k of ['position','normal','color']){ let len=0; parts.forEach(g=>len+=g.attributes[k].array.length); const A=new Float32Array(len); let o=0; parts.forEach(g=>{ A.set(g.attributes[k].array,o); o+=g.attributes[k].array.length; }); out.setAttribute(k,new THREE.BufferAttribute(A,3)); }
+  return out; }
+function initForest(){ const trees=props.filter(p=>p.lazy), mk=(geo,mat,n,shadow)=>{ const m=new THREE.InstancedMesh(geo,mat,Math.max(1,n)); m.setColorAt(0,new THREE.Color(1,1,1)); m.count=0; m.frustumCulled=false; m.castShadow=shadow; m.receiveShadow=true;
+    m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.instanceColor.setUsage(THREE.DynamicDrawUsage); scene.add(m); return m; };
+  FOREST.near={}; FOREST.far={};
+  for(const kind of ['tree','pine']){ const n=trees.filter(p=>p.kind===kind).length;
+    FOREST.near[kind]=[...Array(8)].map((_,v)=>{ const V=propVariant(kind,v); return mk(V.geo,V.mat,trees.filter(p=>p.kind===kind&&p.id%8===v).length,true); });
+    FOREST.far[kind]=[...Array(4)].map((_,v)=>mk(farTreeGeo(kind,v),propVariant(kind,0).mat,trees.filter(p=>p.kind===kind&&p.id%4===v).length,false)); }
+  FOREST.trees=trees; forestDirty=true; }
+const _fc=new THREE.Color(), _fm=new THREE.Matrix4();
+function stepForest(dt){ if(!FOREST.near) return; FOREST.t-=dt; const cx=camera.position.x, cz=camera.position.z;
+  const moved=Math.hypot(cx-FOREST.lastX,cz-FOREST.lastZ);
+  if(!(forestDirty&&FOREST.t<=0)&&!(moved>6&&FOREST.t<=0)) return; FOREST.t=0.2; forestDirty=false; FOREST.lastX=cx; FOREST.lastZ=cz;
+  const cnt=new Map(); const push=(m,p)=>{ const i=cnt.get(m)||0; p.g.updateMatrix(); _fm.copy(p.g.matrix); m.setMatrixAt(i,_fm); const t=p.tint||1; m.setColorAt(i,_fc.setRGB(t,t*(0.97+0.06*((p.id*37)%10)/10),t)); cnt.set(m,i+1); };
+  const N2=NEAR_TREE*NEAR_TREE, F2=FAR_TREE*FAR_TREE;
+  for(const p of FOREST.trees){ if(p.gone||!p.alive||p.g.parent) continue; const dx=p.x-cx, dz=p.z-cz, d2=dx*dx+dz*dz; if(d2>F2) continue;
+    if(d2<N2) push(FOREST.near[p.kind][p.id%8],p); else if(d2<420000||(d2<1000000?p.id%2===0:p.id%3===0)) push(FOREST.far[p.kind][p.id%4],p); } // deep in the haze, every other (then every third) tree is plenty
+  for(const set of [FOREST.near,FOREST.far]) for(const kind in set) for(const m of set[kind]){ const n=cnt.get(m)||0; m.count=n; if(n){ m.instanceMatrix.needsUpdate=true; m.instanceColor.needsUpdate=true; } } }
+// a tree's own mesh (for the pickaxe to hit, and while it shakes, falls or grows)
+function treeMesh(p){ if(p.g.children.length) return p.g.children[0]; const V=propVariant(p.kind,p.id%8), m=new THREE.Mesh(V.geo,V.mat); m.castShadow=m.receiveShadow=true; m.userData.piece=p; p.g.add(m); return m; }
+function treeAnim(p){ const moving=p.wob>0||p.dying>0||(p.alive&&p.grow<1);
+  if(moving&&!p.g.parent){ treeMesh(p); scene.add(p.g); forestDirty=true; FOREST.t=0; }
+  else if(!moving&&p.g.parent){ scene.remove(p.g); p.g.scale.set(p.s,p.s*(p.hs||1),p.s); p.g.rotation.x=p.g.rotation.z=0; forestDirty=true; FOREST.t=0; } }
+/* ---------- front yards and back gardens ----------
+   Every house gets a tree or two in the front yard (small and medium ones, clear of the path and the driveway) and
+   bigger ones out back where there's room; a flower bed along the front wall, round shrubs at the corners and a
+   mailbox by the sidewalk. The yard trees are real trees (they farm and grow back); the garden pieces are one mesh
+   per town, just for looks. */
+function yardFrame(t,h){ const C=CELL, X=h.side==='n'||h.side==='s';
+  const fN=h.side==='n'||h.side==='w', x0=h.i0*C, x1=(h.i0+h.w)*C, z0=h.j0*C, z1=(h.j0+h.d)*C;
+  // u along the front, w out from the front wall (toward the street, negative w goes behind the house)
+  if(X){ const fz=fN?z0:z1, s=fN?-1:1; return {len:x1-x0,depth:z1-z0,p:(u,w)=>[x0+u,fz+s*w]}; }
+  const fx=fN?x0:x1, s=fN?-1:1; return {len:z1-z0,depth:x1-x0,p:(u,w)=>[fx+s*w,z0+u]}; }
+function yardTrees(add,r){
+  const free=(t,x,z,pad)=>{ if(Math.hypot(x-t.x,z-t.z)>t.R+6) return false; if(Math.abs(x-t.x)<ROAD_HW+WALK_W+1.4||Math.abs(z-t.z)<ROAD_HW+WALK_W+1.4) return false;
+    for(const h of t.houses){ if(x>h.i0*CELL-pad&&x<(h.i0+h.w)*CELL+pad&&z>h.j0*CELL-pad&&z<(h.j0+h.d)*CELL+pad) return false; const G=h.garage; if(G&&x>G.i*CELL-pad&&x<(G.i+1)*CELL+pad&&z>G.j*CELL-pad&&z<(G.j+1)*CELL+pad) return false; }
+    for(const rd of WORLD.roads){ if(rd.street) continue; if(roadDistAt(x,z)<ROAD_HW+2) return false; } return true; };
+  for(const t of TOWNS){ if(!t.houses.length) planHouses(t);
+    for(const h of t.houses){ const f=yardFrame(t,h), gside=h.garage?1:0;
+      // front yard: one or two smallish trees in the corners, clear of the path (middle) and the garage side
+      const spots=[[0.18,2.6],[0.82,2.6]]; for(const [fu,fw] of spots){ if(r()<0.25) continue; const u=f.len*fu+(r()-.5)*0.8; if(Math.abs(u-f.len/2)<2.2) continue; if(gside&&fu>0.6) continue;
+        const [x,z]=f.p(u,fw+(r()-.5)*0.6); if(!free(t,x,z,1.6)) continue; if(propsNear(x,z,[],1).some(q=>Math.hypot(q.x-x,q.z-z)<3.5)) continue;
+        const p=add(r()<0.75?'tree':'pine',x,z,0.55+r()*0.45); p.hs=0.85+r()*0.35; p.g.scale.set(p.s,p.s*p.hs,p.s); p.tint=0.9+r()*0.18; p.yard=true; p.boxes=propBoxes(p); }
+      // back garden: bigger trees behind the house, where nothing else is
+      for(let n=0;n<3;n++){ if(r()<0.35) continue; const u=f.len*(0.15+r()*0.7), w=-(f.depth+3+r()*4); const [x,z]=f.p(u,w); if(!free(t,x,z,2.2)) continue;
+        if(propsNear(x,z,[],1).some(q=>Math.hypot(q.x-x,q.z-z)<4.5)) continue; const p=add(r()<0.6?'tree':'pine',x,z,0.8+r()*0.8); p.hs=0.85+r()*0.4; p.g.scale.set(p.s,p.s*p.hs,p.s); p.tint=0.88+r()*0.2; p.yard=true; p.boxes=propBoxes(p); } } } }
+let gardenMeshes=[];
+function buildGardens(){ const flowers=[0xe8456b,0xf2c014,0xffffff,0xa45ee5,0xff8a3d,0xe23a3a], q=seeded(77123);
+  for(const t of TOWNS){ const parts=[], put=(g,col,x,y,z,ry=0)=>{ g=g.index?g.toNonIndexed():g.clone(); g.rotateY(ry); g.translate(x,y,z); const n=g.attributes.position.count, c=new Float32Array(n*3), cc=new THREE.Color(col); for(let i=0;i<n;i++){ c[i*3]=cc.r; c[i*3+1]=cc.g; c[i*3+2]=cc.b; } g.setAttribute('color',new THREE.BufferAttribute(c,3)); parts.push(g); };
+    const y0=t.h;
+    for(const h of t.houses){ const f=yardFrame(t,h), X=h.side==='n'||h.side==='s', ry=X?0:Math.PI/2, mid=f.len/2;
+      // flower beds along the front wall, either side of the door: dark soil, a brick edge, rows of flowers
+      for(const sd of [-1,1]){ if(h.garage&&sd>0&&f.len<11) continue; const a=sd<0?0.6:mid+1.2, b=sd<0?mid-1.2:f.len-0.6, L=b-a; if(L<1.2) continue;
+        const [cx,cz]=f.p((a+b)/2,0.55); put(new THREE.BoxGeometry(L,0.12,0.8),0x4a3424,cx,y0+0.06,cz,ry); put(new THREE.BoxGeometry(L+0.1,0.16,0.08),0x9a5a42,...f.p((a+b)/2,0.98).reduce((o,v,i)=>(o[i?2:0]=v,o),[0,y0+0.08,0]),ry);
+        const col=flowers[Math.floor(q()*flowers.length)], col2=flowers[Math.floor(q()*flowers.length)];
+        for(let u=a+0.2;u<b-0.1;u+=0.32){ for(const w of [0.35,0.72]){ const [x,z]=f.p(u+(q()-.5)*0.1,w+(q()-.5)*0.08); put(new THREE.IcosahedronGeometry(0.09+q()*0.04,0),q()<0.75?col:col2,x,y0+0.2+q()*0.08,z); put(new THREE.CylinderGeometry(0.012,0.012,0.16,3),0x3f7a2e,x,y0+0.12,z); } } }
+      // round shrubs at the front corners
+      for(const fu of [0.25,f.len-0.25]){ if(h.garage&&fu>mid) continue; const [x,z]=f.p(fu,0.4); const rr=0.45+q()*0.2; put(new THREE.IcosahedronGeometry(rr,1).scale(1,0.85,1),0x3d7a32,x,y0+rr*0.7,z); }
+      // a mailbox by the sidewalk, beside the front path
+      { const [x,z]=f.p(mid+1.25,(X?Math.abs((h.side==='n'?h.j0*CELL:(h.j0+h.d)*CELL)-t.z):Math.abs((h.side==='w'?h.i0*CELL:(h.i0+h.w)*CELL)-t.x))-(ROAD_HW+WALK_W)-0.45);
+        put(new THREE.BoxGeometry(0.09,1.05,0.09),0x5a4030,x,y0+0.52,z,ry); put(new THREE.BoxGeometry(0.24,0.24,0.46),[0x2a2d33,0x8a2a2a,0x2f5d8a,0xe0ddd5][Math.floor(q()*4)],x,y0+1.12,z,ry+Math.PI/2);
+        put(new THREE.BoxGeometry(0.03,0.16,0.07),0xd23a2a,...[x+(X?0.14:0),y0+1.2,z+(X?0:0.14)],ry); } }
+    if(!parts.length) continue;
+    const out=new THREE.BufferGeometry(); for(const k of ['position','normal','color']){ let len=0; parts.forEach(g=>len+=g.attributes[k].array.length); const A=new Float32Array(len); let o=0; parts.forEach(g=>{ A.set(g.attributes[k].array,o); o+=g.attributes[k].array.length; }); out.setAttribute(k,new THREE.BufferAttribute(A,3)); }
+    out.computeBoundingSphere(); const m=new THREE.Mesh(out,new THREE.MeshLambertMaterial({vertexColors:true})); m.castShadow=true; m.receiveShadow=true; m.matrixAutoUpdate=false; m.userData.town=t; scene.add(m); gardenMeshes.push(m); } }
 /* materials: infinite by default; switch it off in Settings to farm for your builds */
 const MAT_MAX=999, BUILD_COST=10;
 function giveMats(mat,n,point){ if(settings.infMats||n<=0) return; P.mats[mat]=Math.min(MAT_MAX,(P.mats[mat]|0)+n); if(point) dmgNum(point,'+'+n+' '+MATERIALS[mat].name.toUpperCase(),'mat'); syncMats(); }
@@ -6869,6 +7004,7 @@ function botEditWall(p,mask){
   if(net.role==='host') netOp({op:'shape',key:p.key,mask:p.mask,dir:p.dir,half:p.half,path:p.path||null}); reshaped(p,nb0);
 }
 function botFire(eye,dist,s){
+  if(BT&&BT.sky) return; // no shooting at someone still in the sky
   const w=B.wpn, W=WEAPONS[w];
   const head=Math.random()<0.08+0.32*s;
   const aim=new THREE.Vector3(BT.pos.x,BT.pos.y+(head?(BT.crouch?1.2:1.66):(BT.crouch?0.8:1.15)),BT.pos.z);
@@ -7078,7 +7214,6 @@ function renderBigMapImage(){
   for(const [w,col] of [[7,'#26282c'],[3.6,'#9a9ea4']]){ g.strokeStyle=col; g.lineWidth=w;
     for(const rd of WORLD.roads){ g.beginPath(); rd.pts.forEach((p,k)=>k?g.lineTo(X(p[0]),X(p[1])):g.moveTo(X(p[0]),X(p[1]))); g.stroke(); }
     g.fillStyle=col; WORLD.towns.forEach(t=>{ g.beginPath(); g.arc(X(t.u),X(t.v),(PLAZA_R/mpp)+w/2+1,0,7); g.fill(); }); }
-  g.setLineDash([10,8]); g.strokeStyle='rgba(255,255,255,.55)'; g.lineWidth=2; g.beginPath(); g.arc(X(0),X(0),MAP_R/mpp,0,7); g.stroke(); // the edge of the island
   g.setLineDash([]); g.strokeStyle='rgba(255,236,190,.8)'; g.lineWidth=2; g.beginPath(); g.arc(X(0),X(0),FLAT_R/mpp,0,7); g.stroke(); // the build field
   return c;
 }
@@ -7140,8 +7275,8 @@ function warmBuildShaders(){ try{ const g=new THREE.Group(), geo=new THREE.BoxGe
   const gw=makeGlider(0xff6a3d); gw.visible=true; gw.scale.setScalar(0.003); g.add(gw);
   g.position.copy(camera.position); scene.add(g); renderer.compile(scene,camera); scene.remove(g); }catch(e){ console.warn('shader warm-up skipped',e); } }
 setTimeout(warmBuildShaders,1500);
-initProps(); props.forEach(p=>{ if(townAt(p.x,p.z,6)){ p.gone=true; p.alive=false; p.g.visible=false; } }); syncMats();
-buildWorld(); initChests(); spawnFloorLoot(); initKarts();
+initProps(); props.forEach(p=>{ if(!p.yard&&townAt(p.x,p.z,6)){ p.gone=true; p.alive=false; p.g.visible=false; } }); syncMats();
+buildWorld(); initChests(); spawnFloorLoot(); initKarts(); initForest(); buildGardens();
 syncBot();
 // locker: render a portrait of every outfit once, then build the cards
 (function(){

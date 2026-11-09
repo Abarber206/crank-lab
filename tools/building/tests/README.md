@@ -11,3 +11,4 @@ Run with Node and Playwright (Chromium), from a folder that has `three` and `pee
 - `mp_kart.js` — a buggy in a party: the host drives and a friend sees it move with the driver seated, the friend rides as passenger, and the parked buggy ends up in the same place for both. Needs the `peer` and `express` packages.
 - `tswap.js` — with full slots, Interact swaps the weapon in your hands for one on the ground; map houses can't be edited under any edit setting; the mouse wheel steps a scope's zoom in and out.
 - `tslope.js` — mountainsides: you can't walk up a 45°+ face, you slide down it with no fall damage, and gentle hills are still walkable.
+- `tquick.js` — the drop from the sky happens with the bot on; the Kettle Creek–Copper Ridge and Hollow Hill–Brambleford roads exist; a buggy on a cliff slides back; walking past the old circular edge is no longer stopped.
