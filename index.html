@@ -6235,7 +6235,7 @@ function addChest(x,y,z,yaw){ const c={id:chests.length,x,y,z,yaw,open:false,pro
   c.g.position.set(x,y,z); c.g.rotation.y=yaw; scene.add(c.g); chests.push(c); return c; }
 function initChests(){
   for(const t of TOWNS) for(const h of t.houses){ const s=houseSpots(h);
-    s.chest.forEach(p=>{ const yaw=Math.atan2(t.x-p.x,t.z-p.z)+Math.PI; addChest(p.x,p.y,p.z,yaw); }); }
+    const cr=seeded(t.seed+h.id*977+5); s.chest.forEach(p=>{ if(cr()>0.45) return; const yaw=Math.atan2(t.x-p.x,t.z-p.z)+Math.PI; addChest(p.x,p.y,p.z,yaw); }); }
   // a few in the wild, under trees and on hilltops
   const r=seeded(99173), RC=MAP_R-30; let made=0;
   for(let k=0;k<3000&&made<35;k++){ const u=(r()*2-1)*RC, v=(r()*2-1)*RC, d2=u*u+v*v; if(d2<60*60||d2>RC*RC) continue;

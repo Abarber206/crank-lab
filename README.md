@@ -70,7 +70,7 @@ Ten towns sit on the flattest lowland spots around the island (Rustwood, Pebble 
 - **Houses** are made of real build pieces, so you can shoot, pickaxe, crack and collapse them, but you can't edit them (whatever the edit setting). **Clear builds**, or the start of a new round, puts them back.
 - **Front yards and gardens.** Every house has a tree or two in the front yard and bigger ones out back where there's room, a flower bed along the front wall, round shrubs at the corners and a mailbox by the sidewalk.
 - **Garages.** Some houses have a one-car garage beside them, facing the same street: a concrete floor with an oil stain, the overhead door rolled up under a flat roof, a workbench with a pegboard of tools and a shelf of crates. A concrete driveway runs out to the street. Now and then a dune buggy is parked inside (at most two per town).
-- **Chests.** Gold-banded chests sit in houses (some upstairs) and out in the wild. They glow, give off a soft shimmering hum when you're within about 9 m, and show as gold squares on the minimap. Hold **Interact** (V, bindable) next to one for half a second and it bursts open, throwing out:
+- **Chests.** Gold-banded chests sit in about half the houses (some upstairs) and out in the wild. They glow, give off a soft shimmering hum when you're within about 9 m, and show as gold squares on the minimap. Hold **Interact** (V, bindable) next to one for half a second and it bursts open, throwing out:
   - a gun (any rarity, with rarer ones less likely)
   - ammo for that gun
   - often a bonus: heals, grenades or extra ammo
