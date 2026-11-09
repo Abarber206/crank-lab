@@ -1685,13 +1685,21 @@ function coneFrame(mask){
   [A,Bc,Cc,D].forEach(c=>parts.push(beamGeo(c,E,0.13)));
   g=mergeGeos(parts); g.computeVertexNormals(); coneFrameCache.set(mask,g); return g;
 }
+let _glassMat=null; const _glassGeo={};
+function glassMat(){ return _glassMat||(_glassMat=new THREE.MeshPhongMaterial({color:0xcfe6f2,transparent:true,opacity:0.3,shininess:120,specular:0xffffff,depthWrite:false,side:THREE.DoubleSide})); }
+function windowGlassGeo(axis){ if(_glassGeo[axis]) return _glassGeo[axis]; const w=CELL/3, h=LVL/3, X=axis==='x';
+  const glass=new THREE.PlaneGeometry(w-0.04,h-0.04); if(X) glass.rotateY(Math.PI/2);
+  const bars=mergeGeos([new THREE.BoxGeometry(X?0.05:0.05,h,X?0.05:0.05),new THREE.BoxGeometry(X?0.05:w,0.05,X?w:0.05)]);
+  return _glassGeo[axis]={glass,bars}; }
 function makeGroup(p,mat,real){
   const g=new THREE.Group(); g.position.copy(pieceCenter(p));
   const M=p.skin?houseSkin(p):matFor[p.mat||'wood'], base=mat||(p.type==='wall'?M.wall:M.floor);
   const add=(geo,x,y,z,rx,rz,mm)=>{ const m=new THREE.Mesh(geo,mat||mm||base); m.position.set(x,y,z); if(rx)m.rotation.x=rx; if(rz)m.rotation.z=rz;
-    if(real){ m.castShadow=true; m.receiveShadow=true; m.userData.piece=p; } g.add(m); };
+    if(real){ m.castShadow=!m.material.transparent; m.receiveShadow=true; m.userData.piece=p; } g.add(m); };
   if(p.fix&&p.skin&&!mat) p.fix.parts.forEach(([geo,k])=>add(geo,0,0,0,0,0,k==='inner'?housePlainMat(p.skin):M[k]));
   if(p.type==='wall') add(p.skin?houseWallGeo(p.axis,p.mask==null?511:p.mask,p.out||1):wallGeo(p.axis,p.mask==null?511:p.mask),0,0,0);
+  if(p.type==='wall'&&p.skin&&!mat&&p.mask!=null&&!(p.mask&16)&&(p.mask&2)){ const gg=windowGlassGeo(p.axis); add(gg.glass,0,0,0,0,0,glassMat()); const gm=p.group?null:null; add(gg.bars,0,0,0,0,0,M.beam); }
+  else if(p.type==='wall'){}
   else if(p.type==='floor') add(floorGeo(p.mask==null?15:p.mask),0,0,0); else if(p.type==='ramp'){
     const sg=p.path?stairPathGeo(p.path):stairGeoFor(p.dir,p.half==null?-1:p.half); add(sg.t,0,0,0,0,0,M.tread); add(sg.s,0,0,0,0,0,M.beam);
   } else { const m=new THREE.Mesh(coneGeo(p.mask||0),mat||M.cone); if(real){m.castShadow=m.receiveShadow=true;m.userData.piece=p;} g.add(m);
@@ -2456,7 +2464,7 @@ function batchTown(t){
   unbatchTown(t); const list=[], byMat=new Map();
   pieces.forEach(p=>{ if(p.owner==='world'&&p.town===t&&!p.anim&&!damageStage(p)) list.push(p); });
   for(const p of list){ p.group.updateMatrixWorld(true); for(const m of p.group.children){ if(!m.isMesh) continue; const k=m.material.userData.batch||m.material; let a=byMat.get(k); if(!a){ a=[]; byMat.set(k,a); } a.push(m); } }
-  const meshes=[]; byMat.forEach((ms,mat)=>{ const mm=new THREE.Mesh(mergeWorld(ms),mat); mm.castShadow=mm.receiveShadow=true; scene.add(mm); meshes.push(mm); });
+  const meshes=[]; byMat.forEach((ms,mat)=>{ const mm=new THREE.Mesh(mergeWorld(ms),mat); mm.castShadow=!mat.transparent; mm.receiveShadow=true; scene.add(mm); meshes.push(mm); });
   list.forEach(p=>{ p.group.visible=false; p.batched=true; }); townBatch.set(t,{meshes,list});
 }
 function unbatchTown(t){ const b=townBatch.get(t); if(!b) return; townBatch.delete(t); b.meshes.forEach(m=>{ scene.remove(m); m.geometry.dispose(); }); b.list.forEach(p=>{ p.batched=false; if(p.group) p.group.visible=true; }); }
