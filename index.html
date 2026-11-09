@@ -2890,7 +2890,7 @@ function animateSky(H,S,dt){ const G=H.group, r=H.rig, A=H.anim, gl=S.sky==='gli
   A.glK=Math.max(0,Math.min(1,(A.glK||0)+(gl?dt*2.6:-dt*4))); const e=1-Math.pow(1-A.glK,3), gd=H.glider;
   gd.visible=A.glK>0.01;
   if(gd.visible){ G.updateMatrixWorld(true); r.armL.hand.getWorldPosition(_skA); r.armR.hand.getWorldPosition(_skB); _skA.add(_skB).multiplyScalar(0.5); G.worldToLocal(_skA);
-    gd.position.copy(_skA); gd.scale.set(Math.max(0.05,e),Math.max(0.25,e),Math.max(0.35,e)); gd.rotation.set(-th-0.02-(1-e)*0.5+Math.sin(t*1.3)*0.025*e,0,-A.skyZ*0.25); } }
+    gd.position.copy(_skA); gd.scale.set(Math.max(0.05,e),Math.max(0.25,e),Math.max(0.35,e)); A.glP=lerp(A.glP||0,gl?Math.max(-0.95,Math.min(0.45,0.1+gam*0.95)):0,Math.min(1,dt*4)); gd.rotation.set(A.glP-th-0.02-(1-e)*0.5+Math.sin(t*1.3)*0.025*e,0,-A.skyZ*0.25); } }
 function moveBody(E,fw,st,jump,dt){ if(E.kart){ if(E.kart.seat===0) E.kart.k.inp={fw,st,hb:!!jump}; return; } if(E.sky){ skyMove(E,fw,st,jump,dt); return; } moveBody0(E,fw,st,jump,dt); }
 
 /* ---------- the dune buggy ----------
