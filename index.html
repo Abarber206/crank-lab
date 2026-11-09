@@ -5832,9 +5832,17 @@ function dropZombie(z){ scene.remove(z.m.g); horde.zs.delete(z.id); }
 function clearZombies(){ [...horde.zs.values()].forEach(dropZombie); clearGoo(); }
 // players the zombies can go after
 function hordeTargets(){ const a=[]; if(!(net.dead||P.hp<=0)) a.push(P); net.players.forEach(pl=>{ if(pl.alive&&pl.id!=='bot') a.push(pl); }); return a; }
+const zFlashes=[]; let zShardMat=null;
+function zObliterate(z){ const c=z.pos.clone().setY(z.pos.y+1.1*z.sc), far=c.distanceTo(P.pos)>70;
+  if(!zShardMat) zShardMat=new THREE.MeshBasicMaterial({color:0xd06bff});
+  burst(c,far?8:22,7.5,0.11,goreMat); burst(c,far?4:14,9,0.06,zShardMat); burst(c.clone().setY(z.pos.y+0.3),far?3:8,3,0.08,goreMat);
+  if(far) return; const m=new THREE.Mesh(new THREE.SphereGeometry(0.5,16,10),new THREE.MeshBasicMaterial({color:0xe8a8ff,transparent:true,opacity:0.85,blending:THREE.AdditiveBlending,depthWrite:false}));
+  m.position.copy(c); m.scale.setScalar(z.sc*0.6); scene.add(m); zFlashes.push({m,t:0,s:z.sc}); }
+function stepZFlash(dt){ for(let i=zFlashes.length-1;i>=0;i--){ const f=zFlashes[i]; f.t+=dt; const k=f.t/0.28; if(k>=1){ scene.remove(f.m); f.m.geometry.dispose(); f.m.material.dispose(); zFlashes.splice(i,1); continue; }
+    f.m.scale.setScalar(f.s*(0.6+2.4*Math.sqrt(k))); f.m.material.opacity=0.85*(1-k)*(1-k); } }
 function zombieHurt(z,dmg,by){
   if(!z.alive) return; z.hp-=dmg; z.hitFlash=0.12;
-  if(z.hp<=0){ z.alive=false; z.hp=0; z.deadT=0; horde.kills++; creditKill(z,by); zombieLoot(z); burst(z.pos.clone().setY(z.pos.y+1.1*z.sc),10,4,0.09,goreMat); zsfx('zdie',z.pos);
+  if(z.hp<=0){ z.alive=false; z.hp=0; z.deadT=0; horde.kills++; creditKill(z,by); zombieLoot(z); zObliterate(z); zsfx('zdie',z.pos);
     if(by===net.id||!net.role) stat('h',0); }
   else if(Math.random()<0.35) zsfx('zhurt',z.pos);
 }
@@ -6020,7 +6028,7 @@ function onHordeMsg(m){
     if(!z){ z=newZombie(ZCODE[s[1]]||'husk',s[2],s[4],s[0]); z.pos.set(s[2],s[3],s[4]); }
     z.tgt.set(s[2],s[3],s[4]); z.yawT=s[5]; z.vel.set(s[8]||0,0,s[9]||0);
     const wasAlive=z.alive; z.alive=s[6]>0; z.hp=s[6]*z.maxHp; if(s[7]&&z.atk<=0.05) z.atk=ZATK;
-    if(wasAlive&&!z.alive){ z.deadT=0; burst(z.pos.clone().setY(z.pos.y+1.1*z.sc),10,4,0.09,goreMat); zsfx('zdie',z.pos); } }
+    if(wasAlive&&!z.alive){ z.deadT=0; zObliterate(z); zsfx('zdie',z.pos); } }
   horde.zs.forEach(z=>{ if(!seen.has(z.id)) dropZombie(z); });
 }
 function hordeClientStep(dt){
@@ -6032,7 +6040,7 @@ function hordeClientStep(dt){
 }
 function animateZombie(z,dt){
   const g=z.m.g, R=z.m.R; g.position.copy(z.pos); g.rotation.y=z.yaw;
-  if(!z.alive){ if(R.lump) R.lump.visible=false; const k=Math.min(1,z.deadT/0.6); g.rotation.x=-k*1.45; g.position.y=z.pos.y-0.1*k; if(z.deadT>1.1) g.scale.setScalar(z.sc*Math.max(0.01,1-(z.deadT-1.1)*2)); return; }
+  if(!z.alive){ if(R.lump) R.lump.visible=false; const d=z.deadT; g.scale.setScalar(z.sc*(d<0.06?1+d*3:Math.max(0.001,1.18-(d-0.06)*9))); if(d>0.2) g.visible=false; return; }
   const ty=z.type, sp=Math.hypot(z.vel.x,z.vel.z), mv=Math.min(1,sp/1.5), run=ty==='runner';
   z.walk+=dt*(run?2.6+sp*2.4:ty==='brute'?1.2+sp*1.4:1.4+sp*1.6);
   const s=Math.sin(z.walk), c=Math.cos(z.walk), now=performance.now();
@@ -7551,7 +7559,7 @@ function frame(now){
   } else { P.vel.x*=0.8; P.vel.z*=0.8; }
   if(swingT>0) swingT-=dt;
   stepClouds(dt); stepDoors(dt); stepAmbience(dt); stepPick(dt); stepSpin(dt); stepProjs(dt); stepDrops(dt); stepProps(dt); if(playing||net.role) hordeUpdate(dt); stepDusk(dt); updateHordeHUD(); stepUse(dt); updateUseBar();
-  stepGrass(dt); stepChests(dt); stepAnims(now); stepChunks(dt); stepFallers(dt); stepShakes(dt); stepLootGlow(dt); stepKarts(dt); stepPlayers(dt); stepTracers(dt); if(B&&B.active) animateBot(dt);
+  stepGrass(dt); stepChests(dt); stepAnims(now); stepChunks(dt); stepFallers(dt); stepShakes(dt); stepLootGlow(dt); stepZFlash(dt); stepKarts(dt); stepPlayers(dt); stepTracers(dt); if(B&&B.active) animateBot(dt);
   if(!playing&&net.role==='host'&&B&&B.active){ botUpdate(dt); const n=Math.max(1,Math.ceil(dt/0.008)); for(let k=0;k<n;k++) physStep(dt/n,B); }
   if(net.role){ net.sendT-=dt; if(net.sendT<=0){ net.sendT=0.05; netSend(myState()); if(net.role==='host'&&B&&B.active) netSend(botState()); }
     if(net.role==='host'){ party.syncT-=dt; if(party.syncT<=0){ party.syncT=2; partySync(); }
