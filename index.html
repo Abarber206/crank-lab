@@ -1258,7 +1258,7 @@ WORLD.roads.forEach((rd,k)=>{ const p=rd.pts, n=p.length, pos=[], nor=[], uv=[],
     if(up(L0,L1,R0)) idx.push(L0,L1,R0); else idx.push(L0,R0,L1);
     if(up(R0,L1,R1)) idx.push(R0,L1,R1); else idx.push(R0,R1,L1); }
   const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3)); g.setAttribute('normal',new THREE.Float32BufferAttribute(nor,3)); g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2)); g.setAttribute('lines',new THREE.Float32BufferAttribute(lines,1)); g.setIndex(idx); g.computeBoundingSphere();
-  const rm=new THREE.MeshLambertMaterial({map:roadTex,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-4*(4+k)}); rm.onBeforeCompile=roadOBC;
+  const rm=new THREE.MeshLambertMaterial({map:roadTex,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-4*(4+k)}); rm.onBeforeCompile=roadOBC;
   const m=new THREE.Mesh(g,rm);
   m.receiveShadow=true; m.matrixAutoUpdate=false; scene.add(m); roadMeshes.push(m);
   rd.box=[bx0-6,bz0-6,bx1+6,bz1+6]; });
@@ -1278,7 +1278,7 @@ WORLD.roads.forEach((rd,k)=>{ const p=rd.pts, n=p.length, pos=[], nor=[], uv=[],
       const o=nearestLower(k,x,z); if(o&&Math.hypot(o[0]-x,o[1]-z)>0.4) run.push([x,z,o]); else flush(); }
     flush(); });
   if(idx.length){ const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3)); g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2)); g.setIndex(idx); g.computeVertexNormals();
-    const fm=new THREE.Mesh(g,new THREE.MeshLambertMaterial({map:roadPlainTex,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-8}));
+    const fm=new THREE.Mesh(g,new THREE.MeshLambertMaterial({map:roadPlainTex,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-8}));
     fm.receiveShadow=true; fm.matrixAutoUpdate=false; scene.add(fm); roadMeshes.push(fm); } }
 
 /* ---------- grass, flowers and bushes ----------
@@ -6457,6 +6457,12 @@ function treeAnim(p){ const moving=p.wob>0||p.dying>0||(p.alive&&p.grow<1);
    bigger ones out back where there's room; a flower bed along the front wall, round shrubs at the corners and a
    mailbox by the sidewalk. The yard trees are real trees (they farm and grow back); the garden pieces are one mesh
    per town, just for looks. */
+// is (x,z) on (or within pad of) a front path or driveway of this town? (sidewalks along the streets are kept clear separately)
+function onWalk(t,x,z,pad){ const seg=(ax,az,bx,bz,w)=>{ const dx=bx-ax, dz=bz-az, L2=dx*dx+dz*dz||1e-6; let f=((x-ax)*dx+(z-az)*dz)/L2; f=f<0?0:f>1?1:f; return Math.hypot(x-ax-dx*f,z-az-dz*f)<w/2+pad; };
+  for(const h of t.houses){ const D=doorOf(h), X=h.side==='n'||h.side==='s', across=X?D.z-t.z:D.x-t.x, edge=Math.sign(across)*(ROAD_HW+WALK_W-0.1);
+    if(seg(D.x,D.z,X?D.x:t.x+edge,X?t.z+edge:D.z,WALK_W)) return true;
+    if(h.garage){ const f=garageFrame(h), m=f.p(2.5,0.02), a2=f.X?m[1]-t.z:m[0]-t.x, e2=Math.sign(a2)*(ROAD_HW+0.05); if(seg(m[0],m[1],f.X?m[0]:t.x+e2,f.X?t.z+e2:m[1],3.4)) return true; } }
+  return Math.abs(x-t.x)<ROAD_HW+WALK_W+pad||Math.abs(z-t.z)<ROAD_HW+WALK_W+pad; }
 function yardFrame(t,h){ const C=CELL, X=h.side==='n'||h.side==='s';
   const fN=h.side==='n'||h.side==='w', x0=h.i0*C, x1=(h.i0+h.w)*C, z0=h.j0*C, z1=(h.j0+h.d)*C;
   // u along the front, w out from the front wall (toward the street, negative w goes behind the house)
@@ -6482,14 +6488,14 @@ function yardTrees(add,r){
     for(const h of t.houses){ const f=yardFrame(t,h), gside=h.garage?1:0;
       // front yard: one or two smallish trees in the corners, clear of the path (middle) and the garage side
       const spots=[[0.18,2.6],[0.82,2.6]]; for(const [fu,fw] of spots){ if(r()<0.25) continue; const u=f.len*fu+(r()-.5)*0.8; if(Math.abs(u-f.len/2)<2.2) continue; if(gside&&fu>0.6) continue;
-        const [x,z]=f.p(u,fw+(r()-.5)*0.6); if(!free(t,x,z,1.6)) continue; if(propsNear(x,z,[],1).some(q=>Math.hypot(q.x-x,q.z-z)<3.5)) continue;
+        const [x,z]=f.p(u,fw+(r()-.5)*0.6); if(!free(t,x,z,1.6)||onWalk(t,x,z,1.4)) continue; if(propsNear(x,z,[],1).some(q=>Math.hypot(q.x-x,q.z-z)<3.5)) continue;
         const p=add(r()<0.75?'tree':'pine',x,z,0.55+r()*0.45); p.hs=0.85+r()*0.35; p.g.scale.set(p.s,p.s*p.hs,p.s); p.tint=0.9+r()*0.18; p.yard=true; p.boxes=propBoxes(p); }
       // back garden: bigger trees behind the house, where nothing else is
-      for(let n=0;n<3;n++){ if(r()<0.35) continue; const u=f.len*(0.15+r()*0.7), w=-(f.depth+3+r()*4); const [x,z]=f.p(u,w); if(!free(t,x,z,2.2)) continue;
+      for(let n=0;n<3;n++){ if(r()<0.35) continue; const u=f.len*(0.15+r()*0.7), w=-(f.depth+3+r()*4); const [x,z]=f.p(u,w); if(!free(t,x,z,2.2)||onWalk(t,x,z,2.0)) continue;
         if(propsNear(x,z,[],1).some(q=>Math.hypot(q.x-x,q.z-z)<4.5)) continue; const p=add(r()<0.6?'tree':'pine',x,z,0.8+r()*0.8); p.hs=0.85+r()*0.4; p.g.scale.set(p.s,p.s*p.hs,p.s); p.tint=0.88+r()*0.2; p.yard=true; p.boxes=propBoxes(p); } } } }
 let gardenMeshes=[];
 function buildGardens(){ const flowers=[0xe8456b,0xf2c014,0xffffff,0xa45ee5,0xff8a3d,0xe23a3a], q=seeded(77123);
-  for(const t of TOWNS){ const parts=[], put=(g,col,x,y,z,ry=0)=>{ g=g.index?g.toNonIndexed():g.clone(); g.rotateY(ry); g.translate(x,y,z); const n=g.attributes.position.count, c=new Float32Array(n*3), cc=new THREE.Color(col); for(let i=0;i<n;i++){ c[i*3]=cc.r; c[i*3+1]=cc.g; c[i*3+2]=cc.b; } g.setAttribute('color',new THREE.BufferAttribute(c,3)); parts.push(g); };
+  for(const t of TOWNS){ const parts=[], put=(g,col,x,y,z,ry=0)=>{ if(col!==0x5a4030&&col!==0xd23a2a&&!(g.parameters&&g.parameters.height===0.24)&&onWalk(t,x,z,0.15)) return; g=g.index?g.toNonIndexed():g.clone(); g.rotateY(ry); g.translate(x,y,z); const n=g.attributes.position.count, c=new Float32Array(n*3), cc=new THREE.Color(col); for(let i=0;i<n;i++){ c[i*3]=cc.r; c[i*3+1]=cc.g; c[i*3+2]=cc.b; } g.setAttribute('color',new THREE.BufferAttribute(c,3)); parts.push(g); };
     const y0=t.h;
     for(const h of t.houses){ const f=yardFrame(t,h), X=h.side==='n'||h.side==='s', ry=X?0:Math.PI/2, mid=f.len/2;
       // flower beds along the front wall, either side of the door: dark soil, a brick edge, rows of flowers
