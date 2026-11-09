@@ -6026,15 +6026,16 @@ function onHordeMsg(m){
   const seen=new Set();
   for(const s of m.zs){ seen.add(s[0]); let z=horde.zs.get(s[0]);
     if(!z){ z=newZombie(ZCODE[s[1]]||'husk',s[2],s[4],s[0]); z.pos.set(s[2],s[3],s[4]); }
-    z.tgt.set(s[2],s[3],s[4]); z.yawT=s[5]; z.vel.set(s[8]||0,0,s[9]||0);
+    z.tgt.set(s[2],s[3],s[4]); z.netP=(z.netP||new THREE.Vector3()).set(s[2],s[3],s[4]); z.netT=performance.now(); z.yawT=s[5]; z.vel.set(s[8]||0,0,s[9]||0);
     const wasAlive=z.alive; z.alive=s[6]>0; z.hp=s[6]*z.maxHp; if(s[7]&&z.atk<=0.05) z.atk=ZATK;
     if(wasAlive&&!z.alive){ z.deadT=0; zObliterate(z); zsfx('zdie',z.pos); } }
   horde.zs.forEach(z=>{ if(!seen.has(z.id)) dropZombie(z); });
 }
 function hordeClientStep(dt){
   const k=1-Math.exp(-dt*12);
-  horde.zs.forEach(z=>{ z.tgt.x+=z.vel.x*Math.min(dt,0.05)*0.5; z.tgt.z+=z.vel.z*Math.min(dt,0.05)*0.5;
-    if(z.pos.distanceTo(z.tgt)>5) z.pos.copy(z.tgt); else z.pos.lerp(z.tgt,k);
+  const now=performance.now();
+  horde.zs.forEach(z=>{ if(z.netP){ const age=Math.min(0.25,(now-z.netT)/1000); z.tgt.set(z.netP.x+z.vel.x*age,z.netP.y,z.netP.z+z.vel.z*age); }
+    const d=z.pos.distanceTo(z.tgt); if(d>9) z.pos.copy(z.tgt); else z.pos.lerp(z.tgt,1-Math.exp(-dt*(d>2?14:9)));
     if(z.yawT!=null) z.yaw+=angDiff(z.yawT,z.yaw)*Math.min(1,dt*12); z.atk=Math.max(0,z.atk-dt); if(!z.alive) z.deadT+=dt;
     animateZombie(z,dt); }); stepGoo(dt);
 }
