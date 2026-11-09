@@ -213,7 +213,7 @@ body.touch.dragging .slot.empty{display:grid!important} /* empty slots show up a
 #matStock{right:calc(env(safe-area-inset-right,0px) + 14px);top:46%;display:grid;gap:4px;font:800 italic 16px/1 var(--font-hud);text-shadow:0 1px 2px #000}
 #matStock span{display:flex;align-items:center;gap:6px;justify-content:flex-end;background:var(--slot-dark);padding:4px 8px;border-radius:4px;opacity:.75;min-width:64px}
 #matStock span.on{opacity:1;box-shadow:inset 0 0 0 2px rgba(255,255,255,.6)}
-#matStock i{width:14px;height:14px;border-radius:3px;box-shadow:inset 0 0 0 2px rgba(0,0,0,.35)}
+#matStock i{width:18px;height:18px;display:block} #matStock i svg,#matSw svg{width:100%;height:100%;display:block;filter:drop-shadow(0 1px 1px rgba(0,0,0,.5))}
 .dn.mat{color:#ffe7a0;font-size:16px}
 .dn.pts{color:#ffcf4a;font-size:20px}
 .modepick{display:flex;align-items:center;gap:8px;font:700 15px/1 var(--font-ui,inherit);color:var(--ink)}
@@ -3820,6 +3820,7 @@ function sfx(k){
     case 'rb_down': tone('sine',300,140,0.5,0.12); noise(500,0.3,0.15,0.8,0,'lowpass',150); break;
     case 'rb_up': tone('triangle',440,660,0.18,0.1); tone('triangle',660,990,0.25,0.09,0.12); noise(4000,0.2,0.05,1,0.05,'highpass'); break;
     case 'cloud': noise(700,1.9,0.16,0.45,0,'bandpass',260); noise(2600,1.2,0.06,0.6,0.05,'highpass',900); break;
+    case 'van_hum': tone('sine',58,58,2.0,0.035); tone('sine',116,117,2.0,0.012); tone('triangle',880,880,0.05,0.008,1.0); break;
     case 'rb_tick': tone('square',1200,1180,0.03,0.025); break;
     case 'pickup': knock(900,0.05,0.2,6); noise(2500,0.06,0.1,1.5,0.03,'bandpass',5000); break;
     case 'ammo_pick': for(let q=0;q<3;q++) knock(1400+q*300,0.04,0.18,8,q*0.05); break;
@@ -4998,7 +4999,7 @@ function syncMode(){
   const rl=$('tReload'); rl.dataset.act=edit?'reset':'reload'; rl.classList.toggle('active',!!edit);
   rl.innerHTML=edit?'Reset':'<svg viewBox="0 0 24 24"><path d="M19 12a7 7 0 1 1-2-5" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><path d="M18 3v5h-5" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   $('tBuild').classList.toggle('on',inBuild);
-  $('matName').textContent=MATERIALS[buildMat].name; $('matSw').style.background='#'+MATERIALS[buildMat].chip.toString(16).padStart(6,'0');
+  $('matName').textContent=MATERIALS[buildMat].name; { const sw=$('matSw'); if(sw.dataset.m!==buildMat&&typeof matIcon==='function'){ sw.dataset.m=buildMat; sw.innerHTML=matIcon(buildMat); sw.style.background='none'; sw.style.boxShadow='none'; } }
   if(edit) updateEditLabel();
   if(typeof syncMats==='function') syncMats();
 }
@@ -6889,8 +6890,11 @@ function buildGardens(){ const flowers=[0xe8456b,0xf2c014,0xffffff,0xa45ee5,0xff
 /* materials: infinite by default; switch it off in Settings to farm for your builds */
 const MAT_MAX=999, BUILD_COST=10;
 function giveMats(mat,n,point){ if(settings.infMats||n<=0) return; P.mats[mat]=Math.min(MAT_MAX,(P.mats[mat]|0)+n); if(point) dmgNum(point,'+'+n+' '+MATERIALS[mat].name.toUpperCase(),'mat'); syncMats(); }
-function syncMats(){ const sm=$('matBtn').querySelector('small'); if(sm) sm.textContent=settings.infMats?'∞':((P.mats&&P.mats[buildMat])|0);
-  const st=$('matStock'); if(st){ st.hidden=settings.infMats; if(!settings.infMats) st.innerHTML=MAT_ORDER.map(m=>`<span class="${m===buildMat?'on':''}"><i style="background:#${MATERIALS[m].chip.toString(16).padStart(6,'0')}"></i>${(P.mats&&P.mats[m])|0}</span>`).join(''); } }
+function matIcon(m){ return m==='wood'?'<svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="5.4" rx="1" fill="#e0b070"/><rect x="2" y="9.3" width="20" height="5.4" rx="1" fill="#cf9a58"/><rect x="2" y="15.6" width="20" height="5.4" rx="1" fill="#e0b070"/><path d="M5 5.7h7M14 12h6M6 18.3h9" stroke="#8a5a2a" stroke-width="1" stroke-linecap="round"/><circle cx="17" cy="5.7" r="1" fill="#8a5a2a"/><circle cx="8" cy="12" r="1" fill="#8a5a2a"/></svg>'
+  :m==='brick'?'<svg viewBox="0 0 24 24"><rect x="1.5" y="3" width="21" height="18" rx="1.5" fill="#d9cfc2"/><g fill="#c23f33"><rect x="2.5" y="4" width="9" height="4.6" rx=".6"/><rect x="12.5" y="4" width="9" height="4.6" rx=".6"/><rect x="2.5" y="9.7" width="4.2" height="4.6" rx=".6"/><rect x="7.7" y="9.7" width="8.6" height="4.6" rx=".6"/><rect x="17.3" y="9.7" width="4.2" height="4.6" rx=".6"/><rect x="2.5" y="15.4" width="9" height="4.6" rx=".6"/><rect x="12.5" y="15.4" width="9" height="4.6" rx=".6"/></g></svg>'
+  :'<svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="18" rx="2" fill="#9aa6b2"/><path d="M2 9l20-5M2 16l20-5M6 21l16-4" stroke="#c9d3dc" stroke-width="2.2" opacity=".8"/><rect x="2" y="3" width="20" height="18" rx="2" fill="none" stroke="#5d6772" stroke-width="1.6"/><g fill="#4d5660"><circle cx="5.2" cy="6.2" r="1.1"/><circle cx="18.8" cy="6.2" r="1.1"/><circle cx="5.2" cy="17.8" r="1.1"/><circle cx="18.8" cy="17.8" r="1.1"/></g></svg>'; }
+function syncMats(){ { const sw=$('matSw'); if(sw&&sw.dataset.m!==buildMat){ sw.dataset.m=buildMat; sw.innerHTML=matIcon(buildMat); sw.style.background='none'; sw.style.boxShadow='none'; } } const sm=$('matBtn').querySelector('small'); if(sm) sm.textContent=settings.infMats?'∞':((P.mats&&P.mats[buildMat])|0);
+  const st=$('matStock'); if(st){ st.hidden=settings.infMats; if(!settings.infMats) st.innerHTML=MAT_ORDER.map(m=>`<span class="${m===buildMat?'on':''}"><i class="mi">${matIcon(m)}</i>${(P.mats&&P.mats[m])|0}</span>`).join(''); } }
 
 
 /* ---------- inventory: pickaxe + 5 slots that hold any weapon or item ---------- */
@@ -8023,11 +8027,17 @@ function makeVan(x,y,z,yaw){ if(!_vanMats) _vanMats={white:new THREE.MeshPhongMa
   // the terminal on the kerb side: a screen and two handles
   const term=new THREE.Group(); term.position.set(1.07,1.62,0.55); g.add(term);
   const panel=new THREE.Mesh(B(0.08,0.95,1.5),M.dark); term.add(panel); const scr=new THREE.Mesh(new THREE.PlaneGeometry(1.32,0.66),M.ready); scr.rotation.y=Math.PI/2; scr.position.x=0.045; scr.position.y=0.06; term.add(scr);
+  { const cv=document.createElement('canvas'); cv.width=512; cv.height=128; const q=cv.getContext('2d'); q.fillStyle='#1f5fd8'; q.fillRect(0,0,512,128); q.fillStyle='#ff7a1a'; q.fillRect(0,112,512,16);
+    q.save(); q.translate(64,60); q.lineWidth=11; q.strokeStyle='#fff'; q.beginPath(); q.arc(0,0,34,0.5,5.6); q.stroke(); q.fillStyle='#fff'; q.beginPath(); q.moveTo(34*Math.cos(5.6)+16,34*Math.sin(5.6)-2); q.lineTo(34*Math.cos(5.6)-12,34*Math.sin(5.6)-18); q.lineTo(34*Math.cos(5.6)-8,34*Math.sin(5.6)+16); q.fill(); q.restore();
+    q.fillStyle='#fff'; q.font='900 italic 74px "Arial Black",Arial,sans-serif'; q.textBaseline='middle'; q.fillText('REBOOT',128,62);
+    const sign=new THREE.Mesh(new THREE.PlaneGeometry(2.5,0.62),new THREE.MeshPhongMaterial({map:new THREE.CanvasTexture(cv),shininess:50})); sign.rotation.y=-Math.PI/2; sign.position.set(-1.066,2.1,0.55); g.add(sign); }
+  const pad=new THREE.Mesh(new THREE.RingGeometry(0.55,0.72,40).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({color:0x7fc8ff,transparent:true,opacity:0.35,blending:THREE.AdditiveBlending,depthWrite:false,fog:false})); pad.position.set(1.75,0.09,0.55); g.add(pad);
+  const holo=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.7,0.03),new THREE.MeshBasicMaterial({color:0x9fd8ff,transparent:true,opacity:0.75,blending:THREE.AdditiveBlending,depthWrite:false,fog:false})); holo.position.set(-0.35,3.75,-0.1); holo.visible=false; g.add(holo);
   g.position.set(x,y,z); g.rotation.y=yaw; scene.add(g);
   const flare=new THREE.Mesh(new THREE.CylinderGeometry(0.55,0.55,46,20,1,true).translate(0,23,0),new THREE.MeshBasicMaterial({color:0x7fc8ff,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide,fog:false})); flare.position.y=2.9; flare.visible=false; g.add(flare);
   const c=Math.round(Math.cos(yaw)), s=Math.round(Math.sin(yaw)), hx=Math.abs(c)*1.08+Math.abs(s)*2.2, hz=Math.abs(s)*1.08+Math.abs(c)*2.2;
   const tx=x+c*1.75, tz=z-s*1.75; // where you stand to use the terminal (local +x, rotated)
-  return {x,y,z,yaw,g,scr,beacon,flare,cd:0,prog:0,req:0,flash:0,tx,tz,solid:{boxes:[[x-hx,y,z-hz,x+hx,y+2.85,z+hz]],key:'van'+Math.round(x)+'_'+Math.round(z),isVan:true}}; }
+  return {x,y,z,yaw,g,scr,beacon,flare,dish,pad,holo,cd:0,prog:0,req:0,flash:0,tx,tz,solid:{boxes:[[x-hx,y,z-hz,x+hx,y+2.85,z+hz]],key:'van'+Math.round(x)+'_'+Math.round(z),isVan:true}}; }
 // ---- interact: grab a card (hold), reboot at a van (hold) ----
 function rbTargets(consider){ if(!net.role&&!(AB&&AB.active)) return; const now=performance.now();
   rbPeople().forEach(pl=>{ if(pl.id==='bot'||!pl.alive||!(pl.flags&256)||!sameTeam(pl)) return; const rv=RB.rev.get(pl.id)||0;
@@ -8036,7 +8046,7 @@ function rbTargets(consider){ if(!net.role&&!(AB&&AB.active)) return; const now=
   if(RB.carry.size&&VANS) VANS.forEach(v=>{ const ready=now>=v.cd, names=[...RB.carry].map(id=>(RB.cards.get(id)||{}).n||'teammate').join(' & ');
     consider(v.tx,v.y,v.tz,2.6,{kind:'rvan',pri:2,v,label:ready?'Reboot '+names:'Van charging · '+Math.ceil((v.cd-now)/1000)+'s',prog:ready?()=>v.prog:null,busy:()=>v.prog>0?'Rebooting '+names:null}); }); }
 var _rbTick=0;
-function stepReboot(dt){ if(!net.role&&!RB.cards.size&&!P.down&&!(AB&&AB.active)) return; const now=performance.now(), T=now/1000;
+function stepReboot(dt){ const now=performance.now(), T=now/1000;
   // reviving someone: hold Interact on them
   rbPeople().forEach(pl=>{ const on=useHeld&&useTgt&&useTgt.kind==='revive'&&useTgt.pl===pl&&!isDead()&&!P.down&&(pl.flags&256); let v=RB.rev.get(pl.id)||0;
     if(on){ if(v>=0){ v+=dt/RB_REV_T; if(v>=1){ v=-1; rbSend({op:'rev',id:pl.id,by:net.id}); setTimeout(()=>{ if(RB.rev.get(pl.id)===-1) RB.rev.delete(pl.id); },2500); } RB.rev.set(pl.id,v); } }
@@ -8054,6 +8064,10 @@ function stepReboot(dt){ if(!net.role&&!RB.cards.size&&!P.down&&!(AB&&AB.active)
     else if(!on&&!v.req) v.prog=Math.max(0,v.prog-dt*2);
     if(v.req&&now-v.req>3000){ v.req=0; v.prog=0; }
     // looks: the screen says ready or charging; the light bar pulses while it charges you up, and a column of light goes up when it fires
+    { const dv=Math.hypot(v.x-P.pos.x,v.z-P.pos.z); if(dv<160){ v.dish.rotation.y+=dt*0.5; const need=rbNeeded(), carry=RB.carry.size>0;
+        v.pad.material.opacity=(carry?0.6+0.3*Math.sin(T*5):0.22)*(now>=v.cd?1:0.4); const ps=carry?1+0.08*Math.sin(T*5):1; v.pad.scale.set(ps,1,ps);
+        v.holo.visible=need&&now>=v.cd; if(v.holo.visible){ v.holo.rotation.y+=dt*2.2; v.holo.position.y=3.75+0.1*Math.sin(T*2.4+v.id); v.holo.material.opacity=0.55+0.25*Math.sin(T*6+v.id); }
+        if(dv<14&&AC){ v.humT=(v.humT||0)-dt; if(v.humT<=0){ v.humT=1.9; sfxAt('van_hum',new THREE.Vector3(v.x,v.y+1.5,v.z)); } } } }
     const ready=now>=v.cd; if(v.scr.material!==(ready?_vanMats.ready:_vanMats.wait)) v.scr.material=ready?_vanMats.ready:_vanMats.wait;
     const lit=v.prog>0?0.6+0.4*Math.sin(T*18):ready?0.55+0.25*Math.sin(T*2.2+v.id):0.15; v.beacon.scale.set(1,1,1); v.beacon.material.color.setHSL(0.56,1,0.35+0.4*lit);
     if(v.flash>0||v.prog>0){ v.flash=Math.max(0,v.flash-dt); v.flare.visible=true; v.flare.material.opacity=Math.max(v.prog*0.35,Math.min(1,v.flash)*0.7); } else if(v.flare.visible) v.flare.visible=false; }

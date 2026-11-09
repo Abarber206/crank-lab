@@ -1,0 +1,11 @@
+const {sleep,page,launch,open}=require('./h.js');
+(async()=>{ const b=await launch(); const {pg,errs}=await open(b,page('/home/claude/crank-lab/index.html','scene,P,renderer,settings,VANS,onRb,selectPiece,giveMats,syncMats,RB'),{vp:{width:1100,height:640}});
+ await pg.waitForFunction(()=>window.T&&T.renderer&&T.VANS,null,{timeout:180000});
+ await pg.evaluate(()=>{ T.settings.skyDrop=false; T.settings.infMats=false; const s=document.querySelector('#botSel'); s.value='off'; s.dispatchEvent(new Event('change')); document.getElementById('play').click(); });
+ await pg.waitForFunction(()=>T.renderer.info.render.frame>5,null,{timeout:120000}); await sleep(1000);
+ await pg.evaluate(()=>{ const v=T.VANS[2]; T.onRb({op:'card',id:'x1',n:'Buddy',t:0,o:2,p:[v.x+30,v.y,v.z],ttl:100}); T.RB.carry.add('x1'); T.RB.cards.get('x1').holder='me';
+   T.P.pos.set(v.x-(v.tx-v.x)*3.4+2,v.y+0.2,v.z-(v.tz-v.z)*3.4+2.5); T.P.vel.set(0,0,0); T.P.yaw=Math.atan2(-(v.x-T.P.pos.x),-(v.z-T.P.pos.z)); T.P.pitch=0.05; });
+ await sleep(4000); await pg.screenshot({path:'van_a.png'});
+ await pg.evaluate(()=>{ const v=T.VANS[2]; T.P.pos.set(v.tx+(v.tx-v.x)*2.6+1.5,v.y+0.2,v.tz+(v.tz-v.z)*2.6+2); T.P.yaw=Math.atan2(-(v.x-T.P.pos.x),-(v.z-T.P.pos.z)); T.giveMats('wood',170); T.giveMats('brick',100); T.selectPiece('wall'); T.syncMats(); });
+ await sleep(4000); await pg.screenshot({path:'van_b.png'});
+ console.log(errs.join('\n')||'no errors'); await b.close(); })();
