@@ -309,7 +309,7 @@ body.touch #stickHint{width:100px;height:100px;opacity:.6}
 #menu.lobby #respawn,#menu.lobby #clear{display:none}
 #menu.lobby .btn:not(.primary){background:rgba(255,255,255,.14);color:#fff}
 #menu.lobby .btn:not(.primary):hover{background:rgba(255,255,255,.22)}
-.shophead{border-radius:10px;padding:14px 16px} .shophead h2{margin:0 0 4px} .shophead p{margin:0;color:var(--muted);font-size:14px}
+.shophead{border-radius:10px;padding:14px 16px;position:relative} .shoptimer{position:absolute;top:14px;right:16px;font:800 italic 15px/1 var(--font-hud)!important;letter-spacing:.06em;text-transform:uppercase;color:#ffe08a!important} .shoptimer b{font-size:19px;color:#fff} .lkempty{margin:0 0 10px;color:var(--muted);font-size:14px} .shophead h2{margin:0 0 4px} .shophead p{margin:0;color:var(--muted);font-size:14px}
 #menu.lobby .shophead p{color:rgba(225,236,255,.8)}
 .shopgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
 .shopgrid .ofit{aspect-ratio:3/4;border-radius:8px}
@@ -324,6 +324,7 @@ body.touch #stickHint{width:100px;height:100px;opacity:.6}
 .shopgrid .empty{grid-column:1 / -1;color:var(--muted)}
 #menu.lobby .shopgrid .empty{color:rgba(225,236,255,.8)}
 @media (max-width:820px){
+  .shoptimer{position:static!important;margin-top:8px!important}
   #menu.lobby .mtab[data-tab=play]{grid-template-columns:minmax(0,1fr)}
   #menu.lobby .mtab[data-tab=play]>*{grid-column:1}
   #menu.lobby .mtab[data-tab=play]>.stage{grid-row:auto;height:44vh;min-height:250px}
@@ -586,7 +587,8 @@ body.touch #stickHint{width:100px;height:100px;opacity:.6}
     </section>
     <section class="mtab" data-tab="locker" hidden>
       <section class="locker">
-      <div class="shopbar"><p>Outfits and pickaxes with a price unlock with points. Earn them in <b>Zombie horde</b>: 10 for a walker, 15 for a runner, 60 for a brute, plus a bonus for every wave you clear.</p></div>
+      <div class="shopbar" hidden></div>
+      <p class="lkempty" id="lkHint">Get more outfits and pickaxes in the <b>Item Shop</b>.</p>
       <div class="buybox" id="buyBox" hidden><p></p><button class="btn primary" id="buyOk" type="button">Buy</button><button class="btn" id="buyNo" type="button">Cancel</button></div>
       <h3 class="lk">Outfits</h3>
       <div id="outfits" class="outfits" role="listbox" aria-label="Outfit"></div>
@@ -595,7 +597,7 @@ body.touch #stickHint{width:100px;height:100px;opacity:.6}
     </section>
     </section>
     <section class="mtab" data-tab="shop" hidden>
-      <div class="shophead"><h2>Item Shop</h2><p>Earn points in <b>Zombie horde</b> and spend them here. Bought items go straight to your Locker.</p></div>
+      <div class="shophead"><h2>Item Shop</h2><p>Spend the points you earn in <b>Zombie horde</b>. Bought items go straight to your Locker.</p><p class="shoptimer">New items in <b id="shopTimer">20:00</b></p></div>
       <div id="shopGrid" class="shopgrid"></div>
     </section>
     <section class="mtab" data-tab="settings" hidden>
@@ -5477,7 +5479,7 @@ function endMatch(){
 }
 function onPartyStart(m){
   if(m.seq!=null) party.seq=m.seq; party.live=true; party.mode=m.mode; syncModeCards();
-  respawn(); sfx('win'); if(skyDropAllowed()) matchDrop();
+  respawn(); if(m.mode==='horde') emptyLoadout(); sfx('win'); if(skyDropAllowed()) matchDrop();
   if(!playing){ showTab('play'); party.pendingStart=true; if(isTouch) setTimeout(()=>{ if(!playing&&party.live) startPlay(); },900); }
   renderParty();
 }
@@ -6107,9 +6109,11 @@ function startWave(){
   horde.wave++; horde.phase='wave'; horde.toSpawn=hordeWaveSize(horde.wave); horde.spawnT=0;
   sfx('wave');
 }
+// anyone still skydiving or gliding in (you, or a living squadmate)
+function hordeAirborne(){ if(P.sky&&!isDead()) return true; let a=false; net.players.forEach(pl=>{ if(pl.id!=='bot'&&pl.alive&&(pl.flags&192)) a=true; }); return a; }
 function hordeStart(){
-  clearZombies(); horde.on=true; horde.wave=0; horde.kills=0; horde.phase='break'; horde.t=20;
-  if(!net.role){ clearBuilds(); respawn(); if(skyDropAllowed()){ const a=Math.random()*6.283; skyDrop(SPAWN[0]+Math.cos(a)*20,SPAWN[2]+Math.sin(a)*20,SKY_MATCH); } }
+  clearZombies(); horde.on=true; horde.wave=0; horde.kills=0; horde.phase='break'; horde.t=20; horde.landT=0;
+  if(!net.role){ clearBuilds(); respawn(); emptyLoadout(); if(skyDropAllowed()){ const a=Math.random()*6.283; skyDrop(SPAWN[0]+Math.cos(a)*20,SPAWN[2]+Math.sin(a)*20,SKY_MATCH); } }
   syncBot(); refreshTeamMarkers();
 }
 function hordeStop(){ clearZombies(); horde.on=false; horde.phase='idle'; if(net.role==='host') netSend({type:'hz',off:1}); syncBot(); refreshTeamMarkers(); }
@@ -6120,7 +6124,8 @@ function hordeUpdate(dt){
   if(!horde.on) return;
   if(net.role==='client'){ hordeClientStep(dt); return; }
   // waves
-  if(horde.phase==='break'){ horde.t-=dt; if(horde.t<=0) startWave(); }
+  if(horde.phase==='break'){ horde.land=horde.wave===0&&hordeAirborne(); if(horde.land){ horde.landT=(horde.landT||0)+dt; if(horde.landT>90) horde.land=false; } // stuck in the air a long time: go anyway
+    if(!horde.land){ horde.t-=dt; if(horde.t<=0){ horde.landT=0; startWave(); } } }
   else if(horde.phase==='wave'){
     horde.spawnT-=dt;
     let alive=0; horde.zs.forEach(z=>{ if(z.alive) alive++; });
@@ -6152,7 +6157,7 @@ function hordeUpdate(dt){
 function hordeHeal(){ giveItems(3,2); giveMats('wood',60); giveMats('brick',40); giveMats('metal',20); if(net.dead) return; P.sh=Math.min(100,P.sh+50); P.hp=Math.min(100,P.hp+30); }
 function hordeState(){
   const zs=[]; horde.zs.forEach(z=>zs.push([z.id,ZCODE.indexOf(z.type),+z.pos.x.toFixed(2),+z.pos.y.toFixed(2),+z.pos.z.toFixed(2),+z.yaw.toFixed(2),+(z.hp/z.maxHp).toFixed(2),z.atk>0?1:0,+z.vel.x.toFixed(1),+z.vel.z.toFixed(1)]));
-  return {type:'hz',w:horde.wave,ph:horde.phase,t:+horde.t.toFixed(1),k:horde.kills,left:horde.toSpawn,zs};
+  return {type:'hz',ld:horde.land?1:0,w:horde.wave,ph:horde.phase,t:+horde.t.toFixed(1),k:horde.kills,left:horde.toSpawn,zs};
 }
 // a client draws the host's zombies
 function onHordeMsg(m){
@@ -6162,7 +6167,7 @@ function onHordeMsg(m){
   if(m.over){ banner('Overrun!','Your squad survived '+m.w+' waves · '+m.k+' zombies',5); sfx('lose'); return; }
   if(!horde.on){ horde.on=true; clearZombies(); syncBot(); refreshTeamMarkers(); }
   if(m.w>horde.wave&&m.ph==='wave') sfx('wave');
-  horde.wave=m.w; horde.phase=m.ph; horde.t=m.t; horde.kills=m.k; horde.toSpawn=m.left;
+  horde.wave=m.w; horde.phase=m.ph; horde.t=m.t; horde.land=!!m.ld; horde.kills=m.k; horde.toSpawn=m.left;
   const seen=new Set();
   for(const s of m.zs){ seen.add(s[0]); let z=horde.zs.get(s[0]);
     if(!z){ z=newZombie(ZCODE[s[1]]||'husk',s[2],s[4],s[0]); z.pos.set(s[2],s[3],s[4]); }
@@ -6245,7 +6250,7 @@ function updateHordeHUD(){
   const now=performance.now(); let title, sub, fill, urgent=false, brk=horde.phase==='break';
   if(brk){ if(WAVEBAR.phase!=='break') WAVEBAR.brk=Math.max(1,horde.t); WAVEBAR.brk=Math.max(WAVEBAR.brk,horde.t); const t=Math.max(0,Math.ceil(horde.t));
     title=horde.wave?'Wave '+horde.wave+' cleared':'Build your fort'; if(horde.wave&&WAVEBAR.bonus) title+=' · +'+WAVEBAR.bonus+' pts';
-    sub='Wave '+(horde.wave+1)+' in '+t+'s'; fill=Math.max(0,horde.t)/WAVEBAR.brk; urgent=horde.t<=5; }
+    sub=horde.land?'Wave 1 starts when everyone lands':'Wave '+(horde.wave+1)+' in '+t+'s'; fill=Math.max(0,horde.t)/WAVEBAR.brk; urgent=horde.t<=5; }
   else { if(WAVEBAR.phase!=='wave'||WAVEBAR.wave!==horde.wave){ WAVEBAR.total=0; WAVEBAR.bonus=0; } const left=alive+(horde.toSpawn|0); WAVEBAR.total=Math.max(WAVEBAR.total,left);
     title='Wave '+horde.wave; sub=left+' left'; fill=WAVEBAR.total?left/WAVEBAR.total:0; }
   WAVEBAR.phase=horde.phase; WAVEBAR.wave=horde.wave;
@@ -7611,7 +7616,7 @@ syncBot();
   const wear=()=>reskin(localHero,OUTFITS[outfitIdx(settings.outfit)],PICKAXES[pickIdx(settings.pickaxe)].id);
   // shop: items marked `shop` cost points; everything else is yours from the start
   const PRICE={o:{common:150,uncommon:300,rare:600,epic:1000,legendary:1600},p:{common:100,uncommon:200,rare:400,epic:700,legendary:1100}};
-  const owned=(k,it)=>!it.shop||wallet.owned.includes(k+':'+it.id), price=(k,it)=>PRICE[k][it.rarity]||500;
+  const FREE={o:'rook',p:'steel'}, owned=(k,it)=>it.id===FREE[k]||wallet.owned.includes(k+':'+it.id), price=(k,it)=>PRICE[k][it.rarity]||500;
   if(!owned('o',OUTFITS[outfitIdx(settings.outfit)])){ settings.outfit='rook'; saveSettings(); }
   if(!owned('p',PICKAXES[pickIdx(settings.pickaxe)])){ settings.pickaxe='steel'; saveSettings(); }
   const buy=$('buyBox');
@@ -7620,12 +7625,11 @@ syncBot();
     buy.hidden=false; buy.querySelector('p').innerHTML=`<b>${it.name}</b> · ${RNAME[it.rarity]} ${k==='o'?'outfit':'pickaxe'} · <b>${c.toLocaleString()} pts</b>`+(can?'':`<br><small>You need ${(c-wallet.pts).toLocaleString()} more. Take down zombies in Zombie horde to earn points.</small>`);
     $('buyOk').disabled=!can; $('buyOk').textContent=can?'Buy for '+c.toLocaleString():'Not enough points'; };
   $('buyOk').addEventListener('click',()=>{ if(!offer) return; const {k,it}=offer, c=price(k,it); if(owned(k,it)||wallet.pts<c) return;
-    wallet.pts-=c; wallet.owned.push(k+':'+it.id); saveWallet(); renderWallet(); buy.hidden=true; offer=null; sfx('win'); toast('Unlocked '+it.name);
+    wallet.pts-=c; wallet.owned.push(k+':'+it.id); saveWallet(); renderWallet(); renderShop(); buy.hidden=true; offer=null; sfx('win'); toast('Unlocked '+it.name);
     if(k==='o') pick(it.id); else pickPk(it.id); });
   $('buyNo').addEventListener('click',()=>{ buy.hidden=true; offer=null; });
   window.renderShop=()=>{ [['o',box,OUTFITS],['p',pbox,PICKAXES]].forEach(([k,el,list])=>list.forEach(it=>{ const b=el.querySelector(`[data-id="${it.id}"]`); if(!b) return;
-      const own=owned(k,it); b.classList.toggle('locked',!own); b.classList.toggle('afford',!own&&wallet.pts>=price(k,it));
-      let pr=b.querySelector('.price'); if(own){ if(pr) pr.remove(); } else { if(!pr){ pr=document.createElement('i'); pr.className='price'; b.appendChild(pr); } pr.textContent=price(k,it).toLocaleString(); } }));
+      const own=owned(k,it); b.hidden=!own; b.classList.remove('locked','afford'); const pr=b.querySelector('.price'); if(pr) pr.remove(); }));
     if(offer) offerBuy(offer.k,offer.it); if(window.renderItemShop) renderItemShop(); };
   const pick=id=>{ const it=OUTFITS[outfitIdx(id)]; if(!owned('o',it)){ offerBuy('o',it); return; } buy.hidden=true; settings.outfit=id; saveSettings(); wear(); mark(box,id);
     if(B&&B.h.outfit===id){ const others=OUTFITS.filter(o=>o.id!==id&&!o.shop); reskin(B.h,others[Math.floor(Math.random()*others.length)],B.h.pickaxe); } }; // the bot never dresses like you
@@ -7705,8 +7709,24 @@ function stageFrame(now){ const S=_stage; if(!S||!S.on) return; if(!stageVisible
   S.r.render(S.sc,S.cam); }
 function stageStart(){ try{ if(!_stage) stageInit(); }catch(e){ return; } if(_stage.on) return; if(!stageVisible()) return; _stage.on=true; _stage.last=0; requestAnimationFrame(stageFrame); }
 /* ---------- item shop: everything that costs points, as big cards; owned ones say so and equip on a tap ---------- */
+const SHOP_MS=20*60*1000;
+// what's on sale in a rotation: a pure function of the 20-minute slot, so every player sees the same shop
+function shopRotationIds(slot){ const r=seeded(slot*7919+101), pick=(list,n)=>{ const pool=list.slice(), out=[]; while(out.length<n&&pool.length) out.push(pool.splice(Math.floor(r()*pool.length),1)[0].id); return out; };
+  return [...pick(OUTFITS.filter(o=>o.id!=='rook'),5),...pick(PICKAXES.filter(p=>p.id!=='steel'),3)]; } // a short ranked list per kind
+const SHOP_EPOCH=Math.floor(Date.UTC(2026,0,1)/SHOP_MS), shopMemo=new Map();
+function shopRotationAt(slot){ // walk forward from a fixed start so everyone agrees exactly, and nothing repeats two rotations running
+  if(slot<=SHOP_EPOCH){ const ids=shopRotationIds(slot); return [ids[0],ids[1],ids[5]]; }
+  if(shopMemo.has(slot)) return shopMemo.get(slot);
+  let k=slot-1; while(k>SHOP_EPOCH&&!shopMemo.has(k)) k--; let prev=k<=SHOP_EPOCH?shopRotationAt(k):shopMemo.get(k);
+  for(let q=k+1;q<=slot;q++){ const ids=shopRotationIds(q), o=ids.slice(0,5).filter(id=>!prev.includes(id)).slice(0,2), p=ids.slice(5).filter(id=>!prev.includes(id)).slice(0,1); prev=[...o,...p]; shopMemo.set(q,prev); }
+  return prev; }
+function shopRotation(slot=Math.floor(Date.now()/SHOP_MS)){ const byId=id=>OUTFITS.find(o=>o.id===id)||PICKAXES.find(p=>p.id===id);
+  return shopRotationAt(slot).map((id,i)=>[i<2?'o':'p',byId(id)]); }
+let shopSlot=-1;
+setInterval(()=>{ const left=SHOP_MS-(Date.now()%SHOP_MS), el=$('shopTimer'); if(el){ const m=Math.floor(left/60000), sec=Math.floor(left/1000)%60; el.textContent=m+':'+String(sec).padStart(2,'0'); }
+  const sl=Math.floor(Date.now()/SHOP_MS); if(sl!==shopSlot){ const fresh=shopSlot>=0; shopSlot=sl; renderItemShop(); if(fresh&&!menu.hidden) toast('The Item Shop has new items'); } },1000);
 function renderItemShop(){ const g=$('shopGrid'), L=window._locker; if(!g||!L) return; g.innerHTML='';
-  const items=[...OUTFITS.filter(o=>o.shop).map(it=>['o',it]),...PICKAXES.filter(p=>p.shop).map(it=>['p',it])];
+  const items=shopRotation();
   const R=['legendary','epic','rare','uncommon','common']; items.sort((a,b)=>R.indexOf(a[1].rarity)-R.indexOf(b[1].rarity)||(a[0]<b[0]?-1:1));
   if(!items.length){ g.innerHTML='<p class="empty">Nothing in the shop right now.</p>'; return; }
   items.forEach(([k,it])=>{ const own=L.owned(k,it), c=L.price(k,it), b=document.createElement('button'); b.type='button'; b.className='ofit '+it.rarity+(k==='p'?' tool':'')+(!own&&wallet.pts>=c?' afford':'');
