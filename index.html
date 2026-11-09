@@ -128,6 +128,13 @@ body.touch .mats .k{display:none}
 #buildReason{left:50%;top:calc(50% + 26px);transform:translateX(-50%);font:800 italic 15px/1 var(--font-hud);text-transform:uppercase;letter-spacing:.04em;color:#ff8a78;text-shadow:0 1px 3px #000;white-space:nowrap}
 #kartHud{left:50%;bottom:150px;transform:translateX(-50%);display:flex;align-items:baseline;gap:5px;font:800 italic 15px/1 var(--font-hud);color:#e9edf2;text-shadow:0 1px 3px #000}
 #kartHud b{font-size:30px;color:#fff;min-width:44px;text-align:right}
+#rbWait{left:50%;top:calc(env(safe-area-inset-top,0px) + 96px);transform:translateX(-50%);width:min(420px,calc(100vw - 32px));box-sizing:border-box;display:grid;justify-items:center;gap:8px;padding:14px 18px 12px;background:rgba(6,16,48,.78);border:1px solid rgba(140,200,255,.35);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.4);text-align:center}
+#rbWait.down{border-color:rgba(255,120,90,.55)} #rbWait.down .rbbar i{background:linear-gradient(90deg,#ff5a3a,#ffb07a)} #rbWait .rbt{font:900 italic 24px/1 var(--font-hud);letter-spacing:.08em;text-transform:uppercase;color:#ff8a6a}
+#rbWait p{margin:0;font:800 italic 17px/1.2 var(--font-hud);letter-spacing:.03em;text-transform:uppercase;color:#fff}
+#rbWait small{font:700 13px/1.2 var(--font-hud);letter-spacing:.1em;text-transform:uppercase;color:#9fc6ff}
+.rbbar{display:block;width:100%;height:6px;border-radius:3px;background:rgba(255,255,255,.14);overflow:hidden} .rbbar i{display:block;height:100%;width:100%;background:linear-gradient(90deg,#4fa8ff,#9fe0ff);transform-origin:left;transition:transform .3s linear}
+#rbCarry{left:50%;top:calc(env(safe-area-inset-top,0px) + 58px);transform:translateX(-50%);display:flex;align-items:center;gap:8px;padding:7px 14px 7px 8px;background:rgba(6,16,48,.75);border:1px solid rgba(140,200,255,.45);border-radius:999px;font:800 italic 15px/1 var(--font-hud);letter-spacing:.05em;text-transform:uppercase;color:#dff0ff;white-space:nowrap}
+.rbchip{width:16px;height:22px;border-radius:3px;background:linear-gradient(160deg,#bfe6ff,#3f8fff 55%,#1a3c9a);box-shadow:0 0 10px #6fb8ff,inset 0 0 0 1.5px #ffe08a;animation:rbchip 1.6s ease-in-out infinite} @keyframes rbchip{50%{transform:rotateY(180deg)}}
 #chestBar{left:50%;top:calc(50% + 92px);transform:translateX(-50%);display:grid;justify-items:center;gap:4px;font:800 italic 14px/1 var(--font-hud);color:#ffe08a;text-shadow:0 1px 3px #000}
 #chestBar .usek{display:inline-block;min-width:22px;padding:2px 6px;border-radius:4px;background:rgba(255,255,255,.92);color:#10151c;font-style:normal;text-align:center}
 body.touch #chestBar .usek{display:none}
@@ -487,6 +494,8 @@ body.touch #stickHint{width:100px;height:100px;opacity:.6}
   </div>
 </div>
 <div class="hud" id="kartHud" hidden><b id="kartSpd">0</b><span>km/h</span></div>
+<div class="hud" id="rbWait" hidden><span class="rbt" id="rbT">Eliminated</span><p id="rbMsg"></p><span class="rbbar"><i id="rbBar"></i></span><small id="rbSub"></small></div>
+<div class="hud" id="rbCarry" hidden><span class="rbchip"></span><span id="rbCarryT"></span></div>
 <div class="hud" id="chestBar" hidden><span><b id="useK" class="usek"></b> <span id="useT"></span></span><span class="pb" id="usePB"><i id="chestB"></i></span></div>
 <div class="hud" id="useBar" hidden><span id="useT"></span><span class="pb"><i id="useB"></i></span></div>
 <div class="hud" id="pieceHp" hidden><span id="pieceHpT"></span><span class="pb"><i id="pieceHpB"></i></span><span id="pieceHpS"></span></div>
@@ -549,7 +558,7 @@ body.touch #stickHint{width:100px;height:100px;opacity:.6}
     </nav>
     <section class="mtab" data-tab="play">
       <div class="stage" id="stage" aria-hidden="true"><canvas id="stageC"></canvas><div class="plates" id="plates"></div><p class="stagehint">Drag to spin</p></div>
-      <p class="sub" id="verTag" style="opacity:.55;font-size:12px;margin:0 0 4px">Update: Nov 9 · new lobby &amp; Item Shop, realistic gun sounds, glass windows, buggy fixes</p>
+      <p class="sub" id="verTag" style="opacity:.55;font-size:12px;margin:0 0 4px">Update: Nov 9 · knocked &amp; revive, reboot cards &amp; vans, new lobby &amp; Item Shop, realistic gun sounds</p>
       <p class="sub">A build-fight practice range. Snappy Chapter 1-style running and jumping, turbo build on a 5&nbsp;m by 4&nbsp;m grid, and wall, floor, ramp and cone edits. Ramp rush, crank 90s, and chase your best height.</p>
       <div class="modes" id="modeCards" role="radiogroup" aria-label="Mode">
         <button type="button" class="mode" data-mode="fight" role="radio"><b>Build fight</b><small>Fight the bot or your friends: box up, edit, crank 90s.</small></button>
@@ -2644,7 +2653,7 @@ function bodyOverlaps(E,p){
 // below your feet (a step's height) a new piece lifts you; anything cutting through your body is ghosted for you instead
 function phaseCheck(p){ for(const E of [P,B]){ if(!E||(E===B&&!B.active)) continue; if(!E.phase) E.phase=new Set(); if(bodyOverlaps(E,p)) E.phase.add(p); } }
 function updatePhase(E){ if(!E||!E.phase||!E.phase.size) return; E.phase.forEach(p=>{ if(!pieces.has(p.key)||!bodyOverlaps(E,p)) E.phase.delete(p); }); }
-const solidNear=(E)=>{ const ps=near(E.pos.x,E.pos.z); if(E.phase&&E.phase.size) E.phase.forEach(p=>ps.delete(p)); if(props.length) propsNear(E.pos.x,E.pos.z,ps); if(karts) for(const k of karts) if(!k.dead&&Math.abs(k.x-E.pos.x)<5&&Math.abs(k.z-E.pos.z)<5&&!(E.kart&&E.kart.k===k)) ps.add(k.solid); return ps; };
+const solidNear=(E)=>{ const ps=near(E.pos.x,E.pos.z); if(E.phase&&E.phase.size) E.phase.forEach(p=>ps.delete(p)); if(props.length) propsNear(E.pos.x,E.pos.z,ps); if(VANS) for(const v of VANS) if(Math.abs(v.x-E.pos.x)<7&&Math.abs(v.z-E.pos.z)<7) ps.add(v.solid); if(karts) for(const k of karts) if(!k.dead&&Math.abs(k.x-E.pos.x)<5&&Math.abs(k.z-E.pos.z)<5&&!(E.kart&&E.kart.k===k)) ps.add(k.solid); return ps; };
 function popPlayerOut(){ depen(solidNear(P),P); if(B&&B.active) depen(solidNear(B),B); }
 // a floor, stair or cone cutting through you pushes you up on top of it whenever there's room above it;
 // walls (and pieces with no headroom over them) stay ghosted until you walk out
@@ -2745,7 +2754,7 @@ function stepEmote(dt,fw,st){
 }
 function moveInput(dt){
   const [fw,st]=wishInput(); stepEmote(dt,fw,st);
-  const ms=(1-0.35*adsK)*(P.useT>0?0.55:1); moveBody(P,fw*ms,st*ms,isHeld('jump')||touchJump,dt);
+  const ms=(1-0.35*adsK)*(P.useT>0?0.55:1)*(P.down?0.2:1); moveBody(P,fw*ms,st*ms,(isHeld('jump')||touchJump)&&!P.down,dt);
 }
 function moveBody0(E,fw,st,jump,dt){
   const fx=-Math.sin(E.yaw), fz=-Math.cos(E.yaw), rx=Math.cos(E.yaw), rz=-Math.sin(E.yaw);
@@ -2948,7 +2957,7 @@ function kartPoint(k,x,y,z,out){ return (out||_kv).set(x,y,z).applyEuler(k.g.rot
 function kartPose(k){ k.g.position.set(k.x,k.y,k.z); k.g.rotation.set(k.pitch,k.yaw,k.roll); k.g.updateMatrixWorld(true);
   const fx=-Math.sin(k.yaw), fz=-Math.cos(k.yaw); k.solid.boxes=[-0.8,0,0.8].map(a=>{ const cx=k.x-fx*a, cz=k.z-fz*a; return [cx-0.6,k.y+0.3,cz-0.6,cx+0.6,k.y+1.45,cz+0.6]; }); }
 // does the buggy's body (three circles along it) run into anything new at (x,z)?
-function kartHits(k,x,z,yaw,ox,oz){ const fx=-Math.sin(yaw), fz=-Math.cos(yaw), lo=k.y+0.45, hi=k.y+1.4, ps=near(x,z,1); propsNear(x,z,ps);
+function kartHits(k,x,z,yaw,ox,oz){ const fx=-Math.sin(yaw), fz=-Math.cos(yaw), lo=k.y+0.45, hi=k.y+1.4, ps=near(x,z,1); propsNear(x,z,ps); if(VANS) for(const v of VANS) if(Math.abs(v.x-x)<8&&Math.abs(v.z-z)<8) ps.add(v.solid);
   for(const o of karts) if(o!==k&&!o.dead&&Math.abs(o.x-x)<4&&Math.abs(o.z-z)<4) ps.add(o.solid);
   const hit=(cx,cz)=>{ for(const p of ps){ for(const b of p.boxes) if(b[4]>lo&&b[1]<hi&&circBox(b,cx,cz,0.7)) return b; if(p.slab) for(const s of [[0,0],[0.5,0],[-0.5,0],[0,0.5],[0,-0.5]]){ const t=slabTop(p,cx+s[0],cz+s[1]); if(t!==null&&t>lo&&t-ST<hi) return p; } } return null; };
   for(const a of [-0.85,0,0.85]){ const b=hit(x-fx*a,z-fz*a); if(b&&b!==hit(ox-fx*a,oz-fz*a)) return true; } return false; }
@@ -3292,7 +3301,7 @@ function validatePlacement(t,E=P){
   return {ok:true};
 }
 function tryPlace(type,E=P){
-  if(E===P&&isDead()||E.sky||E.kart) return false;
+  if(E===P&&(isDead()||P.down)||E.sky||E.kart) return false;
   const t=computeTarget(type,E);
   if(!validatePlacement(t,E).ok) return false;
   t.mat=E===P?buildMat:(B&&E===B?(B.boxMat||(B.skill>0.65?'brick':'wood')):'wood'); t.owner=E===P?net.id:'bot';
@@ -3504,7 +3513,7 @@ function toggleBuild(){
 // eliminated (in a room, or by the bot) = no moving, shooting, building or editing until you respawn
 function isDead(){ return net.dead||(typeof round!=='undefined'&&round.state==='over'&&P.hp<=0)||(horde.on&&!net.role&&P.hp<=0); }
 function fireDown(src){
-  if(isDead()||P.sky||(P.kart&&(P.kart.seat===0||mode!=='gun'))) return; if(P.emote) P.emote=null;
+  if(isDead()||P.down||P.sky||(P.kart&&(P.kart.seat===0||mode!=='gun'))) return; if(P.emote) P.emote=null;
   if(edit){ if(src==='desk'){ edit.painting=null; edit.mouse=true; paintTile(tileAtNDC(0,0)); } return; }
   fireHeld=true;
   if(mode==='build'){ tryPlace(heldPiece||piece); turboT=settings.turbo; }
@@ -3546,7 +3555,7 @@ function swing(fromImpact){
     if(hp_&&hp_.owner==='world') giveMats(hp_.mat,Math.round(HOUSE_FARM[hp_.mat][0]+Math.random()*(HOUSE_FARM[hp_.mat][1]-HOUSE_FARM[hp_.mat][0])),hit.point); } // houses farm like the map does
 }
 function toggleEdit(){ if(edit) exitEdit(true); else enterEdit(); }
-function respawn(){ animEvent(localHero,'revive'); P.sky=null; kartForget(); P.pos.set(...SPAWN); P.vel.set(0,0,0); P.onGround=true; P.fallTop=null; P.hp=100; P.sh=100; defaultLoadout(); P.reloadT=0; P.useT=0; syncItems(); P.mats={wood:30,brick:0,metal:0}; if(typeof syncMats==='function'&&document.getElementById('matStock')) syncMats(); }
+function respawn(){ P.down=null; animEvent(localHero,'revive'); P.sky=null; kartForget(); P.pos.set(...SPAWN); P.vel.set(0,0,0); P.onGround=true; P.fallTop=null; P.hp=100; P.sh=100; defaultLoadout(); P.reloadT=0; P.useT=0; syncItems(); P.mats={wood:30,brick:0,metal:0}; if(typeof syncMats==='function'&&document.getElementById('matStock')) syncMats(); }
 
 /* ---------- audio ---------- */
 let AC=null, noiseBuf=null, sfxGain=1, sfxLP=20000, sfxVerb=0, master=null, verb=null, cur=null;
@@ -3733,6 +3742,12 @@ function sfx(k){
     case 'throw': noise(600,0.18,0.25,1.2,0,'bandpass',1800); click(2600,0.15,0); break;
     case 'clink': knock(1900*r(),0.05,0.3,10); knock(2800*r(),0.04,0.15,10,0.01); break;
     case 'boom': noise(120,1.4,1.0,0.7,0,'lowpass',40); noise(900,0.3,0.7,0.6,0,'lowpass',200); noise(3000,0.08,0.5,0.8,0,'highpass'); for(let q=0;q<10;q++) noise(1500+Math.random()*3000,0.03,0.08,2,0.15+Math.random()*0.8); break;
+    case 'rb_grab': tone('sine',660,990,0.22,0.11); tone('sine',990,1480,0.3,0.08,0.07); tone('triangle',1480,1975,0.35,0.05,0.15); noise(7000,0.3,0.05,1,0,'highpass'); break;
+    case 'rb_drop': tone('sine',520,780,0.5,0.07); tone('sine',780,1170,0.6,0.05,0.12); noise(5000,0.5,0.04,1,0.05,'highpass'); break;
+    case 'rb_boot': tone('sawtooth',110,880,1.1,0.05); tone('sine',220,1760,1.15,0.07,0.04); noise(2500,0.9,0.06,0.7,0.15,'bandpass',9000); tone('triangle',880,1320,0.45,0.11,1.1); tone('triangle',1320,1760,0.5,0.08,1.25); break;
+    case 'rb_down': tone('sine',300,140,0.5,0.12); noise(500,0.3,0.15,0.8,0,'lowpass',150); break;
+    case 'rb_up': tone('triangle',440,660,0.18,0.1); tone('triangle',660,990,0.25,0.09,0.12); noise(4000,0.2,0.05,1,0.05,'highpass'); break;
+    case 'rb_tick': tone('square',1200,1180,0.03,0.025); break;
     case 'pickup': knock(900,0.05,0.2,6); noise(2500,0.06,0.1,1.5,0.03,'bandpass',5000); break;
     case 'ammo_pick': for(let q=0;q<3;q++) knock(1400+q*300,0.04,0.18,8,q*0.05); break;
     case 'chop': knock(320*r(),0.12,0.6,6); knock(820*r(),0.05,0.35,5); noise(2600,0.04,0.18,1.2,0,'highpass'); for(let q=0;q<3;q++) noise(4000+Math.random()*2000,0.02,0.06,2,0.03+q*0.03); break;
@@ -4640,6 +4655,18 @@ function animateRig0(H,S,dt){
     r.gun.visible=r.pump.visible=r.hammer.visible=r.plan.visible=false; r.pick.visible=false;
     return;
   }
+  // ----- knocked down: face down, dragging yourself along on your forearms -----
+  if(S.down){ A.downT=Math.min(1,(A.downT||0)+dt*2.2); const e=A.downT*A.downT*(3-2*A.downT), set=(o,ax,v,f)=>{ o.rotation[ax]=lerp(o.rotation[ax],v,f||sm); };
+    G.rotation.x=lerp(G.rotation.x,-1.38*e,Math.min(1,dt*10)); G.rotation.z=0; G.position.y=S.pos.y+0.3*e;
+    A.crawl=(A.crawl||0)+dt*(1.2+Math.min(1.5,sp)*4.5); const c1=Math.sin(A.crawl), c2=Math.sin(A.crawl+Math.PI), mvK=Math.min(1,sp/0.6);
+    r.hips.position.y=lerp(r.hips.position.y,0.94,sm); set(r.hips,'x',0); set(r.hips,'y',0.12*c1*mvK); set(r.hips,'z',0); set(r.spine,'x',-0.1); set(r.spine,'y',0); set(r.chest,'x',-0.15); set(r.chest,'y',-0.1*c1*mvK); set(r.chest,'z',0);
+    set(r.neck,'x',-0.75); set(r.neck,'y',0); set(r.neck,'z',0);
+    set(r.armL.sh,'x',2.5+0.45*c1*mvK); set(r.armR.sh,'x',2.5+0.45*c2*mvK); set(r.armL.sh,'z',-0.35); set(r.armR.sh,'z',0.35); set(r.armL.sh,'y',0); set(r.armR.sh,'y',0);
+    set(r.armL.el,'x',0.9+0.5*Math.max(0,-c1)*mvK); set(r.armR.el,'x',0.9+0.5*Math.max(0,-c2)*mvK); set(r.armL.wr,'x',0.3); set(r.armR.wr,'x',0.3);
+    for(const [L,cc] of [[r.legL,c2],[r.legR,c1]]){ set(L.hp,'x',-0.08+0.35*Math.max(0,cc)*mvK); set(L.hp,'z',0); set(L.kn,'x',-0.25-0.75*Math.max(0,cc)*mvK); set(L.an,'x',0.5); }
+    for(const k of GUN_MODELS) if(r[k]) r[k].visible=false; r.gun.visible=r.pump.visible=r.hammer.visible=r.plan.visible=false; r.pick.visible=false;
+    if(H.glider) H.glider.visible=false; return; }
+  A.downT=0;
   // ----- skydiving / gliding; afterwards the body levels out and the glider folds away -----
   if(S.sky){ animateSky(H,S,dt); return; }
   if(G.rotation.x||G.rotation.z){ G.rotation.x*=Math.exp(-dt*12); G.rotation.z*=Math.exp(-dt*12); if(Math.abs(G.rotation.x)<1e-3) G.rotation.x=0; if(Math.abs(G.rotation.z)<1e-3) G.rotation.z=0; A.skyX=G.rotation.x; A.skyZ=G.rotation.z; const th=G.rotation.x; G.position.x-=0.94*Math.sin(th)*Math.sin(S.yaw); G.position.y+=0.94*(1-Math.cos(th)); G.position.z-=0.94*Math.sin(th)*Math.cos(S.yaw); }
@@ -4826,7 +4853,7 @@ function slopeFor(E){
   const upYaw=[-Math.PI/2,Math.PI,Math.PI/2,0][r.dir]; return RAMP_ANG*Math.cos(angDiff(upYaw,E.yaw));
 }
 function animateHero(dt){
-  animateRig(localHero,{slope:slopeFor(P),pos:P.pos,vel:P.vel,yaw:P.yaw,pitch:P.pitch,onGround:P.onGround,crouch:P.crouch,building:mode==='build'&&!edit,editing:!!edit,item:mode==='item'&&P.useT>0,
+  animateRig(localHero,{down:!!P.down,slope:slopeFor(P),pos:P.pos,vel:P.vel,yaw:P.yaw,pitch:P.pitch,onGround:P.onGround,crouch:P.crouch,building:mode==='build'&&!edit,editing:!!edit,item:mode==='item'&&P.useT>0,
     gun:mode==='gun'&&!edit?P.wpn:false,ads:adsK,swingT,reload:(mode==='gun'&&P.reloadT>0)?{w:P.wpn,p:1-P.reloadT/P.reloadDur}:null,emote:P.emote,sky:P.sky?P.sky.phase:null,seat:seatInfo(P,P.yaw)},dt);
 }
 
@@ -4834,6 +4861,7 @@ function animateHero(dt){
 const tmpA=new THREE.Vector3(), tmpB=new THREE.Vector3();
 let camY=0, camDip=0, skyCamK=0, kartCamK=0;
 function updateCamera(){
+  if(rbSpectate()) return;
   const eye=P.crouch?EYE_CROUCH:EYE_STAND;
   // smooth the camera height over stair steps and small bumps; follow fast for real jumps and falls
   const dyCam=P.pos.y-camY; camY=Math.abs(dyCam)>1.2?P.pos.y-Math.sign(dyCam)*1.2:camY+dyCam*Math.min(1,lastDt*(P.onGround?16:30));
@@ -4904,7 +4932,7 @@ function startPlay(){
 $('play').addEventListener('click',startPlay);
 $('invClose').addEventListener('click',closeInv);
 $('invDrop').addEventListener('click',()=>{ dropFromSlot(invSel); });
-$('respawn').addEventListener('click',()=>{ respawn(); if(skyDropAllowed()){ emptyLoadout(); const a=Math.random()*6.283, r=12+Math.random()*25; skyDrop(SPAWN[0]+Math.cos(a)*r,SPAWN[2]+Math.sin(a)*r,SKY_BACK); } });
+$('respawn').addEventListener('click',()=>{ if(RB.wait) rbGiveUp(false); else if(net.dead&&net.role) net.dead=false; respawn(); if(skyDropAllowed()){ emptyLoadout(); const a=Math.random()*6.283, r=12+Math.random()*25; skyDrop(SPAWN[0]+Math.cos(a)*r,SPAWN[2]+Math.sin(a)*r,SKY_BACK); } });
 $('clear').addEventListener('click',()=>{ if(net.role==='client'){ toast('Only the host can clear builds'); return; } clearBuilds(); netOp({op:'clear'}); });
 $('fs').addEventListener('click',()=>{
   const el=document.documentElement;
@@ -5213,10 +5241,10 @@ function teamMarker(pl){
   const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),depthTest:false,transparent:true,sizeAttenuation:false})); sp.scale.set(0.16,0.04,1); sp.position.y=2.62; sp.renderOrder=21; m.add(sp); sp.position.set(0,0.27,0);
 }
 function refreshTeamMarkers(){ net.players.forEach(pl=>{ if(pl.id!=='bot') teamMarker(pl); }); }
-function dropPlayer(id){ kartLeft(id); const pl=net.players.get(id); if(!pl) return; scene.remove(pl.h.group); net.players.delete(id); updateRoomUI(); }
+function dropPlayer(id){ kartLeft(id); rbLeft(id); const pl=net.players.get(id); if(!pl) return; scene.remove(pl.h.group); net.players.delete(id); updateRoomUI(); }
 // flags: 1 ground, 2 crouch, 4 building, 8 dead, 16 editing, 32 aiming; weapon in s[10]; shield in s[11]
 function myState(){
-  const f=(P.onGround?1:0)|(P.crouch?2:0)|(mode==='build'&&!edit?4:0)|(net.dead?8:0)|(edit?16:0)|(adsK>0.5?32:0)|(P.sky?(P.sky.phase==='glide'?128:64):0);
+  const f=(P.onGround?1:0)|(P.crouch?2:0)|(mode==='build'&&!edit?4:0)|(net.dead?8:0)|(edit?16:0)|(adsK>0.5?32:0)|(P.sky?(P.sky.phase==='glide'?128:64):0)|(P.down?256:0);
   return {type:'st',id:net.id,n:net.name,t:+settings.team||0,o:outfitIdx(settings.outfit),p:pickIdx(settings.pickaxe),s:[+P.pos.x.toFixed(3),+P.pos.y.toFixed(3),+P.pos.z.toFixed(3),+P.vel.x.toFixed(2),+P.vel.y.toFixed(2),+P.vel.z.toFixed(2),+P.yaw.toFixed(3),+P.pitch.toFixed(3),f,net.lastSwing,mode==='gun'&&!edit?WCODE[P.wpn]:0,Math.round(P.sh),P.emote?EMOTE_IDS.indexOf(P.emote.id)+1:0],k:kartNet(),kp:kartParkNet()};
 }
 function onState(m){
@@ -5240,7 +5268,7 @@ function stepPlayers(dt){
     // smooth yaw (shortest way round) so turning never snaps
     pl.dyaw=pl.dyaw===undefined?pl.yaw:pl.dyaw+angDiff(pl.yaw,pl.dyaw)*Math.min(1,dt*18);
     if(pl.h.group.visible) animateRig(pl.h,{pos:pl.pos,vel:pl.vel,yaw:pl.dyaw,pitch:pl.pitch,onGround:!!(pl.flags&1),crouch:pl.crouch,building:!!(pl.flags&4),editing:!!(pl.flags&16),
-      gun:pl.wpn==='pick'?false:pl.wpn,ads:(pl.flags&32)?1:0,swingT:pl.swingT,emote:pl.emote,sky:(pl.flags&128)?'glide':(pl.flags&64)?'fall':null,seat:seatInfo(pl,pl.dyaw)},dt);
+      gun:pl.wpn==='pick'?false:pl.wpn,ads:(pl.flags&32)?1:0,swingT:pl.swingT,emote:pl.emote,down:!!(pl.flags&256),sky:(pl.flags&128)?'glide':(pl.flags&64)?'fall':null,seat:seatInfo(pl,pl.dyaw)},dt);
   });
 }
 function applyOp(o,quiet){
@@ -5296,6 +5324,7 @@ function hostData(from,m){
   else if(m.type==='hit'){ m.id=from; if(m.to==='bot'){ if(B&&B.active){ botHurt(m.dmg,from,m.w); } } else if(m.to===net.id) onHit(m); else { const c=net.conns.get(m.to); if(c&&c.open) c.send(m); } }
   else if(m.type==='elim'){ m.id=from; onElim(m); netSend(m,from); }
   else if(m.type==='ready'){ party.ready.set(from,!!m.v); partySync(); }
+  else if(m.type==='rb'){ onRb(m); netSend(m,from); }
 }
 // someone else fired: tracers, muzzle flash and sound from their character
 function onShot(m){
@@ -5310,8 +5339,9 @@ function onHit(m){
   if(from&&sameTeam(from)) return; // no team damage
   const f=$('hurtfx'); f.classList.add('on'); void f.offsetWidth; f.classList.remove('on'); sfx('hurt'); animEvent(localHero,'hurt');
   if(from) dmgDirFrom(from.pos);
-  if(hurt(P,m.dmg)){ net.dead=true; net.deaths++; animEvent(localHero,'die'); const e={type:'elim',id:net.id,by:m.id,w:m.w}; onElim(e); netSend(e);
-    setTimeout(()=>{ net.dead=false; const a=Math.random()*Math.PI*2, r=8+Math.random()*20; respawn(); P.pos.set(SPAWN[0]+Math.cos(a)*r,0,SPAWN[2]+Math.sin(a)*r); if(skyDropAllowed()) skyDrop(P.pos.x,P.pos.z,SKY_BACK); },3000); }
+  if(P.down){ P.hp-=Math.max(1,m.dmg*0.25); if(P.hp<=0) rbBleedOut(); return; }
+  if(hurt(P,m.dmg)){ if(rbCanKnock()){ rbKnock(m.id,m.w); return; } net.dead=true; net.deaths++; animEvent(localHero,'die'); const e={type:'elim',id:net.id,by:m.id,w:m.w}; onElim(e); netSend(e);
+    afterDeath(); }
 }
 function onElim(m){
   const nm=id=>id===net.id?'You':id==='bot'?'Bot':id==='zombie'?'A zombie':(net.players.get(id)||{}).name||'Player', w=(WEAPONS[m.w]||{name:m.w==='zombie'?'Claws':'Pickaxe'}).name;
@@ -5331,6 +5361,7 @@ function clientData(m){
   else if(m.type==='undo'){ const p=pieces.get(m.key); if(p&&p.owner===net.id){ removePiece(p); } if(m.real&&!pieces.has(m.real.key)){ const q=addPiece(m.real); q.mask=m.real.mask; q.half=m.real.half; if(m.real.hp!=null) q.hp=m.real.hp; buildPiece(q); } }
   else if(m.type==='fix'){ const p=pieces.get(m.key); if(p&&!(p.mask===m.mask&&(p.dir??0)===(m.dir??0)&&(p.half??-1)===(m.half??-1)&&String(p.path||'')===String(m.path||''))){ if(edit&&edit.piece===p) exitEdit(false); p.mask=m.mask; p.dir=m.dir; p.half=m.half; p.path=m.path||null; buildPiece(p); } }
   else if(m.type==='shot'){ if(m.id!==net.id) onShot(m); }
+  else if(m.type==='rb') onRb(m);
   else if(m.type==='hit'){ if(m.to===net.id) onHit(m); }
   else if(m.type==='elim'){ if(m.id!==net.id||m.by===net.id) onElim(m); }
   else if(m.type==='leave'){ dropPlayer(m.id); releaseBuilds(m.id); }
@@ -5392,7 +5423,7 @@ window.addEventListener('pagehide',()=>{ if(net.role) leaveGame(true); });
 function leaveGame(silent){
   const was=net.id; if(net.role) pieces.forEach(p=>{ if(p.owner===was) p.owner='me'; else if(p.owner!=='bot') p.owner='public'; }); // back to solo: everything left is yours to edit
   if(net.peer){ try{ net.peer.destroy(); }catch(e){} }
-  net.peer=null; net.role=null; net.host=null; net.conns.clear(); net.code=null; net.id='me'; net.dead=false; $('clear').disabled=false;
+  net.peer=null; net.role=null; net.host=null; net.conns.clear(); net.code=null; net.id='me'; net.dead=false; rbReset(); $('clear').disabled=false;
   [...net.players.keys()].forEach(dropPlayer);
   if(!silent) setRoomStatus('');
   updateRoomUI();
@@ -5479,7 +5510,7 @@ function endMatch(){
 }
 function onPartyStart(m){
   if(m.seq!=null) party.seq=m.seq; party.live=true; party.mode=m.mode; syncModeCards();
-  respawn(); if(m.mode==='horde') emptyLoadout(); sfx('win'); if(skyDropAllowed()) matchDrop();
+  rbReset(); respawn(); if(m.mode==='horde') emptyLoadout(); sfx('win'); if(skyDropAllowed()) matchDrop();
   if(!playing){ showTab('play'); party.pendingStart=true; if(isTouch) setTimeout(()=>{ if(!playing&&party.live) startPlay(); },900); }
   renderParty();
 }
@@ -5973,7 +6004,7 @@ function newZombie(type,x,z,id){
 function dropZombie(z){ scene.remove(z.m.g); horde.zs.delete(z.id); }
 function clearZombies(){ [...horde.zs.values()].forEach(dropZombie); clearGoo(); }
 // players the zombies can go after
-function hordeTargets(){ const a=[]; if(!(net.dead||P.hp<=0)) a.push(P); net.players.forEach(pl=>{ if(pl.alive&&pl.id!=='bot') a.push(pl); }); return a; }
+function hordeTargets(){ const a=[]; if(!(net.dead||P.hp<=0||P.down)) a.push(P); net.players.forEach(pl=>{ if(pl.alive&&pl.id!=='bot'&&!(pl.flags&256)) a.push(pl); }); return a; }
 const zFlashes=[]; let zShardMat=null;
 function zObliterate(z){ const c=z.pos.clone().setY(z.pos.y+1.1*z.sc), far=c.distanceTo(P.pos)>70;
   if(!zShardMat) zShardMat=new THREE.MeshBasicMaterial({color:0xd06bff});
@@ -6009,7 +6040,7 @@ function fallHurt(drop){
   P.hp=Math.max(0,P.hp-dmg); if(P.hp>0) return;
   animEvent(localHero,'die');
   if(net.role){ net.dead=true; net.deaths++; const e={type:'elim',id:net.id,by:net.id,w:'fall'}; onElim(e); netSend(e);
-    setTimeout(()=>{ net.dead=false; const a=Math.random()*Math.PI*2, r=8+Math.random()*20; respawn(); P.pos.set(SPAWN[0]+Math.cos(a)*r,0,SPAWN[2]+Math.sin(a)*r); if(skyDropAllowed()) skyDrop(P.pos.x,P.pos.z,SKY_BACK); },3000); }
+    afterDeath(); }
   else if(horde.on){ horde.phase='over'; horde.t=6; horde.best=Math.max(horde.best,horde.wave-1); banner('Fell!','You survived '+(horde.wave-1)+(horde.wave-1===1?' wave':' waves')+' · '+horde.kills+' zombies',5); sfx('lose'); }
   else if(B&&B.active&&round.state==='fight') endRound(false);
   else { net.dead=true; feed('<b>You</b> fell too far',true); banner('Eliminated','by the fall',2); sfx('lose'); setTimeout(()=>{ net.dead=false; respawn(); },2500); }
@@ -6493,13 +6524,13 @@ function useDown(){ useHeld=true; const t=useTgt; if(!t||isDead()) return;
 function useUp(){ useHeld=false; }
 function findUseTarget(){
   if(P.kart) return playing&&!isDead()&&!invOpen?{kind:'kartout',label:'Get out'}:null;
-  if(!playing||isDead()||edit||invOpen||P.sky) return null;
+  if(!playing||isDead()||P.down||edit||invOpen||P.sky) return null;
   const fx=-Math.sin(P.yaw), fz=-Math.cos(P.yaw); let best=null, bs=1e9;
-  const consider=(x,y,z,r,o)=>{ const dx=x-P.pos.x, dz=z-P.pos.z, d=Math.hypot(dx,dz); if(d>r||Math.abs(y-P.pos.y)>1.8) return; const face=d>0.05?(dx*fx+dz*fz)/d:1, s=d-face*0.9; if(s<bs){ bs=s; best=o; } };
+  const consider=(x,y,z,r,o)=>{ const dx=x-P.pos.x, dz=z-P.pos.z, d=Math.hypot(dx,dz); if(d>r||Math.abs(y-P.pos.y)>1.8) return; const face=d>0.05?(dx*fx+dz*fz)/d:1, s=d-face*0.9-(o.pri||0); if(s<bs){ bs=s; best=o; } };
   for(const c of chests) if(!c.open&&c.g.visible) consider(c.x,c.y,c.z,2.4,{kind:'chest',c,label:'Open chest'});
   drops.forEach(d=>{ if(AMMO_T[d.item]||d.pending||(!d.landed&&d.t<0.4)) return; const nm=itemInfo(d.item).name+(isWeapon(d.item)&&d.item!=='nade'?'':' ×'+d.n), sw=canTake(d)?-1:swapSlotFor(d); consider(d.pos.x,d.pos.y,d.pos.z,1.9,{kind:'drop',d,label:sw>=0?'Swap '+itemInfo(P.inv[sw]).name+' for '+nm:'Pick up '+nm}); });
   near(P.pos.x,P.pos.z,1).forEach(p=>{ if(!p.doors) return; p.doors.forEach((dr,c)=>{ if(!dr) return; const q=doorCenter(p,c); consider(q.x,q.y-1.2,q.z,2.4,{kind:'door',p,c,label:dr.open?'Close door':'Open door'}); }); });
-  kartTargets(consider);
+  kartTargets(consider); rbTargets(consider);
   return best; }
 function stepChests(dt){
   chestHumT-=dt; let best=null, bd=9; useTgt=findUseTarget();
@@ -6515,8 +6546,8 @@ function stepChests(dt){
     if(c.open){ c.goneT=(c.goneT||0)+dt; const f=Math.max(0,Math.min(1,(c.goneT-1.6)/0.6)); if(f>0){ c.g.scale.setScalar(1-0.85*f); c.g.position.y=c.y-0.5*f; if(f>=1) c.g.visible=false; if(!c.poofed){ c.poofed=true; if(d<60) burst(new THREE.Vector3(c.x,c.y+0.4,c.z),8,2.5,0.06,chestMats.gold); } } }
   }
   // the prompt: what Interact would do here (and how far along opening a chest is)
-  showing=!!useTgt; if(showing){ const lt=useTgt.kind==='chest'&&useTgt.c.prog>0?'Opening chest':useTgt.label; if($('useT').textContent!==lt) $('useT').textContent=lt; const kl=codeName(settings.binds.interact||'KeyV'); if($('useK').textContent!==kl) $('useK').textContent=kl;
-    const pr=useTgt.kind==='chest'; $('usePB').hidden=!pr; if(pr) $('chestB').style.width=Math.min(100,useTgt.c.prog*100).toFixed(0)+'%'; }
+  showing=!!useTgt; if(showing){ const lt=useTgt.kind==='chest'&&useTgt.c.prog>0?'Opening chest':(useTgt.busy&&useTgt.busy())||useTgt.label; if($('useT').textContent!==lt) $('useT').textContent=lt; const kl=codeName(settings.binds.interact||'KeyV'); if($('useK').textContent!==kl) $('useK').textContent=kl;
+    const pr=useTgt.kind==='chest'||!!useTgt.prog; $('usePB').hidden=!pr; if(pr) $('chestB').style.width=Math.min(100,(useTgt.prog?useTgt.prog():useTgt.c.prog)*100).toFixed(0)+'%'; }
   if(bar.hidden===showing) bar.hidden=!showing; const tu=$('tUse'); if(tu&&tu.hidden===showing) tu.hidden=!showing;
   if(best&&chestHumT<=0){ chestHumT=1.6+Math.random()*1.4; sfxAt('chest_hum',new THREE.Vector3(best.x,best.y+0.5,best.z)); }
   chestNear=best;
@@ -7497,6 +7528,7 @@ function drawMini(){
   TOWNS.forEach(t=>{ const px=tx(t.x), pz=tz(t.z), dx=px-c, dz=pz-c, m=Math.hypot(dx,dz), lim=c-9*dpr, qx=m>lim?c+dx/m*lim:px, qz=m>lim?c+dz/m*lim:pz; if(m>lim) return; // only towns actually on the minimap (the full map shows them all)
     g.fillStyle='#f6e7c6'; g.strokeStyle='#3a2a14'; g.lineWidth=1.2*dpr; g.beginPath(); g.moveTo(qx,qz-5*dpr); g.lineTo(qx+4*dpr,qz-1*dpr); g.lineTo(qx+3*dpr,qz-1*dpr); g.lineTo(qx+3*dpr,qz+3.5*dpr); g.lineTo(qx-3*dpr,qz+3.5*dpr); g.lineTo(qx-3*dpr,qz-1*dpr); g.lineTo(qx-4*dpr,qz-1*dpr); g.closePath(); g.fill(); g.stroke();
     if(m<=lim){ g.font=`800 ${9*dpr}px sans-serif`; g.textAlign='center'; g.fillStyle='#fff'; g.strokeStyle='rgba(0,0,0,.7)'; g.lineWidth=2.5*dpr; g.strokeText(t.name,qx,qz-7*dpr); g.fillText(t.name,qx,qz-7*dpr); } });
+  rbMiniMap(g,tx,tz,c,dpr);
   horde.zs.forEach(z=>{ if(!z.alive) return; const px=tx(z.pos.x), pz=tz(z.pos.z); if(px<0||pz<0||px>S||pz>S) return; g.fillStyle=z.type==='brute'?'#ff9a3c':z.type==='hurler'?'#c8ff5a':'#e070ff'; g.strokeStyle='#14240f'; g.lineWidth=dpr; g.beginPath(); g.arc(px,pz,(z.type==='brute'?3.6:2.6)*dpr,0,7); g.fill(); g.stroke(); });
   // you: arrow pointing where you face
   g.save(); g.translate(c,c); g.rotate(-P.yaw); g.fillStyle='#fff'; g.strokeStyle='#0d1726'; g.lineWidth=1.5*dpr;
@@ -7548,6 +7580,7 @@ function drawBigMap(){
   const dot=(x,z,col)=>{ g.fillStyle=col; g.strokeStyle='#fff'; g.lineWidth=1.6*u; g.beginPath(); g.arc(X(x),Z(z),5*u,0,7); g.fill(); g.stroke(); };
   net.players.forEach(pl=>dot(pl.pos.x,pl.pos.z,'#'+(sameTeam(pl)?(horde.on?0x3f8fff:TEAM_COL[pl.team]):pl.id==='bot'?0xff4b3a:colorFor(pl.id)).toString(16).padStart(6,'0')));
   if(B&&B.active&&B.h.group.visible) dot(B.pos.x,B.pos.z,'#ff4b3a');
+  rbBigMap(g,X,Z,u);
   // you: an arrow pointing where you face, with a soft pulse so it's easy to find
   const px=X(P.pos.x), pz=Z(P.pos.z), pulse=(performance.now()/900)%1;
   g.strokeStyle=`rgba(255,255,255,${0.7*(1-pulse)})`; g.lineWidth=2*u; g.beginPath(); g.arc(px,pz,(8+16*pulse)*u,0,7); g.stroke();
@@ -7606,7 +7639,7 @@ function warmBuildShaders(){ try{ const g=new THREE.Group(), geo=new THREE.BoxGe
   g.position.copy(camera.position); scene.add(g); renderer.compile(scene,camera); scene.remove(g); }catch(e){ console.warn('shader warm-up skipped',e); } }
 setTimeout(warmBuildShaders,1500);
 initProps(); props.forEach(p=>{ if(!p.yard&&townAt(p.x,p.z,6)){ p.gone=true; p.alive=false; p.g.visible=false; } }); syncMats();
-buildWorld(); initChests(); spawnFloorLoot(); initKarts(); initForest(); buildGardens();
+buildWorld(); initChests(); spawnFloorLoot(); initKarts(); initVans(); initForest(); buildGardens();
 syncBot();
 // locker: render a portrait of every outfit once, then build the cards
 (function(){
@@ -7738,6 +7771,201 @@ function renderItemShop(){ const g=$('shopGrid'), L=window._locker; if(!g||!L) r
 window.renderItemShop=renderItemShop;
 setTimeout(()=>{ syncLobby(); renderItemShop(); },80); setTimeout(renderItemShop,2500);
 
+/* ---------- reboot cards and reboot vans ---------- */
+var VANS; var RB={rev:new Map(),cards:new Map(),carry:new Set(),wait:null,noMate:0,spec:{yaw:0,who:null}};
+var RB_TTL=100, RB_GRAB_T=1.0, RB_BOOT_T=4, RB_VAN_CD=25, RB_REV_T=3.5, RB_DOWN_HP=10, RB_BLEED=30, RB_UP_HP=30;
+function rbCol(c){ return horde.on?0x3f8fff:(TEAM_COL[c.t]||0x3f8fff); }
+function rbMate(c){ return c.id===net.id||horde.on||(+settings.team>0&&c.t===+settings.team); }
+function rbMatesUp(){ let n=0; net.players.forEach(pl=>{ if(pl.id!=='bot'&&pl.alive&&!(pl.flags&256)&&sameTeam(pl)) n++; }); return n; }
+function rbNeeded(){ for(const c of RB.cards.values()) if(rbMate(c)) return true; return RB.carry.size>0; }
+function rbSend(m){ m.type='rb'; onRb(m); netSend(m); }
+function rbRespawnNow(){ net.dead=false; const a=Math.random()*Math.PI*2, r=8+Math.random()*20; respawn(); P.pos.set(SPAWN[0]+Math.cos(a)*r,0,SPAWN[2]+Math.sin(a)*r); if(skyDropAllowed()) skyDrop(P.pos.x,P.pos.z,SKY_BACK); }
+// you just went down in a room
+function afterDeath(){
+  RB.carry.forEach(id=>rbSend({op:'drop',id,p:[+P.pos.x.toFixed(2),+P.pos.y.toFixed(2),+P.pos.z.toFixed(2)]})); // cards you were carrying fall where you fell
+  if(net.role&&(horde.on||+settings.team>0)&&rbMatesUp()>0){
+    const [gy]=groundAt(P.pos.x,P.pos.z,P.pos.y+0.5,near(P.pos.x,P.pos.z)); RB.wait={t0:performance.now(),ttl:RB_TTL}; RB.noMate=0; RB.spec.who=null; RB.spec.yaw=P.yaw;
+    rbSend({op:'card',id:net.id,n:net.name||'Player',t:+settings.team||0,o:outfitIdx(settings.outfit),p:[+P.pos.x.toFixed(2),+Math.max(gy,P.pos.y-40).toFixed(2),+P.pos.z.toFixed(2)],ttl:RB_TTL});
+    return; }
+  setTimeout(rbRespawnNow,3000); }
+function rbGiveUp(drop=true){ if(!RB.wait) return; RB.wait=null; rbSend({op:'gone',id:net.id}); if(drop) rbRespawnNow(); else net.dead=false; }
+function rbReset(){ P.down=null; RB.rev.clear(); RB.cards.forEach(c=>rbKill(c)); RB.cards.clear(); RB.carry.clear(); if(RB.wait){ RB.wait=null; net.dead=false; } if(VANS) VANS.forEach(v=>{ v.cd=0; v.prog=0; v.req=0; }); }
+function rbLeft(id){ const c=RB.cards.get(id); if(c){ rbKill(c); RB.cards.delete(id); RB.carry.delete(id); } RB.cards.forEach(c=>{ if(c.holder===id){ c.holder=null; c.g.visible=true; } }); }
+function rbKill(c){ if(c.g){ scene.remove(c.g); c.g.traverse(o=>{ if(o.geometry) o.geometry.dispose(); }); } }
+function rbCanKnock(){ return !!net.role&&(horde.on||+settings.team>0)&&rbMatesUp()>0&&!P.sky&&!P.down; }
+function rbKnock(by,w){ kartForget(); P.down={by,w,t0:performance.now(),noMate:0}; P.hp=RB_DOWN_HP; P.sh=0; P.crouch=false; P.useT=0; P.reloadT=0; if(edit) exitEdit(false); if(mode==='build') selectPick();
+  animEvent(localHero,'hurt'); sfx('rb_down'); banner('Knocked','Hang on · a teammate can revive you',2); rbSend({op:'down',id:net.id,by,w}); }
+function rbBleedOut(){ if(!P.down) return; const d=P.down; P.down=null; P.hp=0; net.dead=true; net.deaths++; animEvent(localHero,'die'); const e={type:'elim',id:net.id,by:d.by||net.id,w:d.w||'zombie'}; onElim(e); netSend(e); afterDeath(); }
+function onRb(m){ const now=performance.now();
+  if(m.op==='down'){ if(m.id!==net.id){ const pl=net.players.get(m.id), nm=esc((pl&&pl.name)||'A teammate'); if(pl&&sameTeam(pl)){ feed(`<b>${nm}</b> is down · hold Interact on them to revive`); if(pl.pos) sfxAt('rb_down',pl.pos); } else if(m.by===net.id) feed(`You knocked <b>${nm}</b>`); } return; }
+  if(m.op==='rev'){ RB.rev.delete(m.id); if(m.id===net.id&&P.down){ P.down=null; P.hp=RB_UP_HP; P.sh=0; animEvent(localHero,'revive'); sfx('rb_up'); const pl=net.players.get(m.by); banner('Revived','by '+((pl&&pl.name)||'a teammate'),1.6); rbSend({op:'up',id:net.id,by:m.by}); } return; }
+  if(m.op==='up'){ RB.rev.delete(m.id); if(m.by===net.id){ const pl=net.players.get(m.id); feed(`You revived <b>${esc((pl&&pl.name)||'a teammate')}</b>`); sfx('rb_up'); } return; }
+  if(m.op==='card'){ const old=RB.cards.get(m.id); if(old) rbKill(old);
+    const c={id:m.id,n:m.n,t:m.t|0,o:m.o|0,x:m.p[0],y:m.p[1],z:m.p[2],holder:null,exp:now+(m.ttl||RB_TTL)*1000,prog:0,req:0}; c.g=rbCardMesh(c); RB.cards.set(m.id,c);
+    if(m.id!==net.id&&rbMate(c)){ feed(`<b>${esc(c.n)}</b> is down · grab their reboot card`); sfxAt('rb_drop',new THREE.Vector3(c.x,c.y,c.z)); } }
+  else if(m.op==='grab'){ if(m.id===net.id&&RB.wait){ const c=RB.cards.get(net.id); if(c&&!c.holder) rbSend({op:'held',id:net.id,by:m.by}); } }
+  else if(m.op==='held'){ const c=RB.cards.get(m.id); if(!c) return; c.holder=m.by; c.prog=0; c.req=0; c.g.visible=false;
+    if(m.by===net.id){ RB.carry.add(m.id); sfx('rb_grab'); toast('Got '+c.n+"'s card · take it to a Reboot Van"); }
+    else if(m.id===net.id){ const pl=net.players.get(m.by); feed(`<b>${esc((pl&&pl.name)||'A teammate')}</b> picked up your card`); sfx('rb_grab'); } }
+  else if(m.op==='drop'){ const c=RB.cards.get(m.id); if(!c) return; c.holder=null; c.x=m.p[0]; c.z=m.p[2]; const [gy]=groundAt(c.x,c.z,m.p[1]+0.5,near(c.x,c.z)); c.y=Math.max(gy,m.p[1]-40); c.g.visible=true; RB.carry.delete(m.id); }
+  else if(m.op==='boot'){ if(m.id!==net.id||!RB.wait) return; const v=VANS&&VANS[m.van]; if(!v) return; RB.wait=null; net.dead=false; respawn(); emptyLoadout();
+    const a=Math.random()*6.283; P.pos.set(v.x+Math.cos(a)*4,0,v.z+Math.sin(a)*4); if(skyDropAllowed()) skyDrop(P.pos.x,P.pos.z,SKY_AUTO+25); else P.pos.y=terrainH(P.pos.x,P.pos.z)+0.1;
+    rbSend({op:'done',id:net.id,van:m.van,by:m.by}); banner('Rebooted','Back in the fight',2); }
+  else if(m.op==='done'){ const c=RB.cards.get(m.id); const nm=c?c.n:'A teammate'; if(c){ rbKill(c); RB.cards.delete(m.id); } RB.carry.delete(m.id);
+    const v=VANS&&VANS[m.van]; if(v){ v.cd=now+RB_VAN_CD*1000; v.prog=0; v.req=0; v.flash=2.4; if(Math.hypot(v.x-P.pos.x,v.z-P.pos.z)<140) sfxAt('rb_boot',new THREE.Vector3(v.x,v.y+2,v.z)); }
+    if(m.by===net.id) feed(`You rebooted <b>${esc(nm)}</b>`); else if(m.id!==net.id){ const pl=net.players.get(m.by); feed(`<b>${esc((pl&&pl.name)||'A teammate')}</b> rebooted <b>${esc(nm)}</b>`); } }
+  else if(m.op==='gone'){ const c=RB.cards.get(m.id); if(c){ rbKill(c); RB.cards.delete(m.id); } RB.carry.delete(m.id); }
+}
+function esc(s){ return String(s).replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[ch]); }
+// ---- the card: a holographic trading card with your portrait, a sheen sweeping across it, a beam you can see from afar ----
+function rbCardFace(c){ const W=256, H=360, cv=document.createElement('canvas'); cv.width=W; cv.height=H; const g=cv.getContext('2d'), col='#'+rbCol(c).toString(16).padStart(6,'0');
+  const draw=img=>{ g.clearRect(0,0,W,H); const rr=(x,y,w,h,r)=>{ g.beginPath(); g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r); g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.closePath(); };
+    const bg=g.createLinearGradient(0,0,0,H); bg.addColorStop(0,'#eaf6ff'); bg.addColorStop(0.18,col); bg.addColorStop(1,'#0a1a4a'); rr(4,4,W-8,H-8,22); g.fillStyle=bg; g.fill();
+    g.save(); rr(4,4,W-8,H-8,22); g.clip(); g.globalAlpha=0.12; g.fillStyle='#fff'; for(let i=-H;i<W+H;i+=26){ g.beginPath(); g.moveTo(i,0); g.lineTo(i+12,0); g.lineTo(i+12-H*0.6,H); g.lineTo(i-H*0.6,H); g.fill(); }
+    g.globalAlpha=0.22; for(let r=30;r<300;r+=34){ g.beginPath(); g.arc(W/2,H*0.42,r,0,7); g.strokeStyle='#fff'; g.lineWidth=1.5; g.stroke(); } g.restore(); g.globalAlpha=1;
+    g.lineWidth=6; g.strokeStyle='#ffe08a'; rr(10,10,W-20,H-20,18); g.stroke(); g.lineWidth=2; g.strokeStyle='rgba(255,255,255,.7)'; rr(18,18,W-36,H-36,14); g.stroke();
+    // the reboot glyph: a circular arrow
+    g.save(); g.translate(W/2,44); g.strokeStyle='#fff'; g.lineWidth=5; g.beginPath(); g.arc(0,0,15,0.5,5.6); g.stroke(); g.fillStyle='#fff'; g.beginPath(); g.moveTo(15*Math.cos(5.6)+8,15*Math.sin(5.6)-1); g.lineTo(15*Math.cos(5.6)-6,15*Math.sin(5.6)-9); g.lineTo(15*Math.cos(5.6)-4,15*Math.sin(5.6)+8); g.fill(); g.restore();
+    g.font='900 italic 20px "Arial Black",Arial,sans-serif'; g.textAlign='center'; g.fillStyle='#fff'; g.fillText('REBOOT',W/2,86);
+    // the portrait in a glowing window
+    g.save(); rr(40,98,W-80,182,14); g.fillStyle='rgba(4,10,30,.55)'; g.fill(); g.clip(); const gl=g.createRadialGradient(W/2,200,10,W/2,200,120); gl.addColorStop(0,'rgba(170,220,255,.75)'); gl.addColorStop(1,'rgba(170,220,255,0)'); g.fillStyle=gl; g.fillRect(40,98,W-80,182);
+    if(img) g.drawImage(img,W/2-84,92,168,224); else { g.fillStyle='rgba(255,255,255,.8)'; g.beginPath(); g.arc(W/2,160,26,0,7); g.fill(); g.fillRect(W/2-34,192,68,80); } g.restore();
+    g.lineWidth=3; g.strokeStyle='#ffe08a'; rr(40,98,W-80,182,14); g.stroke();
+    const nm=String(c.n||'Player').slice(0,14).toUpperCase(); let fs=30; g.font=`900 italic ${fs}px "Arial Black",Arial,sans-serif`; while(g.measureText(nm).width>W-56&&fs>14){ fs-=2; g.font=`900 italic ${fs}px "Arial Black",Arial,sans-serif`; }
+    g.lineWidth=5; g.strokeStyle='rgba(0,10,40,.8)'; g.strokeText(nm,W/2,320); g.fillStyle='#fff'; g.fillText(nm,W/2,320); tex.needsUpdate=true; };
+  const tex=new THREE.CanvasTexture(cv); tex.anisotropy=4; const o=OUTFITS[c.o]||OUTFITS[0], src=document.querySelector(`#outfits [data-id="${o.id}"] img`);
+  draw(null); if(src){ const im=new Image(); im.onload=()=>draw(im); im.src=src.src; } return tex; }
+var _rbSheen=null, _rbBeam=null;
+function rbCardMesh(c){ const g=new THREE.Group(), col=rbCol(c), tex=rbCardFace(c), W=0.78, H=1.1;
+  const face=new THREE.MeshBasicMaterial({map:tex,transparent:true,fog:false}); const f1=new THREE.Mesh(new THREE.PlaneGeometry(W,H),face), f2=f1.clone(); f2.rotation.y=Math.PI; f1.position.z=0.006; f2.position.z=-0.006;
+  const frame=new THREE.Mesh(new THREE.BoxGeometry(W*0.97,H*0.97,0.01),new THREE.MeshBasicMaterial({color:col,fog:false}));
+  if(!_rbSheen){ const cv=document.createElement('canvas'); cv.width=128; cv.height=8; const x=cv.getContext('2d'), gr=x.createLinearGradient(0,0,128,0); gr.addColorStop(0,'rgba(255,255,255,0)'); gr.addColorStop(0.45,'rgba(255,255,255,0)'); gr.addColorStop(0.5,'rgba(255,255,255,.85)'); gr.addColorStop(0.55,'rgba(255,255,255,0)'); gr.addColorStop(1,'rgba(255,255,255,0)'); x.fillStyle=gr; x.fillRect(0,0,128,8); _rbSheen=new THREE.CanvasTexture(cv); _rbSheen.wrapS=THREE.RepeatWrapping; }
+  const shT=_rbSheen.clone(); shT.needsUpdate=true; shT.wrapS=THREE.RepeatWrapping; shT.repeat.set(0.6,1); shT.rotation=0.5; shT.center.set(0.5,0.5);
+  const sheen=new THREE.Mesh(new THREE.PlaneGeometry(W*0.94,H*0.94),new THREE.MeshBasicMaterial({map:shT,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,fog:false,side:THREE.DoubleSide})); sheen.position.z=0.009;
+  const card=new THREE.Group(); card.add(frame,f1,f2,sheen); card.position.y=1.35; g.add(card);
+  if(!_rbBeam){ const cv=document.createElement('canvas'); cv.width=4; cv.height=128; const x=cv.getContext('2d'), gr=x.createLinearGradient(0,128,0,0); gr.addColorStop(0,'rgba(255,255,255,.85)'); gr.addColorStop(0.25,'rgba(255,255,255,.35)'); gr.addColorStop(1,'rgba(255,255,255,0)'); x.fillStyle=gr; x.fillRect(0,0,4,128); _rbBeam=new THREE.CanvasTexture(cv); }
+  const beam=new THREE.Mesh(new THREE.CylinderGeometry(0.32,0.32,36,20,1,true).translate(0,18,0),new THREE.MeshBasicMaterial({map:_rbBeam,color:col,transparent:true,opacity:0.55,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide,fog:false}));
+  const core=new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,36,8,1,true).translate(0,18,0),new THREE.MeshBasicMaterial({map:_rbBeam,color:0xffffff,transparent:true,opacity:0.6,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
+  const ring=new THREE.Mesh(new THREE.RingGeometry(0.45,0.62,48).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:0.7,blending:THREE.AdditiveBlending,depthWrite:false,fog:false})); ring.position.y=0.04;
+  const N=16, pos=new Float32Array(N*3); for(let i=0;i<N;i++){ const a=Math.random()*6.283, r=0.15+Math.random()*0.45; pos[i*3]=Math.cos(a)*r; pos[i*3+1]=Math.random()*2.2; pos[i*3+2]=Math.sin(a)*r; }
+  const pg=new THREE.BufferGeometry(); pg.setAttribute('position',new THREE.BufferAttribute(pos,3)); const sparks=new THREE.Points(pg,new THREE.PointsMaterial({color:0xcfeaff,size:0.07,transparent:true,opacity:0.9,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
+  g.add(beam,core,ring,sparks); g.position.set(c.x,c.y,c.z); scene.add(g); c.card=card; c.sheen=shT; c.beam=beam; c.ring=ring; c.sparks=sparks; c.ph=Math.random()*6; return g; }
+// ---- the vans: one parked outside every town, broadside on to the town so its terminal faces you ----
+function initVans(){ VANS=[]; const vanCfg=[];
+  TOWNS.forEach((t,k)=>{ const r=seeded(4400+k*31), a0=r()*6.283; let best=null;
+    for(let ring=0;ring<3&&!best;ring++) for(let q=0;q<16;q++){ const a=a0+q*Math.PI/8, R=t.R+9+ring*6, x=t.x+Math.cos(a)*R, z=t.z+Math.sin(a)*R;
+      if(townAt(x,z,3)||roadDistAt(x,z)<ROAD_HW+4.5||slopeAt(x,z)[0]>0.22) continue; if(chests.some(c=>Math.hypot(c.x-x,c.z-z)<10)) continue;
+      if(karts&&karts.some(kk=>Math.hypot(kk.x-x,kk.z-z)<10)) continue; best={x,z,a}; break; }
+    if(!best) return; const dx=t.x-best.x, dz=t.z-best.z; let yaw=0, bd=-9; for(const y of [0,Math.PI/2,Math.PI,Math.PI*1.5]){ const d=Math.cos(y)*dx-Math.sin(y)*dz; if(d>bd){ bd=d; yaw=y; } }
+    vanCfg.push({x:best.x,z:best.z,yaw,town:t.name}); });
+  vanCfg.forEach((o,i)=>{ const y=Math.min(...[[-1.2,-2.2],[1.2,-2.2],[-1.2,2.2],[1.2,2.2],[0,0]].map(([a,b])=>terrainH(o.x+a,o.z+b))); const v=makeVan(o.x,y-0.05,o.z,o.yaw); v.id=i; v.town=o.town; VANS.push(v);
+    props.forEach(p=>{ if(!p.gone&&Math.hypot(p.x-o.x,p.z-o.z)<7.5){ p.gone=true; p.alive=false; p.g.visible=false; } }); }); }
+var _vanMats;
+function vanScreen(ready){ const cv=document.createElement('canvas'); cv.width=256; cv.height=128; const g=cv.getContext('2d'); const gr=g.createLinearGradient(0,0,0,128); gr.addColorStop(0,ready?'#1c5cff':'#3a3f4a'); gr.addColorStop(1,ready?'#0a1f6a':'#1a1d24'); g.fillStyle=gr; g.fillRect(0,0,256,128);
+  g.strokeStyle=ready?'#9fe0ff':'#8a8f99'; g.lineWidth=4; g.strokeRect(6,6,244,116); g.save(); g.translate(58,64); g.lineWidth=7; g.strokeStyle='#fff'; g.beginPath(); g.arc(0,0,26,0.5,5.6); g.stroke(); g.fillStyle='#fff'; g.beginPath(); g.moveTo(26*Math.cos(5.6)+12,26*Math.sin(5.6)-2); g.lineTo(26*Math.cos(5.6)-9,26*Math.sin(5.6)-14); g.lineTo(26*Math.cos(5.6)-6,26*Math.sin(5.6)+12); g.fill(); g.restore();
+  g.fillStyle='#fff'; g.font='900 italic 34px "Arial Black",Arial,sans-serif'; g.textAlign='left'; g.textBaseline='middle'; g.fillText(ready?'REBOOT':'CHARGING',100,64); const t=new THREE.CanvasTexture(cv); return new THREE.MeshBasicMaterial({map:t}); }
+function makeVan(x,y,z,yaw){ if(!_vanMats) _vanMats={white:new THREE.MeshPhongMaterial({color:0xf1f3f6,shininess:60,specular:0x444444}),blue:new THREE.MeshPhongMaterial({color:0x1f5fd8,shininess:70,specular:0x555555}),orange:new THREE.MeshPhongMaterial({color:0xff7a1a,shininess:40}),
+    dark:new THREE.MeshPhongMaterial({color:0x22262d,shininess:30}),glass:new THREE.MeshPhongMaterial({color:0x2a4466,shininess:120,specular:0xaaccff}),rub:new THREE.MeshLambertMaterial({color:0x18191c}),metal:new THREE.MeshPhongMaterial({color:0xb8bec6,shininess:90,specular:0x888888}),
+    lamp:new THREE.MeshBasicMaterial({color:0x9fe0ff}),ready:vanScreen(true),wait:vanScreen(false)};
+  const M=_vanMats, g=new THREE.Group(), add=(geo,mat,px,py,pz,rx=0,ry=0,rz=0)=>{ const m=new THREE.Mesh(geo,mat); m.position.set(px,py,pz); m.rotation.set(rx,ry,rz); m.castShadow=m.receiveShadow=true; g.add(m); return m; };
+  const B=(w,h,d)=>new THREE.BoxGeometry(w,h,d);
+  add(B(2.0,0.35,4.3),M.dark,0,0.62,0);                       // chassis
+  add(B(2.12,2.05,2.9),M.white,0,1.82,0.55);                  // the box at the back
+  add(B(2.14,0.26,2.92),M.blue,0,1.32,0.55); add(B(2.15,0.07,2.93),M.orange,0,1.5,0.55); // livery stripes
+  add(B(2.0,1.45,1.35),M.white,0,1.52,-1.5);                  // cab
+  add(B(2.02,0.5,1.37),M.blue,0,0.98,-1.5);
+  add(B(1.84,0.62,0.06),M.glass,0,1.92,-2.17,-0.18); for(const s of [-1,1]) add(B(0.06,0.55,0.9),M.glass,s*1.005,1.95,-1.55);
+  add(B(2.1,0.22,0.12),M.metal,0,0.8,-2.2); for(const s of [-1,1]){ add(new THREE.CylinderGeometry(0.11,0.11,0.05,14).rotateX(Math.PI/2),M.lamp,s*0.75,1.2,-2.19); add(B(0.16,0.1,0.04),new THREE.MeshBasicMaterial({color:0xd01818}),s*0.9,1.25,2.01); }
+  for(const [wx,wz] of [[-1,-1.45],[1,-1.45],[-1,1.35],[1,1.35]]){ add(new THREE.CylinderGeometry(0.46,0.46,0.32,20).rotateZ(Math.PI/2),M.rub,wx*0.92,0.46,wz); add(new THREE.CylinderGeometry(0.26,0.26,0.34,12).rotateZ(Math.PI/2),M.metal,wx*0.92,0.46,wz); }
+  // the roof: a dish on a mast and a light bar that blazes when someone's rebooted
+  add(new THREE.CylinderGeometry(0.05,0.05,0.7,8),M.metal,0.4,3.2,0.9); const dish=add(new THREE.SphereGeometry(0.62,20,10,0,Math.PI*2,0,Math.PI*0.42),M.white,0.4,3.55,0.9,-0.9,0,0.3); dish.material=M.white;
+  add(new THREE.CylinderGeometry(0.04,0.04,0.5,6),M.metal,0.4,3.55,0.55,-0.9);
+  const beacon=add(B(0.9,0.14,0.22),M.lamp,-0.35,2.93,-0.1);
+  // the terminal on the kerb side: a screen and two handles
+  const term=new THREE.Group(); term.position.set(1.07,1.62,0.55); g.add(term);
+  const panel=new THREE.Mesh(B(0.08,0.95,1.5),M.dark); term.add(panel); const scr=new THREE.Mesh(new THREE.PlaneGeometry(1.32,0.66),M.ready); scr.rotation.y=Math.PI/2; scr.position.x=0.045; scr.position.y=0.06; term.add(scr);
+  g.position.set(x,y,z); g.rotation.y=yaw; scene.add(g);
+  const flare=new THREE.Mesh(new THREE.CylinderGeometry(0.55,0.55,46,20,1,true).translate(0,23,0),new THREE.MeshBasicMaterial({color:0x7fc8ff,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide,fog:false})); flare.position.y=2.9; flare.visible=false; g.add(flare);
+  const c=Math.round(Math.cos(yaw)), s=Math.round(Math.sin(yaw)), hx=Math.abs(c)*1.08+Math.abs(s)*2.2, hz=Math.abs(s)*1.08+Math.abs(c)*2.2;
+  const tx=x+c*1.75, tz=z-s*1.75; // where you stand to use the terminal (local +x, rotated)
+  return {x,y,z,yaw,g,scr,beacon,flare,cd:0,prog:0,req:0,flash:0,tx,tz,solid:{boxes:[[x-hx,y,z-hz,x+hx,y+2.85,z+hz]],key:'van'+Math.round(x)+'_'+Math.round(z),isVan:true}}; }
+// ---- interact: grab a card (hold), reboot at a van (hold) ----
+function rbTargets(consider){ if(!net.role) return; const now=performance.now();
+  net.players.forEach(pl=>{ if(pl.id==='bot'||!pl.alive||!(pl.flags&256)||!sameTeam(pl)) return; const rv=RB.rev.get(pl.id)||0;
+    consider(pl.pos.x,pl.pos.y,pl.pos.z,2.3,{kind:'revive',pri:3,pl,label:'Revive '+(pl.name||'teammate'),prog:()=>RB.rev.get(pl.id)||0,busy:()=>(RB.rev.get(pl.id)||0)>0?'Reviving '+(pl.name||'teammate'):null}); });
+  RB.cards.forEach(c=>{ if(c.holder||c.id===net.id||!rbMate(c)) return; consider(c.x,c.y,c.z,2.4,{kind:'rcard',pri:2,c,label:'Grab '+c.n+"'s reboot card",prog:()=>c.prog,busy:()=>c.prog>0?'Grabbing card':null}); });
+  if(RB.carry.size&&VANS) VANS.forEach(v=>{ const ready=now>=v.cd, names=[...RB.carry].map(id=>(RB.cards.get(id)||{}).n||'teammate').join(' & ');
+    consider(v.tx,v.y,v.tz,2.6,{kind:'rvan',pri:2,v,label:ready?'Reboot '+names:'Van charging · '+Math.ceil((v.cd-now)/1000)+'s',prog:ready?()=>v.prog:null,busy:()=>v.prog>0?'Rebooting '+names:null}); }); }
+var _rbTick=0;
+function stepReboot(dt){ if(!net.role&&!RB.cards.size&&!P.down) return; const now=performance.now(), T=now/1000;
+  // reviving someone: hold Interact on them
+  net.players.forEach(pl=>{ const on=useHeld&&useTgt&&useTgt.kind==='revive'&&useTgt.pl===pl&&!isDead()&&!P.down&&(pl.flags&256); let v=RB.rev.get(pl.id)||0;
+    if(on){ if(v>=0){ v+=dt/RB_REV_T; if(v>=1){ v=-1; rbSend({op:'rev',id:pl.id,by:net.id}); setTimeout(()=>{ if(RB.rev.get(pl.id)===-1) RB.rev.delete(pl.id); },2500); } RB.rev.set(pl.id,v); } }
+    else if(v>0){ v=Math.max(0,v-dt*2); if(v>0) RB.rev.set(pl.id,v); else RB.rev.delete(pl.id); }
+    if(!(pl.flags&256)&&v>=0) RB.rev.delete(pl.id); });
+  // you, down: bleeding out (and right away if nobody's left standing to come for you)
+  if(P.down){ P.hp-=dt*RB_DOWN_HP/RB_BLEED; if(rbMatesUp()===0){ P.down.noMate+=dt; if(P.down.noMate>2) P.hp=0; } else P.down.noMate=0;
+    if(P.hp<=0||isDead()) rbBleedOut(); }
+  // hold to grab / hold to reboot
+  for(const c of RB.cards.values()){ const on=useHeld&&useTgt&&useTgt.kind==='rcard'&&useTgt.c===c&&!isDead();
+    if(on&&!c.req){ c.prog+=dt/RB_GRAB_T; if(c.prog>=1){ c.req=now; rbSend({op:'grab',id:c.id,by:net.id}); } } else if(!on&&!c.req) c.prog=Math.max(0,c.prog-dt*3);
+    if(c.req&&now-c.req>2000&&!c.holder){ c.req=0; c.prog=0; } }
+  if(VANS) for(const v of VANS){ const on=useHeld&&useTgt&&useTgt.kind==='rvan'&&useTgt.v===v&&!isDead()&&now>=v.cd&&RB.carry.size>0;
+    if(on&&!v.req){ v.prog+=dt/RB_BOOT_T; _rbTick-=dt; if(_rbTick<=0){ _rbTick=0.25; sfx('rb_tick'); } if(v.prog>=1){ v.req=now; RB.carry.forEach(id=>rbSend({op:'boot',id,by:net.id,van:v.id})); } }
+    else if(!on&&!v.req) v.prog=Math.max(0,v.prog-dt*2);
+    if(v.req&&now-v.req>3000){ v.req=0; v.prog=0; }
+    // looks: the screen says ready or charging; the light bar pulses while it charges you up, and a column of light goes up when it fires
+    const ready=now>=v.cd; if(v.scr.material!==(ready?_vanMats.ready:_vanMats.wait)) v.scr.material=ready?_vanMats.ready:_vanMats.wait;
+    const lit=v.prog>0?0.6+0.4*Math.sin(T*18):ready?0.55+0.25*Math.sin(T*2.2+v.id):0.15; v.beacon.scale.set(1,1,1); v.beacon.material.color.setHSL(0.56,1,0.35+0.4*lit);
+    if(v.flash>0||v.prog>0){ v.flash=Math.max(0,v.flash-dt); v.flare.visible=true; v.flare.material.opacity=Math.max(v.prog*0.35,Math.min(1,v.flash)*0.7); } else if(v.flare.visible) v.flare.visible=false; }
+  // cards bob, spin and shimmer
+  for(const c of RB.cards.values()){ if(!c.g.visible) continue; const d=Math.hypot(c.x-camera.position.x,c.z-camera.position.z); if(d>600) continue;
+    c.card.rotation.y+=dt*1.3; c.card.position.y=1.35+Math.sin(T*2+c.ph)*0.12; c.sheen.offset.x=(T*0.45+c.ph)%1;
+    c.beam.material.opacity=0.38+0.17*Math.sin(T*3+c.ph); const s=1+0.18*Math.sin(T*4+c.ph); c.ring.scale.set(s,1,s);
+    const pa=c.sparks.geometry.attributes.position; for(let i=0;i<pa.count;i++){ let y=pa.getY(i)+dt*(0.35+(i%5)*0.08); if(y>2.4) y=0.05; pa.setY(i,y); } pa.needsUpdate=true;
+    // settle onto whatever is under it now (a build broken out from under it)
+    if(d<80){ const [gy]=groundAt(c.x,c.z,c.y+0.3,near(c.x,c.z)); if(gy<c.y-0.02) c.y=Math.max(gy,c.y-dt*9); } c.g.position.set(c.x,c.y,c.z);
+    if(now>c.exp+8000&&c.id!==net.id){ rbKill(c); RB.cards.delete(c.id); } } // its owner left without saying (they respawned or dropped)
+  // you, waiting
+  const el=$('rbWait'); el.classList.toggle('down',!!P.down);
+  if(P.down){ if(el.hidden) el.hidden=false; if($('rbT').textContent!=='Knocked') $('rbT').textContent='Knocked'; let rv=null; net.players.forEach(pl=>{ if(!rv&&pl.alive&&!(pl.flags&256)&&sameTeam(pl)&&Math.hypot(pl.pos.x-P.pos.x,pl.pos.z-P.pos.z)<2.6) rv=pl; });
+    const msg=rv?(rv.name||'A teammate')+' is here · hang on':'Crawl to cover · a teammate can revive you'; if($('rbMsg').textContent!==msg) $('rbMsg').textContent=msg;
+    const sub='Bleeding out · '+Math.max(0,Math.ceil(P.hp))+' HP'; if($('rbSub').textContent!==sub) $('rbSub').textContent=sub; $('rbBar').style.transform='scaleX('+Math.max(0,P.hp/RB_DOWN_HP).toFixed(3)+')'; }
+  else if(RB.wait&&$('rbT').textContent!=='Eliminated') $('rbT').textContent='Eliminated';
+  if(RB.wait){ const left=Math.max(0,RB.wait.ttl-(now-RB.wait.t0)/1000), mine=RB.cards.get(net.id), hold=mine&&mine.holder, hp=hold&&net.players.get(hold);
+    if(rbMatesUp()===0){ RB.noMate+=dt; if(RB.noMate>3){ feed('No teammates left standing · respawning'); rbGiveUp(true); } } else RB.noMate=0;
+    if(left<=0&&RB.wait){ feed('Your card expired · respawning'); rbGiveUp(true); }
+    if(RB.wait){ if(el.hidden) el.hidden=false; const msg=hold?((hp&&hp.name)||'A teammate')+' has your card · heading to a van':'Your card is waiting where you fell';
+      if($('rbMsg').textContent!==msg) $('rbMsg').textContent=msg; const who=RB.spec.who&&net.players.get(RB.spec.who), sub=(who?'Spectating '+(who.name||'teammate')+' · ':'')+'card expires in '+Math.floor(left/60)+':'+String(Math.floor(left%60)).padStart(2,'0');
+      if($('rbSub').textContent!==sub) $('rbSub').textContent=sub; $('rbBar').style.transform='scaleX('+(left/RB.wait.ttl).toFixed(3)+')'; } }
+  if(!RB.wait&&!P.down&&!el.hidden) el.hidden=true;
+  // you, carrying
+  const ce=$('rbCarry'); if(RB.carry.size&&!isDead()){ const names=[...RB.carry].map(id=>(RB.cards.get(id)||{}).n||'teammate').join(' & '), t='Carrying '+names+"'s card · find a Reboot Van";
+    if(ce.hidden) ce.hidden=false; if($('rbCarryT').textContent!==t) $('rbCarryT').textContent=t; } else if(!ce.hidden) ce.hidden=true; }
+// waiting for a reboot: watch a teammate (the one carrying your card first), orbiting slowly behind them
+function rbSpectate(){ if(!RB.wait) return false; const mine=RB.cards.get(net.id); let pl=mine&&mine.holder&&net.players.get(mine.holder);
+  if(!pl||!pl.alive){ pl=null; net.players.forEach(q=>{ if(!pl&&q.id!=='bot'&&q.alive&&sameTeam(q)) pl=q; }); } if(!pl) return false;
+  if(RB.spec.who!==pl.id){ RB.spec.who=pl.id; RB.spec.yaw=pl.dyaw??pl.yaw; }
+  RB.spec.yaw+=angDiff(pl.dyaw??pl.yaw,RB.spec.yaw)*Math.min(1,lastDt*2.5);
+  const px=pl.pos.x, py=pl.pos.y+1.5, pz=pl.pos.z; camera.position.set(px+Math.sin(RB.spec.yaw)*4.8,py+1.3,pz+Math.cos(RB.spec.yaw)*4.8);
+  const gy=terrainH(camera.position.x,camera.position.z)+0.4; if(camera.position.y<gy) camera.position.y=gy; camera.lookAt(px,py,pz);
+  hero.visible=false; skyDome.position.copy(camera.position);
+  { const st=(sc.right-sc.left)/sun.shadow.mapSize.x, a=Math.round(pl.pos.dot(_lX)/st)*st, b=Math.round(pl.pos.dot(_lY)/st)*st, cc=pl.pos.dot(SUN_DIR);
+    sun.target.position.set(0,0,0).addScaledVector(_lX,a).addScaledVector(_lY,b).addScaledVector(SUN_DIR,cc); sun.position.copy(sun.target.position).addScaledVector(SUN_DIR,65); }
+  return true; }
+// ---- map icons ----
+function rbVanIcon(g,x,y,s,ready){ g.save(); g.translate(x,y); g.fillStyle=ready?'#1f5fd8':'#59606b'; g.strokeStyle='#fff'; g.lineWidth=1.4*s/7; const w=s*1.5, h=s*1.1;
+  g.beginPath(); if(g.roundRect) g.roundRect(-w/2,-h/2,w,h,s*0.25); else g.rect(-w/2,-h/2,w,h); g.fill(); g.stroke();
+  g.strokeStyle='#fff'; g.lineWidth=s*0.18; g.beginPath(); g.arc(0,0,s*0.3,0.5,5.6); g.stroke(); g.restore(); }
+function rbCardIcon(g,x,y,s,col){ g.save(); g.translate(x,y); g.shadowColor=col; g.shadowBlur=s*1.2; g.fillStyle=col; g.strokeStyle='#ffe08a'; g.lineWidth=s*0.2;
+  g.beginPath(); g.moveTo(0,-s); g.lineTo(s*0.7,0); g.lineTo(0,s); g.lineTo(-s*0.7,0); g.closePath(); g.fill(); g.shadowBlur=0; g.stroke(); g.restore(); }
+function rbMiniMap(g,tx,tz,c,dpr){ if(!rbNeeded()) return; const now=performance.now(), clampTo=(px,pz,r)=>{ const dx=px-c, dz=pz-c, m=Math.hypot(dx,dz), lim=c-r-2; return m>lim?[c+dx/m*lim,c+dz/m*lim]:[px,pz]; };
+  if(VANS) VANS.forEach(v=>{ const [qx,qz]=clampTo(tx(v.x),tz(v.z),7*dpr); rbVanIcon(g,qx,qz,6*dpr,now>=v.cd); });
+  RB.cards.forEach(cd=>{ if(cd.holder||!rbMate(cd)) return; const [qx,qz]=clampTo(tx(cd.x),tz(cd.z),6*dpr); rbCardIcon(g,qx,qz,5*dpr,'#'+rbCol(cd).toString(16).padStart(6,'0')); }); }
+function rbBigMap(g,X,Z,u){ if(!rbNeeded()) return; const now=performance.now();
+  if(VANS) VANS.forEach(v=>{ rbVanIcon(g,X(v.x),Z(v.z),8*u,now>=v.cd); g.font=`800 ${Math.round(10*u)}px "Chakra Petch",sans-serif`; g.textAlign='center'; g.textBaseline='top'; g.lineWidth=3*u; g.strokeStyle='rgba(0,0,0,.75)'; g.fillStyle='#bfe0ff'; g.strokeText('Reboot Van',X(v.x),Z(v.z)+8*u); g.fillText('Reboot Van',X(v.x),Z(v.z)+8*u); });
+  RB.cards.forEach(cd=>{ if(cd.holder||!rbMate(cd)) return; rbCardIcon(g,X(cd.x),Z(cd.z),7*u,'#'+rbCol(cd).toString(16).padStart(6,'0')); }); }
+
 /* ---------- controller (standard gamepad mapping) ----------
    Combat: RT fire, RB/LB next/prev weapon, X reload, Y edit, B build mode.
    Build:  RT wall, RB floor, LT stairs, LB cone (hold any to turbo), X rotate, Y edit, B back to weapons.
@@ -7786,6 +8014,7 @@ function frame(now){
   pollPad(dt);
   if(playing){
     if(isDead()){ P.vel.x=0; P.vel.z=0; fireHeld=false; heldPiece=null; if(edit) exitEdit(false); } else moveInput(dt);
+    if(P.down){ fireHeld=false; heldPiece=null; adsHeld=false; P.crouch=false; P.useT=0; P.emote=null; if(edit) exitEdit(false); }
     if(B&&B.active) botUpdate(dt);
     const n=Math.max(1,Math.ceil(dt/0.008)); stepFall(); for(let k=0;k<n;k++){ physStep(dt/n,P); if(B&&B.active) physStep(dt/n,B); }
     combatTick(dt);
@@ -7803,7 +8032,7 @@ function frame(now){
   } else { P.vel.x*=0.8; P.vel.z*=0.8; }
   if(swingT>0) swingT-=dt;
   stepClouds(dt); stepDoors(dt); stepAmbience(dt); stepPick(dt); stepSpin(dt); stepProjs(dt); stepDrops(dt); stepProps(dt); if(playing||net.role) hordeUpdate(dt); stepDusk(dt); updateHordeHUD(); stepUse(dt); updateUseBar();
-  stepGrass(dt); stepChests(dt); stepAnims(now); stepChunks(dt); stepFallers(dt); stepShakes(dt); stepLootGlow(dt); stepZFlash(dt); stepKarts(dt); stepPlayers(dt); stepTracers(dt); if(B&&B.active) animateBot(dt);
+  stepGrass(dt); stepChests(dt); stepReboot(dt); stepAnims(now); stepChunks(dt); stepFallers(dt); stepShakes(dt); stepLootGlow(dt); stepZFlash(dt); stepKarts(dt); stepPlayers(dt); stepTracers(dt); if(B&&B.active) animateBot(dt);
   if(!playing&&net.role==='host'&&B&&B.active){ botUpdate(dt); const n=Math.max(1,Math.ceil(dt/0.008)); for(let k=0;k<n;k++) physStep(dt/n,B); }
   if(net.role){ net.sendT-=dt; if(net.sendT<=0){ net.sendT=0.05; netSend(myState()); if(net.role==='host'&&B&&B.active) netSend(botState()); }
     if(net.role==='host'){ party.syncT-=dt; if(party.syncT<=0){ party.syncT=2; partySync(); }
