@@ -1,6 +1,6 @@
 // solo horde with a bot teammate: it drops in, fights, revives you, gets revived, fetches your card to a van, and you reboot it
 const {sleep,page,launch,open}=require('./h.js');
-(async()=>{ const b=await launch(); const {pg,errs}=await open(b,page('/home/claude/crank-lab/index.html','scene,P,AB,RB,VANS,horde,settings,renderer,hordeHurtMe,allyHurt,useDown,useUp,findUseTarget,newZombie,net,get AB2(){return AB}'),{fast:true,norender:true});
+(async()=>{ const b=await launch(); const {pg,errs}=await open(b,page('/home/claude/crank-lab/index.html','scene,netDrop,P,AB,RB,VANS,horde,settings,renderer,hordeHurtMe,allyHurt,useDown,useUp,findUseTarget,newZombie,net,get AB2(){return AB}'),{fast:true,norender:true});
  const R=[]; const ok=(n,p,d)=>R.push((p?'PASS ':'FAIL ')+n+' — '+d);
  await pg.waitForFunction(()=>window.T,null,{timeout:120000});
  await pg.evaluate(()=>{ T.settings.skyDrop=false; const s=document.querySelector('#botSel'); s.value='off'; s.dispatchEvent(new Event('change')); document.querySelector('.mode[data-mode=horde]').click(); });
@@ -8,6 +8,10 @@ const {sleep,page,launch,open}=require('./h.js');
  await pg.evaluate(()=>document.getElementById('play').click()); await sleep(3000);
  const a0=await pg.evaluate(()=>{ const A=T.AB2; return A&&{active:A.active,vis:A.h.group.visible,d:+A.pos.distanceTo(T.P.pos).toFixed(1)}; });
  ok('option shows for horde, teammate drops in with you',optVis&&a0&&a0.active&&a0.vis&&a0.d<15,JSON.stringify(a0));
+ const g0=await pg.evaluate(()=>T.AB2.wpn); ok('teammate starts with no gun',g0===null,String(g0));
+ // a gun on the ground near you: it goes and takes it
+ await pg.evaluate(()=>{ const A=T.AB2; for(const c of []) ; T.netDrop('pump',1,new THREE.Vector3(A.pos.x+6,A.pos.y+1,A.pos.z),new THREE.Vector3(0,1,0)); });
+ await pg.waitForFunction(()=>!!T.AB2.wpn,null,{timeout:40000}).catch(()=>{}); ok('teammate picks up a gun',await pg.evaluate(()=>!!T.AB2.wpn),await pg.evaluate(()=>String(T.AB2.wpn)));
  // it shoots a zombie
  await pg.evaluate(()=>{ const A=T.AB2; T.newZombie('husk',A.pos.x+10,A.pos.z); }); const k0=await pg.evaluate(()=>T.horde.kills);
  await pg.waitForFunction(k=>T.horde.kills>k,k0,{timeout:30000}).catch(()=>{}); ok('teammate kills a zombie',await pg.evaluate(k=>T.horde.kills>k,k0),'');
