@@ -3148,7 +3148,7 @@ const _kc=new THREE.Vector3(), _kr=new THREE.Vector3(), _ku2=new THREE.Vector3()
 function animateRig(H,S,dt){
   if(S.seat){ const look=S.yaw, gunP=S.seat.s===1&&!!S.gun; S.seat.look=look; S.seat.gunP=gunP; if(!gunP){ S.gun=false; S.yaw=S.seat.k.yaw; S.reload=null; }
     S.vel=_ZV; S.onGround=true; S.crouch=false; S.emote=null; S.slope=0; S.building=false; S.editing=false; S.swingT=0; S.sky=null; S.item=false; }
-  animateRig0(H,S,dt); if(S.seat) seatPlace(H,S); }
+  animateRig0(H,S,dt); if(S.seat) seatPlace(H,S); else pickTwoHands(H,S); }
 // engine: a single-cylinder putter that revs with speed, plus tyre skid; for your buggy or the nearest one running
 let kEng=null;
 function kartAudio(dt){ if(!AC||!karts) return;
@@ -4647,6 +4647,10 @@ function gunStockPush(r,mdl){ if(!mdl) return 0; let b=_gunBack.get(mdl);
       for(let i=0;i<pa.count;i+=3){ v.fromBufferAttribute(pa,i).applyMatrix4(M); if(v.y>b) b=v.y; } }); // hand space: +y points back along the gun
     _gunBack.set(mdl,b); }
   return Math.max(0,b-0.22); }
+const _p2a=new THREE.Vector3(), _p2b=new THREE.Vector3(), _p2q=new THREE.Quaternion();
+function pickTwoHands(H,S){ const r=H.rig; if(!r.pick||!r.pick.visible||S.gun||S.building||S.editing||(S.emote&&EMOTES[S.emote.id])||S.sky||S.down||S.item) return;
+  H.group.updateMatrixWorld(true); const t=r.pick.localToWorld(_p2a.set(0,0.11,0)), pole=H.group.localToWorld(_p2b.set(-0.7,0.6,0.3));
+  r.armR.wr.getWorldQuaternion(_p2q); ikArm(r.armL,t,pole,_p2q); r.armL.fing.rotation.x=0.95; }
 function handQuat(out,fwd,up){ _ikY.copy(fwd).negate(); _ikZ.copy(up).addScaledVector(fwd,-up.dot(fwd)).normalize().negate(); _ikX.crossVectors(_ikY,_ikZ).normalize(); _ikM.makeBasis(_ikX,_ikY,_ikZ); return out.setFromRotationMatrix(_ikM); }
 
 // pickaxe swing keyframes (t 0..1): wind-up, strike, recover
