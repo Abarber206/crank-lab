@@ -6758,8 +6758,12 @@ function housePartition(h,l){ if(h._part&&h._part[l]!==undefined) return h._part
   const hitsStair=(ax,az,bx,bz)=>st.some(([i,j])=>{ const sx0=i*C+0.3, sx1=(i+1)*C-0.3, sz0=j*C+0.3, sz1=(j+1)*C-0.3; return Math.max(ax,bx)>sx0&&Math.min(ax,bx)<sx1&&Math.max(az,bz)>sz0&&Math.min(az,bz)<sz1; });
   const cands=[]; for(let b=1;b<h.d;b++) cands.push({X:true,z:z0+b*C,a:x0+IN,b:x1-IN}); for(let a=1;a<h.w;a++) cands.push({X:false,x:x0+a*C,a:z0+IN,b:z1-IN});
   cands.sort((p,q)=>(q.X===frontX)-(p.X===frontX));
-  const pick=cands.find(c=>!(c.X?hitsStair(c.a,c.z,c.b,c.z):hitsStair(c.x,c.a,c.x,c.b)))||null;
-  if(pick){ pick.door=pick.a+(pick.b-pick.a)*0.5+(((h.id*7+l)%3)-1)*1.2; } // the doorway somewhere near the middle
+  const clip=c=>{ let segs=[[c.a,c.b]]; const at=c.X?c.z:c.x, M=0.45;
+    for(const [i,j] of st){ const p0=(c.X?j:i)*C-M, p1=((c.X?j:i)+1)*C+M, q0=(c.X?i:j)*C-M, q1=((c.X?i:j)+1)*C+M; if(at<p0||at>p1) continue;
+      segs=segs.flatMap(([s0,s1])=>{ const o=[]; if(q0>s0) o.push([s0,Math.min(s1,q0)]); if(q1<s1) o.push([Math.max(s0,q1),s1]); return o.filter(([u,v])=>v-u>0.01); }); }
+    const best=segs.sort((u,v)=>(v[1]-v[0])-(u[1]-u[0]))[0]; return best&&best[1]-best[0]>=2.6?Object.assign({},c,{a:best[0],b:best[1]}):null; };
+  const pick=cands.map(clip).filter(Boolean).sort((p,q)=>((q.X===frontX)-(p.X===frontX))||((q.b-q.a)-(p.b-p.a)))[0]||null;
+  if(pick){ pick.door=Math.max(pick.a+0.75,Math.min(pick.b-0.75,pick.a+(pick.b-pick.a)*0.5+(((h.id*7+l)%3)-1)*1.2)); } // the doorway somewhere near the middle
   return h._part[l]=pick; }
 function partitionFix(h,l){ const P_=housePartition(h,l); if(!P_) return null; const C=CELL, y0=l*LVL, top=(l+1)*LVL-FT-0.01, th=0.14, dw=1.25, dh=2.15, parts={inner:[],beam:[]}, boxes=[];
   const ci=P_.X?Math.floor((P_.a+P_.b)/2/C):Math.floor(P_.x/C-0.5)+0, cj=P_.X?Math.floor(P_.z/C-0.5):Math.floor((P_.a+P_.b)/2/C), o=new THREE.Vector3((ci+.5)*C,y0-FT/2,(cj+.5)*C);
