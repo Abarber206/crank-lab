@@ -5287,13 +5287,16 @@ function renderParty(){
   const host=net.role==='host', n=list.length, ready=list.filter(x=>x.ready).length, mname=(party.mode||settings.mode)==='horde'?'Zombie horde':'Build fight';
   $('startMatch').hidden=!host; $('endMatch').hidden=!(host&&party.live); $('readyBtn').hidden=host;
   $('startMatch').textContent=party.live?'Restart match':'Start match';
+  if(host){ const ok=party.live||partyAllReady(); $('startMatch').disabled=!ok; $('startMatch').classList.toggle('primary',ok); $('startMatch').style.opacity=ok?'':'0.5'; }
   $('readyBtn').textContent=party.readyMe?'Ready ✓':'Ready up'; $('readyBtn').classList.toggle('primary',!party.readyMe);
   $('partyState').textContent=party.live?(host?'Match running: '+mname:'Match running: '+mname+'. Press Play to jump in.')
     :host?(n===1?'Share the code so friends can join. Pick a mode, then start.':ready+' of '+n+' ready · '+mname):'Waiting for the leader to start · '+mname;
   $('play').classList.toggle('pulse',party.pendingStart&&!playing);
 }
+function partyAllReady(){ return partyMembers().every(x=>x.lead||x.ready); }
 function startMatch(){
   if(net.role!=='host') return;
+  if(!party.live&&!partyAllReady()){ toast('Waiting for everyone to ready up'); return; }
   party.seq++; party.live=true; party.pendingStart=false;
   if(horde.on) hordeStop();                      // a fresh horde (or none) every match
   clearBuilds(); netOp({op:'clear'});
