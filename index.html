@@ -1801,7 +1801,7 @@ function makeGroup(p,mat,real){
   const add=(geo,x,y,z,rx,rz,mm)=>{ const m=new THREE.Mesh(geo,mat||mm||base); m.position.set(x,y,z); if(rx)m.rotation.x=rx; if(rz)m.rotation.z=rz;
     if(real){ m.castShadow=!m.material.transparent; m.receiveShadow=true; m.userData.piece=p; } g.add(m); };
   if(p.fix&&p.skin&&!mat) p.fix.parts.forEach(([geo,k])=>add(geo,0,0,0,0,0,k==='inner'?housePlainMat(p.skin):M[k]));
-  if(p.type==='wall') add(p.skin?houseWallGeo(p.axis,p.mask==null?511:p.mask,p.out||1):wallGeo(p.axis,p.mask==null?511:p.mask),0,0,0);
+  if(p.type==='wall') add(p.skin?(p.inner?innerWallGeo(p.axis,p.mask==null?511:p.mask):houseWallGeo(p.axis,p.mask==null?511:p.mask,p.out||1)):wallGeo(p.axis,p.mask==null?511:p.mask),0,0,0);
   if(p.type==='wall'&&p.skin&&!mat&&p.mask!=null&&!(p.mask&16)&&(p.mask&2)){ const gg=windowGlassGeo(p.axis); add(gg.glass,0,0,0,0,0,glassMat()); const gm=p.group?null:null; add(gg.bars,0,0,0,0,0,M.beam); }
   else if(p.type==='wall'){}
   else if(p.type==='floor') add(floorGeo(p.mask==null?15:p.mask),0,0,0); else if(p.type==='ramp'){
@@ -2499,8 +2499,7 @@ function housePieces0(h){
   return P_.map(q=>Object.assign(q,{skin:h.skin,key:q.type==='wall'?`w${q.axis}${q.i}_${q.j}_${q.l}`:q.type==='floor'?`f${q.i}_${q.j}_${q.l}`:`m${q.i}_${q.j}_${q.l}`,dir:q.dir||0,axis:q.axis||'x'}));
 }
 function housePieces(h){ const out=housePieces0(h); if(h.garage) out.push(...garagePieces(h));
-  for(let l=h.L;l<h.L+h.floors;l++){ const fx=partitionFix(h,l); if(!fx) continue; const q=out.find(p=>p.type==='floor'&&p.l===l&&p.i===fx.cell[0]&&p.j===fx.cell[1]); if(!q) continue;
-    q.fix=q.fix?{boxes:q.fix.boxes.concat(fx.boxes),parts:q.fix.parts.concat(fx.parts)}:{boxes:fx.boxes,parts:fx.parts}; }
+  for(let l=h.L;l<h.L+h.floors;l++) for(const q of innerWalls(h,l)) out.push(Object.assign(q,{skin:h.skin,key:`w${q.axis}${q.i}_${q.j}_${q.l}`,dir:0}));
   return out; }
 /* A garage: a concrete floor, two walls and a wide open door (the overhead door is rolled up under the roof), a flat
    roof with a little parapet, a workbench with a pegboard of tools on the back wall and a shelving unit on the side.
@@ -2678,7 +2677,7 @@ function bodyOverlaps(E,p){
 // below your feet (a step's height) a new piece lifts you; anything cutting through your body is ghosted for you instead
 function phaseCheck(p){ for(const E of [P,B]){ if(!E||(E===B&&!B.active)) continue; if(!E.phase) E.phase=new Set(); if(bodyOverlaps(E,p)) E.phase.add(p); } }
 function updatePhase(E){ if(!E||!E.phase||!E.phase.size) return; E.phase.forEach(p=>{ if(!pieces.has(p.key)||!bodyOverlaps(E,p)) E.phase.delete(p); }); }
-const solidNear=(E)=>{ const ps=near(E.pos.x,E.pos.z); if(E.phase&&E.phase.size) E.phase.forEach(p=>ps.delete(p)); if(props.length) propsNear(E.pos.x,E.pos.z,ps); if(VANS) for(const v of VANS) if(Math.abs(v.x-E.pos.x)<7&&Math.abs(v.z-E.pos.z)<7) ps.add(v.solid); if(karts) for(const k of karts) if(!k.dead&&Math.abs(k.x-E.pos.x)<5&&Math.abs(k.z-E.pos.z)<5&&!(E.kart&&E.kart.k===k)) ps.add(k.solid); return ps; };
+const solidNear=(E)=>{ const ps=near(E.pos.x,E.pos.z); if(E.phase&&E.phase.size) E.phase.forEach(p=>ps.delete(p)); if(props.length) propsNear(E.pos.x,E.pos.z,ps); if(VANS) for(const v of VANS) if(Math.abs(v.x-E.pos.x)<7&&Math.abs(v.z-E.pos.z)<7) ps.add(v.solid); if(typeof chests!=='undefined') for(const c of chests) if(Math.abs(c.x-E.pos.x)<3&&Math.abs(c.z-E.pos.z)<3&&c.g.visible&&!(c.open&&(c.goneT||0)>1.2)){ const s=c.solid||(c.solid={boxes:[[0,0,0,0,0,0]],key:'chest'+c.id,isChest:true}), X=Math.abs(Math.sin(c.yaw))<0.7, hx=X?0.5:0.34, hz=X?0.34:0.5, b=s.boxes[0]; b[0]=c.x-hx; b[1]=c.y; b[2]=c.z-hz; b[3]=c.x+hx; b[4]=c.y+0.62; b[5]=c.z+hz; ps.add(s); } if(karts) for(const k of karts) if(!k.dead&&Math.abs(k.x-E.pos.x)<5&&Math.abs(k.z-E.pos.z)<5&&!(E.kart&&E.kart.k===k)) ps.add(k.solid); return ps; };
 function popPlayerOut(){ depen(solidNear(P),P); if(B&&B.active) depen(solidNear(B),B); }
 // a floor, stair or cone cutting through you pushes you up on top of it whenever there's room above it;
 // walls (and pieces with no headroom over them) stay ghosted until you walk out
@@ -6779,6 +6778,12 @@ function housePartition(h,l){ if(h._part&&h._part[l]!==undefined) return h._part
   const pick=cands.map(clip).filter(Boolean).sort((p,q)=>((q.X===frontX)-(p.X===frontX))||((q.b-q.a)-(p.b-p.a)))[0]||null;
   if(pick){ pick.door=Math.max(pick.a+0.75,Math.min(pick.b-0.75,pick.a+(pick.b-pick.a)*0.5+(((h.id*7+l)%3)-1)*1.2)); } // the doorway somewhere near the middle
   return h._part[l]=pick; }
+function innerWalls(h,l){ const P_=housePartition(h,l); if(!P_) return []; const C=CELL, out=[], DOOR=511&~18;
+  const n0=Math.ceil((P_.a-0.3)/C), n1=Math.floor((P_.b+0.3)/C); if(n1<=n0) return [];
+  const dk=Math.max(n0,Math.min(n1-1,Math.floor(P_.door/C))); // the stretch with the doorway
+  for(let k=n0;k<n1;k++) out.push(P_.X?{type:'wall',axis:'z',i:k,j:Math.round(P_.z/C),l,mask:k===dk?DOOR:511,mat:h.mat,inner:1}:{type:'wall',axis:'x',i:Math.round(P_.x/C),j:k,l,mask:k===dk?DOOR:511,mat:h.mat,inner:1});
+  return out; }
+function innerWallGeo(axis,mask){ const key='in'+axis+mask; let g=houseGeoCache.get(key); if(g) return g; g=wallGeo(axis,mask).clone(); g.setAttribute('inside',new THREE.BufferAttribute(new Float32Array(g.attributes.position.count).fill(1),1)); houseGeoCache.set(key,g); return g; }
 function partitionFix(h,l){ const P_=housePartition(h,l); if(!P_) return null; const C=CELL, y0=l*LVL, top=(l+1)*LVL-FT-0.01, th=0.14, dw=1.25, dh=2.15, parts={inner:[],beam:[]}, boxes=[];
   const ci=P_.X?Math.floor((P_.a+P_.b)/2/C):Math.floor(P_.x/C-0.5)+0, cj=P_.X?Math.floor(P_.z/C-0.5):Math.floor((P_.a+P_.b)/2/C), o=new THREE.Vector3((ci+.5)*C,y0-FT/2,(cj+.5)*C);
   const seg=(s0,s1,ya,yb,k,solid)=>{ if(s1-s0<0.02) return; const t2=(k==='beam'?th+0.05:th)/2, b=P_.X?[s0,y0+ya,P_.z-t2,s1,y0+yb,P_.z+t2]:[P_.x-t2,y0+ya,s0,P_.x+t2,y0+yb,s1];
