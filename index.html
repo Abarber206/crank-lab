@@ -3974,7 +3974,7 @@ function createHero(jacketHex,opts){
   part(bodyLathe([[.143,0],[.146,.035],[0,.036]],.64),C.jacketD,rig.chest,0,.02,0,null,null,0); // hem band
   part(new THREE.CylinderGeometry(.085,.11,.07,16,1,true),C.jacketD,rig.chest,0,.27,0,null,null,0.008);
   if(top==='jacket'||top==='racer'){
-    [-1,1].forEach(sx=>{ part(rbox(.075,.07,.02,.012),C.jacketL,rig.chest,sx*.11,.07,-.11,null,null,0.004); part(rbox(.012,.012,.012,.004),C.steel,rig.chest,sx*.1,.17,-.124,null,null,0); });
+    [-1,1].forEach(sx=>{ part(rbox(.075,.07,.02,.012),C.jacketL,rig.chest,sx*.11,.07,-.11,null,null,0.004); });
     part(rbox(.016,.34,.01,.004),C.jacketD,rig.chest,0,.07,-.112,null,null,0);
     part(rbox(.08,.06,.02,.015),C.jacketL,rig.chest,.09,.14,-.112,null,null,0.005);
     part(sph(.12),C.jacketD,rig.chest,0,.24,.1,null,[1.15,.6,.7]);
@@ -4067,7 +4067,7 @@ function createHero(jacketHex,opts){
   rig.head=grp(rig.neck,0,.06,0); rig.head.scale.setScalar(.88); // a realistic head-to-body ratio
   part(headGeo(),C.skin,rig.head,0,.135,0,null,null,0);
   part(sph(.03),C.skin,rig.head,-.11,.12,.012,null,[.38,.9,.72],0); part(sph(.03),C.skin,rig.head,.11,.12,.012,null,[.38,.9,.72],0); // ears
-  { const ng=new THREE.ConeGeometry(.02,.055,10); ng.rotateX(-1.25); part(ng,C.skin,rig.head,0,.112,-.128,null,[1,1,.9],0); part(sph(.014),C.skin,rig.head,0,.093,-.138,null,[1.25,.8,1],0); } // nose
+  part(sph(.022),C.skin,rig.head,0,.104,-.124,[-.35,0,0],[.82,1.15,1.05],0); // nose
   rig.lids=[-1,1].map(sx=>{ const l=part(sph(.019),C.skin,rig.head,sx*.045,.163,-.112,null,[1.25,.2,.5],0); return l; });
   rig.eyes=[-1,1].map(sx=>{ const e=grp(rig.head,sx*.045,.148,-.113); part(sph(.0165),0xe9e4dc,e,0,0,0,null,[1.2,.72,.4],0); part(sph(.0095),0x3b2a1e,e,0,0,-.006,null,[1,1,.55],0); return e; });
   rig.brows=[-1,1].map(sx=>part(rbox(.046,.008,.012,.004),C.hair,rig.head,sx*.047,.182,-.121,[0,0,sx*-.12],null,0));
@@ -4164,20 +4164,19 @@ function createHero(jacketHex,opts){
   const arm=sx=>{
     const sh=grp(rig.chest,sx*.19,.21,0); sh.rotation.order='XZY';
     part(sph(.062),C.jacket,sh,0,-.005,0,null,[1,1.05,1.1]);
-    part(limbGeo(.046,.038,.25),C.jacket,sh);
+    part(limbGeo(.055,.046,.25),C.jacket,sh);
     if(top==='armor') part(sph(.095),C.jacketL,sh,0,.0,0,null,[1.1,.75,1.1]);
     if(top==='suit') part(new THREE.TorusGeometry(.06,.014,8,16),C.accent,sh,0,-.12,0,[Math.PI/2,0,0],null,0);
     const el=grp(sh,0,-.25,0), fc=top==='tee'?C.skin:C.jacket;
-    part(sph(.039),fc,el,0,0,0,null,null,0.008);
-    part(limbGeo(.04,.03,.21),fc,el);
-    part(new THREE.TorusGeometry(.043,.009,8,18),C.jacketD,el,0,-.02,0,[Math.PI/2,0,0],null,0);
-    part(limbGeo(.039,.039,.04),C.jacketD,el,0,-.18,0,null,null,0.006);
+    part(sph(.047),fc,el,0,0,0,null,null,0.008);
+    part(limbGeo(.046,.035,.21),fc,el);
+    part(limbGeo(.038,.037,.035),C.jacketD,el,0,-.182,0,null,null,0.006);
     const wr=grp(el,0,-.23,0);
-    part(rbox(.056,.074,.036,.016),C.glove,wr,0,-.035,0,null,null,0.007);
-    const fing=grp(wr,0,-.075,0);
-    for(let f=0;f<4;f++) part(limbGeo(.0072,.0062,.05+(f===1||f===2?.006:0)),C.glove,fing,-.019+f*.0127,0,-.002,null,null,0.004);
-    part(rbox(.062,.011,.04,.004),C.packD,wr,0,-.072,-.002,null,null,0);
-    part(rbox(.019,.05,.022,.008),C.glove,wr,-sx*.034,-.048,-.016,[0,0,sx*.4],null,0.006);
+    part(limbGeo(.03,.034,.03),C.glove,wr,0,.012,0,null,null,0);                     // wrist
+    part(rbox(.064,.07,.036,.02),C.glove,wr,0,-.035,0,null,null,0.007);                // palm
+    const fing=grp(wr,0,-.068,0);
+    part(rbox(.06,.054,.032,.015),C.glove,fing,0,-.025,-.002,null,null,0.004);        // fingers, one soft mitten that curls
+    part(rbox(.024,.046,.025,.011),C.glove,wr,-sx*.036,-.046,-.016,[0,0,sx*.4],null,0.006); // thumb
     const hand=grp(wr,0,-.06,0);
     return {sh,el,wr,fing,hand,side:sx};
   };
@@ -4185,19 +4184,15 @@ function createHero(jacketHex,opts){
   // legs
   const leg=sx=>{
     const hp=grp(rig.hips,sx*.08,-.05,0); hp.rotation.order='XZY';
-    part(limbGeo(.076,.056,.4),C.pants,hp); part(sph(.074),C.pants,hp,0,-.02,0,null,[1,.7,1]);
-    part(rbox(.022,.1,.08,.008),C.pantsD,hp,sx*.074,-.19,0,null,null,0.005);
+    part(limbGeo(.085,.063,.4),C.pants,hp); part(sph(.083),C.pants,hp,0,-.02,0,null,[1,.75,1]);
     const kn=grp(hp,0,-.4,0);
-    part(sph(.058),C.pants,kn,0,0,0,null,null,0.008);
-    part(rbox(.08,.1,.035,.016),C.pantsD,kn,0,-.02,-.05,null,null,0.006);
-    part(limbGeo(.056,.04,.36),C.pants,kn); part(sph(.052),C.pants,kn,0,-.1,.008,null,[.95,1.6,1],0); // calf
+    part(sph(.064),C.pants,kn,0,0,0,null,null,0.008);
+    part(limbGeo(.063,.045,.36),C.pants,kn); part(sph(.056),C.pants,kn,0,-.1,.008,null,[.95,1.6,1],0); // calf
     const an=grp(kn,0,-.37,0);
     part(limbGeo(.047,.05,.1),C.boot,an,0,.02,0);                                           // ankle collar
     part(sph(.052),C.boot,an,0,-.075,.0,null,[.95,.85,1.15]);                              // heel
     part(sph(.05),C.boot,an,0,-.088,-.11,null,[.95,.7,1.5]);                               // toe box
-    for(let q=0;q<3;q++) part(rbox(.045,.005,.007,.002),0xe9e2d0,an,0,-.04-q*.018,-.075-q*.016,[.55,0,0],null,0); // laces
     part(rbox(.098,.02,.25,.009),C.sole,an,0,-.12,-.05,null,null,0.006);
-    part(limbGeo(.055,.055,.035),C.packD,an,0,.04,0,null,null,0.005);
     const foot=grp(an,0,-.13,-.06);
     return {hp,kn,an,foot,side:sx};
   };
@@ -4689,6 +4684,7 @@ function animateRig0(H,S,dt){
   if(S.onGround){
     const stride=S.crouch?0.95:1.45;
     A.phase+=sp*dt/stride*Math.PI;
+    A.kS=lerp(A.kS||0,k,Math.min(1,dt*7)); const kRaw=k; { const k=A.kS; // ease into and out of the run
     const s1=Math.sin(A.phase), c1=Math.cos(A.phase), amp=(S.crouch?0.55:0.78)*k;
     // legs follow the travel direction (forward, back and side-steps all blend)
     const legX=s=>amp*s*cm, legZ=s=>amp*0.55*s*sm_;
@@ -4699,10 +4695,11 @@ function animateRig0(H,S,dt){
     T.hipY=0.94-0.035*k+0.045*k*Math.abs(c1);
     T.hipsY=0.2*k*s1*cm; T.hipsZ=0.05*k*c1;
     T.spX=-0.2*k*Math.max(0,cm)*(S.crouch?0.5:1)+0.06*k*Math.max(0,-cm); T.chY=-T.hipsY*1.25;
-    if(bounceArms){ T.shL=-0.85*k*s1*cm; T.shR=0.85*k*s1*cm; T.elL=T.elR=0.35+0.95*k; T.shLz=-0.1-0.08*k; T.shRz=0.1+0.08*k; }
+    if(bounceArms){ const sw=0.95*k*cm, lag=Math.sin(A.phase-0.25); T.shL=-sw*lag; T.shR=sw*lag; T.elL=0.3+0.75*k+0.35*k*Math.max(0,-lag); T.elR=0.3+0.75*k+0.35*k*Math.max(0,lag); T.shLz=-0.08-0.1*k; T.shRz=0.08+0.1*k; }
     // footstep dust
     { const st0=Math.sign(s1); if(k>0.3&&st0!==A.stepSign){ A.stepSign=st0; if(H===localHero) sfx(stepSound(P)); else if(H.group.visible&&H.group.position.distanceTo(P.pos)<30) sfxAt(B&&H===B.h?stepSound(B):'step_grass',H.group.position); } }
     if(k>0.65&&A.dustCd<=0){ const st=Math.sign(s1); if(st!==A.lastSign){ A.lastSign=st; const ft=(st>0?r.legR:r.legL).foot; ft.getWorldPosition(_fp); if(_fp.distanceTo(P.pos)<40){ burst(_fp,2,1.1,0.05,dustMat); A.dustCd=0.12; } } }
+    } // eased stride
     // idle: breathing, weight shift, look around
     if(sp<0.3){
       A.idleT+=dt; const b=Math.sin(A.t*1.9);
