@@ -5046,6 +5046,12 @@ function teamMarker(pl){
   const col=horde.on?0x3f8fff:TEAM_COL[pl.team]||0x3f8fff;
   const g=new THREE.ConeGeometry(.11,.2,4); g.rotateX(Math.PI);
   const m=new THREE.Mesh(g,new THREE.MeshBasicMaterial({color:col,depthTest:false,transparent:true,opacity:.95})); m.renderOrder=20; m.position.y=2.35; pl.h.group.add(m); pl.mark=m;
+  // the name, in a rounded pill in the team colour
+  const c=document.createElement('canvas'), x=c.getContext('2d'), nm=(pl.name||'Player').slice(0,16); pl.tagName=pl.name; c.width=256; c.height=64;
+  x.font='800 italic 30px "Arial Black", Arial, sans-serif'; const w=Math.min(244,x.measureText(nm).width+28);
+  x.fillStyle='rgba(12,18,28,.72)'; x.beginPath(); x.roundRect?x.roundRect(128-w/2,8,w,46,23):x.rect(128-w/2,8,w,46); x.fill();
+  x.strokeStyle='#'+col.toString(16).padStart(6,'0'); x.lineWidth=4; x.stroke(); x.fillStyle='#fff'; x.textAlign='center'; x.textBaseline='middle'; x.fillText(nm,128,32);
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),depthTest:false,transparent:true,sizeAttenuation:false})); sp.scale.set(0.16,0.04,1); sp.position.y=2.62; sp.renderOrder=21; m.add(sp); sp.position.set(0,0.27,0);
 }
 function refreshTeamMarkers(){ net.players.forEach(pl=>{ if(pl.id!=='bot') teamMarker(pl); }); }
 function dropPlayer(id){ kartLeft(id); const pl=net.players.get(id); if(!pl) return; scene.remove(pl.h.group); net.players.delete(id); updateRoomUI(); }
@@ -5065,6 +5071,7 @@ function onState(m){
   if(s[9]&&s[9]!==pl.swingId){ pl.swingId=s[9]; if(!pl.fresh) pl.swingT=SWING_T; }
   if(pl.fresh){ pl.pos.copy(pl.tgt); pl.fresh=false; }
   kartFromState(pl,m);
+  if(pl.mark&&pl.tagName!==pl.name) teamMarker(pl); // the name arrived or changed
 }
 function stepPlayers(dt){
   const k=1-Math.exp(-dt*14);
