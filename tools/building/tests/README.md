@@ -17,3 +17,4 @@ Run with Node and Playwright (Chromium), from a folder that has `three` and `pee
 - `tstair.js` — house stairs: walking at the handrail from a middle step, you stay on the stairs.
 - `mp_drop.js` — a party match drops both players high up a few metres apart, each with just a pickaxe.
 - `twalk.js` — no yard tree stands on a front path, driveway or sidewalk.
+- `tglide.js` — Jump opens the glider, Jump again lets go into freefall, Jump again redeploys; you land unhurt.

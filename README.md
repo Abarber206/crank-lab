@@ -137,6 +137,7 @@ You drop in from high above the island: the first time you press Play in free pl
 - **Freefall:** steer with the movement keys. Hold forward while looking down to dive: you fall faster (about 60 m/s instead of 38) and cover more ground. Your character lies belly-down with arms out, and sweeps them back in a dive.
 - **The glider** opens by itself about 85 m above whatever is below you, or earlier when you press Jump (after the first second). It's a delta-wing hang glider with a striped sail in your outfit's accent colour; it unfolds wingtips-first, with a whump and a fabric snap.
 - **Gliding:** you sink slowly (about 6.5 m/s) and fly where you look. Forward speeds you up and sinks a little faster, back slows you down, sideways slips. You bank into turns, and you hear the wind and the sail fluttering.
+- **Let go and redeploy:** while gliding, press Jump to let go and freefall again (above about 30 m); press Jump to open it again. If you let go low, it opens by itself about 40 m up.
 - **Landing** on the ground, a roof or a build folds the glider away. A glide never causes fall damage. You can't shoot, build, edit, heal or interact until you land.
 - Friends see you skydive and glide too.
 
