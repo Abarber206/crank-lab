@@ -14,3 +14,4 @@ Run with Node and Playwright (Chromium), from a folder that has `three` and `pee
 - `tquick.js` — the drop from the sky happens with the bot on; the Kettle Creek–Copper Ridge and Hollow Hill–Brambleford roads exist; a buggy on a cliff slides back; walking past the old circular edge is no longer stopped.
 - `thsky.js` — a zombie horde game starts with a drop from the sky.
 - `trsky.js` — pressing Respawn drops you back in from the sky.
+- `tstair.js` — house stairs: walking at the handrail from a middle step, you stay on the stairs.

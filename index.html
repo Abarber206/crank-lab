@@ -1917,8 +1917,8 @@ const DOOR_ANG=1.5, doorMats={};
 function doorSlots(mask){ const out=[]; if(mask==null||mask===511) return out; const k=i=>!!(mask>>i&1);
   for(let c=0;c<3;c++) if(!k(c)&&!k(c+3)&&k(c+6)&&[c-1,c+1].every(n=>n<0||n>2||(k(n)&&k(n+3)))) out.push(c); return out; }
 function doorCenter(p,c){ const tw=CELL/3, th=LVL/3, y=p.l*LVL+th; return p.axis==='x'?new THREE.Vector3(p.i*CELL,y,p.j*CELL+(c+.5)*tw):new THREE.Vector3(p.i*CELL+(c+.5)*tw,y,p.j*CELL); }
-function doorGeo(X){ const key=X?'x':'z'; if(doorGeo[key]) return doorGeo[key]; const tw=CELL/3-0.08, h=2*LVL/3-0.06, th=0.09;
-  const panel=X?new THREE.BoxGeometry(th,h,tw):new THREE.BoxGeometry(tw,h,th); X?panel.translate(0,h/2+0.02,tw/2+0.04):panel.translate(tw/2+0.04,h/2+0.02,0);
+function doorGeo(X){ const key=X?'x':'z'; if(doorGeo[key]) return doorGeo[key]; const tw=CELL/3-0.02, h=2*LVL/3-0.015, th=0.09;
+  const panel=X?new THREE.BoxGeometry(th,h,tw):new THREE.BoxGeometry(tw,h,th); X?panel.translate(0,h/2+0.005,tw/2+0.01):panel.translate(tw/2+0.01,h/2+0.005,0);
   const parts=[{geo:panel,M:new THREE.Matrix4(),col:new THREE.Color(1,1,1)}];
   for(const s of [-1,1]){ const kb=new THREE.SphereGeometry(0.055,10,8); const off=X?new THREE.Vector3(s*0.07,1.0,tw-0.12):new THREE.Vector3(tw-0.12,1.0,s*0.07); parts.push({geo:kb,M:new THREE.Matrix4().makeTranslation(off.x,off.y,off.z),col:new THREE.Color(0xd8c27a)}); }
   return doorGeo[key]=bakeGeo(parts,true); }
@@ -1929,8 +1929,13 @@ function makeDoors(p){ dropDoors(p); if(p.type!=='wall') return; const slots=doo
   p.doors=[]; p.doorMeshes=[]; const g=new THREE.Group(); g.position.copy(pieceCenter(p)); scene.add(g); p.doorG=g; const X=p.axis==='x', tw=CELL/3;
   for(const c of slots){ const pv=new THREE.Group(); X?pv.position.set(0,-LVL/2,-CELL/2+c*tw):pv.position.set(-CELL/2+c*tw,-LVL/2,0);
     const m=new THREE.Mesh(doorGeo(X),doorMat(p)); m.castShadow=m.receiveShadow=true; m.userData.piece=p; pv.add(m); g.add(pv); p.doorMeshes.push(m);
-    p.doors[c]={open:false,ang:0,to:0,pv}; }
+    p.doors[c]={open:false,ang:0,to:0,pv};
+    // a frame round the opening: two jambs and a head, standing a little proud of the wall on both faces
+    const fm=p.skin?houseSkin(p).beam:doorFrameMat(), dh=2*LVL/3, d0=-CELL/2+c*tw, fd=WT+0.07, fw=0.09;
+    for(const e of [d0,d0+tw]){ const jb=new THREE.Mesh(X?new THREE.BoxGeometry(fd,dh+fw,fw):new THREE.BoxGeometry(fw,dh+fw,fd),fm); X?jb.position.set(0,-LVL/2+(dh+fw)/2,e):jb.position.set(e,-LVL/2+(dh+fw)/2,0); jb.castShadow=jb.receiveShadow=true; g.add(jb); }
+    const hd=new THREE.Mesh(X?new THREE.BoxGeometry(fd,fw,tw+fw):new THREE.BoxGeometry(tw+fw,fw,fd),fm); X?hd.position.set(0,-LVL/2+dh+fw/2-0.01,d0+tw/2):hd.position.set(d0+tw/2,-LVL/2+dh+fw/2-0.01,0); hd.castShadow=hd.receiveShadow=true; g.add(hd); }
   doorPieces.add(p); }
+let _dfm=null; function doorFrameMat(){ return _dfm||(_dfm=new THREE.MeshPhongMaterial({color:0x5a3d26,shininess:12})); }
 function dropDoors(p){ if(p.doorG){ if(p.doorG.parent) p.doorG.parent.remove(p.doorG); } p.doorG=null; p.doors=null; p.doorMeshes=null; doorPieces.delete(p); }
 function toggleDoor(p,c,fromNet,open,side){ const d=p.doors&&p.doors[c]; if(!d||!pieces.has(p.key)) return;
   if(!fromNet){ open=!d.open; const q=doorCenter(p,c); side=p.axis==='x'?Math.sign(P.pos.x-q.x)||1:Math.sign(P.pos.z-q.z)||1; }
@@ -2252,6 +2257,8 @@ function houseStair(h){
     stairs.boxes.push(box(s0,s1,0,SW,0,top));
     stairs.parts.inner.push(geo(box(s0,s1,0,SW,0,top-0.04)));
     stairs.parts.tread.push(geo(box(s0,Math.min(S1+0.02,s1+0.03),0,SW+0.03,top-0.04,top))); }
+  // the handrail is solid: stepped boxes up the open side, overlapping so there's never a gap
+  for(let k=0;k<N;k++){ const s0=S1-(k+1)*TR-0.02, s1=S1-k*TR+0.02, top=(k+1)*RISE; stairs.boxes.push(box(Math.max(LAND-0.05,s0),Math.min(S1,s1),SW-0.02,SW+0.08,top,top+1.0)); }
   // handrail up the open side of the steps
   const hr=[[S1-TR/2,RISE],[LAND+TR/2,LVL-RISE]];
   hr.forEach(([s,y])=>stairs.parts.beam.push(geo(box(s-0.05,s+0.05,SW-0.05,SW+0.05,y,y+0.95))));
@@ -6048,7 +6055,7 @@ function updateHordeHUD(){
 const HOUSE_FARM={wood:[5,8],brick:[5,8],metal:[4,7]}; // materials per pickaxe hit on a house
 const PROP_T={
   tree:{hp:300,mat:'wood',per:[6,9],snd:'chop'}, pine:{hp:260,mat:'wood',per:[5,8],snd:'chop'},
-  rock:{hp:360,mat:'brick',per:[7,10],snd:'stone'}, car:{hp:420,mat:'metal',per:[7,11],snd:'clang'}
+  rock:{hp:360,mat:'brick',per:[7,10],snd:'stone'}, furn:{hp:160,mat:'wood',per:[4,7],snd:'chop'}, car:{hp:420,mat:'metal',per:[7,11],snd:'clang'}
 };
 const props=[], propCells=new Map(), PCELL=10;
 const lowSph=new Map(); function lsph(r){ let g=lowSph.get(r); if(!g){ g=new THREE.SphereGeometry(r,9,6); lowSph.set(r,g); } return g; } // low-poly canopy blobs
@@ -6087,6 +6094,26 @@ function propVariant(kind,variant){ const key=kind+variant; let v=propGeos.get(k
       const cg=new THREE.ConeGeometry(rr*s*(0.95+q()*0.1),h*s*1.35,9,1); const pa=cg.attributes.position; // ragged hem: every other rim vertex dips
       for(let i=0;i<pa.count;i++){ if(pa.getY(i)<0){ const a=Math.atan2(pa.getZ(i),pa.getX(i)); pa.setY(i,pa.getY(i)-Math.abs(Math.sin(a*4.5))*0.22*s); } } cg.computeVertexNormals();
       propPart(cg,c,g,0,y*s,0,0,ti*.5+q(),0,0.05); });
+  } else if(p.kind==='furn'){ const F=[0x6b7f99,0x9a5f4a,0x7d8c5a,0x8a6fa0][q()*4|0], wood=0x8a5a36, dk=0x5e3d24;
+    if(variant===0){ // sofa: base, cushions, back, arms, little legs
+      propPart(rbox(2.0,0.32,0.86,0.06),F,g,0,0.3,0,0,0,0,0); for(const x of [-0.48,0.48]) propPart(rbox(0.92,0.14,0.7,0.06),F,g,x,0.52,-0.05,0,0,0,0);
+      propPart(rbox(2.0,0.52,0.2,0.07),F,g,0,0.66,0.33,0,0,0,0); for(const x of [-0.92,0.92]) propPart(rbox(0.18,0.62,0.86,0.07),F,g,x,0.46,0,0,0,0,0);
+      for(const x of [-0.9,0.9]) for(const z of [-0.36,0.36]) propPart(new THREE.CylinderGeometry(0.03,0.03,0.14,6),dk,g,x,0.07,z,0,0,0,0);
+      propPart(rbox(0.4,0.36,0.12,0.05),0xe8dcc0,g,-0.62,0.72,0.18,-0.2,0,0,0); }
+    else if(variant===1){ // dining table with four chairs
+      propPart(rbox(1.6,0.06,0.9,0.02),wood,g,0,0.76,0,0,0,0,0); for(const x of [-0.72,0.72]) for(const z of [-0.37,0.37]) propPart(rbox(0.06,0.73,0.06,0.01),dk,g,x,0.37,z,0,0,0,0);
+      for(const [x,z,r] of [[-0.4,-0.68,0],[0.4,-0.68,0],[-0.4,0.68,Math.PI],[0.4,0.68,Math.PI]]){ const c=new THREE.Group(); c.position.set(x,0,z); c.rotation.y=r; g.add(c);
+        propPart(rbox(0.44,0.05,0.42,0.02),wood,c,0,0.45,0,0,0,0,0); propPart(rbox(0.44,0.5,0.05,0.02),wood,c,0,0.72,0.19,0,0,0,0); for(const a of [-0.18,0.18]) for(const b of [-0.17,0.17]) propPart(rbox(0.04,0.44,0.04,0.01),dk,c,a,0.22,b,0,0,0,0); } }
+    else if(variant===2){ // bookshelf full of books
+      propPart(rbox(1.2,2.0,0.36,0.02),wood,g,0,1.0,0.02,0,0,0,0); propPart(rbox(1.1,1.9,0.04,0.01),dk,g,0,1.0,-0.14,0,0,0,0);
+      for(let k=0;k<5;k++){ const y=0.12+k*0.42; propPart(rbox(1.1,0.03,0.32,0.01),wood,g,0,y,0,0,0,0,0); let x=-0.5; while(x<0.48){ const bw=0.04+q()*0.05, bh=0.22+q()*0.12; propPart(rbox(bw,bh,0.22,0.005),[0x8a2a2a,0x2f5d8a,0x3f7a3a,0xd9b24a,0x6b3f8a,0xe0ddd5][q()*6|0],g,x+bw/2,y+0.015+bh/2,-0.02,0,0,q()<0.1?0.2:0,0); x+=bw+0.005; } } }
+    else if(variant===3){ // kitchen: counter with a worktop and doors, a sink, and a tall fridge at the end
+      propPart(rbox(1.6,0.86,0.6,0.02),0xe8e4da,g,-0.25,0.43,0,0,0,0,0); propPart(rbox(1.66,0.05,0.64,0.01),0x3a3d42,g,-0.25,0.885,-0.01,0,0,0,0);
+      for(const x of [-0.85,-0.45,-0.05,0.35]) propPart(rbox(0.36,0.7,0.02,0.01),0xd9d4c8,g,x,0.43,-0.31,0,0,0,0);
+      propPart(rbox(0.5,0.04,0.36,0.02),0xa9b0b8,g,-0.4,0.91,0,0,0,0,0); propPart(rbox(0.72,1.8,0.66,0.06),0xf2f2ee,g,0.92,0.9,0,0,0,0,0); propPart(rbox(0.03,0.4,0.03,0.01),0x9aa0a6,g,0.62,1.2,-0.34,0,0,0,0); }
+    else { // bed: frame, mattress, blanket, pillows, headboard
+      propPart(rbox(1.5,0.3,2.1,0.04),wood,g,0,0.2,0,0,0,0,0); propPart(rbox(1.42,0.2,2.0,0.08),0xf4f1ea,g,0,0.44,0,0,0,0,0); propPart(rbox(1.46,0.06,1.35,0.03),F,g,0,0.55,-0.32,0,0,0,0);
+      for(const x of [-0.35,0.35]) propPart(rbox(0.55,0.14,0.36,0.07),0xffffff,g,x,0.6,0.78,0,0,0,0); propPart(rbox(1.56,0.9,0.08,0.03),dk,g,0,0.6,1.06,0,0,0,0); }
   } else if(p.kind==='rock'){
     propPart(rockGeo(1.25*s,.9*s,1.05*s,q),0x7f8389,g,0,.5*s,0,0,q()*6,0,0.04);
     propPart(rockGeo(.6,.5,.55,q),0x72767c,g,.95*s,.25*s,.5*s,0,q()*6,0,0.03);
@@ -6151,7 +6178,7 @@ function propVariant(kind,variant){ const key=kind+variant; let v=propGeos.get(k
 }
 function buildPropMesh(p,r){
   if(p.kind==='tree'||p.kind==='pine'){ const g=new THREE.Group(); g.position.set(p.x,0,p.z); g.rotation.y=r()*Math.PI*2; g.scale.setScalar(p.s); p.lazy=true; return g; } // (not in the scene: see the forest)
-  const g=new THREE.Group(); g.position.set(p.x,0,p.z); g.rotation.y=r()*Math.PI*2; const v=propVariant(p.kind,p.id%8);
+  const g=new THREE.Group(); g.position.set(p.x,0,p.z); g.rotation.y=r()*Math.PI*2; const v=propVariant(p.kind,p.kind==='furn'?0:p.id%8);
   const m=new THREE.Mesh(v.geo,v.mat); m.castShadow=m.receiveShadow=true; g.add(m); g.scale.setScalar(p.s); scene.add(g); return g;
 }
 // one coloured mesh + one outline mesh per prop (instead of a dozen parts) keeps the draw count low on phones
@@ -6174,6 +6201,8 @@ function propBoxes0(p){
   const s=p.s, x=p.x, z=p.z;
   if(p.kind==='tree'||p.kind==='pine'){ const t=(p.kind==='tree'?.42:.34)*s+0.05; return [[x-t,0,z-t,x+t,3.2*s*(p.hs||1),z+t]]; }
   if(p.kind==='rock'){ const a=1.05*s, c=.9*s; return [[x-a,0,z-c,x+a,1.35*s,z+c]]; }
+  if(p.kind==='furn'){ const E=[[1.0,0.95,0.45],[0.8,0.8,0.85],[0.6,2.0,0.2],[1.3,1.8,0.33],[0.75,0.7,1.08]][p.ft||0], q=Math.abs(Math.sin(p.g.rotation.y))>0.7, ex=q?E[2]:E[0], ez=q?E[0]:E[2], o=p.ft===3?0.33:0; // (the kitchen is off-centre: the fridge end)
+    const ox=q?0:o*Math.cos(p.g.rotation.y), oz=q?-o*Math.sin(p.g.rotation.y):0; return [[x-ex+ox,0,z-ez+oz,x+ex+ox,E[1],z+ez+oz]]; }
   // car: long side follows its yaw, rounded to the nearest 90 degrees for a simple box
   const along=Math.abs(Math.cos(p.g.rotation.y))>.7; return [along?[x-2,0,z-.95,x+2,1.8,z+.95]:[x-.95,0,z-2,x+.95,1.8,z+2]];
 }
@@ -6288,7 +6317,7 @@ function initProps(){
   /* About 520 trees, 520 pines (higher up), 220 rocks (on rocky ground) and 40 cars, 25 of them parked along the roads.
      They keep off the roads, the towns, bare rock (except the rocks) and snow. Seeded from integer maths, so every
      player in a party gets the same ones. */
-  const r=seeded(20261108), RR=MAP_R-20, byKind={tree:[],pine:[],rock:[],car:[]}; let id=0, tries=0;
+  const r=seeded(20261108), RR=MAP_R-20, byKind={tree:[],pine:[],rock:[],car:[],furn:[]}; let id=0, tries=0;
   const add=(kind,x,z,sc,yaw)=>{
     const p={id:id++,kind,x,z,s:sc,isProp:true,type:'prop',slab:false,alive:true,respawnT:0,wob:0,grow:1};
     p.key='prop'+p.id; p.mat=PROP_T[kind].mat; p.maxHp=Math.round(PROP_T[kind].hp*(kind==='rock'?p.s:1)); p.hp=p.maxHp;
@@ -6324,6 +6353,7 @@ function initProps(){
       if(!roomy(x,z,kind)) continue;
       add(kind,x,z,kind==='rock'?.8+r()*.7:1); made++; } }
   yardTrees(add,r);
+  houseFurniture(add);
   // parked cars: on a road's shoulder, lined up with it
   const roads=WORLD.roads; let parked=0;
   for(let t=0;t<800&&parked<25&&roads.length;t++){ const rd=roads[Math.floor(r()*roads.length)], n=rd.pts.length; if(n<9) continue;
@@ -6414,6 +6444,18 @@ function yardFrame(t,h){ const C=CELL, X=h.side==='n'||h.side==='s';
   // u along the front, w out from the front wall (toward the street, negative w goes behind the house)
   if(X){ const fz=fN?z0:z1, s=fN?-1:1; return {len:x1-x0,depth:z1-z0,p:(u,w)=>[x0+u,fz+s*w]}; }
   const fx=fN?x0:x1, s=fN?-1:1; return {len:z1-z0,depth:x1-x0,p:(u,w)=>[fx+s*w,z0+u]}; }
+// furniture in the inner corners of each house's ground floor (not where the stairs are), backs to the wall
+function houseFurniture(add){ for(const t of TOWNS){ if(!t.houses.length) planHouses(t);
+  for(const h of t.houses){ const q=seeded(t.seed+h.id*131+7), C=CELL, IN=WT/2+0.12, x0=h.i0*C+IN, x1=(h.i0+h.w)*C-IN, z0=h.j0*C+IN, z1=(h.j0+h.d)*C-IN;
+    const stairs=h.floors>1?houseStair(h).cells:[], inStair=(x,z)=>stairs.some(([i,j])=>x>i*C-0.3&&x<(i+1)*C+0.3&&z>j*C-0.3&&z<(j+1)*C+0.3);
+    const SZ=[[2.0,0.9],[1.6,1.7],[1.2,0.4],[2.6,0.66],[1.5,2.16]], picks=h.floors>1?[0,1,2,3]:[0,3,4,1,2]; let n=0;
+    for(const [cx,cz,sx,sz] of [[x0,z0,1,1],[x1,z0,-1,1],[x0,z1,1,-1],[x1,z1,-1,-1]]){ if(n>=3) break;
+      const ft=picks[(n+(q()*2|0))%picks.length]; n++; const [W,D]=SZ[ft];
+      // back against the side wall (the one that isn't the front), running along it
+      const side=h.side==='n'||h.side==='s'; // front wall runs along x: put the item against the x-facing (side) wall
+      let x,z,yaw; if(side){ x=cx+sx*(D/2+0.05); z=cz+sz*(W/2+0.1); yaw=Math.atan2(-sx,0); } else { x=cx+sx*(W/2+0.1); z=cz+sz*(D/2+0.05); yaw=Math.atan2(0,-sz); }
+      if(inStair(x,z)||inStair(x+(side?0:sx*W/2),z+(side?sz*W/2:0))) continue;
+      const p=add('furn',x,z,1,yaw); p.ft=ft; p.yard=true; p.g.children[0].geometry=propVariant('furn',ft).geo; p.boxes=propBoxes(p); } } } }
 function yardTrees(add,r){
   const free=(t,x,z,pad)=>{ if(Math.hypot(x-t.x,z-t.z)>t.R+6) return false; if(Math.abs(x-t.x)<ROAD_HW+WALK_W+1.4||Math.abs(z-t.z)<ROAD_HW+WALK_W+1.4) return false;
     for(const h of t.houses){ if(x>h.i0*CELL-pad&&x<(h.i0+h.w)*CELL+pad&&z>h.j0*CELL-pad&&z<(h.j0+h.d)*CELL+pad) return false; const G=h.garage; if(G&&x>G.i*CELL-pad&&x<(G.i+1)*CELL+pad&&z>G.j*CELL-pad&&z<(G.j+1)*CELL+pad) return false; }
@@ -7182,7 +7224,7 @@ function drawMini(){
     const qx=m>lim?c+dx/m*lim:px, qz=m>lim?c+dz/m*lim:pz; g.fillStyle=col; g.strokeStyle='#fff'; g.lineWidth=1.5*dpr; g.beginPath(); g.arc(qx,qz,r,0,7); g.fill(); g.stroke(); };
   net.players.forEach(pl=>dot(pl.pos.x,pl.pos.z,'#'+(sameTeam(pl)?(horde.on?0x3f8fff:TEAM_COL[pl.team]):pl.id==='bot'?0xff4b3a:colorFor(pl.id)).toString(16).padStart(6,'0')));
   if(B&&B.active&&B.h.group.visible) dot(B.pos.x,B.pos.z,'#ff4b3a');
-  propsNear(ox,oz,[],Math.ceil(R/PCELL)+1).forEach(p=>{ const px=tx(p.x), pz=tz(p.z); if(px<-4||pz<-4||px>S+4||pz>S+4) return;
+  propsNear(ox,oz,[],Math.ceil(R/PCELL)+1).forEach(p=>{ if(p.kind==='furn') return; const px=tx(p.x), pz=tz(p.z); if(px<-4||pz<-4||px>S+4||pz>S+4) return;
     g.fillStyle=p.kind==='rock'?'#a8aeb4':p.kind==='car'?'#c47a4a':'#2f6b2a'; g.beginPath(); g.arc(px,pz,(p.kind==='car'?2.6:p.kind==='rock'?2.2:2.8)*p.s*dpr,0,7); g.fill(); });
   chests.forEach(ch=>{ if(ch.open) return; const px=tx(ch.x), pz=tz(ch.z); if(px<0||pz<0||px>S||pz>S) return; g.fillStyle='#ffc84a'; g.strokeStyle='#5a3a00'; g.lineWidth=dpr; g.fillRect(px-3*dpr,pz-2.2*dpr,6*dpr,4.4*dpr); g.strokeRect(px-3*dpr,pz-2.2*dpr,6*dpr,4.4*dpr); });
   TOWNS.forEach(t=>{ const px=tx(t.x), pz=tz(t.z), dx=px-c, dz=pz-c, m=Math.hypot(dx,dz), lim=c-9*dpr, qx=m>lim?c+dx/m*lim:px, qz=m>lim?c+dz/m*lim:pz; if(m>lim) return; // only towns actually on the minimap (the full map shows them all)
