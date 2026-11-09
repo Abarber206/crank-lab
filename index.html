@@ -47,6 +47,12 @@ canvas#c{position:fixed;top:0;left:0;width:100vw;height:100vh;height:100dvh;disp
 @keyframes lowhp{0%,100%{box-shadow:inset 0 0 120px 10px rgba(255,40,40,.15)}50%{box-shadow:inset 0 0 160px 30px rgba(255,40,40,.45)}}
 @media (prefers-reduced-motion:reduce){#hurtfx.low{animation:none;box-shadow:inset 0 0 140px 20px rgba(255,40,40,.3)}}
 @media (orientation:portrait){#compass{display:none}}
+#cloudFx{position:fixed;inset:0;pointer-events:none;z-index:4;overflow:hidden;background:radial-gradient(ellipse at 50% 60%,#ffffff 0%,#eef4fb 55%,#d9e6f3 100%);opacity:0}
+#cloudFx i{position:absolute;border-radius:50%;background:radial-gradient(closest-side,rgba(255,255,255,1) 0%,rgba(255,255,255,.92) 45%,rgba(240,246,252,.55) 70%,rgba(240,246,252,0) 100%);filter:blur(6px);will-change:transform,opacity}
+#cloudFx.go{animation:cloudIn 2.3s ease-in forwards}
+#cloudFx.go i{animation:puffUp 2.3s cubic-bezier(.5,0,.75,.4) forwards}
+@keyframes cloudIn{0%{opacity:1}35%{opacity:1}100%{opacity:0}}
+@keyframes puffUp{0%{transform:translate(0,0) scale(1);opacity:1}100%{transform:translate(var(--dx),-130vh) scale(2.6);opacity:.2}}
 #hurtfx{position:fixed;inset:0;pointer-events:none;z-index:4;box-shadow:inset 0 0 140px 20px rgba(255,40,40,0);transition:box-shadow .4s}
 #hurtfx.on{box-shadow:inset 0 0 140px 20px rgba(255,40,40,.55);transition:none}
 /* ---- HUD: map top-right, vitals + slot bar bottom-center, thumb cluster bottom-right ---- */
@@ -502,6 +508,7 @@ body.touch #stickHint{width:100px;height:100px;opacity:.6}
 <div class="hud" id="waveHud"><div class="wt"><b id="whT"></b><span id="whS"></span></div><div class="wb"><i id="whF"></i></div></div>
 <div class="hud" id="banner"><div class="big" id="banTitle"></div><div class="small" id="banSub"></div></div>
 <div id="hurtfx"></div>
+<div id="cloudFx" hidden></div>
 <div id="scope" hidden><i class="h"></i><i class="v"></i><i class="m"></i><i class="c"></i><b id="scopeZ"></b></div>
 <div class="hud" id="bottom">
   <div id="vitals" hidden>
@@ -2780,6 +2787,17 @@ function moveBody0(E,fw,st,jump,dt){
    back to slow down, sideways to slip. You land on the ground, a roof or a build, and the glider folds away.
    No shooting, building or editing until you land. */
 const SKY_AUTO=85, SKY_FIRST=620, SKY_MATCH=520, SKY_BACK=160;
+// a random open spot somewhere on the island (not up a mountainside); r is a random-number source (seeded for parties)
+function randomDropSpot(r=Math.random){ const h0=terrainH(SPAWN[0],SPAWN[2]);
+  for(let i=0;i<80;i++){ const a=r()*Math.PI*2, d=Math.sqrt(r())*640, x=SPAWN[0]+Math.cos(a)*d, z=SPAWN[2]+Math.sin(a)*d;
+    if(slopeAt(x,z)[0]<0.3&&terrainH(x,z)<h0+70) return [x,z]; }
+  return [SPAWN[0],SPAWN[2]]; }
+// the screen goes white and the cloud bank rushes up past you as you fall out of it
+function cloudFx(){ const el=document.getElementById('cloudFx'); if(!el) return;
+  if(!el.children.length) for(let i=0;i<16;i++){ const p=document.createElement('i'), s=30+Math.random()*55; p.style.cssText=`width:${s}vmax;height:${s*0.62}vmax;left:${Math.random()*110-25}%;top:${40+Math.random()*80}%;--dx:${(Math.random()-0.5)*40}vw;animation-delay:${Math.random()*0.25}s`; el.appendChild(p); }
+  el.hidden=false; el.classList.remove('go'); void el.offsetWidth; el.classList.add('go'); sfx('cloud');
+  clearTimeout(cloudFx.t); cloudFx.t=setTimeout(()=>{ el.classList.remove('go'); el.hidden=true; },2500); }
+function cloudDrop(x,z,h){ cloudFx(); skyDrop(x,z,h); }
 function skyDropAllowed(){ return settings.skyDrop!==false; }
 function skyDrop(x,z,h,E=P){ E.pos.set(x,terrainH(x,z)+h,z); E.vel.set(0,-6,0); E.onGround=false; E.groundSlab=null; E.fallTop=null; E.crouch=false;
   E.sky={phase:'fall',t:0,dive:0,jumpWas:true}; if(E===P){ if(edit) exitEdit(false); fireHeld=false; adsHeld=false; if(mode==='build') selectPick(); sfx('sky_start'); } }
@@ -3755,6 +3773,7 @@ function sfx(k){
     case 'rb_boot': tone('sawtooth',110,880,1.1,0.05); tone('sine',220,1760,1.15,0.07,0.04); noise(2500,0.9,0.06,0.7,0.15,'bandpass',9000); tone('triangle',880,1320,0.45,0.11,1.1); tone('triangle',1320,1760,0.5,0.08,1.25); break;
     case 'rb_down': tone('sine',300,140,0.5,0.12); noise(500,0.3,0.15,0.8,0,'lowpass',150); break;
     case 'rb_up': tone('triangle',440,660,0.18,0.1); tone('triangle',660,990,0.25,0.09,0.12); noise(4000,0.2,0.05,1,0.05,'highpass'); break;
+    case 'cloud': noise(700,1.9,0.16,0.45,0,'bandpass',260); noise(2600,1.2,0.06,0.6,0.05,'highpass',900); break;
     case 'rb_tick': tone('square',1200,1180,0.03,0.025); break;
     case 'pickup': knock(900,0.05,0.2,6); noise(2500,0.06,0.1,1.5,0.03,'bandpass',5000); break;
     case 'ammo_pick': for(let q=0;q<3;q++) knock(1400+q*300,0.04,0.18,8,q*0.05); break;
@@ -4932,12 +4951,12 @@ function startPlay(){
   catch(e){ lockFailed=true; menu.hidden=true; playing=true; }
   // If the browser never answers the lock request, start anyway.
   setTimeout(()=>{ if(!playing){ lockFailed=!locked; menu.hidden=true; playing=true; } },700);
-  if(!P.everPlayed){ P.everPlayed=true; if((!net.role||!party.live)&&skyDropAllowed()){ emptyLoadout(); skyDrop(SPAWN[0],SPAWN[2],SKY_FIRST); } } // the first time in: from the sky
+  if(!P.everPlayed){ P.everPlayed=true; if((!net.role||!party.live)&&skyDropAllowed()){ emptyLoadout(); const sp=randomDropSpot(); cloudDrop(sp[0],sp[1],SKY_FIRST); } } // the first time in: from the sky
 }
 $('play').addEventListener('click',startPlay);
 $('invClose').addEventListener('click',closeInv);
 $('invDrop').addEventListener('click',()=>{ dropFromSlot(invSel); });
-$('respawn').addEventListener('click',()=>{ if(RB.wait) rbGiveUp(false); else if(net.dead&&net.role) net.dead=false; respawn(); if(skyDropAllowed()){ emptyLoadout(); const a=Math.random()*6.283, r=12+Math.random()*25; skyDrop(SPAWN[0]+Math.cos(a)*r,SPAWN[2]+Math.sin(a)*r,SKY_BACK); } });
+$('respawn').addEventListener('click',()=>{ if(RB.wait) rbGiveUp(false); else if(net.dead&&net.role) net.dead=false; respawn(); if(skyDropAllowed()){ emptyLoadout(); const sp=randomDropSpot(); P.pos.set(sp[0],terrainH(sp[0],sp[1]),sp[1]); cloudDrop(sp[0],sp[1],SKY_BACK); } });
 $('clear').addEventListener('click',()=>{ if(net.role==='client'){ toast('Only the host can clear builds'); return; } clearBuilds(); netOp({op:'clear'}); });
 $('fs').addEventListener('click',()=>{
   const el=document.documentElement;
@@ -6149,7 +6168,7 @@ function startWave(){
 function hordeAirborne(){ if(P.sky&&!isDead()) return true; let a=false; net.players.forEach(pl=>{ if(pl.id!=='bot'&&pl.alive&&(pl.flags&192)) a=true; }); return a; }
 function hordeStart(){
   clearZombies(); horde.on=true; horde.wave=0; horde.kills=0; horde.phase='break'; horde.t=20; horde.landT=0;
-  if(!net.role){ clearBuilds(); respawn(); emptyLoadout(); if(skyDropAllowed()){ const a=Math.random()*6.283; skyDrop(SPAWN[0]+Math.cos(a)*20,SPAWN[2]+Math.sin(a)*20,SKY_MATCH); } }
+  if(!net.role){ clearBuilds(); respawn(); emptyLoadout(); if(skyDropAllowed()){ const sp=randomDropSpot(); cloudDrop(sp[0],sp[1],SKY_MATCH); } }
   syncBot(); refreshTeamMarkers();
 }
 function hordeStop(){ clearZombies(); horde.on=false; horde.phase='idle'; if(net.role==='host') netSend({type:'hz',off:1}); syncBot(); refreshTeamMarkers(); }
@@ -6855,9 +6874,9 @@ function itemInfo(id){ return WEAPONS[id]||ITEMS[id]||{name:'Empty',rarity:'comm
 function infiniteAmmo(){ return !horde.on; } // build fights keep endless reserves; the horde makes you scavenge
 function emptyLoadout(){ defaultLoadout(); P.inv=[null,null,null,null,null]; P.items={bandage:0,mini:0}; P.nades=0; P.res={light:0,medium:0,shells:0,heavy:0,rockets:0}; P.slot=-1; if(typeof selectPick==='function') selectPick(); syncItems(); }
 // where a party match drops everyone: one spot (from the match number, the same on every screen), each player a few metres apart
-function matchDrop(){ const r=seeded(1000+party.seq), a=r()*6.283, cx=SPAWN[0]+Math.cos(a)*30, cz=SPAWN[2]+Math.sin(a)*30;
+function matchDrop(){ const r=seeded(1000+party.seq), [cx,cz]=randomDropSpot(r);
   let h=0; for(const c of String(net.id||'me')) h=(h*31+c.charCodeAt(0))>>>0; const b=(h%360)*Math.PI/180, d=4+(h>>9)%6;
-  emptyLoadout(); skyDrop(cx+Math.cos(b)*d,cz+Math.sin(b)*d,SKY_MATCH); }
+  emptyLoadout(); cloudDrop(cx+Math.cos(b)*d,cz+Math.sin(b)*d,SKY_MATCH); }
 function defaultLoadout(){
   P.inv=['ar','pump','bandage','mini',null]; P.slot=-1;
   P.ammo={}; for(const k in WEAPONS) P.ammo[k]=WEAPONS[k].mag||0;
@@ -7784,7 +7803,7 @@ function rbMate(c){ return c.id===net.id||horde.on||(+settings.team>0&&c.t===+se
 function rbMatesUp(){ let n=0; net.players.forEach(pl=>{ if(pl.id!=='bot'&&pl.alive&&!(pl.flags&256)&&sameTeam(pl)) n++; }); return n; }
 function rbNeeded(){ for(const c of RB.cards.values()) if(rbMate(c)) return true; return RB.carry.size>0; }
 function rbSend(m){ m.type='rb'; onRb(m); netSend(m); }
-function rbRespawnNow(){ net.dead=false; const a=Math.random()*Math.PI*2, r=8+Math.random()*20; respawn(); P.pos.set(SPAWN[0]+Math.cos(a)*r,0,SPAWN[2]+Math.sin(a)*r); if(skyDropAllowed()) skyDrop(P.pos.x,P.pos.z,SKY_BACK); }
+function rbRespawnNow(){ net.dead=false; respawn(); if(skyDropAllowed()){ const sp=randomDropSpot(); P.pos.set(sp[0],terrainH(sp[0],sp[1]),sp[1]); emptyLoadout(); cloudDrop(sp[0],sp[1],SKY_BACK); } else { const a=Math.random()*Math.PI*2, r=8+Math.random()*20; P.pos.set(SPAWN[0]+Math.cos(a)*r,0,SPAWN[2]+Math.sin(a)*r); } }
 // you just went down in a room
 function afterDeath(){
   RB.carry.forEach(id=>rbSend({op:'drop',id,p:[+P.pos.x.toFixed(2),+P.pos.y.toFixed(2),+P.pos.z.toFixed(2)]})); // cards you were carrying fall where you fell
