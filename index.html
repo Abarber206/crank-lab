@@ -4647,19 +4647,18 @@ function gunStockPush(r,mdl){ if(!mdl) return 0; let b=_gunBack.get(mdl);
 function handQuat(out,fwd,up){ _ikY.copy(fwd).negate(); _ikZ.copy(up).addScaledVector(fwd,-up.dot(fwd)).normalize().negate(); _ikX.crossVectors(_ikY,_ikZ).normalize(); _ikM.makeBasis(_ikX,_ikY,_ikZ); return out.setFromRotationMatrix(_ikM); }
 
 // pickaxe swing keyframes (t 0..1): wind-up, strike, recover
-function pickSwing(t,pitch){
-  const ease=x=>x*x*(3-2*x), K=[ // t, shoulder fwd, shoulder out, elbow, chest twist, spine lean, wrist
-    [0,   0.3,  0.14, 0.5,  0,    0,   -0.3],
-    [0.2, 2.75, 0.5,  1.55,-0.5, -0.06,-0.45],
-    [0.27,2.6,  0.42, 1.35,-0.42,-0.04,-0.35],
-    [0.45,0.22+pitch*0.45,-0.3,0.05,0.42,0.24,0],
-    [0.62,0.3+pitch*0.4,-0.26,0.12,0.36,0.2,-0.08],
-    [1,   0.3,  0.14, 0.5,  0,    0,   -0.3]];
-  // (handle angle from straight down = shoulder + elbow + wrist + spine lean + 0.95 grip tilt: ~1.5 is level in front)
+function pickSwing(t,pitch,side=1){
+  // t, shoulder fwd, shoulder out (+ = out to the right), elbow, chest twist (+ = toward the left), spine lean, wrist
+  const R=[0,0.6,0.25,1.1,0,0,0.2], F=side>0?[ // forehand: up over the right shoulder, sweep down and across to the left
+    [0.22,2.3,0.95,1.2,-0.55,-0.05,0.1],[0.44,1.35+pitch*0.5,-0.35,0.1,0.45,0.18,-0.1],[0.7,0.6+pitch*0.3,-0.75,0.35,0.7,0.14,-0.2]]:[ // backhand: up across the left shoulder, sweep out to the right
+    [0.22,2.25,-1.1,1.45,0.65,-0.05,0.3],[0.44,1.35+pitch*0.5,0.45,0.15,-0.35,0.16,0],[0.7,0.65+pitch*0.3,1.0,0.4,-0.65,0.12,-0.1]];
+  const K=[R,...F,[1,...R.slice(1)]];
   let i=0; while(i<K.length-2&&t>K[i+1][0]) i++;
-  const a=K[i], b=K[i+1], u=Math.max(0,Math.min(1,(t-a[0])/(b[0]-a[0]))), e=i===2?u*u:ease(u); // the strike accelerates into the hit
-  const L=j=>a[j]+(b[j]-a[j])*e;
-  return {sh:L(1),shz:L(2),el:L(3),ch:L(4),sp:L(5),wr:L(6),k:t>0.2&&t<0.7?Math.sin((t-0.2)/0.5*Math.PI):0};
+  const a=K[i], b=K[i+1], a0=K[Math.max(0,i-1)], b1=K[Math.min(K.length-1,i+2)], h=b[0]-a[0], u=Math.max(0,Math.min(1,(t-a[0])/h));
+  // Catmull-Rom through the keys: the arm flows through each pose instead of stopping at it
+  const C=j=>{ const p0=a0[j], p1=a[j], p2=b[j], p3=b1[j], m1=(p2-p0)*0.5, m2=(p3-p1)*0.5, u2=u*u, u3=u2*u;
+    return (2*u3-3*u2+1)*p1+(u3-2*u2+u)*m1+(-2*u3+3*u2)*p2+(u3-u2)*m2; };
+  return {sh:C(1),shz:C(2),el:C(3),ch:C(4),sp:C(5),wr:C(6),k:t>0.3&&t<0.75?Math.sin((t-0.3)/0.45*Math.PI):0};
 }
 function animateRig0(H,S,dt){
   const G=H.group, r=H.rig, A=H.anim; A.t+=dt;
@@ -4794,6 +4793,7 @@ function animateRig0(H,S,dt){
     else if(id==='salute'){ const up=Math.min(1,t*4); T.shR=lerp(T.shR,2.05,up); T.shRz=0.75*up; T.elR=lerp(T.elR,2.35,up); T.chX-=0.05*up; T.nkX-=0.05*up; }
   }
   // ----- upper body by activity -----
+  if(!(S.swingT>0)) A.inSwing=false;
   if(gun){ T.chY+=-0.42; T.nkY+=0.32; T.spY+=-0.05; }
   else if(building){
     const st=A.strike, swing=st>0.5?(1-st)*2:st*2; // up fast, down fast
@@ -4802,7 +4802,8 @@ function animateRig0(H,S,dt){
   } else if(S.editing){ T.shR=1.35+S.pitch*0.7; T.elR=0.3; T.shL=0.95; T.elL=0.85; T.shLz=0.15; }
   else if(S.swingT>0){
     // overhead chop: wind up over the right shoulder, whip down across the body, settle back
-    const t=Math.min(1,1-S.swingT/SWING_T), sw=pickSwing(t,S.pitch);
+    if(!A.inSwing||S.swingT>A.prevSwT+1e-3) A.side=-(A.side||-1); A.inSwing=true; A.prevSwT=S.swingT; // each new swing comes from the other side
+    const t=Math.min(1,1-S.swingT/SWING_T), sw=pickSwing(t,S.pitch,A.side);
     T.shR=sw.sh; T.shRz=sw.shz; T.elR=sw.el; T.chY+=sw.ch; T.spX+=sw.sp; T.wrR=sw.wr;
     // the whole body throws the swing: hips turn with the chest, knees dip at impact, the free arm pulls back
     T.hipsY+=sw.ch*0.35; T.hipY-=0.035*sw.k; T.knL-=0.12*sw.k; T.knR-=0.12*sw.k; T.nkY-=sw.ch*0.5;
