@@ -10,5 +10,5 @@ const {sleep,page,launch,open}=require('./h.js');
    return pg.evaluate(()=>({as:+(T.P.sky&&T.P.sky.as||0).toFixed(1),vy:+T.P.vel.y.toFixed(1),hs:+Math.hypot(T.P.vel.x,T.P.vel.z).toFixed(1),ph:T.P.sky&&T.P.sky.phase})); };
  const lvl=await at(0,4000), dive=await at(-0.75,4000), climb=await at(0.65,900), stall=await at(0.65,7000), back=await at(0,4000);
  console.log(JSON.stringify({lvl,dive,climb,stall,back}));
- const ok=lvl.ph==='glide'&&Math.abs(lvl.as-12)<2&&lvl.vy<-3&&lvl.vy>-7&&dive.as>24&&dive.vy<-18&&climb.vy>1&&stall.as<10&&stall.vy<-1&&back.vy<0;
+ const ok=lvl.ph==='glide'&&Math.abs(lvl.as-13)<2&&lvl.vy<-1.5&&lvl.vy>-4&&lvl.hs/-lvl.vy>3.8&&dive.as>24&&dive.vy<-18&&climb.vy>1&&stall.as<10&&stall.vy<-1&&back.vy<0;
  console.log(ok?'PASS':'FAIL'); console.log(errs.join('\n')||'no errors'); await b.close(); })();

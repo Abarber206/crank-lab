@@ -2826,7 +2826,7 @@ function skyMove(E,fw,st,jump,dt){ const S=E.sky; S.t+=dt;
     if(jump&&!S.jumpWas&&S.gt>0.6&&above>30){ S.phase='fall'; S.t=0; S.released=true; S.jumpWas=jump; if(E===P) sfx('sky_start'); return; } // let go
     // flight path angle follows where you look (and W dives a little more, S flares); airspeed is energy:
     // diving adds speed, climbing spends it, drag pulls it back toward the trim speed; too slow and the nose won't stay up
-    const G0=-0.42, TRIM=12, VMAX=33, VMIN=6;
+    const G0=-0.22, TRIM=13, VMAX=33, VMIN=6;
     if(S.as==null){ S.as=Math.max(10,Math.min(20,Math.hypot(E.vel.x,E.vel.z)+6)); S.gam=G0; }
     let gt=G0+(E.pitch||0)*1.15-(fw>0.3?0.14:0)+(fw<-0.3?0.16:0); gt=Math.max(-1.15,Math.min(0.42,gt));
     const lift=Math.max(0,Math.min(1,(S.as-8)/9)); gt=Math.min(gt,G0+(0.42-G0)*lift); if(S.as<8.5) gt=Math.min(gt,G0-0.25*(1-S.as/8.5)); // stall: the nose drops
@@ -2868,7 +2868,7 @@ function makeGlider(col){ const g=new THREE.Group(), body=new THREE.Group(), spa
 const _skA=new THREE.Vector3(), _skB=new THREE.Vector3();
 function animateSky(H,S,dt){ const G=H.group, r=H.rig, A=H.anim, gl=S.sky==='glide', t=A.t;
   if(G.rotation.order!=='YXZ') G.rotation.order='YXZ';
-  const dive=gl?0:Math.max(0,Math.min(1,(-S.vel.y-38)/20)), gam=Math.atan2(S.vel.y,Math.hypot(S.vel.x,S.vel.z)+0.01), want=gl?Math.max(-0.95,Math.min(0.5,-0.2+(gam+0.42)*0.9)):-(1.18+0.32*dive);
+  const dive=gl?0:Math.max(0,Math.min(1,(-S.vel.y-38)/20)), gam=Math.atan2(S.vel.y,Math.hypot(S.vel.x,S.vel.z)+0.01), want=gl?Math.max(-0.95,Math.min(0.5,-0.2+(gam+0.22)*0.9)):-(1.18+0.32*dive);
   A.skyX=lerp(A.skyX||0,want,Math.min(1,dt*(gl?5:3))); A.skyZ=lerp(A.skyZ||0,Math.max(-0.55,Math.min(0.55,-(A.yawRate||0)*(gl?0.2:0.07)))+(gl?Math.sin(A.t*1.1)*0.03:0),Math.min(1,dt*3));
   const th=A.skyX, hu=0.94; G.rotation.x=th; G.rotation.z=A.skyZ;
   G.position.set(S.pos.x-hu*Math.sin(th)*Math.sin(S.yaw),S.pos.y+hu*(1-Math.cos(th)),S.pos.z-hu*Math.sin(th)*Math.cos(S.yaw));
@@ -6730,8 +6730,8 @@ function stepForest(dt){ if(!FOREST.near) return; FOREST.t-=dt; const cx=camera.
 // a tree's own mesh (for the pickaxe to hit, and while it shakes, falls or grows)
 function treeMesh(p){ if(p.g.children.length) return p.g.children[0]; const V=propVariant(p.kind,p.id%8), m=new THREE.Mesh(V.geo,V.mat); m.castShadow=m.receiveShadow=true; m.userData.piece=p; p.g.add(m); return m; }
 function treeAnim(p){ const moving=p.wob>0||p.dying>0||(p.alive&&p.grow<1);
-  if(moving&&!p.g.parent){ treeMesh(p); scene.add(p.g); forestDirty=true; FOREST.t=0; }
-  else if(!moving&&p.g.parent){ scene.remove(p.g); p.g.scale.set(p.s,p.s*(p.hs||1),p.s); p.g.rotation.x=p.g.rotation.z=0; forestDirty=true; FOREST.t=0; } }
+  if(moving&&!p.g.parent){ treeMesh(p); scene.add(p.g); forestDirty=true; FOREST.t=0; stepForest(0); }
+  else if(!moving&&p.g.parent){ scene.remove(p.g); p.g.scale.set(p.s,p.s*(p.hs||1),p.s); p.g.rotation.x=p.g.rotation.z=0; forestDirty=true; FOREST.t=0; stepForest(0); } } // swap in the same frame: never neither, never both
 /* ---------- front yards and back gardens ----------
    Every house gets a tree or two in the front yard (small and medium ones, clear of the path and the driveway) and
    bigger ones out back where there's room; a flower bed along the front wall, round shrubs at the corners and a
