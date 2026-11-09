@@ -2483,6 +2483,7 @@ function housePieces0(h){
     const g=P_.find(q=>q.type==='floor'&&q.l===L&&q.i===S.top[0]&&q.j===S.top[1]); g.fix=S.stairs; }
   // pitched roof: two slopes meeting at a ridge along the longer side
   const top=L+h.floors;
+  for(let a=0;a<w;a++) for(let b=0;b<d;b++) P_.push({type:'floor',i:i0+a,j:j0+b,l:top,mat:'wood',ceil:1}); // the ceiling (the attic floor)
   for(let a=0;a<w;a++) for(let b=0;b<d;b++){ let mask=0;
     if(d===2&&w>=2) mask=b===0?12:3; else if(w===2) mask=a===0?10:5;
     const gable=[]; if(a===0) gable.push(['w',-1]); if(a===w-1) gable.push(['e',1]); if(b===0) gable.push(['n',-1]); if(b===d-1) gable.push(['s',1]);
@@ -6534,7 +6535,9 @@ function addChest(x,y,z,yaw){ const c={id:chests.length,x,y,z,yaw,open:false,pro
   c.g.position.set(x,y,z); c.g.rotation.y=yaw; scene.add(c.g); chests.push(c); return c; }
 function initChests(){
   for(const t of TOWNS) for(const h of t.houses){ const s=houseSpots(h);
-    const cr=seeded(t.seed+h.id*977+5); s.chest.forEach(p=>{ if(cr()>0.45) return; const yaw=Math.atan2(t.x-p.x,t.z-p.z)+Math.PI; addChest(p.x,p.y,p.z,yaw); }); }
+    const cr=seeded(t.seed+h.id*977+5); s.chest.forEach(p=>{ if(cr()>0.45) return; const yaw=Math.atan2(t.x-p.x,t.z-p.z)+Math.PI; addChest(p.x,p.y,p.z,yaw); });
+    if(cr()<0.35){ const top=h.L+h.floors, x=(h.i0+h.w/2)*CELL+(h.w%2?0:CELL*0.5), z=(h.j0+h.d/2)*CELL+(h.d%2?0:CELL*0.5), [gy]=groundAt(x,z,top*LVL+0.8,near(x,z)); // up in the attic
+      if(gy>top*LVL-0.3) addChest(x,gy,z,h.w>=h.d?0:Math.PI/2); } }
   // a few in the wild, under trees and on hilltops
   const r=seeded(99173), RC=MAP_R-30; let made=0;
   for(let k=0;k<3000&&made<35;k++){ const u=(r()*2-1)*RC, v=(r()*2-1)*RC, d2=u*u+v*v; if(d2<60*60||d2>RC*RC) continue;
