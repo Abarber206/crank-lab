@@ -4708,7 +4708,7 @@ function startPlay(){
 $('play').addEventListener('click',startPlay);
 $('invClose').addEventListener('click',closeInv);
 $('invDrop').addEventListener('click',()=>{ dropFromSlot(invSel); });
-$('respawn').addEventListener('click',()=>{ respawn(); });
+$('respawn').addEventListener('click',()=>{ respawn(); if(skyDropAllowed()){ const a=Math.random()*6.283, r=12+Math.random()*25; skyDrop(SPAWN[0]+Math.cos(a)*r,SPAWN[2]+Math.sin(a)*r,SKY_BACK); } });
 $('clear').addEventListener('click',()=>{ if(net.role==='client'){ toast('Only the host can clear builds'); return; } clearBuilds(); netOp({op:'clear'}); });
 $('fs').addEventListener('click',()=>{
   const el=document.documentElement;
