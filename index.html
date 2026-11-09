@@ -327,7 +327,7 @@ body.touch #stickHint{width:100px;height:100px;opacity:.6}
 .shopgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
 .shopgrid .ofit{aspect-ratio:3/4;border-radius:8px}
 .shopgrid .ofit.tool{aspect-ratio:3/4}
-.shopgrid .ofit img{object-fit:contain}
+.shopgrid .ofit img{object-fit:contain} .ofit svg.emo{position:absolute;left:16%;top:8%;width:68%;height:62%;pointer-events:none;filter:drop-shadow(0 2px 3px rgba(0,0,0,.35))} .picks.emotes .ofit svg.emo{top:4%;height:66%}
 .shopgrid .ofit span{font-size:16px;padding:22px 6px 8px}
 .shopgrid .cost{position:absolute;top:8px;right:8px;display:flex;align-items:center;gap:4px;font:800 italic 15px/1 var(--font-hud);color:#ffe08a;background:rgba(5,14,40,.78);border-radius:999px;padding:4px 9px 4px 5px}
 .shopgrid .cost::before{content:"";width:14px;height:14px;border-radius:50%;background:#ffcf4a;box-shadow:inset 0 0 0 2px #b07a16}
@@ -393,7 +393,7 @@ kbd{font-family:var(--font-ui);background:#1c2a40;border-radius:3px;padding:1px 
 .mtabs{display:flex;gap:4px;border-bottom:1px solid rgba(255,255,255,.12);overflow-x:auto}
 .mtabs button{font:800 italic 15px/1 var(--font-hud);letter-spacing:.06em;text-transform:uppercase;background:none;border:0;border-bottom:3px solid transparent;color:var(--muted);padding:10px 14px 9px;cursor:pointer;white-space:nowrap}
 .mtabs button.on{color:var(--ink);border-bottom-color:var(--build)} .mtabs button:hover{color:var(--ink)}
-.mtab{display:grid;gap:14px;min-width:0}
+.mtab{display:grid;gap:14px;min-width:0;align-content:start}
 .allyopt{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;background:#15233a;border:1px solid rgba(255,255,255,.14);cursor:pointer}
 .allyopt input{width:20px;height:20px;accent-color:#3f8fff;flex:none} .allyopt b{display:block;font:800 italic 17px/1.1 var(--font-hud);letter-spacing:.04em;text-transform:uppercase} .allyopt small{color:var(--muted);font-size:13px}
 #menu.lobby .allyopt{background:rgba(4,18,64,.5);backdrop-filter:blur(8px)} #menu.lobby .allyopt small{color:rgba(225,236,255,.75)}
@@ -608,12 +608,15 @@ body.touch #stickHint{width:100px;height:100px;opacity:.6}
     <section class="mtab" data-tab="locker" hidden>
       <section class="locker">
       <div class="shopbar" hidden></div>
-      <p class="lkempty" id="lkHint">Get more outfits and pickaxes in the <b>Item Shop</b>.</p>
+      <p class="lkempty" id="lkHint">Get more outfits, pickaxes and dances in the <b>Item Shop</b>.</p>
       <div class="buybox" id="buyBox" hidden><p></p><button class="btn primary" id="buyOk" type="button">Buy</button><button class="btn" id="buyNo" type="button">Cancel</button></div>
       <h3 class="lk">Outfits</h3>
       <div id="outfits" class="outfits" role="listbox" aria-label="Outfit"></div>
       <h3 class="lk">Pickaxe</h3>
       <div id="picks" class="outfits picks" role="listbox" aria-label="Pickaxe"></div>
+      <h3 class="lk">Emotes</h3>
+      <p class="lkempty">The one you pick plays on your Emote key.</p>
+      <div id="emotesBox" class="outfits picks emotes" role="listbox" aria-label="Emote"></div>
     </section>
     </section>
     <section class="mtab" data-tab="shop" hidden>
@@ -698,8 +701,10 @@ try{ Object.assign(settings, JSON.parse(localStorage.getItem('cranklab.settings'
 settings.binds=Object.assign({},DEFAULT_BINDS,settings.binds||{});
 /* emotes: picked in the Locker, played with the Emote bind (B) or the smiley button; moving, jumping, shooting or
    building stops them. The id travels in the player state so everyone sees it. */
-const EMOTES={wave:{name:'Wave',dur:2.6},dance:{name:'Groove',dur:12,beat:1.9},cheer:{name:'Cheer',dur:2.4},salute:{name:'Salute',dur:2.2}};
-const EMOTE_IDS=Object.keys(EMOTES);
+const EMOTES={wave:{name:'Wave',dur:2.6,rarity:'common'},dance:{name:'Groove',dur:12,beat:1.9,rarity:'uncommon'},cheer:{name:'Cheer',dur:2.4,rarity:'common'},salute:{name:'Salute',dur:2.2,rarity:'common'},
+  floss:{name:'Floss',dur:10,beat:2.2,rarity:'rare',shop:1},robot:{name:'Robot',dur:10,beat:2.2,rarity:'uncommon',shop:1},hype:{name:'Hype',dur:8,beat:2.1,rarity:'uncommon',shop:1},
+  disco:{name:'Disco Fever',dur:10,beat:2,rarity:'epic',shop:1},shuffle:{name:'Shuffle',dur:10,beat:2,rarity:'rare',shop:1}};
+const EMOTE_IDS=Object.keys(EMOTES), EMOTE_LIST=EMOTE_IDS.map(id=>Object.assign({id},EMOTES[id]));
 if(!EMOTES[settings.emote]) settings.emote='dance';
 function saveSettings(){ try{ localStorage.setItem('cranklab.settings', JSON.stringify(settings)); }catch(e){} }
 
@@ -4769,6 +4774,20 @@ function animateRig0(H,S,dt){
       T.hipsZ+=0.14*s2; T.hipY+=-0.04+0.035*Math.abs(Math.sin(b)); T.knL+=-0.35*Math.max(0,s2); T.knR+=-0.35*Math.max(0,-s2); T.hpL+=0.15*Math.max(0,s2); T.hpR+=0.15*Math.max(0,-s2);
       T.chZ+=-0.1*s2; T.chY+=0.25*Math.sin(b/4); T.nkX+=0.1*Math.abs(s1)-0.04; T.nkZ=0.08*s2;
       T.shL=1.2+0.9*Math.max(0,s1); T.shR=1.2+0.9*Math.max(0,-s1); T.shLz=-0.6; T.shRz=0.6; T.elL=1.4-0.6*Math.max(0,s1); T.elR=1.4-0.6*Math.max(0,-s1); }
+    else if(id==='floss'){ const b=t*Math.PI*2*1.6, s=Math.sin(b), q=Math.sin(b*2);
+      T.shL=0.75*s; T.shR=-0.75*s; T.shLz=-0.3+0.7*s; T.shRz=0.3+0.7*s; T.elL=T.elR=0.12;
+      T.hipsZ+=-0.13*s; T.hipsY+=0.12*q; T.chZ+=0.06*s; T.hipY+=-0.02-0.015*Math.abs(q); T.knL+=-0.15*Math.max(0,s); T.knR+=-0.15*Math.max(0,-s); T.nkZ=-0.06*s; }
+    else if(id==='robot'){ const n=Math.floor(t*2.2), f=Math.min(1,(t*2.2-n)*5), K=[[1.57,1.57,0,0,0.5],[1.57,0.2,1.57,1.57,-0.5],[0.3,1.57,1.57,0.2,0.5],[1.57,1.57,1.57,1.57,0]], a=K[n%4], p=K[(n+3)%4], L=i=>p[i]+(a[i]-p[i])*f;
+      T.shL=L(0); T.shR=L(1); T.elL=L(2); T.elR=L(3); T.nkY=L(4)*0.6; T.chY+=L(4)*0.2; T.shLz=-0.12; T.shRz=0.12; T.knL+=-0.12*(n%2); T.knR+=-0.12*((n+1)%2); }
+    else if(id==='hype'){ const b=t*Math.PI*2*2.1, s=Math.sin(b), d=1-Math.abs(s), p1=Math.max(0,s), p2=Math.max(0,-s);
+      T.hipY+=-0.06*d; T.knL+=-0.45*d; T.knR+=-0.45*d; T.hpL+=0.2*d; T.hpR+=0.2*d;
+      T.shR=1.0+1.9*p1; T.elR=1.5-1.3*p1; T.shL=1.0+1.9*p2; T.elL=1.5-1.3*p2; T.shLz=-0.3; T.shRz=0.3; T.nkX+=0.1*s; T.chX+=-0.06*Math.abs(s); }
+    else if(id==='disco'){ const b=t*Math.PI*2, up=Math.sin(b)>0?1:0, sw=Math.sin(b*2);
+      T.shR=lerp(0.4,2.75,up); T.shRz=lerp(-0.35,0.55,up); T.elR=0.08; T.shL=0.1; T.shLz=-0.3; T.elL=0.45; // one arm loose at the side, the other points up, then down across
+      T.hipsZ+=0.12*sw; T.chZ+=-0.08*sw; T.knL+=-0.25*Math.max(0,sw); T.knR+=-0.25*Math.max(0,-sw); T.nkY=up?0.35:-0.2; T.nkX+=up?-0.2:0.15; }
+    else if(id==='shuffle'){ const b=t*Math.PI*2*2, s=Math.sin(b), c=Math.cos(b);
+      T.hpL+=0.5*Math.max(0,s); T.knL+=-0.9*Math.max(0,s); T.hpR+=0.5*Math.max(0,-s); T.knR+=-0.9*Math.max(0,-s); T.hpLz=-0.15*Math.max(0,-c); T.hpRz=0.15*Math.max(0,c);
+      T.hipY+=-0.03+0.03*Math.abs(c); T.hipsY+=0.25*s; T.chY+=-0.3*s; T.shL=0.7*s; T.shR=-0.7*s; T.elL=T.elR=1.35; T.shLz=-0.2; T.shRz=0.2; }
     else if(id==='cheer'){ const b=t*Math.PI*2*2.2, up=Math.min(1,t*6);
       T.shL=lerp(T.shL,2.8,up); T.shR=lerp(T.shR,2.8,up); T.shLz=-0.35*up; T.shRz=0.35*up; T.elL=T.elR=0.25+0.35*Math.max(0,Math.sin(b));
       T.hipY+=0.05*Math.max(0,Math.sin(b)); T.knL+=-0.25*Math.max(0,-Math.sin(b)); T.knR=T.knL; T.nkX-=0.25*up; }
@@ -4788,7 +4807,7 @@ function animateRig0(H,S,dt){
     // the whole body throws the swing: hips turn with the chest, knees dip at impact, the free arm pulls back
     T.hipsY+=sw.ch*0.35; T.hipY-=0.035*sw.k; T.knL-=0.12*sw.k; T.knR-=0.12*sw.k; T.nkY-=sw.ch*0.5;
     T.shL=-0.25-0.35*sw.k+0.6*Math.max(0,-sw.ch); T.elL=0.7+0.3*sw.k; T.shLz=-0.18;
-  } else if(S.gun===false&&!building){
+  } else if(S.gun===false&&!building&&!emo){
     // pickaxe carried ready: forearm up, handle angled up past the shoulder, the head just above and in front of it
     T.shR=T.shR*0.35+0.12; T.elR=1.25+0.15*k; T.shRz=0.2; T.wrR=0.55;
   }
@@ -7677,20 +7696,20 @@ syncBot();
   const mark=(el,id)=>el.querySelectorAll('.ofit').forEach(b=>{ const on=b.dataset.id===id; b.classList.toggle('on',on); b.setAttribute('aria-selected',on); });
   const wear=()=>reskin(localHero,OUTFITS[outfitIdx(settings.outfit)],PICKAXES[pickIdx(settings.pickaxe)].id);
   // shop: items marked `shop` cost points; everything else is yours from the start
-  const PRICE={o:{common:150,uncommon:300,rare:600,epic:1000,legendary:1600},p:{common:100,uncommon:200,rare:400,epic:700,legendary:1100}};
-  const FREE={o:'rook',p:'steel'}, owned=(k,it)=>it.id===FREE[k]||wallet.owned.includes(k+':'+it.id), price=(k,it)=>PRICE[k][it.rarity]||500;
+  const PRICE={o:{common:150,uncommon:300,rare:600,epic:1000,legendary:1600},p:{common:100,uncommon:200,rare:400,epic:700,legendary:1100},e:{common:100,uncommon:250,rare:450,epic:700,legendary:1000}};
+  const FREE={o:'rook',p:'steel'}, owned=(k,it)=>(k==='e'?!it.shop:it.id===FREE[k])||wallet.owned.includes(k+':'+it.id), price=(k,it)=>PRICE[k][it.rarity]||500;
   if(!owned('o',OUTFITS[outfitIdx(settings.outfit)])){ settings.outfit='rook'; saveSettings(); }
   if(!owned('p',PICKAXES[pickIdx(settings.pickaxe)])){ settings.pickaxe='steel'; saveSettings(); }
   const buy=$('buyBox');
   let offer=null;
   const offerBuy=(k,it)=>{ offer={k,it}; const c=price(k,it), can=wallet.pts>=c;
-    buy.hidden=false; buy.querySelector('p').innerHTML=`<b>${it.name}</b> · ${RNAME[it.rarity]} ${k==='o'?'outfit':'pickaxe'} · <b>${c.toLocaleString()} pts</b>`+(can?'':`<br><small>You need ${(c-wallet.pts).toLocaleString()} more. Take down zombies in Zombie horde to earn points.</small>`);
+    buy.hidden=false; buy.querySelector('p').innerHTML=`<b>${it.name}</b> · ${RNAME[it.rarity]} ${k==='o'?'outfit':k==='e'?'dance':'pickaxe'} · <b>${c.toLocaleString()} pts</b>`+(can?'':`<br><small>You need ${(c-wallet.pts).toLocaleString()} more. Take down zombies in Zombie horde to earn points.</small>`);
     $('buyOk').disabled=!can; $('buyOk').textContent=can?'Buy for '+c.toLocaleString():'Not enough points'; };
   $('buyOk').addEventListener('click',()=>{ if(!offer) return; const {k,it}=offer, c=price(k,it); if(owned(k,it)||wallet.pts<c) return;
     wallet.pts-=c; wallet.owned.push(k+':'+it.id); saveWallet(); renderWallet(); renderShop(); buy.hidden=true; offer=null; sfx('win'); toast('Unlocked '+it.name);
-    if(k==='o') pick(it.id); else pickPk(it.id); });
+    if(k==='o') pick(it.id); else if(k==='e') pickEm(it.id); else pickPk(it.id); });
   $('buyNo').addEventListener('click',()=>{ buy.hidden=true; offer=null; });
-  window.renderShop=()=>{ [['o',box,OUTFITS],['p',pbox,PICKAXES]].forEach(([k,el,list])=>list.forEach(it=>{ const b=el.querySelector(`[data-id="${it.id}"]`); if(!b) return;
+  window.renderShop=()=>{ [['o',box,OUTFITS],['p',pbox,PICKAXES],['e',$('emotesBox'),EMOTE_LIST]].forEach(([k,el,list])=>list.forEach(it=>{ const b=el.querySelector(`[data-id="${it.id}"]`); if(!b) return;
       const own=owned(k,it); b.hidden=!own; b.classList.remove('locked','afford'); const pr=b.querySelector('.price'); if(pr) pr.remove(); }));
     if(offer) offerBuy(offer.k,offer.it); if(window.renderItemShop) renderItemShop(); };
   const pick=id=>{ const it=OUTFITS[outfitIdx(id)]; if(!owned('o',it)){ offerBuy('o',it); return; } buy.hidden=true; settings.outfit=id; saveSettings(); wear(); mark(box,id);
@@ -7702,7 +7721,13 @@ syncBot();
   OUTFITS.forEach(o=>{ const b=document.createElement('button'); b.type='button'; b.className='ofit '+o.rarity; b.dataset.id=o.id; b.setAttribute('role','option');
     b.innerHTML=`<span>${o.name}<small>${o.rarity}</small></span>`; b.addEventListener('click',()=>pick(o.id)); box.appendChild(b); });
   pick(OUTFITS[outfitIdx(settings.outfit)].id); renderShop();
-  window._locker={owned,price,pick,pickPk,offerBuy};
+  const ebox=$('emotesBox');
+  const pickEm=id=>{ const it=EMOTE_LIST.find(e=>e.id===id); if(!it) return; if(!owned('e',it)){ offerBuy('e',it); return; } buy.hidden=true; settings.emote=id; saveSettings(); mark(ebox,id); window._stagePrev={id,t0:performance.now()}; };
+  EMOTE_LIST.forEach(e=>{ const b=document.createElement('button'); b.type='button'; b.className='ofit '+e.rarity; b.dataset.id=e.id; b.setAttribute('role','option');
+    b.innerHTML=emoteIcon(e.id)+`<span>${e.name}<small>${e.rarity}</small></span>`; b.addEventListener('click',()=>pickEm(e.id)); ebox.appendChild(b); });
+  if(!owned('e',EMOTE_LIST.find(e=>e.id===settings.emote)||{})){ settings.emote='dance'; saveSettings(); }
+  mark(ebox,settings.emote); renderShop();
+  window._locker={owned,price,pick,pickPk,pickEm,offerBuy};
   setTimeout(()=>{ try{
     const W=168, Hh=224, r=new THREE.WebGLRenderer({antialias:true,alpha:true,preserveDrawingBuffer:true}); r.setPixelRatio(1); r.setSize(W,Hh); r.setClearColor(0,0);
     const sc=new THREE.Scene(); sc.add(new THREE.HemisphereLight(0xffffff,0x5a6a80,0.95)); const kl=new THREE.DirectionalLight(0xffffff,0.75); kl.position.set(2,4,-5); sc.add(kl);
@@ -7763,7 +7788,7 @@ function stageFrame(now){ const S=_stage; if(!S||!S.on) return; if(!stageVisible
   const n=S.heroes.length, wide=n>1?Math.min(1,0.55+n*0.15):0; // pull the camera back a little for a party
   S.cam.position.set(0.2,1.2+wide*0.3,-5.1-wide*3.6); S.cam.lookAt(0,0.78,wide*0.5);
   if(!S.drag){ S.spinV*=Math.exp(-3*dt); S.spin+=S.spinV*dt*0.2; S.spin*=Math.exp(-0.9*dt); }
-  S.heroes.forEach((e,i)=>{ const st={pos:e.pos,vel:_stZ,yaw:e.yaw+(i===0?S.spin:0),pitch:-0.05,onGround:true,crouch:false,building:false,editing:false,gun:false,ads:0,swingT:0,emote:null};
+  S.heroes.forEach((e,i)=>{ const st={pos:e.pos,vel:_stZ,yaw:e.yaw+(i===0?S.spin:0),pitch:-0.05,onGround:true,crouch:false,building:false,editing:false,gun:false,ads:0,swingT:0,emote:i===0&&window._stagePrev&&EMOTES[_stagePrev.id]&&performance.now()-_stagePrev.t0<EMOTES[_stagePrev.id].dur*1000?{id:_stagePrev.id,t:(performance.now()-_stagePrev.t0)/1000}:null};
     animateRig(e.h,st,dt); e.h.rig.pick.visible=false;
     e.h.group.updateMatrixWorld(true); _stH.copy(e.pos); _stH.y+=2.15; _stH.project(S.cam);
     e.plate.style.left=((_stH.x+1)/2*w)+'px'; e.plate.style.top=Math.max(34,(1-_stH.y)/2*h)+'px'; e.plate.hidden=_stH.z>1; });
@@ -7773,29 +7798,32 @@ function stageStart(){ try{ if(!_stage) stageInit(); }catch(e){ return; } if(_st
 /* ---------- item shop: everything that costs points, as big cards; owned ones say so and equip on a tap ---------- */
 const SHOP_MS=20*60*1000;
 // what's on sale in a rotation: a pure function of the 20-minute slot, so every player sees the same shop
-function shopRotationIds(slot){ const r=seeded(slot*7919+101), pick=(list,n)=>{ const pool=list.slice(), out=[]; while(out.length<n&&pool.length) out.push(pool.splice(Math.floor(r()*pool.length),1)[0].id); return out; };
-  return [...pick(OUTFITS.filter(o=>o.id!=='rook'),5),...pick(PICKAXES.filter(p=>p.id!=='steel'),3)]; } // a short ranked list per kind
-const SHOP_EPOCH=Math.floor(Date.UTC(2026,0,1)/SHOP_MS), shopMemo=new Map();
+function shopRotationIds(slot){ const r=seeded(slot*7919+101), pick=(list,n,k)=>{ const pool=list.slice(), out=[]; while(out.length<n&&pool.length) out.push(k+':'+pool.splice(Math.floor(r()*pool.length),1)[0].id); return out; };
+  return {o:pick(OUTFITS.filter(o=>o.id!=='rook'),7,'o'),p:pick(PICKAXES.filter(p=>p.id!=='steel'),5,'p'),e:pick(EMOTE_LIST.filter(e=>e.shop),5,'e')}; } // a short ranked list per kind
+const SHOP_EPOCH=Math.floor(Date.UTC(2026,0,1)/SHOP_MS), shopMemo=new Map(), SHOP_N={o:3,p:2,e:2}; // 3 outfits, 2 pickaxes, 2 dances
 function shopRotationAt(slot){ // walk forward from a fixed start so everyone agrees exactly, and nothing repeats two rotations running
-  if(slot<=SHOP_EPOCH){ const ids=shopRotationIds(slot); return [ids[0],ids[1],ids[5]]; }
+  if(slot<=SHOP_EPOCH){ const ids=shopRotationIds(slot); return [...ids.o.slice(0,3),...ids.p.slice(0,2),...ids.e.slice(0,2)]; }
   if(shopMemo.has(slot)) return shopMemo.get(slot);
   let k=slot-1; while(k>SHOP_EPOCH&&!shopMemo.has(k)) k--; let prev=k<=SHOP_EPOCH?shopRotationAt(k):shopMemo.get(k);
-  for(let q=k+1;q<=slot;q++){ const ids=shopRotationIds(q), o=ids.slice(0,5).filter(id=>!prev.includes(id)).slice(0,2), p=ids.slice(5).filter(id=>!prev.includes(id)).slice(0,1); prev=[...o,...p]; shopMemo.set(q,prev); }
+  for(let q=k+1;q<=slot;q++){ const ids=shopRotationIds(q), next=[]; for(const kk of ['o','p','e']) next.push(...ids[kk].filter(id=>!prev.includes(id)).slice(0,SHOP_N[kk])); prev=next; shopMemo.set(q,prev); }
   return prev; }
-function shopRotation(slot=Math.floor(Date.now()/SHOP_MS)){ const byId=id=>OUTFITS.find(o=>o.id===id)||PICKAXES.find(p=>p.id===id);
-  return shopRotationAt(slot).map((id,i)=>[i<2?'o':'p',byId(id)]); }
+function shopRotation(slot=Math.floor(Date.now()/SHOP_MS)){ return shopRotationAt(slot).map(x=>{ const [k,id]=x.split(':'); return [k,k==='o'?OUTFITS.find(o=>o.id===id):k==='p'?PICKAXES.find(p=>p.id===id):EMOTE_LIST.find(e=>e.id===id)]; }).filter(x=>x[1]); }
 let shopSlot=-1;
 setInterval(()=>{ const left=SHOP_MS-(Date.now()%SHOP_MS), el=$('shopTimer'); if(el){ const m=Math.floor(left/60000), sec=Math.floor(left/1000)%60; el.textContent=m+':'+String(sec).padStart(2,'0'); }
   const sl=Math.floor(Date.now()/SHOP_MS); if(sl!==shopSlot){ const fresh=shopSlot>=0; shopSlot=sl; renderItemShop(); if(fresh&&!menu.hidden) toast('The Item Shop has new items'); } },1000);
+// a dancing figure for an emote card, posed a little differently for each dance
+function emoteIcon(id){ const P={wave:[-40,150,0],dance:[-130,-50,1],cheer:[-150,-30,0],salute:[-40,-150,0],floss:[-20,200,1],robot:[-90,-90,0],hype:[-160,-20,1],disco:[-40,-20,1],shuffle:[-110,-70,1]}[id]||[-120,-60,1];
+  const arm=(sx,deg)=>{ const a=deg*Math.PI/180, x2=50+sx*8+Math.cos(a)*22*sx, y2=38+Math.sin(a)*22; return `<line x1="${50+sx*8}" y1="38" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}"/>`; };
+  return `<svg class="emo" viewBox="0 0 100 100" aria-hidden="true"><g stroke="#fff" stroke-width="7" stroke-linecap="round" fill="none"><circle cx="50" cy="22" r="9" fill="#fff" stroke="none"/><line x1="50" y1="34" x2="50" y2="62"/>${arm(-1,P[0])}${arm(1,P[1])}<line x1="50" y1="62" x2="${P[2]?36:42}" y2="86"/><line x1="50" y1="62" x2="${P[2]?66:58}" y2="${P[2]?78:86}"/></g><g fill="#fff" opacity=".85"><circle cx="82" cy="30" r="5"/><rect x="85" y="10" width="3" height="21"/><circle cx="16" cy="44" r="4"/><rect x="18.5" y="28" width="2.5" height="17"/></g></svg>`; }
 function renderItemShop(){ const g=$('shopGrid'), L=window._locker; if(!g||!L) return; g.innerHTML='';
   const items=shopRotation();
   const R=['legendary','epic','rare','uncommon','common']; items.sort((a,b)=>R.indexOf(a[1].rarity)-R.indexOf(b[1].rarity)||(a[0]<b[0]?-1:1));
   if(!items.length){ g.innerHTML='<p class="empty">Nothing in the shop right now.</p>'; return; }
   items.forEach(([k,it])=>{ const own=L.owned(k,it), c=L.price(k,it), b=document.createElement('button'); b.type='button'; b.className='ofit '+it.rarity+(k==='p'?' tool':'')+(!own&&wallet.pts>=c?' afford':'');
-    const src=document.querySelector(`#${k==='o'?'outfits':'picks'} [data-id="${it.id}"] img`);
-    b.innerHTML=(src?`<img alt="" src="${src.src}">`:'')+(own?'<b class="own">Owned</b>':`<b class="cost">${c.toLocaleString()}</b>`)+`<span></span>`;
-    const sp=b.querySelector('span'); sp.textContent=it.name; sp.insertAdjacentHTML('beforeend',`<small class="kind">${RNAME[it.rarity]} ${k==='o'?'outfit':'pickaxe'}</small>`);
-    b.addEventListener('click',()=>{ if(own){ if(k==='o') L.pick(it.id); else L.pickPk(it.id); toast('Equipped '+it.name); renderItemShop(); } else L.offerBuy(k,it); });
+    const src=k==='e'?null:document.querySelector(`#${k==='o'?'outfits':'picks'} [data-id="${it.id}"] img`);
+    b.innerHTML=(k==='e'?emoteIcon(it.id):src?`<img alt="" src="${src.src}">`:'')+(own?'<b class="own">Owned</b>':`<b class="cost">${c.toLocaleString()}</b>`)+`<span></span>`;
+    const sp=b.querySelector('span'); sp.textContent=it.name; sp.insertAdjacentHTML('beforeend',`<small class="kind">${RNAME[it.rarity]} ${k==='o'?'outfit':k==='e'?'dance':'pickaxe'}</small>`);
+    b.addEventListener('click',()=>{ if(own){ if(k==='o') L.pick(it.id); else if(k==='e') L.pickEm(it.id); else L.pickPk(it.id); toast('Equipped '+it.name); renderItemShop(); } else L.offerBuy(k,it); });
     g.appendChild(b); }); }
 window.renderItemShop=renderItemShop;
 setTimeout(()=>{ syncLobby(); renderItemShop(); },80); setTimeout(renderItemShop,2500);
