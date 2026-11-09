@@ -5896,7 +5896,7 @@ function startWave(){
 }
 function hordeStart(){
   clearZombies(); horde.on=true; horde.wave=0; horde.kills=0; horde.phase='break'; horde.t=20;
-  if(!net.role){ clearBuilds(); respawn(); }
+  if(!net.role){ clearBuilds(); respawn(); if(skyDropAllowed()){ const a=Math.random()*6.283; skyDrop(SPAWN[0]+Math.cos(a)*20,SPAWN[2]+Math.sin(a)*20,SKY_MATCH); } }
   syncBot(); refreshTeamMarkers();
 }
 function hordeStop(){ clearZombies(); horde.on=false; horde.phase='idle'; if(net.role==='host') netSend({type:'hz',off:1}); syncBot(); refreshTeamMarkers(); }
