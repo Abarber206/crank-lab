@@ -20,3 +20,4 @@ Run with Node and Playwright (Chromium), from a folder that has `three` and `pee
 - `tglide.js` — Jump opens the glider, Jump again lets go into freefall, Jump again redeploys; you land unhurt.
 - `tzdie.js` — a killed monster is obliterated (gone within a moment).
 - `tmapz.js` — the full map zooms in toward the cursor and shows the real houses and garages.
+- `tkdmg.js` — crashing a buggy again and again wrecks it and throws the driver clear.

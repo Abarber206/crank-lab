@@ -86,6 +86,7 @@ A small two-seat buggy: a tube roll cage, bucket seats, knobbly tyres on long-tr
 - **Driving:** forward and back to drive, brake and reverse; left and right steer; **Jump** is the handbrake, which lets the back slide out. It does about 63 km/h on asphalt, a bit less on grass, and it pulls up hills well. The camera sits further back and you look around freely; your speed shows above the hotbar.
 - **It feels like a buggy:** it squats under power and dives under braking, leans in corners, follows every bump on its springs, climbs kerbs and ramps, flies off jumps, and stops with a bump against walls and trees. Dust kicks up off grass and dirt, the exhaust puffs, and the single-cylinder engine putters at idle and revs as you go, with tyre squeal when you slide.
 - **Fighting:** the driver can't shoot, build or edit. The passenger can shoot (guns only). Running into zombies hurts them.
+- **Damage:** hard crashes, big landings and zombies wear a buggy down. It scorches darker and sits askew, smokes grey and then black with sparks, and finally burns out, throwing its riders clear. A minute later it's back in its garage, good as new. Buggies bump off each other.
 - **In a party** everyone sees the buggy move and who's in it, and a friend can ride along. A buggy left somewhere stays there, also for players who join later. A new match puts every buggy back in its garage.
 
 ## Trees, rocks and cars

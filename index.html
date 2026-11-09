@@ -2565,7 +2565,7 @@ function bodyOverlaps(E,p){
 // below your feet (a step's height) a new piece lifts you; anything cutting through your body is ghosted for you instead
 function phaseCheck(p){ for(const E of [P,B]){ if(!E||(E===B&&!B.active)) continue; if(!E.phase) E.phase=new Set(); if(bodyOverlaps(E,p)) E.phase.add(p); } }
 function updatePhase(E){ if(!E||!E.phase||!E.phase.size) return; E.phase.forEach(p=>{ if(!pieces.has(p.key)||!bodyOverlaps(E,p)) E.phase.delete(p); }); }
-const solidNear=(E)=>{ const ps=near(E.pos.x,E.pos.z); if(E.phase&&E.phase.size) E.phase.forEach(p=>ps.delete(p)); if(props.length) propsNear(E.pos.x,E.pos.z,ps); if(karts) for(const k of karts) if(Math.abs(k.x-E.pos.x)<5&&Math.abs(k.z-E.pos.z)<5&&!(E.kart&&E.kart.k===k)) ps.add(k.solid); return ps; };
+const solidNear=(E)=>{ const ps=near(E.pos.x,E.pos.z); if(E.phase&&E.phase.size) E.phase.forEach(p=>ps.delete(p)); if(props.length) propsNear(E.pos.x,E.pos.z,ps); if(karts) for(const k of karts) if(!k.dead&&Math.abs(k.x-E.pos.x)<5&&Math.abs(k.z-E.pos.z)<5&&!(E.kart&&E.kart.k===k)) ps.add(k.solid); return ps; };
 function popPlayerOut(){ depen(solidNear(P),P); if(B&&B.active) depen(solidNear(B),B); }
 // a floor, stair or cone cutting through you pushes you up on top of it whenever there's room above it;
 // walls (and pieces with no headroom over them) stay ghosted until you walk out
@@ -2779,6 +2779,7 @@ function moveBody(E,fw,st,jump,dt){ if(E.kart){ if(E.kart.seat===0) E.kart.k.inp
 var karts=null;
 const KART_PAINT=[0xe8521e,0x2f9e44,0xd62828,0x1f6fd1,0xf2c014,0xc9a66b,0x1fa2a0,0x8b3fd1], KWR=0.34, KWB=1.78, KTRACK=1.46;
 const KART_SEATS=[[-0.32,0.68,0.12],[0.32,0.68,0.12]], KART_WHEELS=[[-0.73,-0.92,1],[0.73,-0.92,1],[-0.75,0.86,0],[0.75,0.86,0]];
+const KART_HP=420;
 const KMAX=17.5, KMAX_OFF=15.5, KREV=6, KACC=10, KBRK=17;
 const ME=()=>net.role?net.id:'me';
 let kartGeo=null; const kartMats={};
@@ -2859,7 +2860,7 @@ function makeKartModel(pi,num){ if(!kartGeo) kartGeo=buildKartGeo(); const G=kar
   return {g,body,wheels,sw:swm,flag}; }
 function newKart(id,pi,x,y,z,yaw){ const m=makeKartModel(pi,[7,11,23,3,42,8,15,99,5,61,17,33][id%12]); scene.add(m.g);
   const k=Object.assign(m,{id,x,y,z,yaw,pitch:0,roll:0,vx:0,vz:0,vy:0,gvy:0,steer:0,spinA:0,air:false,sq:0,sqV:0,lean:0,croll:0,wh:[0,0,0,0],seats:[null,null],driver:null,local:false,inp:null,tgt:null,
-    home:{x,y,z,yaw},solid:{boxes:[],isKart:true,key:'kart'+id},settleT:Math.random()*0.3,puffT:0,flagT:Math.random()*9});
+    hp:KART_HP,dead:0,home:{x,y,z,yaw},solid:{boxes:[],isKart:true,key:'kart'+id},settleT:Math.random()*0.3,puffT:0,flagT:Math.random()*9});
   kartPose(k); return k; }
 function initKarts(){ karts=[]; for(const t of TOWNS){ let n=0; for(const h of t.houses){ const G=h.garage; if(!G||!G.kart||n>=2) continue; n++; const f=garageFrame(h), c=f.p(2.5,2.25); karts.push(newKart(karts.length,G.paint,c[0],h.L*LVL,c[1],f.yaw)); } } }
 // where a point on the buggy is in the world
@@ -2869,7 +2870,7 @@ function kartPose(k){ k.g.position.set(k.x,k.y,k.z); k.g.rotation.set(k.pitch,k.
   const fx=-Math.sin(k.yaw), fz=-Math.cos(k.yaw); k.solid.boxes=[-0.8,0,0.8].map(a=>{ const cx=k.x-fx*a, cz=k.z-fz*a; return [cx-0.6,k.y+0.3,cz-0.6,cx+0.6,k.y+1.45,cz+0.6]; }); }
 // does the buggy's body (three circles along it) run into anything new at (x,z)?
 function kartHits(k,x,z,yaw,ox,oz){ const fx=-Math.sin(yaw), fz=-Math.cos(yaw), lo=k.y+0.45, hi=k.y+1.4, ps=near(x,z,1); propsNear(x,z,ps);
-  for(const o of karts) if(o!==k&&Math.abs(o.x-x)<4&&Math.abs(o.z-z)<4) ps.add(o.solid);
+  for(const o of karts) if(o!==k&&!o.dead&&Math.abs(o.x-x)<4&&Math.abs(o.z-z)<4) ps.add(o.solid);
   const hit=(cx,cz)=>{ for(const p of ps){ for(const b of p.boxes) if(b[4]>lo&&b[1]<hi&&circBox(b,cx,cz,0.7)) return b; if(p.slab) for(const s of [[0,0],[0.5,0],[-0.5,0],[0,0.5],[0,-0.5]]){ const t=slabTop(p,cx+s[0],cz+s[1]); if(t!==null&&t>lo&&t-ST<hi) return p; } } return null; };
   for(const a of [-0.85,0,0.85]){ const b=hit(x-fx*a,z-fz*a); if(b&&b!==hit(ox-fx*a,oz-fz*a)) return true; } return false; }
 function kartGround(k,ps){ const out=k.wh; let i=0; for(const [wx,wz] of KART_WHEELS){ const p=kartPoint(k,wx,0,wz); out[i++]=groundAt(p.x,p.z,k.y+0.55,ps)[0]; } return out; }
@@ -2892,16 +2893,17 @@ function simKart(k,inp,dt){ const fx=-Math.sin(k.yaw), fz=-Math.cos(k.yaw), rx=M
   const sMax=0.56-0.26*Math.min(1,Math.abs(vf)/KMAX); k.steer+=(inp.st*sMax-k.steer)*Math.min(1,dt*7);
   if(ground) k.yaw-=vf*Math.tan(k.steer)/KWB*(inp.hb?1.35:1)*dt;
   // move, sliding along walls; a hard hit stops it with a bump
-  const ox=k.x, oz=k.z, nx=ox+k.vx*dt, nz=oz+k.vz*dt;
+  const sp0=Math.hypot(k.vx,k.vz), ox=k.x, oz=k.z, nx=ox+k.vx*dt, nz=oz+k.vz*dt;
   if(!kartHits(k,nx,nz,k.yaw,ox,oz)){ k.x=nx; k.z=nz; }
   else if(!kartHits(k,nx,oz,k.yaw,ox,oz)){ k.x=nx; k.vz*=0.3; }
   else if(!kartHits(k,ox,nz,k.yaw,ox,oz)){ k.z=nz; k.vx*=0.3; }
   else { const sp=Math.hypot(k.vx,k.vz); if(sp>4){ sfxAt('kart_bump',_kz.set(k.x,k.y+0.5,k.z)); if(P.kart&&P.kart.k===k) shake=Math.max(shake,Math.min(0.25,sp*0.02)); k.sqV-=sp*0.15; } k.vx*=-0.2; k.vz*=-0.2; }
-  for(const o of karts){ if(o===k||Math.abs(o.x-k.x)>4||Math.abs(o.z-k.z)>4||Math.abs(o.y-k.y)>1.5) continue;
+  for(const o of karts){ if(o===k||o.dead||Math.abs(o.x-k.x)>4||Math.abs(o.z-k.z)>4||Math.abs(o.y-k.y)>1.5) continue;
     const fx2=-Math.sin(k.yaw), fz2=-Math.cos(k.yaw), ox2=-Math.sin(o.yaw), oz2=-Math.cos(o.yaw); let best=null;
     for(const a of [-0.85,0,0.85]) for(const b of [-0.85,0,0.85]){ const dx=(k.x-fx2*a)-(o.x-ox2*b), dz=(k.z-fz2*a)-(o.z-oz2*b), d=Math.hypot(dx,dz); if(d<1.35&&(!best||d<best.d)) best={d,dx,dz}; }
     if(best){ const d=best.d||1e-3, nx=best.dx/d, nz=best.dz/d; k.x+=nx*(1.35-d); k.z+=nz*(1.35-d);
       const rvx=k.vx-o.vx, rvz=k.vz-o.vz, vn=rvx*nx+rvz*nz; if(vn<0){ k.vx-=1.5*vn*nx; k.vz-=1.5*vn*nz; if(vn<-3){ sfxAt('kart_bump',_kz.set(k.x,k.y+0.5,k.z)); k.sqV-=Math.min(2,-vn*0.15); if(P.kart&&P.kart.k===k) shake=Math.max(shake,Math.min(0.2,-vn*0.02)); } } } }
+  { const lost=sp0-Math.hypot(k.vx,k.vz); if(lost>6) kartDamage(k,(lost-6)*16); } // a hard knock (a wall, a tree, another buggy) costs health
   { const dx=k.x-SPAWN[0], dz=k.z-SPAWN[2], d=Math.hypot(dx,dz); if(d>WORLD_EDGE){ k.x=SPAWN[0]+dx/d*WORLD_EDGE; k.z=SPAWN[2]+dz/d*WORLD_EDGE; k.vx*=0.3; k.vz*=0.3; } }
   // ground under each wheel: height, nose and side tilt; off a ramp it flies
   k.g.position.set(k.x,k.y,k.z); k.g.rotation.set(k.pitch,k.yaw,k.roll);
@@ -2909,7 +2911,7 @@ function simKart(k,inp,dt){ const fx=-Math.sin(k.yaw), fz=-Math.cos(k.yaw), rx=M
   { // springs: the body is pushed up toward its ride height over the ground under the wheels, damped; it keeps its own
     // vertical speed, so over a crest or off a ramp it carries on up and flies
     const REST=GRAV/340, comp=gC+REST-k.y, wasAir=k.air;
-    if(comp>-0.14){ k.vy+=(340*comp-20*k.vy)*dt; if(wasAir&&k.vy<-3.5){ sfxAt('kart_land',_kz.set(k.x,k.y,k.z)); k.sqV-=Math.min(3,-k.vy*0.25); if(P.kart&&P.kart.k===k){ shake=Math.max(shake,Math.min(0.3,-k.vy*0.025)); camDip=Math.min(camDip,-0.12); } } }
+    if(comp>-0.14){ k.vy+=(340*comp-20*k.vy)*dt; if(wasAir&&k.vy<-3.5){ if(k.vy<-11) kartDamage(k,(-k.vy-11)*12); sfxAt('kart_land',_kz.set(k.x,k.y,k.z)); k.sqV-=Math.min(3,-k.vy*0.25); if(P.kart&&P.kart.k===k){ shake=Math.max(shake,Math.min(0.3,-k.vy*0.025)); camDip=Math.min(camDip,-0.12); } } }
     k.vy-=GRAV*dt; k.y+=k.vy*dt;
     if(k.y<gC-0.18){ k.y=gC-0.18; if(k.vy<0) k.vy=0; } // bottomed out
     k.air=comp<-0.14;
@@ -2923,7 +2925,7 @@ function simKart(k,inp,dt){ const fx=-Math.sin(k.yaw), fz=-Math.cos(k.yaw), rx=M
   // ram the zombies
   if(horde.on&&Math.abs(vf)>4){ const now=performance.now(); horde.zs.forEach(z=>{ if(!z.alive||(z.kartT||0)>now) return; const dx=z.pos.x-k.x, dz=z.pos.z-k.z; if(dx*dx+dz*dz>(1.4+0.4*z.sc)**2||Math.abs(z.pos.y-k.y)>2) return;
     z.kartT=now+700; const dmg=Math.round(10+Math.abs(vf)*2.4); if(net.role==='client') netSend({type:'zhit',id:net.id,z:z.id,dmg}); else zombieHurt(z,dmg,net.id);
-    dmgNum(z.pos.clone().setY(z.pos.y+1.6*z.sc),dmg,'hp'); sfxAt('kart_hit',z.pos); k.vx*=0.6; k.vz*=0.6; k.sqV-=1.2; burst(z.pos.clone().setY(z.pos.y+1),6,4,0.08,goreMat); }); } }
+    dmgNum(z.pos.clone().setY(z.pos.y+1.6*z.sc),dmg,'hp'); sfxAt('kart_hit',z.pos); k.vx*=0.6; k.vz*=0.6; k.sqV-=1.2; kartDamage(k,6); burst(z.pos.clone().setY(z.pos.y+1),6,4,0.08,goreMat); }); } }
 // everyone else's view of a buggy someone else is driving: glide to where they say it is (a little ahead, by its speed)
 function interpKart(k,dt){ const T=k.tgt, age=Math.min(0.25,(performance.now()-T.t)/1000), tx=T.x+T.vx*age, tz=T.z+T.vz*age, f=Math.min(1,dt*12);
   if(Math.hypot(tx-k.x,tz-k.z)>8){ k.x=tx; k.z=tz; k.y=T.y; } else { k.x+=(tx-k.x)*f; k.z+=(tz-k.z)*f; k.y+=(T.y-k.y)*f; }
@@ -2943,7 +2945,8 @@ function stepPuffs(dt){ for(const p of kartPuffs){ if(!p.m.visible) continue; p.
   p.m.position.addScaledVector(p.v,dt); p.v.multiplyScalar(Math.exp(-dt*2)); p.v.y+=dt*0.4; p.m.scale.setScalar(p.size*(1+2.2*f)); p.m.material.opacity=0.42*(1-f)*(1-f); } }
 function kartModel(k,dt,dCam){ kartPose(k); k.g.visible=dCam<240; if(dCam>90) return;
   k.sqV+=(-140*k.sq-12*k.sqV)*dt; k.sq=Math.max(-0.08,Math.min(0.06,k.sq+k.sqV*dt));
-  k.body.position.y=k.sq; k.body.rotation.x=k.lean; k.body.rotation.z=k.croll;
+  k.body.position.y=k.sq; k.body.rotation.x=k.lean+(k.skew?k.skew.x:0); k.body.rotation.z=k.croll+(k.skew?k.skew.z:0);
+  if(k.hp<KART_HP*0.5&&dCam<80&&Math.random()<dt*(k.hp<KART_HP*0.25?14:6)){ const p=kartPoint(k,0,1.05,0.8,_ku); kartPuff(p,k.hp<KART_HP*0.25?0x2a2a2a:0x8f8f8f,new THREE.Vector3((Math.random()-.5)*0.4,1.2,(Math.random()-.5)*0.4),0.35,1.6); if(k.hp<KART_HP*0.25&&Math.random()<0.2) burst(p,2,2,0.03); }
   const vf=k.vf||0; k.spinA+=vf/KWR*dt;
   // each wheel follows the ground under it on its spring
   const ps=dCam<40&&!k.air?near(k.x,k.z,1):null; if(ps) kartGround(k,ps);
@@ -2972,8 +2975,16 @@ function exitKart(place){ if(!P.kart) return; const k=P.kart.k, s=P.kart.seat; c
   if(!spot){ const p=kartPoint(k,0,1.5,0,_ku); spot=[p.x,p.y,p.z]; } // nowhere beside it: hop out on top
   P.pos.set(spot[0],spot[1],spot[2]); P.vel.set(vx*0.5,1.5,vz*0.5); P.onGround=false; P.fallTop=null; sfx('kart_out'); }
 // the buggy in your state, so friends see you in it (the driver also sends where it is)
+function kartDamage(k,n){ if(k.dead||n<=0) return; k.hp=Math.max(0,k.hp-n); kartLook(k); if(k.hp<=0) kartWreck(k); }
+// the look of the damage: paint scorches darker, the body sits askew, smoke from the engine (grey, then black with sparks)
+function kartLook(k){ const f=1-k.hp/KART_HP; if(f<0.2&&!k.dmgMat) return;
+  if(!k.dmgMat){ k.body.traverse(m=>{ if(m.isMesh&&m.material&&KART_PAINT.some(c=>m.material.color&&m.material.color.getHex()===c)){ k.dmgMat=m.material.clone(); k.paintCol=m.material.color.clone(); m.material=k.dmgMat; } }); }
+  if(k.dmgMat) k.dmgMat.color.copy(k.paintCol).lerp(new THREE.Color(0x2a2522),Math.min(0.75,f*0.9));
+  k.skew={x:(f>0.4?0.03:0)+(f>0.7?0.03:0),z:(f>0.5?-0.04:0)}; }
+function kartWreck(k){ k.dead=60; const c=_kz.set(k.x,k.y+0.8,k.z).clone(); sfxAt('boom',c); burst(c,26,8,0.18,goreMat?matFor.metal.chip:undefined); burst(c,18,6,0.12);
+  if(P.kart&&P.kart.k===k){ exitKart(true); P.vel.y=7; } k.vx=k.vz=0; k.g.visible=false; }
 function kartNet(){ if(!P.kart) return undefined; const k=P.kart.k, s=P.kart.seat; if(s!==0) return [k.id,1];
-  return [k.id,0,+k.x.toFixed(2),+k.y.toFixed(2),+k.z.toFixed(2),+k.yaw.toFixed(3),+k.pitch.toFixed(3),+k.roll.toFixed(3),+k.vx.toFixed(2),+k.vz.toFixed(2),+k.steer.toFixed(2),+(k.thr||0).toFixed(1)]; }
+  return [k.id,0,+k.x.toFixed(2),+k.y.toFixed(2),+k.z.toFixed(2),+k.yaw.toFixed(3),+k.pitch.toFixed(3),+k.roll.toFixed(3),+k.vx.toFixed(2),+k.vz.toFixed(2),+k.steer.toFixed(2),+(k.thr||0).toFixed(1),Math.round(k.hp)]; }
 function kartParkNet(){ if(!kartPark||performance.now()>kartPark.until) return undefined; const k=kartPark.k; return [k.id,+k.x.toFixed(2),+k.y.toFixed(2),+k.z.toFixed(2),+k.yaw.toFixed(3)]; }
 function kartFromState(pl,m){ if(!karts) return; const kk=m.k, mine=ME();
   for(const k of karts) for(let s=0;s<2;s++) if(k.seats[s]===pl.id&&!(kk&&kk[0]===k.id&&kk[1]===s)){ k.seats[s]=null; if(s===0&&k.driver===pl.id){ k.driver=null; k.tgt=null; } }
@@ -2982,14 +2993,14 @@ function kartFromState(pl,m){ if(!karts) return; const kk=m.k, mine=ME();
     if(k.seats[s]===mine){ // we both got in at once: the leader (or the lower id) keeps the seat
       if(pl.id==='h'||(mine!=='h'&&pl.id<mine)){ exitKart(true); toast('Someone got in first'); } else return; }
     k.seats[s]=pl.id; pl.kart={k,seat:s};
-    if(s===0){ k.driver=pl.id; k.local=false; k.tgt={x:kk[2],y:kk[3],z:kk[4],yaw:kk[5],pitch:kk[6],roll:kk[7],vx:kk[8],vz:kk[9],steer:kk[10],thr:kk[11]||0,t:performance.now()}; } } }
+    if(s===0){ k.driver=pl.id; k.local=false; k.tgt={x:kk[2],y:kk[3],z:kk[4],yaw:kk[5],pitch:kk[6],roll:kk[7],vx:kk[8],vz:kk[9],steer:kk[10],thr:kk[11]||0,t:performance.now()}; if(kk[12]!=null&&kk[12]<k.hp){ k.hp=kk[12]; kartLook(k); if(k.hp<=0) kartWreck(k); } } } }
   if(m.kp){ const k=karts[m.kp[0]]; if(k&&!k.driver){ k.x=m.kp[1]; k.y=m.kp[2]; k.z=m.kp[3]; k.yaw=m.kp[4]; k.vx=k.vz=0; } } }
 function kartLeft(id){ if(!karts) return; for(const k of karts) for(let s=0;s<2;s++) if(k.seats[s]===id){ k.seats[s]=null; if(s===0){ k.driver=null; k.tgt=null; } } }
 function kartSnapshot(){ return karts?karts.filter(k=>Math.hypot(k.x-k.home.x,k.z-k.home.z)>0.3||Math.abs(angDiff(k.yaw,k.home.yaw))>0.05).map(k=>[k.id,+k.x.toFixed(2),+k.y.toFixed(2),+k.z.toFixed(2),+k.yaw.toFixed(3)]):[]; }
 function applyKartSnapshot(ks){ if(!karts||!ks) return; for(const [id,x,y,z,yaw] of ks){ const k=karts[id]; if(k){ k.x=x; k.y=y; k.z=z; k.yaw=yaw; k.vx=k.vz=0; k.settleT=0; } } }
 function resetKarts(){ if(!karts) return; if(P.kart){ kartForget(); P.onGround=false; } kartPark=null;
-  for(const k of karts){ Object.assign(k,{x:k.home.x,y:k.home.y,z:k.home.z,yaw:k.home.yaw,pitch:0,roll:0,vx:0,vz:0,vy:0,steer:0,air:false,seats:[null,null],driver:null,local:false,tgt:null,settleT:0}); kartPose(k); } }
-function kartTargets(consider){ if(!karts) return; for(const k of karts){ if(Math.abs(k.x-P.pos.x)>5||Math.abs(k.z-P.pos.z)>5||k.air) continue;
+  for(const k of karts){ if(k.dmgMat) k.dmgMat.color.copy(k.paintCol); k.g.visible=true; Object.assign(k,{dead:0,hp:KART_HP,skew:null,x:k.home.x,y:k.home.y,z:k.home.z,yaw:k.home.yaw,pitch:0,roll:0,vx:0,vz:0,vy:0,steer:0,air:false,seats:[null,null],driver:null,local:false,tgt:null,settleT:0}); kartPose(k); } }
+function kartTargets(consider){ if(!karts) return; for(const k of karts){ if(k.dead) continue; if(Math.abs(k.x-P.pos.x)>5||Math.abs(k.z-P.pos.z)>5||k.air) continue;
   for(let s=0;s<2;s++){ if(k.seats[s]) continue; const p=kartPoint(k,s?0.95:-0.95,0,0.1,_ku); consider(p.x,k.y,p.z,2.3,{kind:'kart',k,s,label:s?'Ride as passenger':'Drive'}); } } }
 // how a rider sits: posed in the seat, placed by the buggy
 const _ZV=new THREE.Vector3();
@@ -3031,7 +3042,9 @@ function kartAudio(dt){ if(!AC||!karts) return;
   else { kEng.g.gain.setTargetAtTime(0,now,0.15); kEng.sg.gain.setTargetAtTime(0,now,0.1); } }
 function stepKarts(dt){ if(!karts) return; const me=ME();
   if(P.kart&&(isDead()||!karts.includes(P.kart.k))) kartForget();
-  for(const k of karts){ const dCam=Math.hypot(k.x-camera.position.x,k.z-camera.position.z);
+  for(const k of karts){ if(k.dead>0){ k.dead-=dt; if(k.dead<=0){ k.dead=0; Object.assign(k,{x:k.home.x,y:k.home.y,z:k.home.z,yaw:k.home.yaw,pitch:0,roll:0,vx:0,vz:0,vy:0,hp:KART_HP,seats:[null,null],driver:null,local:false,tgt:null,skew:null}); if(k.dmgMat) k.dmgMat.color.copy(k.paintCol); k.g.visible=true; kartPose(k); } continue; }
+  }
+  for(const k of karts){ if(k.dead) continue; const dCam=Math.hypot(k.x-camera.position.x,k.z-camera.position.z);
     if(k.local&&k.seats[0]===me){ const inp=playing&&k.inp?k.inp:{fw:0,st:0,hb:false}; k.inp=null; let t=dt; while(t>1e-5){ const h=Math.min(t,1/60); simKart(k,inp,h); t-=h; } }
     else if(k.driver&&k.tgt) interpKart(k,dt);
     else if(dCam<160) settleKart(k,dt);
