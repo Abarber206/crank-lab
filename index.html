@@ -749,9 +749,9 @@ try{ Object.assign(settings, JSON.parse(localStorage.getItem('cranklab.settings'
 settings.binds=Object.assign({},DEFAULT_BINDS,settings.binds||{});
 /* emotes: picked in the Locker, played with the Emote bind (B) or the smiley button; moving, jumping, shooting or
    building stops them. The id travels in the player state so everyone sees it. */
-const EMOTES={wave:{name:'Wave',dur:2.6,rarity:'common'},dance:{name:'Groove',dur:12,beat:1.9,rarity:'uncommon'},cheer:{name:'Cheer',dur:2.4,rarity:'common'},salute:{name:'Salute',dur:2.2,rarity:'common'},
-  floss:{name:'Floss',dur:10,beat:2.2,rarity:'rare',shop:1},robot:{name:'Robot',dur:10,beat:2.2,rarity:'uncommon',shop:1},hype:{name:'Hype',dur:8,beat:2.1,rarity:'uncommon',shop:1},
-  disco:{name:'Disco Fever',dur:10,beat:2,rarity:'epic',shop:1},shuffle:{name:'Shuffle',dur:10,beat:2,rarity:'rare',shop:1}};
+const EMOTES={wave:{name:'Wave',dur:2.8,rarity:'common'},dance:{name:'Groove',dur:16.8,beat:1.9,rarity:'uncommon'},cheer:{name:'Cheer',dur:2.7,rarity:'common'},salute:{name:'Salute',dur:2.4,rarity:'common'},
+  floss:{name:'Floss',dur:14.5,beat:2.2,rarity:'rare',shop:1},robot:{name:'Robot',dur:14.5,beat:2.2,rarity:'uncommon',shop:1},hype:{name:'Hype',dur:15.2,beat:2.1,rarity:'uncommon',shop:1},
+  disco:{name:'Disco Fever',dur:16,beat:2,rarity:'epic',shop:1},shuffle:{name:'Shuffle',dur:16,beat:2,rarity:'rare',shop:1}}; // each dance lasts eight bars of its song
 const EMOTE_IDS=Object.keys(EMOTES), EMOTE_LIST=EMOTE_IDS.map(id=>Object.assign({id},EMOTES[id]));
 if(!EMOTES[settings.emote]) settings.emote='dance';
 function saveSettings(){ try{ localStorage.setItem('cranklab.settings', JSON.stringify(settings)); }catch(e){} }
@@ -3186,13 +3186,45 @@ function wishInput(){
   fw+=-stick.y-pad.ly; st+=stick.x+pad.lx;
   return [fw,st];
 }
-const GROOVE={ // per beat: kick pattern, snare pattern, hats per beat, bass notes (Hz), lead notes
-  dance:  {k:[1,0,1,0],s:[0,1,0,1],hat:2,bw:'triangle',bass:[55,55,65.4,73.4,55,55,49,61.7],lead:null},
-  floss:  {k:[1,1,1,1],s:[0,1,0,1],hat:2,bw:'triangle',bass:[82.4,82.4,98,110,82.4,82.4,73.4,98],lead:[659,784,880,784,659,587,659,784],lw:'square'},
-  robot:  {k:[1,0,0,1],s:[0,0,1,0],hat:4,bw:'square',bass:[65.4,65.4,65.4,77.8,65.4,65.4,58.3,65.4],lead:[1047,0,1245,0,1047,1568,0,1245],lw:'square',zap:1},
-  hype:   {k:[1,1,1,1],s:[0,1,0,1],hat:4,bw:'sawtooth',bass:[73.4,73.4,87.3,73.4,98,98,87.3,110],lead:null,clap:1},
-  disco:  {k:[1,1,1,1],s:[0,1,0,1],hat:2,open:1,bw:'triangle',oct:1,bass:[61.7,61.7,73.4,82.4,92.5,92.5,82.4,73.4],lead:[740,0,880,988,0,880,740,0],lw:'triangle'},
-  shuffle:{k:[1,0,1,1],s:[0,1,0,1],hat:3,sw:1,bw:'triangle',bass:[49,49,58.3,49,65.4,58.3,49,43.7],lead:[587,0,698,0,784,698,0,587],lw:'sawtooth'} };
+/* The songs, one per dance, each a four-bar loop in sixteenths. Drums are strings (x a hit, c a clap, o an open hat,
+   r a roll); bass, chords and tune are MIDI notes (0 a rest). Groove is funk in E minor, Floss bubblegum pop in C,
+   Robot electro in F minor, Hype half-time with a sliding sub bass, Disco Fever four-on-the-floor with octave bass
+   and strings, Shuffle swung house with organ stabs. */
+const SONGS={
+  dance:{k:['x.....x...x.....','x.....x..x.x....'],s:['....x.......x...','....x..x....x...'],h:['x.x.x.x.x.x.x.xo'],
+    bass:{w:'triangle',v:.2,len:1.5,n:[[40,0,0,52,0,0,43,0,45,0,47,0,50,0,52,0],[40,0,0,52,0,0,43,0,45,0,43,0,40,0,38,0],[45,0,0,57,0,0,48,0,50,0,52,0,55,0,57,0],[47,0,0,59,0,0,47,0,45,0,47,0,43,0,42,0]]},
+    chord:{w:'sawtooth',v:.018,len:.08,r:['..x..x....x..x..'],c:[[64,67,71,74],[64,67,71,74],[61,64,67,69],[63,66,69,71]]},
+    lead:{w:'square',v:.024,len:.1,n:[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,76,0,74,0,71,0,74,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[79,0,76,0,74,0,71,0,69,0,71,0,67,0,64,0]]}},
+  floss:{k:['x...x...x...x...'],s:['....c.......c...'],h:['..x...x...x...x.'],
+    bass:{w:'triangle',v:.2,len:1.5,n:[[36,0,36,0,36,0,36,0,36,0,36,0,43,0,36,0],[43,0,43,0,43,0,43,0,43,0,43,0,50,0,43,0],[45,0,45,0,45,0,45,0,45,0,45,0,52,0,45,0],[41,0,41,0,41,0,41,0,41,0,43,0,45,0,47,0]]},
+    chord:{w:'triangle',v:.03,len:.12,r:['x..x..x.x..x..x.'],c:[[60,64,67],[59,62,67],[60,64,69],[60,65,69]]},
+    lead:{w:'square',v:.026,len:.13,echo:1,n:[[76,0,76,0,79,0,76,0,72,0,74,0,76,0,0,0],[74,0,74,0,79,0,74,0,71,0,72,0,74,0,0,0],[72,0,72,0,76,0,72,0,69,0,71,0,72,0,0,0],[77,0,76,0,74,0,72,0,74,0,0,0,79,0,0,0]]}},
+  robot:{k:['x.....x.x.......','x.....x.x.....x.'],s:['....x.......x...'],h:['x.xxx.xxx.xxx.xx'],
+    bass:{w:'square',v:.055,len:.9,n:[[29,0,41,0,29,0,41,0,29,0,41,0,29,41,29,41],[29,0,41,0,29,0,41,0,29,0,41,0,29,41,29,41],[25,0,37,0,25,0,37,0,25,0,37,0,25,37,25,37],[27,0,39,0,27,0,39,0,27,0,39,0,27,39,27,39]]},
+    chord:{w:'square',v:.016,len:.07,r:['x..x..x.....x...'],c:[[65,68,72],[65,68,72],[65,68,73],[63,67,70]]},
+    lead:{w:'square',v:.026,len:.09,zap:1,n:[[77,0,0,84,0,0,80,0,0,0,89,0,0,84,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[73,0,0,80,0,0,77,0,0,0,85,0,0,80,0,0],[75,0,79,0,82,0,87,0,91,0,87,0,82,0,79,0]]}},
+  hype:{sub:1,k:['x.........x..x..','x.....x...x.....'],s:['........c.......'],h:['x.x.x.r.x.x.xrx.','x.x.r.x.x.r.x.rr'],
+    bass:{w:'sine',v:.26,len:3,n:[[38,0,0,0,0,0,0,0,0,0,38,0,0,41,0,0],[38,0,0,0,0,0,36,0,0,0,33,0,0,0,0,0],[34,0,0,0,0,0,0,0,0,0,34,0,0,38,0,0],[36,0,0,0,0,0,36,0,0,0,40,0,0,0,43,0]]},
+    chord:{w:'sawtooth',v:.024,len:.14,r:['x.....x.....x...','....x.....x.....'],c:[[62,65,69],[62,65,69],[58,62,65],[60,64,67]]},
+    lead:{w:'sine',v:.04,len:.22,n:[[86,0,0,0,0,0,81,0,0,0,0,0,84,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[82,0,0,0,0,0,77,0,0,0,0,0,81,0,0,0],[84,0,0,0,0,0,0,0,88,0,0,0,91,0,0,0]]}},
+  disco:{k:['x...x...x...x...'],s:['....x.......x...'],h:['x.o.x.o.x.o.x.o.'],
+    bass:{w:'triangle',v:.19,len:1.1,n:[[35,0,47,0,35,0,47,0,35,0,47,0,35,47,35,47],[40,0,52,0,40,0,52,0,40,0,52,0,40,52,40,52],[33,0,45,0,33,0,45,0,33,0,45,0,33,45,33,45],[42,0,54,0,42,0,54,0,42,0,54,0,42,54,44,46]]},
+    chord:{w:'sawtooth',v:.012,len:.08,pad:1,r:['p...x..x..x...x.'],c:[[62,66,69,74],[62,64,68,71],[61,64,69,73],[61,64,66,69]]},
+    lead:{w:'triangle',v:.045,len:.17,echo:1,n:[[78,0,0,0,81,0,83,0,0,0,81,0,78,0,0,0],[76,0,0,0,80,0,83,0,0,0,80,0,76,0,0,0],[73,0,0,0,76,0,81,0,0,0,85,0,83,0,81,0],[78,0,0,0,0,0,73,0,76,0,0,0,78,0,0,0]]}},
+  shuffle:{swing:.34,k:['x...x...x...x...'],s:['....c.......c...'],h:['..x..xx...x..xx.'],
+    bass:{w:'triangle',v:.2,len:1.3,n:[[0,0,43,0,0,0,43,0,0,0,43,0,0,43,46,0],[0,0,39,0,0,0,39,0,0,0,39,0,0,39,41,0],[0,0,41,0,0,0,41,0,0,0,41,0,0,41,45,0],[0,0,38,0,0,0,38,0,0,0,38,0,0,38,42,0]]},
+    chord:{w:'triangle',v:.03,len:.1,r:['..x..x.x..x..x.x'],c:[[62,65,67,70],[62,63,67,70],[60,65,69,72],[60,62,65,69]]},
+    lead:{w:'sawtooth',v:.018,len:.12,n:[[0,0,0,0,0,0,0,0,74,0,77,0,79,0,0,0],[82,0,0,79,0,0,77,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,72,0,77,0,81,0,0,0],[84,0,0,81,0,0,77,0,74,0,0,0,0,0,0,0]]}} };
+const M2F=n=>440*Math.pow(2,(n-69)/12);
+// one beat of a song: its four sixteenths, each scheduled a little later
+function songBeat(id,b){ const S=SONGS[id]||SONGS.dance, bd=1/((EMOTES[id]||{}).beat||2), sx=bd/4, bar=Math.floor(b/4), q=((b%4)+4)%4, at=(a)=>a[bar%a.length];
+  for(let st=0;st<4;st++){ const i=q*4+st, d=st*sx+(S.swing&&st%2?sx*S.swing:0), K=at(S.k)[i], N=at(S.s)[i], H=at(S.h)[i];
+    if(K==='x'){ if(S.sub){ tone('sine',150,40,0.3,0.26,d); } else tone('sine',125,44,0.17,0.24,d); noise(3000,0.012,0.05,1,d,'highpass'); }
+    if(N==='x'){ noise(1900,0.13,0.15,0.8,d); tone('triangle',200,150,0.06,0.07,d); } else if(N==='c'){ noise(1500,0.04,0.1,1.5,d); noise(1300,0.05,0.12,1.5,d+0.012); noise(1300,0.09,0.1,1.5,d+0.026); }
+    if(H==='x') noise(8000,0.025,0.03,1,d,'highpass'); else if(H==='o') noise(7500,0.1,0.038,1,d,'highpass'); else if(H==='r'){ for(let k=0;k<3;k++) noise(8500,0.018,0.024,1,d+k*sx/3,'highpass'); }
+    const B=S.bass, bn=at(B.n)[i]; if(bn){ const f=M2F(bn); tone(B.w,f,S.sub?f*0.94:f*0.995,sx*B.len,B.v,d); if(B.w==='triangle') tone('sine',f,f,sx*B.len*0.7,B.v*0.5,d); }
+    const C=S.chord, cr=C&&at(C.r)[i]; if(cr==='x'||cr==='p'){ for(const n of at(C.c)){ const f=M2F(n); if(cr==='p'){ tone('sawtooth',f,f,bd*3.6,C.v*0.9,d); tone('sawtooth',f*1.005,f*1.005,bd*3.6,C.v*0.7,d); } else tone(C.w,f,f,C.len,C.v,d); } }
+    const L=S.lead, ln=L&&at(L.n)[i]; if(ln){ const f=M2F(ln); tone(L.w,f,L.zap?f*0.5:f,L.len,L.v,d); if(!L.zap) tone(L.w,f*1.006,f*1.006,L.len,L.v*0.55,d); if(L.echo) tone(L.w,f,f,L.len,L.v*0.3,d+sx*3); } } }
 let _gId='dance', _gB=0;
 function emoteBeat(id,b){ _gId=id; _gB=b; sfx('groove'); }
 function startEmote(id){
@@ -4163,13 +4195,7 @@ function sfx(k){
     case 'place': case 'place_wood': knock(230*r(),0.11,0.55,6); knock(700*r(),0.05,0.25,5); noise(3000,0.02,0.08,1,0,'highpass'); break;
     case 'place_brick': noise(380*r(),0.14,0.55,0.9,0,'lowpass',140); knock(900*r(),0.04,0.2,4); for(let q=0;q<3;q++) noise(1800+Math.random()*1500,0.02,0.07,3,0.02+q*0.03); break;
     case 'place_metal': [520,733,1240].forEach((f,q)=>tone('sine',f*r(),f*0.98,0.32-q*0.06,0.09)); noise(4000,0.03,0.12,1,0,'highpass'); tone('square',180,90,0.05,0.05); break;
-    case 'groove': { const G=GROOVE[_gId]||GROOVE.dance, n=_gB, bd=1/((EMOTES[_gId]||{}).beat||2), hb=bd/2, L=G.bass.length;
-      if(G.k[n%4]){ tone('sine',125,44,0.17,0.24); noise(3000,0.012,0.05,1,0,'highpass'); }
-      if(G.s[n%4]){ noise(1900,0.13,0.15,0.8); tone('triangle',200,150,0.06,0.07); if(G.clap){ noise(1300,0.05,0.12,1.5,0.012); noise(1300,0.08,0.1,1.5,0.026); } }
-      for(let i=0;i<G.hat;i++){ const d=G.sw&&i%3===1?bd*(i+0.35)/G.hat:bd*i/G.hat; noise(8000,G.open&&i===G.hat-1?0.09:0.025,G.open&&i===G.hat-1?0.045:0.035,1,d,'highpass'); }
-      const f=G.bass[n%L]; tone(G.bw,f,f*0.995,hb*0.85,G.bw==='triangle'?0.2:0.07); if(G.oct) tone(G.bw,f*2,f*2,hb*0.6,0.13,hb); else if(n%2) tone(G.bw,f,f,hb*0.5,G.bw==='triangle'?0.13:0.05,hb);
-      if(G.lead){ const l=G.lead[n%G.lead.length]; if(l){ tone(G.lw,l,G.zap?l*0.5:l,G.zap?0.09:0.12,0.03,G.sw?hb*1.3:hb); if(!G.zap) tone(G.lw,l*1.5,l*1.5,0.08,0.014,G.sw?hb*1.3:hb); } }
-      break; }
+    case 'groove': songBeat(_gId,_gB); break;
     case 'beat_kick': tone('sine',120,45,0.16,0.22); noise(5000,0.03,0.04,1,0.12,'highpass'); break;
     case 'beat_snare': noise(1800,0.12,0.16,0.8); tone('triangle',190,150,0.06,0.07); break;
     case 'creak': tone('sawtooth',92*r(),58,0.55,0.05); tone('sawtooth',61*r(),44,0.7,0.04,0.08); noise(240,0.7,0.35,0.8,0,'lowpass',80); for(let q=0;q<4;q++) knock(260+Math.random()*320,0.06,0.16,5,0.12+q*0.1); break;
@@ -4186,6 +4212,7 @@ function sfx(k){
     case 'headhit': tone('sine',2700,2500,0.09,0.17); tone('sine',3500,3400,0.07,0.1,0.03); noise(6000,0.02,0.1,1,0,'highpass'); break;
     case 'hurt': break; break;
     case 'step': case 'step_grass': noise(2600*r(),0.05,0.035,0.8,0,'highpass'); noise(520*r(),0.06,0.05,0.7,0,'lowpass'); break; // a soft swish
+    case 'step_water': noise(700*r(),0.16,0.09,0.7,0,'lowpass',260); noise(3200*r(),0.09,0.035,1,0.02,'highpass'); for(let q=0;q<2;q++) tone('sine',500+Math.random()*500,300,0.05,0.012,0.04+q*0.05); break; // a splash
     case 'step_dirt': noise(900*r(),0.07,0.07,0.7,0,'lowpass'); noise(2400*r(),0.03,0.025,1,0.01); break;
     case 'step_road': knock(260*r(),0.04,0.06,4); noise(2200*r(),0.035,0.05,1.2); break;
     case 'step_concrete': knock(330*r(),0.035,0.07,5); noise(3000*r(),0.025,0.04,1.5,0,'highpass'); break;
@@ -4279,6 +4306,16 @@ function stepAmbience(dt){ if(!AC) return;
   { const v=P.sky?P.vel.length():0, fall=P.sky&&P.sky.phase==='fall', glide=P.sky&&P.sky.phase==='glide', now=AC.currentTime;
     amb.sky.g.gain.setTargetAtTime(playing&&!document.hidden&&P.sky?(fall?0.05+0.07*Math.min(1,v/60):0.03):0,now,0.25); amb.sky.f.frequency.setTargetAtTime(fall?500+v*16:900,now,0.3); amb.sky.lg.gain.setTargetAtTime(glide?0.012:0,now,0.3); }
   amb.t+=dt; const on=playing&&!document.hidden, hi=Math.max(0,Math.min(1,(P.pos.y-terrainH(P.pos.x,P.pos.z)+P.pos.y*0.15)/60));
+  // water: how far the sea and the nearest running water are is looked up a few times a second
+  if(!amb.sea){ const mk=(type,freq,q)=>{ const s=AC.createBufferSource(); s.buffer=noiseBuf; s.loop=true; s.playbackRate.value=0.7+Math.random()*0.5; const f=AC.createBiquadFilter(); f.type=type; f.frequency.value=freq; f.Q.value=q; const g=AC.createGain(); g.gain.value=0; s.connect(f).connect(g).connect(master); s.start(0,Math.random()*0.3); return {f,g}; };
+    amb.sea=mk('lowpass',520,0.5); amb.hiss=mk('highpass',2600,0.5); amb.riv=mk('bandpass',1500,0.9); amb.riv2=mk('bandpass',3200,1.2); amb.wT=0; amb.dSea=1e9; amb.dRiv=1e9; }
+  amb.wT-=dt; if(amb.wT<=0){ amb.wT=0.3; const SEA_=WGEN.sea(), px=P.pos.x, pz=P.pos.z; let ds=1e9, dr=1e9;
+    for(const R of [0,6,14,26,42,62,86]) for(let q=0;q<(R?8:1);q++){ const a=q*Math.PI/4+R, w=waterAt(px+Math.cos(a)*R,pz+Math.sin(a)*R); if(w>-999){ if(SEA_&&Math.abs(w-SEA_.Y)<0.3){ if(R<ds) ds=R; } else if(R<dr) dr=R; } }
+    amb.dSea=ds; amb.dRiv=dr; }
+  { const now=AC.currentTime, k01=x=>Math.max(0,Math.min(1,x)), up=P.sky?0.25:1, wt=typeof WATER!=='undefined'&&WATER&&WATER.mat?WATER.mat.uniforms.time.value:amb.t, swell=0.5+0.5*Math.sin(wt*0.9+1.2); // the surf comes in with the wave you can see
+    const ks=on?Math.pow(k01(1-amb.dSea/95),1.6)*up:0, kh=on?Math.pow(k01(1-amb.dSea/40),2)*up:0, kr=on?Math.pow(k01(1-amb.dRiv/30),2)*up:0;
+    amb.sea.g.gain.setTargetAtTime((0.02+0.05*swell)*ks,now,0.5); amb.sea.f.frequency.setTargetAtTime(380+420*swell,now,0.6); amb.hiss.g.gain.setTargetAtTime(0.024*swell*swell*swell*kh,now,0.35);
+    amb.riv.g.gain.setTargetAtTime(0.034*kr*(0.75+0.25*Math.sin(amb.t*5.3)*Math.sin(amb.t*1.7)),now,0.12); amb.riv2.g.gain.setTargetAtTime(0.012*kr*(0.6+0.4*Math.sin(amb.t*8.1+1)),now,0.1); }
   const gust=0.5+0.5*Math.sin(amb.t*0.37)*Math.sin(amb.t*0.11+1.3);
   amb.g.gain.setTargetAtTime(on?0.012+0.03*hi+0.012*gust:0,AC.currentTime,0.4); amb.f.frequency.setTargetAtTime(300+500*gust+600*hi,AC.currentTime,0.6);
   if(!on) return;
@@ -4287,6 +4324,7 @@ function stepAmbience(dt){ if(!AC) return;
 // what you're standing on decides the footstep sound
 function stepSound(E){
   if(E.groundSlab) return 'step_'+(E.groundSlab.mat||'wood');
+  { const w=waterAt(E.pos.x,E.pos.z); if(w>-999&&w>terrainH(E.pos.x,E.pos.z)+0.03&&E.pos.y<w+0.3) return 'step_water'; } // wading
   const x=E.pos.x, z=E.pos.z, y=E.pos.y;
   if(y-terrainH(x,z)>0.12){ // on a build or in a house
     const i=Math.floor(x/CELL), j=Math.floor(z/CELL), l=Math.round(y/LVL), f=pieces.get(`f${i}_${j}_${l}`);
@@ -5297,7 +5335,7 @@ const _p2a=new THREE.Vector3(), _p2b=new THREE.Vector3(), _p2q=new THREE.Quatern
 // grip is held with the hand turned upright beside it, the first finger lying along the trigger; the other hand comes in
 // from the side under the fore-end and curls up round it.
 const HAND_POSE={relax:[[.22,.32,.18],[.32,.42,.24],[.3,.55,.12,.15]],fist:[[1.0,1.45,.85],[1.05,1.5,.9],[.9,.1,.45,.6]],pgrip:[[.2,.9,.5],[1.25,1.3,.5],[.7,.22,.3,.35]],
-  cradle:[[1.2,.8,.4],[1.2,.8,.4],[1.15,.25,.55,.6]],wrap:[[1.25,1.3,.5],[1.25,1.3,.5],[.7,.22,.3,.35]],flat:[[.04,.08,.04],[.06,.1,.05],[.15,.85,.05,.05]]};
+  cradle:[[1.2,.8,.4],[1.2,.8,.4],[1.15,.25,.55,.6]],wrap:[[1.25,1.3,.5],[1.25,1.3,.5],[.7,.22,.3,.35]],point:[[.04,.06,.04],[1.2,1.5,.9],[.9,.1,.45,.6]],flat:[[.04,.08,.04],[.06,.1,.05],[.15,.85,.05,.05]]};
 // how the other hand joins in (0 not at all, 1 an upright foregrip, 2 cupping the firing hand; otherwise under the fore-end), and where a grip sits in the firing hand
 const GUN_SUPPORT={nade:0,burst:1,glauncher:1,pistol:2,revolver:2,hcannon:2,gatling:3}, GUN_HOLD={pump:[0,-.025,0],hunting:[0,-.025,0],infantry:[0,-.025,0],dbarrel:[0,-.025,0],sniper:[0,-.02,0],revolver:[0,-.02,0],gatling:[0,-.03,-.05]};
 const _gv1=new THREE.Vector3(), _gv2=new THREE.Vector3(), _gv3=new THREE.Vector3();
@@ -5307,8 +5345,9 @@ function poseHands(H,S,dt){ const r=H.rig; if(!r.armR||!r.armR.fj) return; const
   const set=(a,name,ty,tz)=>{ const P=HAND_POSE[name], f=a.fj; for(let i=0;i<4;i++){ const q=P[i?1:0]; f.mcp[i].rotation.x+=(q[0]-f.mcp[i].rotation.x)*k; f.pip[i].rotation.x+=(q[1]-f.pip[i].rotation.x)*k; f.dip[i].rotation.x+=(q[2]-f.dip[i].rotation.x)*k; }
     const t=P[2], T=a.th; T[0].rotation.x+=(t[0]-T[0].rotation.x)*k; T[0].rotation.z+=(a.side*t[1]-T[0].rotation.z)*k; T[1].rotation.x+=(t[2]-T[1].rotation.x)*k; T[2].rotation.x+=(t[3]-T[2].rotation.x)*k;
     a.hg.rotation.y+=(ty-a.hg.rotation.y)*k; a.hg.rotation.z+=(tz-a.hg.rotation.z)*k; };
-  set(r.armR,held?'pgrip':tool||mdl==='nade'?'fist':S.editing?'flat':'relax',held?Math.PI/2:0,0);
-  const sp=held?GUN_SUPPORT[mdl]:0; const und=sp===undefined||sp===3; set(r.armL,held?(sp===0?'relax':sp===3?'fist':sp?'wrap':'cradle'):two?'fist':S.editing?'flat':'relax',held?(und?0.6:sp?-0.97:0):0,held&&und?1.35:0);
+  const A_=H.anim, rest=(nm,a,ov)=>ov!=null?ov:nm==='relax'?a.side*1.3:0, nR=A_.handR||(held?'pgrip':tool||mdl==='nade'?'fist':S.editing?'flat':'relax'); // an emote says what its hands do; loose hands hang palm-in
+  set(r.armR,nR,held?Math.PI/2:rest(nR,r.armR,A_.turnR),0);
+  const sp=held?GUN_SUPPORT[mdl]:0; const und=sp===undefined||sp===3, nL=A_.handL||(held?(sp===0?'relax':sp===3?'fist':sp?'wrap':'cradle'):two?'fist':S.editing?'flat':'relax'); set(r.armL,nL,held?(und?0.6:sp?-0.97:0):rest(nL,r.armL,A_.turnL),held&&und?1.35:0);
   const gh=held&&GUN_HOLD[mdl]||[0,0,0], hp=r.armR.hand.position, mx=held?-.032+gh[0]:0, my=held?-.092+gh[1]:-.098, mz=held?-.06+gh[2]:-.032; hp.x+=(mx-hp.x)*k; hp.y+=(my-hp.y)*k; hp.z+=(mz-hp.z)*k; }
 const _pkY=new THREE.Vector3(0,1,0), _p2c=new THREE.Vector3();
 function pickTwoHands(H,S){ const r=H.rig; if(!r.pick) return;
@@ -5441,30 +5480,47 @@ function animateRig0(H,S,dt){
   if(S.onGround&&!S.crouch){ const bank=-(A.yawRate||0)*0.035*k; T.chZ+=bank; T.hipsZ+=bank*0.5; T.spX-=A.accLean*(gun?0.5:1);
     T.nkX+=0.05*k*Math.sin(2*A.phase); T.nkY-=T.hipsY*0.6+T.chY*0.4*(gun?0:1); }
   // ----- emotes (wave, dance, cheer, salute): only standing still on the ground -----
-  if(emo){ const t=emo.t, id=emo.id;
-    if(id==='wave'){ const up=Math.min(1,t*5); T.shR=lerp(T.shR,2.9,up); T.shRz=0.35*up; T.elR=0.55+0.45*Math.sin(t*10)*up; T.nkZ=0.12*up; T.chZ+=-0.05*up; T.nkY+=0.15*up; }
-    else if(id==='dance'){ const b=t*Math.PI*2*1.9, s1=Math.sin(b), s2=Math.sin(b/2);
-      T.hipsZ+=0.14*s2; T.hipY+=-0.04+0.035*Math.abs(Math.sin(b)); T.knL+=-0.35*Math.max(0,s2); T.knR+=-0.35*Math.max(0,-s2); T.hpL+=0.15*Math.max(0,s2); T.hpR+=0.15*Math.max(0,-s2);
-      T.chZ+=-0.1*s2; T.chY+=0.25*Math.sin(b/4); T.nkX+=0.1*Math.abs(s1)-0.04; T.nkZ=0.08*s2;
-      T.shL=1.2+0.9*Math.max(0,s1); T.shR=1.2+0.9*Math.max(0,-s1); T.shLz=-0.6; T.shRz=0.6; T.elL=1.4-0.6*Math.max(0,s1); T.elR=1.4-0.6*Math.max(0,-s1); }
-    else if(id==='floss'){ const b=t*Math.PI*2*1.6, s=Math.sin(b), q=Math.sin(b*2);
-      T.shL=0.75*s; T.shR=-0.75*s; T.shLz=-0.3+0.7*s; T.shRz=0.3+0.7*s; T.elL=T.elR=0.12;
-      T.hipsZ+=-0.13*s; T.hipsY+=0.12*q; T.chZ+=0.06*s; T.hipY+=-0.02-0.015*Math.abs(q); T.knL+=-0.15*Math.max(0,s); T.knR+=-0.15*Math.max(0,-s); T.nkZ=-0.06*s; }
-    else if(id==='robot'){ const n=Math.floor(t*2.2), f=Math.min(1,(t*2.2-n)*5), K=[[1.57,1.57,0,0,0.5],[1.57,0.2,1.57,1.57,-0.5],[0.3,1.57,1.57,0.2,0.5],[1.57,1.57,1.57,1.57,0]], a=K[n%4], p=K[(n+3)%4], L=i=>p[i]+(a[i]-p[i])*f;
-      T.shL=L(0); T.shR=L(1); T.elL=L(2); T.elR=L(3); T.nkY=L(4)*0.6; T.chY+=L(4)*0.2; T.shLz=-0.12; T.shRz=0.12; T.knL+=-0.12*(n%2); T.knR+=-0.12*((n+1)%2); }
-    else if(id==='hype'){ const b=t*Math.PI*2*2.1, s=Math.sin(b), d=1-Math.abs(s), p1=Math.max(0,s), p2=Math.max(0,-s);
-      T.hipY+=-0.06*d; T.knL+=-0.45*d; T.knR+=-0.45*d; T.hpL+=0.2*d; T.hpR+=0.2*d;
-      T.shR=1.0+1.9*p1; T.elR=1.5-1.3*p1; T.shL=1.0+1.9*p2; T.elL=1.5-1.3*p2; T.shLz=-0.3; T.shRz=0.3; T.nkX+=0.1*s; T.chX+=-0.06*Math.abs(s); }
-    else if(id==='disco'){ const b=t*Math.PI*2, up=Math.sin(b)>0?1:0, sw=Math.sin(b*2);
-      T.shR=lerp(0.4,2.75,up); T.shRz=lerp(-0.35,0.55,up); T.elR=0.08; T.shL=0.1; T.shLz=-0.3; T.elL=0.45; // one arm loose at the side, the other points up, then down across
-      T.hipsZ+=0.12*sw; T.chZ+=-0.08*sw; T.knL+=-0.25*Math.max(0,sw); T.knR+=-0.25*Math.max(0,-sw); T.nkY=up?0.35:-0.2; T.nkX+=up?-0.2:0.15; }
-    else if(id==='shuffle'){ const b=t*Math.PI*2*2, s=Math.sin(b), c=Math.cos(b);
-      T.hpL+=0.5*Math.max(0,s); T.knL+=-0.9*Math.max(0,s); T.hpR+=0.5*Math.max(0,-s); T.knR+=-0.9*Math.max(0,-s); T.hpLz=-0.15*Math.max(0,-c); T.hpRz=0.15*Math.max(0,c);
-      T.hipY+=-0.03+0.03*Math.abs(c); T.hipsY+=0.25*s; T.chY+=-0.3*s; T.shL=0.7*s; T.shR=-0.7*s; T.elL=T.elR=1.35; T.shLz=-0.2; T.shRz=0.2; }
-    else if(id==='cheer'){ const b=t*Math.PI*2*2.2, up=Math.min(1,t*6);
-      T.shL=lerp(T.shL,2.8,up); T.shR=lerp(T.shR,2.8,up); T.shLz=-0.35*up; T.shRz=0.35*up; T.elL=T.elR=0.25+0.35*Math.max(0,Math.sin(b));
-      T.hipY+=0.05*Math.max(0,Math.sin(b)); T.knL+=-0.25*Math.max(0,-Math.sin(b)); T.knR=T.knL; T.nkX-=0.25*up; }
-    else if(id==='salute'){ const up=Math.min(1,t*4); T.shR=lerp(T.shR,2.05,up); T.shRz=0.75*up; T.elR=lerp(T.elR,2.35,up); T.chX-=0.05*up; T.nkX-=0.05*up; }
+  A.handL=A.handR=null; A.turnL=A.turnR=null;
+  if(emo){ const t=emo.t, id=emo.id, E=EMOTES[id], bt=t*(E.beat||2), TAU=Math.PI*2, cl=x=>Math.max(0,Math.min(1,x)), ez=x=>x*x*(3-2*x), K=ez(cl(t*3.5))*ez(cl((E.dur-t)*3)); // K eases the emote in and out
+    // hit(): step through key poses one a beat, arriving early and holding; pose(): arms are set, the body is added to
+    const hit=(rows,x,snap=0.5)=>{ const n=rows.length, fl=Math.floor(x), i=((fl%n)+n)%n, f=ez(cl((x-fl)/snap)), a=rows[(i+n-1)%n], b=rows[i], o={}; for(const k in b) o[k]=(a[k]||0)+(b[k]-(a[k]||0))*f; return o; };
+    const ARM=['shL','shR','shLz','shRz','shLy','shRy','elL','elR','wrL','wrR','wrLy','wrRy','wrLz','wrRz'], BODY=['hipsX','hipsY','hipsZ','hipX','spX','spY','spZ','chX','chY','chZ','nkX','nkY','nkZ','hpL','hpR','hpLz','hpRz','hpLy','hpRy','knL','knR'];
+    const pose=p=>{ for(const k of ARM) if(p[k]!==undefined) T[k]=lerp(T[k]||0,p[k],K); for(const k of BODY) if(p[k]!==undefined) T[k]=(T[k]||0)+p[k]*K; };
+    // plant(): the standing leg sets how high the hips are, and both soles stay flat
+    const plant=()=>{ const ext=(h,k,z)=>(0.4*Math.cos(h)+0.37*Math.cos(h+k))*Math.cos(z)+0.13; T.hipY=Math.max(ext(T.hpL,T.knL,T.hpLz),ext(T.hpR,T.knR,T.hpRz))+0.041+(T.hop||0); T.anL=-(T.hpL+T.knL); T.anR=-(T.hpR+T.knR); };
+    const dip=0.5+0.5*Math.cos(TAU*bt), sw2=Math.sin(Math.PI*bt), sw4=Math.sin(Math.PI*bt/2); // down on every beat; side to side over two beats, and over four
+    A.handL=A.handR='relax';
+    if(id==='wave'){ const w=Math.sin(t*8.5); // the forearm upright beside the head, palm out, rocking at the elbow and wrist; the head tips towards it
+      pose({shR:0.2,shRz:1.3,shRy:-1.5,elR:1.7+0.3*w,wrRy:1.45,wrRz:0.2*w,chZ:-0.05,spZ:-0.04,nkZ:0.1,nkY:0.15,hipsZ:0.03}); A.handR='flat'; A.turnR=0; }
+    else if(id==='cheer'){ const b=t*TAU*2.2, s=Math.sin(b), j=Math.max(0,Math.sin(b*0.5)); // fists pumping overhead, bouncing off the knees
+      pose({shL:2.45+0.4*s,shR:2.45-0.4*s,shLz:-0.4,shRz:0.4,elL:0.95-0.85*Math.max(0,s),elR:0.95-0.85*Math.max(0,-s),nkX:-0.22,chX:-0.08,knL:-0.35*(1-j),knR:-0.35*(1-j),hpL:0.17*(1-j),hpR:0.17*(1-j)});
+      T.hop=0.07*j*K; plant(); A.handL=A.handR='fist'; A.turnL=A.turnR=0; }
+    else if(id==='salute'){ const up=ez(cl(t*4))*ez(cl((E.dur-t)*5)); // standing straight, the flat hand to the brow, then snapped down
+      T.shR=lerp(T.shR,1.95,up); T.shRz=lerp(T.shRz,0.8,up); T.elR=lerp(T.elR,2.45,up); T.shL=lerp(T.shL,0,up); T.shLz=lerp(T.shLz,-0.04,up); T.elL=lerp(T.elL,0.06,up); T.chX-=0.07*up; T.spX-=0.03*up; T.nkX-=0.04*up; A.handR='flat'; }
+    else if(id==='dance'){ const W=sw4; // a two-step: the weight rocks from foot to foot over four beats, the free foot taps in, the arms swing across, fingers snap on two and four
+      pose({hipX:0.06*W,hipsZ:0.09*W,spZ:-0.05*W,chZ:-0.05*W,chY:0.2*W,hipsY:-0.1*W,nkZ:0.05*W,nkX:0.07*dip-0.03,
+        knL:-0.22*dip-0.3*Math.max(0,W)*(1-dip),knR:-0.22*dip-0.3*Math.max(0,-W)*(1-dip),hpL:0.1*dip+0.16*Math.max(0,W)*(1-dip),hpR:0.1*dip+0.16*Math.max(0,-W)*(1-dip),hpLz:-0.06-0.05*Math.max(0,-W),hpRz:0.06+0.05*Math.max(0,W),
+        shL:0.35+0.45*W,shR:0.35-0.45*W,shLz:-0.28,shRz:0.28,shLy:-0.35,shRy:0.35,elL:1.3+0.3*dip,elR:1.3+0.3*dip}); plant(); A.handL=A.handR=(Math.floor(bt)%2?'fist':'relax'); }
+    else if(id==='floss'){ const b=t*TAU*1.6, s=Math.sin(b), q=Math.sin(b*2); // straight arms swing to one side, one in front of the body and one behind, as the hips swing the other way
+      pose({shL:0.7*s,shR:-0.7*s,shLz:-0.25+0.75*s,shRz:0.25+0.75*s,elL:0.1,elR:0.1,hipX:-0.05*s,hipsZ:-0.14*s,hipsY:0.1*q,chZ:0.07*s,spZ:0.05*s,knL:-0.12-0.14*Math.max(0,s),knR:-0.12-0.14*Math.max(0,-s),hpL:0.06+0.07*Math.max(0,s),hpR:0.06+0.07*Math.max(0,-s),nkZ:-0.06*s});
+      plant(); A.handL=A.handR='fist'; }
+    else if(id==='robot'){ const x=t*2.2, f=x-Math.floor(x), wob=Math.exp(-9*f)*Math.sin(f*46)*0.035, n=Math.floor(x); // right angles, snapped to on the beat and held, with a shudder as each one stops
+      const R_=[{shL:1.57,shR:1.57,shLz:-0.1,shRz:0.1,elL:1.57,elR:0.05,nkY:0.55,chY:0.18,spZ:0,hipsY:0},{shL:1.57,shR:1.57,shLz:-0.1,shRz:0.1,elL:0.05,elR:1.57,nkY:-0.55,chY:-0.18,spZ:0,hipsY:0},
+        {shL:0,shR:0,shLz:-1.5,shRz:1.5,elL:1.5,elR:1.5,nkY:0,chY:0,spZ:0.1,hipsY:0.15},{shL:0,shR:0,shLz:-1.5,shRz:1.5,elL:0.05,elR:1.5,nkY:0.5,chY:0,spZ:-0.1,hipsY:-0.15},
+        {shL:0.25,shR:1.57,shLz:-0.15,shRz:0.1,elL:1.57,elR:1.57,nkY:-0.5,chY:-0.22,spZ:0,hipsY:0},{shL:1.57,shR:0.25,shLz:-0.1,shRz:0.15,elL:1.57,elR:1.57,nkY:0.5,chY:0.22,spZ:0,hipsY:0},
+        {shL:2.6,shR:0.1,shLz:-0.2,shRz:0.5,elL:0.1,elR:1.57,nkY:0,chY:0,spZ:0.08,hipsY:0},{shL:1.57,shR:1.57,shLz:-0.1,shRz:0.1,elL:1.57,elR:1.57,nkY:0,chY:0,spZ:0,hipsY:0}], p=hit(R_,x,0.22);
+      p.shL+=wob; p.shR-=wob; p.elL+=wob; p.elR-=wob; p.nkX=wob*0.8; p.knL=-0.14*(n%2); p.knR=-0.14*((n+1)%2); pose(p); plant(); A.handL=A.handR='flat'; A.turnL=A.turnR=0; }
+    else if(id==='hype'){ const s=Math.sin(Math.PI*bt), roof=Math.floor(bt/8)%2, p1=Math.max(0,s), p2=Math.max(0,-s), pu=0.5-0.5*Math.cos(TAU*bt); // bouncing: fists punched up in turn, then both palms pushing the roof up
+      if(!roof) pose({shR:1.1+1.8*p1,elR:1.6-1.4*p1,shL:1.1+1.8*p2,elL:1.6-1.4*p2,shLz:-0.3,shRz:0.3,chY:0.18*s,nkX:0.08*dip});
+      else pose({shL:2.2+0.5*pu,shR:2.2+0.5*pu,shLz:-0.45,shRz:0.45,elL:1.5-1.2*pu,elR:1.5-1.2*pu,nkX:-0.15,chX:-0.06});
+      pose({knL:-0.5*dip,knR:-0.5*dip,hpL:0.24*dip,hpR:0.24*dip,chX:0.05*dip,hpLz:-0.07,hpRz:0.07}); T.hop=0.05*Math.max(0,Math.sin(TAU*bt-1.2))*K; plant(); A.handL=A.handR=roof?'flat':'fist'; A.turnL=A.turnR=0; }
+    else if(id==='disco'){ const up=Math.floor(bt/2)%2===0, roll=Math.floor(bt/8)%2, g=ez(cl(((bt/2)%1)/0.3)), k2=up?g:1-g; // a finger pointed to the sky then down across the body, the other hand on the hip; then the forearms rolled round each other
+      if(!roll){ pose({shR:lerp(0.5,2.65,k2),shRz:lerp(-0.7,0.6,k2),elR:0.1,shL:-0.25,shLz:-0.6,shLy:-0.9,elL:1.75,nkY:lerp(0.3,-0.3,k2),nkX:lerp(0.18,-0.22,k2),chY:lerp(0.25,-0.2,k2),chZ:lerp(0.06,-0.08,k2),hipsZ:lerp(0.1,-0.12,k2),hipX:lerp(-0.04,0.05,k2)}); A.handR='point'; A.handL='fist'; }
+      else { const a=bt*TAU; pose({shL:1.25+0.25*Math.sin(a),shR:1.25-0.25*Math.sin(a),shLz:-0.25,shRz:0.25,shLy:-0.9,shRy:0.9,elL:1.6+0.35*Math.cos(a),elR:1.6-0.35*Math.cos(a),hipsZ:0.1*sw2,hipX:0.04*sw2,chZ:-0.06*sw2,chY:0.15*sw4}); A.handL=A.handR='fist'; }
+      pose({knL:-0.14*dip-0.22*Math.max(0,sw2)*(1-dip),knR:-0.14*dip-0.22*Math.max(0,-sw2)*(1-dip),hpL:0.07*dip+0.1*Math.max(0,sw2)*(1-dip),hpR:0.07*dip+0.1*Math.max(0,-sw2)*(1-dip)}); plant(); }
+    else if(id==='shuffle'){ const s=sw2, c=Math.cos(Math.PI*bt), L=Math.max(0,s), R=Math.max(0,-s); // the running man: a knee comes up as the standing foot slides back, arms pumping against the legs
+      pose({hpL:0.75*L-0.25*R,knL:-1.15*L-0.1,hpR:0.75*R-0.25*L,knR:-1.15*R-0.1,hipsY:0.2*s,chY:-0.3*s,chX:0.1,spX:0.05,shL:-0.55*s,shR:0.55*s,shLz:-0.18,shRz:0.18,elL:1.4,elR:1.4,nkX:-0.05});
+      T.hop=0.035*Math.abs(c)*K; plant(); A.handL=A.handR='fist'; }
   }
   // ----- upper body by activity -----
   if(!(S.swingT>0)) A.inSwing=false;
@@ -5489,19 +5545,20 @@ function animateRig0(H,S,dt){
   if(S.seat) seatPose(T,S,A);
   // ----- apply (smoothed) -----
   const set=(o,ax,v,f)=>{ o.rotation[ax]=lerp(o.rotation[ax],v,f||sm); };
-  r.hips.position.y=lerp(r.hips.position.y,T.hipY,smF);
+  r.hips.position.y=lerp(r.hips.position.y,T.hipY,smF); r.hips.position.x=lerp(r.hips.position.x,T.hipX||0,smF);
   set(r.hips,'x',T.hipsX); set(r.hips,'y',T.hipsY+A.lag); set(r.hips,'z',T.hipsZ);
-  set(r.spine,'x',T.spX); set(r.spine,'y',T.spY);
+  set(r.spine,'x',T.spX); set(r.spine,'y',T.spY); set(r.spine,'z',T.spZ||0);
   set(r.chest,'x',T.chX); set(r.chest,'y',T.chY-A.lag); set(r.chest,'z',T.chZ);
   set(r.neck,'x',T.nkX); set(r.neck,'y',T.nkY); set(r.neck,'z',T.nkZ);
-  for(const [L,h,hz,kn,an] of [[r.legL,T.hpL,T.hpLz,T.knL,T.anL],[r.legR,T.hpR,T.hpRz,T.knR,T.anR]]){
-    set(L.hp,'x',h,smF); set(L.hp,'z',hz,smF); set(L.kn,'x',kn,smF); set(L.an,'x',an,smF); }
+  for(const [L,h,hz,kn,an,hy] of [[r.legL,T.hpL,T.hpLz,T.knL,T.anL,T.hpLy||0],[r.legR,T.hpR,T.hpRz,T.knR,T.anR,T.hpRy||0]]){
+    set(L.hp,'x',h,smF); set(L.hp,'z',hz,smF); set(L.hp,'y',hy,smF); set(L.kn,'x',kn,smF); set(L.an,'x',an,smF); }
   if(!gun){
     const fa=S.swingT>0?1:sm; // keyframes are already smooth: follow them exactly // the swing is fast: follow it closely
     set(r.armL.sh,'x',T.shL); set(r.armR.sh,'x',T.shR,fa); set(r.armL.sh,'z',T.shLz); set(r.armR.sh,'z',T.shRz,fa);
-    set(r.armL.sh,'y',0); set(r.armR.sh,'y',0);
+    set(r.armL.sh,'y',T.shLy||0); set(r.armR.sh,'y',T.shRy||0);
     set(r.armL.el,'x',T.elL); set(r.armR.el,'x',T.elR,fa); r.armL.el.rotation.y=r.armL.el.rotation.z=r.armR.el.rotation.y=r.armR.el.rotation.z=0;
-    set(r.armL.wr,'x',building?-0.5:0); set(r.armR.wr,'x',S.gun===false&&!building&&!S.editing?(T.wrR||0):0,fa); r.armL.wr.rotation.y=r.armL.wr.rotation.z=r.armR.wr.rotation.y=r.armR.wr.rotation.z=0;
+    set(r.armL.wr,'x',building?-0.5:(T.wrL||0)); set(r.armR.wr,'x',(emo||S.gun===false)&&!building&&!S.editing?(T.wrR||0):0,fa);
+    if(emo){ set(r.armL.wr,'y',T.wrLy||0); set(r.armL.wr,'z',T.wrLz||0); set(r.armR.wr,'y',T.wrRy||0); set(r.armR.wr,'z',T.wrRz||0); } else r.armL.wr.rotation.y=r.armL.wr.rotation.z=r.armR.wr.rotation.y=r.armR.wr.rotation.z=0;
   }
   // ----- weapons: two-handed IK -----
   const mdl=modelOf(gun), GW=gun?WEAPONS[gun===true?'ar':gun]:null;
