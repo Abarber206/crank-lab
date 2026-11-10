@@ -79,6 +79,7 @@ body:not(.touch) #matStock i{width:22px;height:22px}
 #cloudFx.go i{animation:puffUp 2.3s cubic-bezier(.5,0,.75,.4) forwards}
 @keyframes cloudIn{0%{opacity:1}35%{opacity:1}100%{opacity:0}}
 @keyframes puffUp{0%{transform:translate(0,0) scale(1);opacity:1}100%{transform:translate(var(--dx),-130vh) scale(2.6);opacity:.2}}
+#vig{position:fixed;inset:0;pointer-events:none;z-index:3;background:radial-gradient(ellipse 78% 78% at 50% 50%,rgba(0,0,0,0) 62%,rgba(6,10,24,.22) 100%)}
 #hurtfx{position:fixed;inset:0;pointer-events:none;z-index:4;box-shadow:inset 0 0 140px 20px rgba(255,40,40,0);transition:box-shadow .4s}
 #hurtfx.on{box-shadow:inset 0 0 140px 20px rgba(255,40,40,.55);transition:none}
 /* ---- HUD: map top-right, vitals + slot bar bottom-center, thumb cluster bottom-right ---- */
@@ -555,6 +556,7 @@ body.touch #stickHint{width:100px;height:100px;opacity:.6}
 <div class="hud" id="pieceHp" hidden><span id="pieceHpT"></span><span class="pb"><i id="pieceHpB"></i></span><span id="pieceHpS"></span></div>
 <div class="hud" id="waveHud"><div class="wt"><b id="whT"></b><span id="whS"></span></div><div class="wb"><i id="whF"></i></div></div>
 <div class="hud" id="banner"><div class="big" id="banTitle"></div><div class="small" id="banSub"></div></div>
+<div id="vig"></div>
 <div id="hurtfx"></div>
 <div id="cloudFx" hidden></div>
 <div id="scope" hidden><i class="h"></i><i class="v"></i><i class="m"></i><i class="c"></i><b id="scopeZ"></b></div>
@@ -762,6 +764,7 @@ THREE.ShaderChunk.tonemapping_pars_fragment=THREE.ShaderChunk.tonemapping_pars_f
 	color = pow( max( color, 0.0 ), vec3( 1.07 ) );                                 // midtones a touch deeper
 	color += vec3( -0.012, 0.0, 0.022 ) * ( 1.0 - smoothstep( 0.0, 0.35, l ) );    // cool, slightly magical shadows
 	color += vec3( 0.03, 0.016, -0.008 ) * smoothstep( 0.45, 1.0, l );             // warm light
+	color = color * 1.1 / ( 1.0 + 0.1 * color * color );                            // highlights roll off
 	return clamp( color, 0.0, 1.0 ); }`);
 renderer.toneMapping=THREE.CustomToneMapping; renderer.toneMappingExposure=1.0;
 /* Resolution scales itself: if frames take too long the render resolution steps down (never below 0.75x on phones,
@@ -813,15 +816,17 @@ const skyDome=(()=>{ const g=new THREE.SphereGeometry(950,40,20), p=g.attributes
 const camera=new THREE.PerspectiveCamera(settings.fov, innerWidth/innerHeight, 0.08, 3200);
 camera.rotation.order='YXZ';
 
-const hemi=new THREE.HemisphereLight(0xcfe6ff, 0x4f6b35, 0.68); scene.add(hemi); // sky fill from above, green bounce from the grass
-const sun=new THREE.DirectionalLight(0xfff0d8, 1.12);
+const hemi=new THREE.HemisphereLight(0xbddaff, 0x4f6b35, 0.6); scene.add(hemi);
+const bounce=new THREE.DirectionalLight(0xffdcae,0.16); scene.add(bounce); scene.add(bounce.target); // sunlight thrown back off the ground onto shaded sides
+// // sky fill from above, green bounce from the grass
+const sun=new THREE.DirectionalLight(0xffe9c6, 1.3);
 sun.castShadow=settings.shadows;
 sun.shadow.mapSize.set(isTouch?1024:2048, isTouch?1024:2048);
 const sc=sun.shadow.camera; sc.left=-32; sc.right=32; sc.top=32; sc.bottom=-32; sc.near=1; sc.far=160;
 sun.shadow.bias=-0.0006; sun.shadow.normalBias=0.02; sc.left=-45; sc.right=45; sc.top=45; sc.bottom=-45; sc.far=200;
 scene.add(sun); scene.add(sun.target);
 const _lX=new THREE.Vector3(0,1,0).cross(SUN_DIR).normalize(), _lY=SUN_DIR.clone().cross(_lX).normalize(); // light-space axes for shadow snapping
-const rimL=new THREE.DirectionalLight(0xbfe1ff,0.32); rimL.position.set(-40,30,-50); scene.add(rimL); // cool back light for a toon rim
+const rimL=new THREE.DirectionalLight(0xbfe1ff,0.3); rimL.position.set(-40,30,-50); scene.add(rimL); bounce.position.set(-SUN_DIR.x*40,-22,-SUN_DIR.z*40); // cool back light for a toon rim
 
 /* ---------- build textures ----------
    Each material is painted twice: the colour you see, and a height map (grain, plank gaps, mortar, corrugation,
@@ -1706,6 +1711,9 @@ function coneGeo(mask){
   if(coneGeos[mask]) return coneGeos[mask];
   const k=coneCorners(mask), tris=[[k.A,k.E,k.B],[k.B,k.E,k.C],[k.C,k.E,k.D],[k.D,k.E,k.A]], pos=[], uv=[];
   tris.forEach(t=>t.forEach(v=>{ pos.push(v[0]-CELL/2,v[2],v[1]-CELL/2); uv.push(v[0]/CELL,v[1]/CELL); }));
+  const RT=0.24, put=(v,d)=>{ pos.push(v[0]-CELL/2,d?Math.max(v[2]-d,-0.12):v[2],v[1]-CELL/2); uv.push(v[0]/CELL,v[1]/CELL+(d?0.06:0)); };
+  tris.forEach(t=>{ put(t[2],RT); put(t[1],RT); put(t[0],RT); });                       // the underside
+  [[k.A,k.B],[k.B,k.C],[k.C,k.D],[k.D,k.A]].forEach(([a,b])=>{ put(a,0); put(b,0); put(b,RT); put(a,0); put(b,RT); put(a,RT); }); // the four cut edges
   const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3)); g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2)); g.computeVertexNormals();
   return coneGeos[mask]=g;
 }
@@ -6446,7 +6454,7 @@ function stepDusk(dt){
   scene.background.copy(DAY.sky).lerp(DUSK,duskK); scene.fog.color.setHex(HAZE).lerp(DUSK,duskK); scene.fog.near=HAZE_DENS+(0.0042-HAZE_DENS)*duskK; scene.fog.far=HAZE_H-90*duskK;
   skyDome.material.color.setRGB(1,1,1).lerp(new THREE.Color(0x8a6f9a),duskK);
   if(cloudMat){ cloudMat.uniforms.tint.value.setRGB(1,1,1).lerp(new THREE.Color(0xc89aa8),duskK); cloudMat.uniforms.haze.value.setHex(HAZE).lerp(DUSK,duskK); }
-  hemi.intensity=0.68-0.22*duskK; sun.intensity=1.12-0.45*duskK; sun.color.setHex(duskK>0.5?0xffb27a:0xfff0d4);
+  hemi.intensity=0.6-0.14*duskK; bounce.intensity=0.16*(1-duskK); sun.intensity=1.3-0.63*duskK; sun.color.setHex(duskK>0.5?0xffb27a:0xffe9c6);
 }
 /* The wave bar under the compass: the wave number and how many are left (it drains as you kill), or the build
    countdown between waves (it drains to the next wave). It shows up when something changes (a wave starts, a kill,
@@ -7782,7 +7790,7 @@ function renderBigMapImage(){
   for(const [w,col] of [[14,'#26282c'],[7.2,'#9a9ea4']]){ g.strokeStyle=col; g.lineWidth=w;
     for(const rd of WORLD.roads){ g.beginPath(); rd.pts.forEach((p,k)=>k?g.lineTo(X(p[0]),X(p[1])):g.moveTo(X(p[0]),X(p[1]))); g.stroke(); }
     g.fillStyle=col; WORLD.towns.forEach(t=>{ g.beginPath(); g.arc(X(t.u),X(t.v),(PLAZA_R/mpp)+w/2+1,0,7); g.fill(); }); }
-  g.setLineDash([]); g.strokeStyle='rgba(255,236,190,.8)'; g.lineWidth=3; g.beginPath(); g.arc(X(0),X(0),FLAT_R/mpp,0,7); g.stroke(); // the build field
+  g.setLineDash([]);
   return c;
 }
 function drawBigMap(){

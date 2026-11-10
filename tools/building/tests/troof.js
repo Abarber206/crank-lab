@@ -1,0 +1,10 @@
+const {sleep,page,launch,open}=require('./h.js');
+(async()=>{ const b=await launch(); const {pg,errs}=await open(b,page('/home/claude/crank-lab/index.html','scene,P,renderer,settings,pieces,removePiece,terrainH,CELL'),{vp:{width:1100,height:640}});
+ await pg.waitForFunction(()=>window.T&&T.renderer,null,{timeout:180000});
+ await pg.evaluate(()=>{ T.settings.skyDrop=false; const s=document.querySelector('#botSel'); s.value='off'; s.dispatchEvent(new Event('change')); document.getElementById('play').click(); });
+ await pg.waitForFunction(()=>T.renderer.info.render.frame>5,null,{timeout:120000}); await sleep(800);
+ const r=await pg.evaluate(()=>{ const all=[...(T.pieces.values?T.pieces.values():T.pieces)]; const cs=all.filter(p=>p.type==='cone'&&p.skin); if(!cs.length) return 'none';
+   const c=cs[Math.floor(cs.length/2)]; const m=c.mesh||c.group; const pos=new (m.position.constructor)(); m.getWorldPosition(pos); T.removePiece(c);
+   T.P.pos.set(pos.x+3,pos.y+7,pos.z+3); T.P.vel.set(0,0,0); T.P.yaw=Math.atan2(7,7); T.P.pitch=-1.1; T.P.fly=true; return [cs.length,pos.x,pos.y,pos.z,Object.keys(c).join(',')]; });
+ console.log(JSON.stringify(r)); await pg.screenshot({path:'roof.png',timeout:150000});
+ console.log(errs.join('\n')||'no errors'); await b.close(); })();
