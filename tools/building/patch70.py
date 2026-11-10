@@ -1,0 +1,3 @@
+# ---------- 70. phones: the emote button sat right on top of the inventory button; it gets its own slot in the top row ----------
+rep("#emoteBtn{top:calc(env(safe-area-inset-top,0px) + 10px);right:calc(env(safe-area-inset-right,0px) + 200px);","#emoteBtn{top:calc(env(safe-area-inset-top,0px) + 10px);right:calc(env(safe-area-inset-right,0px) + 252px);")
+rep("body.touch #menuBtn{right:calc(env(safe-area-inset-right,0px) + 130px)} }","body.touch #menuBtn{right:calc(env(safe-area-inset-right,0px) + 130px)} body.touch #tBag{right:calc(env(safe-area-inset-right,0px) + 180px)} body.touch #emoteBtn{right:calc(env(safe-area-inset-right,0px) + 230px)} }")

@@ -1,0 +1,4 @@
+# ---------- 114. rock no longer repeats across a mountainside: the same rock is laid on again five times larger and
+# takes over with distance, and broad lighter and darker patches run through it ----------
+rep("    vec3 rk=texture2D(rockMap,vWP.zy*0.085).rgb*bw.x+texture2D(rockMap,vWP.xz*0.085).rgb*bw.y+texture2D(rockMap,vWP.xy*0.085).rgb*bw.z;",
+    "    vec3 rk=texture2D(rockMap,vWP.zy*0.085).rgb*bw.x+texture2D(rockMap,vWP.xz*0.085).rgb*bw.y+texture2D(rockMap,vWP.xy*0.085).rgb*bw.z;\n    { vec3 rkB=texture2D(rockMap,vWP.zy*0.0173+0.37).rgb*bw.x+texture2D(rockMap,vWP.xz*0.0173+0.37).rgb*bw.y+texture2D(rockMap,vWP.xy*0.0173+0.37).rgb*bw.z; // five times larger\n      rk=mix(rkB,rk,0.12+0.48*clamp(45.0/length(cameraPosition-vWP),0.0,1.0))*(0.8+0.42*texture2D(rockMap,vWP.xz*0.0037+0.11).g); }")

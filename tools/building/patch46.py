@@ -1,0 +1,3 @@
+# ---------- 46. a party match only starts once everyone has readied up ----------
+rep("function startMatch(){\n  if(net.role!=='host') return;","function partyAllReady(){ return partyMembers().every(x=>x.lead||x.ready); }\nfunction startMatch(){\n  if(net.role!=='host') return;\n  if(!party.live&&!partyAllReady()){ toast('Waiting for everyone to ready up'); return; }")
+rep("  $('startMatch').textContent=party.live?'Restart match':'Start match';","  $('startMatch').textContent=party.live?'Restart match':'Start match';\n  if(host){ const ok=party.live||partyAllReady(); $('startMatch').disabled=!ok; $('startMatch').classList.toggle('primary',ok); $('startMatch').style.opacity=ok?'':'0.5'; }")

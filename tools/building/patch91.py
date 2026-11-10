@@ -1,0 +1,12 @@
+# ---------- 91. buggy: no stutter at speed (it no longer flickers between "flying" and "driving" on a slope, and it doesn't
+# rattle back and forth when wedged), the engine tops out but gravity can carry it faster downhill, a health bar while you
+# drive, and the outer mountains are a real boundary (you could walk out past where the ground is solid and sink in) ----------
+rep("    if(inp.fw>0.1){ if(vf<-0.3) vf+=KBRK*inp.fw*dt; else vf+=KACC*inp.fw*dt*Math.max(0.12,1-vf/vmax); }","    if(inp.fw>0.1){ if(vf<-0.3) vf+=KBRK*inp.fw*dt; else vf+=KACC*inp.fw*dt*Math.max(0,Math.min(1,1.12-vf/vmax)); }")
+rep("    if(vf>vmax) vf-=Math.min(vf-vmax,5*dt);","    if(vf>vmax) vf-=Math.min(vf-vmax,(0.9+0.004*vf*vf)*dt); // over the engine's top speed (a downhill run): only drag slows it")
+rep("  else { const sp=Math.hypot(k.vx,k.vz); if(sp>4){ sfxAt('kart_bump',_kz.set(k.x,k.y+0.5,k.z)); if(P.kart&&P.kart.k===k) shake=Math.max(shake,Math.min(0.25,sp*0.02)); k.sqV-=sp*0.15; } k.vx*=-0.2; k.vz*=-0.2; }",
+    "  else { const sp=Math.hypot(k.vx,k.vz); if(sp>4){ sfxAt('kart_bump',_kz.set(k.x,k.y+0.5,k.z)); if(P.kart&&P.kart.k===k) shake=Math.max(shake,Math.min(0.25,sp*0.02)); k.sqV-=sp*0.15; k.vx*=-0.2; k.vz*=-0.2; } else { k.vx=0; k.vz=0; } }")
+rep("    k.air=comp<-0.14;","    k.airT=comp<-0.14?(k.airT||0)+dt:0; k.air=k.airT>0.12; // only a real jump counts as flying: a dip or a crest keeps its grip")
+rep("const WORLD_EDGE=2150;","const WORLD_EDGE=822;")
+rep('<div class="hud" id="kartHud" hidden><b id="kartSpd">0</b><span>km/h</span></div>','<div class="hud" id="kartHud" hidden><b id="kartSpd">0</b><span>km/h</span><i class="khp"><u id="kartHp"></u></i></div>')
+rep("#kartHud b{font-size:30px;color:#fff;min-width:44px;text-align:right}","#kartHud b{font-size:30px;color:#fff;min-width:44px;text-align:right} #kartHud{flex-wrap:wrap;justify-content:center;width:150px} #kartHud .khp{flex:0 0 100%;height:6px;margin-top:5px;background:rgba(8,14,26,.7);border-radius:2px;overflow:hidden} #kartHud .khp u{display:block;height:100%;background:#ffd23a;transition:width .15s} #kartHud .khp.low u{background:#ff5a3a}\nbody:not(.touch) #kartHud{bottom:112px}")
+rep("if(hud._v!==v){ hud._v=v; $('kartSpd').textContent=v; } } } }","if(hud._v!==v){ hud._v=v; $('kartSpd').textContent=v; } const hp=Math.max(0,Math.round(100*P.kart.k.hp/KART_HP)); if(hud._h!==hp){ hud._h=hp; $('kartHp').style.width=hp+'%'; $('kartHp').parentNode.classList.toggle('low',hp<30); } } } }")

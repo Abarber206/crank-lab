@@ -1,0 +1,9 @@
+# ---------- 100. lighting: a warmer, stronger sun against a cooler sky fill (more shape and contrast), a soft warm bounce
+# onto shaded sides so they aren't flat, highlights that roll off instead of clipping, and a gentle vignette ----------
+rep("const hemi=new THREE.HemisphereLight(0xcfe6ff, 0x4f6b35, 0.68); scene.add(hemi);","const hemi=new THREE.HemisphereLight(0xbddaff, 0x4f6b35, 0.6); scene.add(hemi);\nconst bounce=new THREE.DirectionalLight(0xffdcae,0.16); scene.add(bounce); scene.add(bounce.target); // sunlight thrown back off the ground onto shaded sides\n//")
+rep("const sun=new THREE.DirectionalLight(0xfff0d8, 1.12);","const sun=new THREE.DirectionalLight(0xffe9c6, 1.3);")
+rep("const rimL=new THREE.DirectionalLight(0xbfe1ff,0.32); rimL.position.set(-40,30,-50); scene.add(rimL);","const rimL=new THREE.DirectionalLight(0xbfe1ff,0.3); rimL.position.set(-40,30,-50); scene.add(rimL); bounce.position.set(-SUN_DIR.x*40,-22,-SUN_DIR.z*40);")
+rep("  hemi.intensity=0.68-0.22*duskK; sun.intensity=1.12-0.45*duskK; sun.color.setHex(duskK>0.5?0xffb27a:0xfff0d4);","  hemi.intensity=0.6-0.14*duskK; bounce.intensity=0.16*(1-duskK); sun.intensity=1.3-0.63*duskK; sun.color.setHex(duskK>0.5?0xffb27a:0xffe9c6);")
+rep("	color += vec3( 0.03, 0.016, -0.008 ) * smoothstep( 0.45, 1.0, l );             // warm light","	color += vec3( 0.03, 0.016, -0.008 ) * smoothstep( 0.45, 1.0, l );             // warm light\n	color = color * 1.1 / ( 1.0 + 0.1 * color * color );                            // highlights roll off")
+rep('<div id="hurtfx"></div>','<div id="vig"></div>\n<div id="hurtfx"></div>')
+rep("#hurtfx{position:fixed;","#vig{position:fixed;inset:0;pointer-events:none;z-index:3;background:radial-gradient(ellipse 78% 78% at 50% 50%,rgba(0,0,0,0) 62%,rgba(6,10,24,.22) 100%)}\n#hurtfx{position:fixed;")
