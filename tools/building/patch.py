@@ -427,5 +427,6 @@ exec(open("/home/claude/mg/patch118.py").read())
 exec(open("/home/claude/mg/patch119.py").read())
 exec(open("/home/claude/mg/patch120.py").read())
 exec(open("/home/claude/mg/patch121.py").read())
+exec(open("/home/claude/mg/patch122.py").read())
 assert 'MTN_R' not in s and 'HILL_RAMP' not in s and 'GROUND,' not in s, 'leftover old map constants'
 open(F,'w').write(s); print('patched',len(s))
