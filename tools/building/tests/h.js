@@ -10,7 +10,7 @@ function page(file,expose,extraHead){
   return html; }
 async function launch(){ return chromium.launch({executablePath:require('fs').readdirSync('/opt/pw-browsers/chromium-1243').includes('chrome-linux64')?'/opt/pw-browsers/chromium-1243/chrome-linux64/chrome':'/opt/pw-browsers/chromium-1243/chrome-linux/chrome',args:['--use-gl=swiftshader','--enable-unsafe-swiftshader','--ignore-gpu-blocklist','--disable-features=WebRtcHideLocalIpsWithMdns,LocalNetworkAccessChecks,BlockInsecurePrivateNetworkRequests']}); }
 async function open(b,html,o={}){
-  if(o.fast){ html=html.replace('<script>\n','<script>\ntry{ localStorage.setItem("cranklab.settings",JSON.stringify({shadows:false,grassLevel:"off",autoRes:false,clouds:"simple"})); }catch(e){}\n'); o.vp=o.vp||{width:320,height:200}; }
+  if(o.fast){ html=html.replace('<script>\n','<script>\ntry{ localStorage.setItem("cranklab.settings",JSON.stringify({shadows:false,reflect:false,grassLevel:"off",autoRes:false,clouds:"simple"})); }catch(e){}\n'); o.vp=o.vp||{width:320,height:200}; }
   const ctx=await b.newContext({viewport:o.vp||{width:640,height:400}}); const pg=await ctx.newPage(); const errs=[];
   pg.on('pageerror',e=>errs.push((o.name||'')+' ERR '+e.message+' '+(e.stack||'').split('\n').slice(1,3).join(' | ')));
   pg.on('console',m=>{ if(m.type()==='error') errs.push((o.name||'')+' console: '+m.text()); if(o.log) console.log('  [page]',m.text()); });

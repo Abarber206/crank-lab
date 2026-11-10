@@ -687,6 +687,7 @@ body.touch #stickHint{width:100px;height:100px;opacity:.6}
           <label for="skyDropC">Drop in from the sky (skydive, then glide) <input type="checkbox" id="skyDropC"></label>
           <label for="instantBuild">Instant build on piece bind (hold to turbo) <input type="checkbox" id="instantBuild"></label>
           <label for="shadows">Shadows <input type="checkbox" id="shadows"></label>
+          <label for="reflectC">Water reflections <input type="checkbox" id="reflectC"></label>
           <label for="cloudSel">Clouds <select id="cloudSel"><option value="volumetric">Volumetric</option><option value="simple">Simple</option><option value="off">Off</option></select></label>
           <label for="grassSel">Grass detail <select id="grassSel"><option value="off">Off</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="ultra">Ultra</option></select></label>
           <label for="autoRes">Auto resolution (lowers sharpness a little to keep the frame rate up) <input type="checkbox" id="autoRes"></label>
@@ -742,7 +743,7 @@ const DEFAULT_BINDS={forward:'KeyW',back:'KeyS',left:'KeyA',right:'KeyD',jump:'S
   wall:'KeyQ',floor:'KeyF',ramp:'KeyE',cone:'KeyC',edit:'KeyG',reset:'Mouse2',rotate:'KeyR',pick:'Digit1',gun:'Digit2',pump:'Digit3',bandage:'Digit4',mini:'Digit5',slot6:'Digit6',inventory:'Tab',reload:'KeyT',material:'KeyX',aim:'Mouse2',emote:'KeyB',map:'KeyM',interact:'KeyV'};
 const BIND_LABELS={forward:'Move forward',back:'Move back',left:'Move left',right:'Move right',jump:'Jump',crouch:'Crouch (hold)',
   fire:'Place / select tiles',wall:'Wall',floor:'Floor',ramp:'Ramp',cone:'Cone',edit:'Edit / confirm',reset:'Reset edit',rotate:'Rotate ramp',pick:'Pickaxe',gun:'Slot 2',pump:'Slot 3',bandage:'Slot 4',mini:'Slot 5',slot6:'Slot 6',inventory:'Inventory',reload:'Reload',material:'Switch material',aim:'Aim down sights',emote:'Emote',map:'Full map',interact:'Interact (open, pick up, doors)'};
-const settings={team:0, editRule:'owner', infMats:true, outfit:'rook', pickaxe:'steel', mode:'fight', bot:'adaptive', btnSize:1, btnOpacity:0.7, leftFire:true, emote:'dance', autoRes:true, grassLevel:null, autoFire:false, aimAssist:true, editSens:1, sens:1, fov:78, turbo:0.05, editRelease:true, instantBuild:false, skyDrop:true, shadows:!isTouch, binds:{}};
+const settings={team:0, editRule:'owner', infMats:true, outfit:'rook', pickaxe:'steel', mode:'fight', bot:'adaptive', btnSize:1, btnOpacity:0.7, leftFire:true, emote:'dance', autoRes:true, grassLevel:null, autoFire:false, aimAssist:true, editSens:1, sens:1, fov:78, turbo:0.05, editRelease:true, instantBuild:false, skyDrop:true, shadows:!isTouch, reflect:!isTouch, binds:{}};
 try{ Object.assign(settings, JSON.parse(localStorage.getItem('cranklab.settings')||'{}')); }catch(e){}
 settings.binds=Object.assign({},DEFAULT_BINDS,settings.binds||{});
 /* emotes: picked in the Locker, played with the Emote bind (B) or the smiley button; moving, jumping, shooting or
@@ -783,6 +784,23 @@ function stepDynRes(raw,now){
 }
 renderer.shadowMap.enabled=true;
 renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+// two-step shadows: with two shadow-casting directional lights, the first one's map is used close up and the second
+// one's (coarser, far wider) beyond it, blended over the last few metres of the first
+THREE.ShaderChunk.shadowmap_pars_fragment+=`
+#if defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 1
+float csmShadow() {
+	vec3 p = vDirectionalShadowCoord[ 0 ].xyz / vDirectionalShadowCoord[ 0 ].w;
+	vec2 e = min( p.xy, 1.0 - p.xy );
+	float k = p.z > 1.0 ? 0.0 : clamp( min( e.x, e.y ) / 0.07, 0.0, 1.0 );
+	float s0 = k > 0.0 ? getShadow( directionalShadowMap[ 0 ], directionalLightShadows[ 0 ].shadowMapSize, directionalLightShadows[ 0 ].shadowBias, directionalLightShadows[ 0 ].shadowRadius, vDirectionalShadowCoord[ 0 ] ) : 1.0;
+	float s1 = k < 1.0 ? getShadow( directionalShadowMap[ 1 ], directionalLightShadows[ 1 ].shadowMapSize, directionalLightShadows[ 1 ].shadowBias, directionalLightShadows[ 1 ].shadowRadius, vDirectionalShadowCoord[ 1 ] ) : 1.0;
+	return mix( s1, s0, k );
+}
+#endif`;
+{ const a='\t#if NUM_DIR_LIGHT_SHADOWS > 0\n\tDirectionalLightShadow directionalLight;', c=THREE.ShaderChunk.shadowmask_pars_fragment;
+  if(c.indexOf(a)<0) console.warn('shadow mask chunk not as expected'); THREE.ShaderChunk.shadowmask_pars_fragment=c.replace(a,'\t#if NUM_DIR_LIGHT_SHADOWS > 1\n\tshadow *= receiveShadow ? csmShadow() : 1.0;\n\t#elif NUM_DIR_LIGHT_SHADOWS > 0\n\tDirectionalLightShadow directionalLight;');
+  const b='directLight.color *= all( bvec2( directLight.visible, receiveShadow ) ) ? getShadow( directionalShadowMap[ i ], directionalLightShadow.shadowMapSize, directionalLightShadow.shadowBias, directionalLightShadow.shadowRadius, vDirectionalShadowCoord[ i ] ) : 1.0;', d=THREE.ShaderChunk.lights_fragment_begin;
+  if(d.indexOf(b)<0) console.warn('light chunk not as expected'); THREE.ShaderChunk.lights_fragment_begin=d.replace(b,'#if NUM_DIR_LIGHT_SHADOWS > 1\n\t\t#if UNROLLED_LOOP_INDEX == 0\n\t\tdirectLight.color *= all( bvec2( directLight.visible, receiveShadow ) ) ? csmShadow() : 1.0;\n\t\t#endif\n\t\t#else\n\t\t'+b+'\n\t\t#endif'); }
 renderer.localClippingEnabled=true;
 const scene=new THREE.Scene();
 const SKY=0x8ec4e8, HAZE=0xcfe2ec;
@@ -838,10 +856,18 @@ const bounce=new THREE.DirectionalLight(0xffdcae,0.16); scene.add(bounce); scene
 // // sky fill from above, green bounce from the grass
 const sun=new THREE.DirectionalLight(0xffe9c6, 1.3);
 sun.castShadow=settings.shadows;
-{ const big=!isTouch&&renderer.capabilities.maxTextureSize>=4096?4096:isTouch?1024:2048; sun.shadow.mapSize.set(big,big); }
+{ const big=!isTouch&&renderer.capabilities.maxTextureSize>=4096?4096:2048; sun.shadow.mapSize.set(big,big); }
 const sc=sun.shadow.camera; sc.left=-32; sc.right=32; sc.top=32; sc.bottom=-32; sc.near=1; sc.far=160;
-{ const hb=isTouch?34:45; sun.shadow.bias=isTouch?-0.0006:-0.00028; sun.shadow.normalBias=isTouch?0.02:0.012; sc.left=-hb; sc.right=hb; sc.top=hb; sc.bottom=-hb; sc.far=200; }
+{ const hb=isTouch?48:45; sun.shadow.bias=isTouch?-0.0006:-0.00028; sun.shadow.normalBias=isTouch?0.02:0.012; sc.left=-hb; sc.right=hb; sc.top=hb; sc.bottom=-hb; sc.far=200; }
 scene.add(sun); scene.add(sun.target);
+// the far shadow map's light: same direction as the sun, no light of its own; redrawn a few times a second, not every frame
+const sunFar=new THREE.DirectionalLight(0x000000,0); sunFar.castShadow=settings.shadows&&!isTouch; sunFar.shadow.mapSize.set(2048,2048);
+{ const fc=sunFar.shadow.camera, hb=204.8; fc.left=-hb; fc.right=hb; fc.top=hb; fc.bottom=-hb; fc.near=1; fc.far=1100; sunFar.shadow.bias=-0.0005; sunFar.shadow.normalBias=0.35; sunFar.shadow.autoUpdate=false; sunFar.shadow.needsUpdate=true; }
+scene.add(sunFar); scene.add(sunFar.target);
+const FARS={a:1e9,b:1e9,t:0,dir:new THREE.Vector3()};
+function placeFarShadow(pos){ if(!sunFar.castShadow) return; const now=performance.now(), st=8, a=Math.round(pos.dot(_lX)/st)*st, b=Math.round(pos.dot(_lY)/st)*st; // it follows you in 8 m steps (40 of its texels)
+  if(a===FARS.a&&b===FARS.b&&now-FARS.t<(FARS.dir.equals(SUN_DIR)?420:300)) return; FARS.a=a; FARS.b=b; FARS.t=now; FARS.dir.copy(SUN_DIR);
+  sunFar.target.position.set(0,0,0).addScaledVector(_lX,a).addScaledVector(_lY,b).addScaledVector(SUN_DIR,pos.dot(SUN_DIR)); sunFar.position.copy(sunFar.target.position).addScaledVector(SUN_DIR,520); sunFar.shadow.needsUpdate=true; }
 const _lX=new THREE.Vector3(0,1,0).cross(SUN_DIR).normalize(), _lY=SUN_DIR.clone().cross(_lX).normalize(); // light-space axes for shadow snapping
 const rimL=new THREE.DirectionalLight(0xbfe1ff,0.3); rimL.position.set(-40,30,-50); scene.add(rimL); bounce.position.set(-SUN_DIR.x*40,-22,-SUN_DIR.z*40); // cool back light for a toon rim
 
@@ -1064,18 +1090,22 @@ function makeWorldGen(o){
       if(dd<1.6){ const k1=dd<1?1-dd:0, core=k1*k1*(3-2*k1), foot=sstep(1.6,0.2,dd), along=0.55+0.45*(4*t*(1-t));
         h+=M.P*along*(core*core*(0.25+1.1*ridged(u/210+M.ox,v/210+M.oz,6,60+i*7,0.47))+0.22*foot); } }
     // the outer range: big ridged mountains (long crests, deep valleys) that close the island in
-    const hb=h;
+    const hb=h; let rid=0.42;
     const de=d+70*fbm(u*0.002,v*0.002,2,20), oR=sstep(MAP_R-130,MAP_R+300,de);
     if(oR>0){ const wu=u+90*fbm(u*0.0012,v*0.0012,2,22), wv=v+90*fbm(u*0.0012+3.3,v*0.0012,2,23);
-      h+=oR*(50+(170+230*oR)*ridged(wu*0.0016,wv*0.0016,6,21,0.44)); }
+      rid=ridged(wu*0.0016,wv*0.0016,6,21,0.44); h+=oR*(50+(170+230*oR)*rid); }
     h*=s;
-    if(SEA){ const al=u*SEA.nx+v*SEA.nz; if(al>SEA.C0-130){ const lat=v*SEA.nx-u*SEA.nz, w=1-sstep(0.30,0.46,Math.atan2(Math.abs(lat),al));
-      if(w>0){ const c=al-SEA.C0-0.0005*lat*lat-16*fbm(lat*0.006+3.1,al*0.006,2,91), bed=c<0?SEA.Y+0.25-c*0.05:SEA.Y-0.15-Math.min(9,c*0.05), b=sstep(-75,-18,c), g0=hb*s; return h+((g0+(bed-g0)*b)-h)*w; } } }
+    seaLast=0;
+    if(SEA){ const al=u*SEA.nx+v*SEA.nz; if(al>SEA.C0-130){ const lat=v*SEA.nx-u*SEA.nz, ang=Math.atan2(Math.abs(lat),al);
+      if(ang<0.85){ // the sides of the bay follow the mountains: crests run out to sea as headlands, valleys drown as coves, and neither side is straight
+        const out=sstep(SEA.C0+20,SEA.C0+260,al), rng=Math.min(1,oR*4);
+        const aE=ang+0.34*(rid-0.42)*out*rng+0.085*fbm(u*0.0042+9.1,v*0.0042,2,93)*(0.4+0.6*out)+0.03*fbm(u*0.013,v*0.013+4.4,2,94)*out, A=lat<0?0.21:0.27, w=1-sstep(A,A+0.15,aE);
+        if(w>0){ seaLast=w; const c=seaC=al-SEA.C0-0.0005*lat*lat-18*fbm(lat*0.006+3.1,al*0.006,2,91), bed=c<0?SEA.Y+0.25-c*0.05:SEA.Y-0.15-Math.min(9,c*0.05), b=sstep(-75,-18,c), g0=Math.max(0,hb*s), h0=h<0?0:h; return h0+((g0+(bed-g0)*b)-h0)*w; } } } } // (inland stays at or above 0, as everywhere else: only the bay floods)
     return h<0?0:h; }
   // the sea: a sector of the rim (toward one town) where the outer range gives way to a beach and open water
-  let SEA=null;
-  const seaW=(u,v)=>{ if(!SEA) return 0; const al=u*SEA.nx+v*SEA.nz; if(al<=SEA.C0-130) return 0; return 1-sstep(0.30,0.46,Math.atan2(Math.abs(v*SEA.nx-u*SEA.nz),al)); };
-  return {genH,MASSIFS,setSea:s=>{ SEA=s; },sea:()=>SEA,seaW,seaTop:()=>SEA?SEA.Y+1.4:-1e9,sandAt:(u,v,h)=>SEA?sstep(SEA.Y+2.6,SEA.Y+1.3,h)*seaW(u,v):0};
+  let SEA=null, seaLast=0, seaC=0;
+  const seaW=(u,v)=>{ if(!SEA) return 0; const al=u*SEA.nx+v*SEA.nz; if(al<=SEA.C0-130||Math.atan2(Math.abs(v*SEA.nx-u*SEA.nz),al)>=0.85) return 0; genH(u,v); return seaLast; };
+  return {genH,MASSIFS,setSea:s=>{ SEA=s; },sea:()=>SEA,seaW,seaTop:()=>SEA?SEA.Y+1.4:-1e9,sandAt:(u,v,h)=>{ if(!SEA||h>SEA.Y+2.6) return 0; const w=seaW(u,v); return w>0?sstep(SEA.Y+2.6,SEA.Y+1.3,h)*w*sstep(-125,-75,seaC):0; }}; // sand only along the shore
 }
 
 /* ---------- baking the playable area into a heightfield, with towns and roads ----------
@@ -1179,7 +1209,7 @@ function bakeWorld(o){
     ROCK[c]=Math.round(rock*255); SNOW[c]=Math.round(snow*255); GRASS[c]=RD[c]<4.8?0:Math.round((1-rock)*(1-snow)*255); }
   // sand and water: SAND is how sandy a cell is, WS the height of the water surface over it (-1e4 where it is dry)
   const SAND=new Uint8Array(N*N), WS=new Float32Array(N*N).fill(-1e4), sea=o.gen.sea();
-  if(sea) for(let j=0;j<N;j++){ const v=-HALF+j*HS; for(let i=0;i<N;i++){ const u=-HALF+i*HS, w=o.gen.seaW(u,v); if(w<=0) continue; const c=j*N+i, h=H[c], sd=sstep(sea.Y+2.6,sea.Y+1.3,h)*w;
+  if(sea) for(let j=0;j<N;j++){ const v=-HALF+j*HS; for(let i=0;i<N;i++){ const u=-HALF+i*HS, w=o.gen.seaW(u,v); if(w<=0) continue; const c=j*N+i, h=H[c], sd=o.gen.sandAt(u,v,h);
     SAND[c]=Math.round(255*sd); if(sd>0.25) GRASS[c]=0; if(sd>0.5) ROCK[c]=Math.round(ROCK[c]*0.3); if(h<sea.Y&&w>0.02) WS[c]=sea.Y; } }
   return {N,H0,H,RD,ROCK,SNOW,GRASS,SAND,WS,at,towns,roads,edges:edges.length};
 
@@ -1416,28 +1446,34 @@ function shoreAt(x,z){ const c=worldCell(x,z); return c>=0&&(WORLD.WS[c]>-999||W
     const o=(y*NS+x)*4; d[o]=Math.max(0,Math.min(255,128+gx*26)); d[o+1]=Math.max(0,Math.min(255,128+gy*26)); d[o+2]=255; d[o+3]=255; }
   const nT=new THREE.DataTexture(d,NS,NS,THREE.RGBAFormat); nT.wrapS=nT.wrapT=THREE.RepeatWrapping; nT.magFilter=THREE.LinearFilter; nT.minFilter=THREE.LinearMipmapLinearFilter; nT.generateMipmaps=true; nT.needsUpdate=true;
   WATER.mat=new THREE.ShaderMaterial({ transparent:true, depthWrite:false, fog:false,
-    uniforms:{ nT:{value:nT}, time:{value:0}, lum:{value:1}, sunDir:{value:SUN_DIR.clone()}, sunCol:{value:new THREE.Color(1,0.95,0.86)}, zen:{value:new THREE.Color(0x3f86d4)}, hor:{value:new THREE.Color(HAZE)}, fogCol:{value:new THREE.Color(HAZE)} },
+    uniforms:{ nT:{value:nT}, reflT:{value:(()=>{ const t=new THREE.DataTexture(new Uint8Array([0,0,0,255]),1,1,THREE.RGBAFormat); t.needsUpdate=true; return t; })()}, reflM:{value:new THREE.Matrix4()}, reflK:{value:0}, time:{value:0}, lum:{value:1}, sunDir:{value:SUN_DIR.clone()}, sunCol:{value:new THREE.Color(1,0.95,0.86)}, zen:{value:new THREE.Color(0x3f86d4)}, hor:{value:new THREE.Color(HAZE)}, fogCol:{value:new THREE.Color(HAZE)} },
     vertexShader:`attribute float depth; attribute vec2 flow; varying vec3 vW; varying float vDepth; varying vec2 vFlow;
       void main(){ vec4 w=modelMatrix*vec4(position,1.0); vW=w.xyz; vDepth=depth; vFlow=flow; gl_Position=projectionMatrix*viewMatrix*w; }`,
-    fragmentShader:`uniform sampler2D nT; uniform float time, lum; uniform vec3 sunDir, sunCol, zen, hor, fogCol; varying vec3 vW; varying float vDepth; varying vec2 vFlow;
+    fragmentShader:`uniform sampler2D nT, reflT; uniform mat4 reflM; uniform float time, lum, reflK; uniform vec3 sunDir, sunCol, zen, hor, fogCol; varying vec3 vW; varying float vDepth; varying vec2 vFlow;
+      #ifdef TONE_MAPPING
+        #define TM(c) toneMapping(c)
+      #else
+        #define TM(c) (c)
+      #endif
       void main(){ float dist=length(cameraPosition-vW); vec3 V=(cameraPosition-vW)/dist; vec2 p=vW.xz-vFlow*time;
         vec2 n1=texture2D(nT,p*0.021+vec2(time*0.011,time*0.007)).xy-0.5, n2=texture2D(nT,p*0.063+vec2(-time*0.02,time*0.016)).xy-0.5, n3=texture2D(nT,p*0.19+vec2(time*0.03,-time*0.027)).xy-0.5;
         float fade=1.0/(1.0+dist*0.012); vec2 a=(n1*1.1+n2*0.8+n3*0.5*fade)*(0.3+0.7*fade)*1.25;
         vec3 N=normalize(vec3(a.x,1.0,a.y));
         float F=0.03+0.97*pow(1.0-max(dot(N,V),0.0),5.0);
         vec3 R=reflect(-V,N); R.y=abs(R.y);
-        vec3 sky=mix(hor,zen,pow(R.y,0.55));
-        vec3 body=mix(vec3(0.20,0.62,0.66),vec3(0.03,0.22,0.36),smoothstep(0.0,4.5,vDepth))*lum;
-        vec3 col=mix(body,sky,F);
-        float sr=max(dot(R,sunDir),0.0); col+=sunCol*(pow(sr,220.0)*2.2+pow(sr,28.0)*0.1);                 // glitter
+        float fg=min(1.0-exp(-dist*0.0011),0.92);
+        vec3 mir=TM(mix(mix(hor,zen,pow(R.y,0.55)),fogCol,fg));                                              // with no mirror image: the sky, by angle
+        if(reflK>0.0){ vec4 rc=reflM*vec4(vW,1.0); vec2 ruv=rc.xy/rc.w+a*vec2(0.022,0.05)/(1.0+dist*0.03);   // the mirror image, wobbled by the ripples
+          mir=mix(mir,texture2D(reflT,clamp(ruv,0.003,0.997)).rgb,reflK); }
+        vec3 body=TM(mix(mix(vec3(0.20,0.62,0.66),vec3(0.03,0.22,0.36),smoothstep(0.0,4.5,vDepth))*lum,fogCol,fg));
+        vec3 col=mix(body,mir,F);
+        float sr=max(dot(R,sunDir),0.0); col+=sunCol*(pow(sr,220.0)*2.2+pow(sr,28.0)*0.1)*(1.0-fg);          // glitter
         float fn=texture2D(nT,vW.xz*0.09+vec2(time*0.02,0.0)).x;
         float foam=(1.0-smoothstep(0.0,0.5,vDepth))*smoothstep(0.35,0.6,fn+0.25*sin(time*1.3+vW.x*0.3+vW.z*0.2));
         foam=max(foam,(1.0-smoothstep(0.0,0.12,vDepth))*0.9);
-        col=mix(col,vec3(0.96,0.98,1.0)*(0.35+0.65*lum),foam*0.85);
+        col=mix(col,TM(mix(vec3(0.96,0.98,1.0)*(0.35+0.65*lum),fogCol,fg)),foam*0.85);
         float al=smoothstep(0.0,0.18,vDepth)*mix(0.62,0.96,smoothstep(0.0,2.5,vDepth)); al=max(al,F*smoothstep(0.0,0.1,vDepth)); al=max(al,foam*0.8);
-        col=mix(col,fogCol,min(1.0-exp(-dist*0.0011),0.92));
         gl_FragColor=vec4(col,al);
-        #include <tonemapping_fragment>
       }` });
   for(let c=0;c<WN*WN;c++) if(WORLD.SAND[c]>64||WORLD.WS[c]>-999) WORLD.GRASS[c]=0; // no grass on the beach or under water
   const S=WGEN.sea(); if(!S) return;
@@ -1454,7 +1490,37 @@ function shoreAt(x,z){ const c=worldCell(x,z); return c>=0&&(WORLD.WS[c]>-999||W
   const MS=Math.floor(WN/2), mc=document.createElement('canvas'); mc.width=mc.height=MS; const mg=mc.getContext('2d'), im=mg.createImageData(MS,MS);
   for(let j=0;j<MS;j++) for(let i=0;i<MS;i++){ const q=(j*2)*WN+i*2, o=(j*MS+i)*4, sd=WORLD.SAND[q]; if(WORLD.WS[q]>-999){ const dp=Math.min(1,(WORLD.WS[q]-WH[q])/5); im.data[o]=70-34*dp; im.data[o+1]=150-50*dp; im.data[o+2]=204-40*dp; im.data[o+3]=255; } else if(sd>20){ im.data[o]=222; im.data[o+1]=204; im.data[o+2]=158; im.data[o+3]=sd; } }
   mg.putImageData(im,0,0); WATER.map=mc;
+  // where the nearest water is, on a coarse grid (for the mirror image): its level, and how far off it is
+  const LC=32, LN=Math.ceil(2*WHALF/LC), lv=new Float32Array(LN*LN).fill(-1e4), ld=new Float32Array(LN*LN).fill(1e4), src=[], per=LC/WHS;
+  for(let j=0;j<LN;j++) for(let i=0;i<LN;i++){ let best=-1e4; for(let b=0;b<per&&best<-999;b+=2) for(let a=0;a<per;a+=2){ const q=Math.min(WN-1,j*per+b)*WN+Math.min(WN-1,i*per+a); if(WORLD.WS[q]>-999){ best=WORLD.WS[q]; break; } }
+    if(best>-999){ lv[j*LN+i]=best; ld[j*LN+i]=0; src.push(j*LN+i); } }
+  for(let j=0;j<LN;j++) for(let i=0;i<LN;i++){ const k=j*LN+i; if(ld[k]===0) continue; let bd=1e9, bl=-1e4; for(const q of src){ const di=(q%LN)-i, dj=Math.floor(q/LN)-j, d=di*di+dj*dj; if(d<bd){ bd=d; bl=lv[q]; } } if(bd<1e9){ ld[k]=Math.sqrt(bd)*LC; lv[k]=bl; } }
+  WATER.lv=lv; WATER.ld=ld; WATER.LN=LN; WATER.LC=LC;
 })();
+const REFL={rt:null,cam:new THREE.PerspectiveCamera(),m:new THREE.Matrix4(),plane:new THREE.Plane(),clip:new THREE.Vector4(),q:new THREE.Vector4(),sz:new THREE.Vector2(),t:new THREE.Vector3(),hid:[]};
+function renderReflection(){ if(!WATER.mat) return; const u=WATER.mat.uniforms; u.reflK.value=0;
+  if(settings.reflect===false||!WATER.lv||!scene.visible) return;
+  const cp=camera.position, LN=WATER.LN, i=Math.max(0,Math.min(LN-1,Math.floor((cp.x-SPAWN[0]+WHALF)/WATER.LC))), j=Math.max(0,Math.min(LN-1,Math.floor((cp.z-SPAWN[2]+WHALF)/WATER.LC))), lvl=WATER.lv[j*LN+i], off=WATER.ld[j*LN+i], hgt=cp.y-lvl;
+  if(lvl<-999||off>300||hgt<0.12||hgt>180) return; // no water near, or too high up for it to matter
+  const K=(1-sstep(180,300,off))*(1-sstep(120,180,hgt)); if(K<0.01) return;
+  renderer.getDrawingBufferSize(REFL.sz); const w=Math.max(64,Math.round(REFL.sz.x*0.5)), h=Math.max(64,Math.round(REFL.sz.y*0.5));
+  if(!REFL.rt){ REFL.rt=new THREE.WebGLRenderTarget(w,h,{minFilter:THREE.LinearFilter,magFilter:THREE.LinearFilter,format:THREE.RGBAFormat}); u.reflT.value=REFL.rt.texture; } else if(REFL.rt.width!==w||REFL.rt.height!==h) REFL.rt.setSize(w,h);
+  // the camera's mirror image below the surface
+  const vc=REFL.cam; camera.updateMatrixWorld(); vc.position.set(cp.x,2*lvl-cp.y,cp.z);
+  REFL.t.set(0,0,-1).applyQuaternion(camera.quaternion).add(cp); REFL.t.y=2*lvl-REFL.t.y;
+  vc.up.set(0,1,0).applyQuaternion(camera.quaternion); vc.up.y=-vc.up.y; vc.lookAt(REFL.t); vc.updateMatrixWorld(); vc.projectionMatrix.copy(camera.projectionMatrix);
+  REFL.m.set(0.5,0,0,0.5, 0,0.5,0,0.5, 0,0,0.5,0.5, 0,0,0,1).multiply(vc.projectionMatrix).multiply(vc.matrixWorldInverse);
+  // its near plane is tilted onto the water surface, so nothing below the surface is drawn (Lengyel's oblique clipping)
+  REFL.plane.normal.set(0,1,0); REFL.plane.constant=-lvl; REFL.plane.applyMatrix4(vc.matrixWorldInverse);
+  const cl=REFL.clip.set(REFL.plane.normal.x,REFL.plane.normal.y,REFL.plane.normal.z,REFL.plane.constant), pe=vc.projectionMatrix.elements, q=REFL.q;
+  q.set((Math.sign(cl.x)+pe[8])/pe[0],(Math.sign(cl.y)+pe[9])/pe[5],-1,(1+pe[10])/pe[14]); cl.multiplyScalar(2/cl.dot(q));
+  pe[2]=cl.x; pe[6]=cl.y; pe[10]=cl.z+1-0.003; pe[14]=cl.w;
+  const hid=REFL.hid; hid.length=0; for(const o of [...WATER.meshes,VCLOUD.sky,grassMesh,flowerMesh]) if(o&&o.visible){ o.visible=false; hid.push(o); }
+  const prev=renderer.getRenderTarget(), au=renderer.shadowMap.autoUpdate; renderer.shadowMap.autoUpdate=false; // the shadow maps from the last frame serve
+  renderer.setRenderTarget(REFL.rt); renderer.clear(); renderer.render(scene,vc); renderer.setRenderTarget(prev); renderer.shadowMap.autoUpdate=au;
+  for(const o of hid) o.visible=true;
+  u.reflM.value.copy(REFL.m); u.reflK.value=K;
+}
 
 /* ---------- roads: asphalt with white edge lines and a dashed yellow centre, plus a paved square in each town ---------- */
 let roadPlainTex=null;
@@ -5159,13 +5225,13 @@ function updateCamera(){
   const hits=ray.intersectObjects(nearMeshes(P.pos.x,P.pos.z,1),false);
   if(hits.length) dist=Math.max(0.25,hits[0].distance-0.3);
   camera.position.copy(pivot).addScaledVector(want,dist);
-  { const gy=terrainH(camera.position.x,camera.position.z)+0.35; if(camera.position.y<gy) camera.position.y=gy; } // never inside a hill
+  { const gy=Math.max(terrainH(camera.position.x,camera.position.z)+0.35,waterAt(camera.position.x,camera.position.z)+0.3); if(camera.position.y<gy) camera.position.y=gy; } // never inside a hill, never under water
   camera.rotation.set(P.pitch,P.yaw,0);
   if(shake>0){ camera.position.x+=(Math.random()-.5)*shake; camera.position.y+=(Math.random()-.5)*shake; shake=Math.max(0,shake-lastDt*1.6); }
   camDist=dist; hero.visible=dist>0.85&&!scopeOn; // through a scope you see what the scope sees
   // the shadow box follows you in whole shadow-map texels, so shadow edges don't crawl as you move
   { const st=(sc.right-sc.left)/sun.shadow.mapSize.x, a=Math.round(P.pos.dot(_lX)/st)*st, b=Math.round(P.pos.dot(_lY)/st)*st, c=P.pos.dot(SUN_DIR);
-    sun.target.position.set(0,0,0).addScaledVector(_lX,a).addScaledVector(_lY,b).addScaledVector(SUN_DIR,c); sun.position.copy(sun.target.position).addScaledVector(SUN_DIR,65); }
+    sun.target.position.set(0,0,0).addScaledVector(_lX,a).addScaledVector(_lY,b).addScaledVector(SUN_DIR,c); sun.position.copy(sun.target.position).addScaledVector(SUN_DIR,65); placeFarShadow(P.pos); }
   skyDome.position.copy(camera.position);
 }
 
@@ -5237,11 +5303,12 @@ function bindSettings(){
   sens.value=settings.sens; fov.value=settings.fov; ts.value=String(settings.turbo); er.checked=settings.editRelease; sh.checked=settings.shadows;
   const show=()=>{ $('sensV').textContent=(+settings.sens).toFixed(2)+'×'; $('fovV').textContent=settings.fov+'°'; };
   show();
+  { const rf=$('reflectC'); rf.checked=settings.reflect!==false; rf.addEventListener('change',()=>{ settings.reflect=rf.checked; saveSettings(); }); }
   sens.addEventListener('input',()=>{ settings.sens=+sens.value; show(); saveSettings(); });
   fov.addEventListener('input',()=>{ settings.fov=+fov.value; applyFov(); show(); saveSettings(); });
   ts.addEventListener('change',()=>{ settings.turbo=+ts.value; saveSettings(); });
   er.addEventListener('change',()=>{ settings.editRelease=er.checked; saveSettings(); });
-  sh.addEventListener('change',()=>{ settings.shadows=sh.checked; sun.castShadow=sh.checked; saveSettings(); });
+  sh.addEventListener('change',()=>{ settings.shadows=sh.checked; sun.castShadow=sh.checked; sunFar.castShadow=sh.checked&&!isTouch; sunFar.shadow.needsUpdate=true; FARS.t=0; saveSettings(); });
   const csl=$('cloudSel'); csl.value=settings.clouds||'volumetric'; csl.addEventListener('change',()=>{ setCloudMode(csl.value); saveSettings(); });
   const gsl=$('grassSel'); gsl.value=settings.grassLevel; gsl.addEventListener('change',()=>{ settings.grassLevel=gsl.value; if(gsl.value!=='off') setGrassLevel(gsl.value); saveSettings(); });
   const ar=$('autoRes'); ar.checked=settings.autoRes!==false; ar.addEventListener('change',()=>{ settings.autoRes=ar.checked; saveSettings(); });
@@ -6577,7 +6644,8 @@ function stepSky(dt){
   const th=t<0.6?lr(E,PI-E,t/0.6):t<0.68?lr(PI-E,PI+E,(t-0.6)/0.08):t<0.92?lr(PI+E,2*PI-E,(t-0.68)/0.24):lr(2*PI-E,2*PI+E,(t-0.92)/0.08); TOD.t=t;
   SKY_SUN.set(Math.cos(th),Math.sin(th)*0.866,Math.sin(th)*0.5); const el=SKY_SUN.y, sunW=sm(0,0.2,el), moonW=sm(0,0.2,-el), setK=1-sm(0,0.4,Math.abs(el-0.02)), nightK=sm(0.06,-0.18,el); TOD.night=nightK;
   // the light: from the sun, or from the moon opposite it; never lower than about 14 degrees
-  _skyT.copy(SKY_SUN).multiplyScalar(el>=0?1:-1); _skyT.y=Math.max(_skyT.y,0.25); SUN_DIR.copy(_skyT.normalize());
+  { const tq=Math.round(th/0.0015)*0.0015; _skyT.set(Math.cos(tq),Math.sin(tq)*0.866,Math.sin(tq)*0.5).multiplyScalar(el>=0?1:-1); } // the light moves in small steps, so shadows hold still between them
+  _skyT.y=Math.max(_skyT.y,0.25); SUN_DIR.copy(_skyT.normalize());
   _lX.set(0,1,0).cross(SUN_DIR).normalize(); _lY.copy(SUN_DIR).cross(_lX).normalize(); bounce.position.set(-SUN_DIR.x*40,-22,-SUN_DIR.z*40);
   const c=PAL.cur, hk=duskK*0.85; for(const k in c){ c[k].copy(PAL.day[k]).lerp(PAL.set[k],setK).lerp(PAL.night[k],nightK).lerp(PAL.horde[k],k==='light'||k==='csun'||k==='glow'?0:hk); }
   if(el>=0){ sun.color.copy(PAL.day.light).lerp(PAL.set.light,setK); sun.intensity=1.3*sunW*(1-0.28*setK)*(1-0.45*duskK); } else { sun.color.copy(PAL.night.light); sun.intensity=0.55*moonW*(1-0.2*duskK); }
@@ -7147,10 +7215,13 @@ function farTreeGeo(kind,v){ const q=seeded(5303+v*977+(kind==='pine'?31:0)), pa
   return out; }
 function initForest(){ const trees=props.filter(p=>p.lazy), mk=(geo,mat,n,shadow)=>{ const m=new THREE.InstancedMesh(geo,mat,Math.max(1,n)); m.setColorAt(0,new THREE.Color(1,1,1)); m.count=0; m.frustumCulled=false; m.castShadow=shadow; m.receiveShadow=true;
     m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.instanceColor.setUsage(THREE.DynamicDrawUsage); scene.add(m); return m; };
-  FOREST.near={}; FOREST.far={};
+  FOREST.near={}; FOREST.far={}; FOREST.mid={};
+  const midDepth=new THREE.MeshDepthMaterial({depthPacking:THREE.RGBADepthPacking}); // drawn into the wide shadow map only: in the sharp one near you they'd be out of range anyway
+  midDepth.onBeforeCompile=sh=>{ sh.vertexShader=sh.vertexShader.replace('#include <project_vertex>','#include <project_vertex>\n\tif( projectionMatrix[ 0 ][ 0 ] > 0.012 ) gl_Position = vec4( 2.0, 2.0, 2.0, 1.0 );'); };
   for(const kind of ['tree','pine']){ const n=trees.filter(p=>p.kind===kind).length;
     FOREST.near[kind]=[...Array(8)].map((_,v)=>{ const V=propVariant(kind,v); return mk(V.geo,V.mat,trees.filter(p=>p.kind===kind&&p.id%8===v).length,true); });
-    FOREST.far[kind]=[...Array(4)].map((_,v)=>mk(farTreeGeo(kind,v),propVariant(kind,0).mat,trees.filter(p=>p.kind===kind&&p.id%4===v).length,false)); }
+    FOREST.far[kind]=[...Array(4)].map((_,v)=>mk(farTreeGeo(kind,v),propVariant(kind,0).mat,trees.filter(p=>p.kind===kind&&p.id%4===v).length,false));
+    FOREST.mid[kind]=FOREST.far[kind].map(f=>{ const m=mk(f.geometry,f.material,f.instanceMatrix.count,true); m.customDepthMaterial=midDepth; return m; }); }
   FOREST.trees=trees; forestDirty=true; }
 const _fc=new THREE.Color(), _fm=new THREE.Matrix4();
 function stepForest(dt){ if(!FOREST.near) return; FOREST.t-=dt; const cx=camera.position.x, cz=camera.position.z;
@@ -7159,8 +7230,8 @@ function stepForest(dt){ if(!FOREST.near) return; FOREST.t-=dt; const cx=camera.
   const cnt=new Map(); const push=(m,p)=>{ const i=cnt.get(m)||0; p.g.updateMatrix(); _fm.copy(p.g.matrix); m.setMatrixAt(i,_fm); const t=p.tint||1; m.setColorAt(i,_fc.setRGB(t,t*(0.97+0.06*((p.id*37)%10)/10),t)); cnt.set(m,i+1); };
   const N2=NEAR_TREE*NEAR_TREE, F2=FAR_TREE*FAR_TREE;
   for(const p of FOREST.trees){ if(p.gone||!p.alive||p.g.parent) continue; const dx=p.x-cx, dz=p.z-cz, d2=dx*dx+dz*dz; if(d2>F2) continue;
-    if(d2<N2) push(FOREST.near[p.kind][p.id%8],p); else if(d2<420000||(d2<1000000?p.id%2===0:p.id%3===0)) push(FOREST.far[p.kind][p.id%4],p); } // deep in the haze, every other (then every third) tree is plenty
-  for(const set of [FOREST.near,FOREST.far]) for(const kind in set) for(const m of set[kind]){ const n=cnt.get(m)||0; m.count=n; if(n){ m.instanceMatrix.needsUpdate=true; m.instanceColor.needsUpdate=true; } } }
+    if(d2<N2) push(FOREST.near[p.kind][p.id%8],p); else if(d2<46000) push(FOREST.mid[p.kind][p.id%4],p); else if(d2<420000||(d2<1000000?p.id%2===0:p.id%3===0)) push(FOREST.far[p.kind][p.id%4],p); } // deep in the haze, every other (then every third) tree is plenty
+  for(const set of [FOREST.near,FOREST.mid,FOREST.far]) for(const kind in set) for(const m of set[kind]){ const n=cnt.get(m)||0; m.count=n; if(n){ m.instanceMatrix.needsUpdate=true; m.instanceColor.needsUpdate=true; } } }
 // a tree's own mesh (for the pickaxe to hit, and while it shakes, falls or grows)
 function treeMesh(p){ if(p.g.children.length) return p.g.children[0]; const V=propVariant(p.kind,p.id%8), m=new THREE.Mesh(V.geo,V.mat); m.castShadow=m.receiveShadow=true; m.userData.piece=p; p.g.add(m); return m; }
 function treeAnim(p){ const moving=p.wob>0||p.dying>0||(p.alive&&p.grow<1);
@@ -8495,7 +8566,7 @@ function rbSpectate(){ if(!RB.wait) return false; const mine=RB.cards.get(net.id
   const gy=terrainH(camera.position.x,camera.position.z)+0.4; if(camera.position.y<gy) camera.position.y=gy; camera.lookAt(px,py,pz);
   hero.visible=false; skyDome.position.copy(camera.position);
   { const st=(sc.right-sc.left)/sun.shadow.mapSize.x, a=Math.round(pl.pos.dot(_lX)/st)*st, b=Math.round(pl.pos.dot(_lY)/st)*st, cc=pl.pos.dot(SUN_DIR);
-    sun.target.position.set(0,0,0).addScaledVector(_lX,a).addScaledVector(_lY,b).addScaledVector(SUN_DIR,cc); sun.position.copy(sun.target.position).addScaledVector(SUN_DIR,65); }
+    sun.target.position.set(0,0,0).addScaledVector(_lX,a).addScaledVector(_lY,b).addScaledVector(SUN_DIR,cc); sun.position.copy(sun.target.position).addScaledVector(SUN_DIR,65); placeFarShadow(pl.pos); }
   return true; }
 // ---- map icons ----
 function rbVanIcon(g,x,y,s,ready){ g.save(); g.translate(x,y); g.fillStyle=ready?'#1f5fd8':'#59606b'; g.strokeStyle='#fff'; g.lineWidth=1.4*s/7; const w=s*1.5, h=s*1.1;
@@ -8693,7 +8764,7 @@ function frame(now){
     if(net.role==='host'){ party.syncT-=dt; if(party.syncT<=0){ party.syncT=2; partySync(); }
       net.pingT-=dt; if(net.pingT<=0){ net.pingT=1; const t=performance.now(); net.conns.forEach((c,id)=>{ if(t-(net.seen.get(id)||t)>9000&&c._gone){ c._gone(); return; } if(c.open) try{c.send({type:'ping',t});}catch(e){} }); } } }
   fitView(); updateCamera(); stepTerrain(camera.position.x,camera.position.z); animateHero(dt); updateGhost(); updateHUD();
-  if(!(menu.classList.contains('lobby')&&!menu.hidden&&(++_lobbySkip%4))){ renderClouds(); renderer.render(scene,camera); }
+  if(!(menu.classList.contains('lobby')&&!menu.hidden&&(++_lobbySkip%4))){ renderClouds(); renderReflection(); renderer.render(scene,camera); }
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
