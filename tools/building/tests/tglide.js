@@ -6,5 +6,5 @@ const {sleep,page,launch,open}=require('./h.js');
    T.skyDrop(T.SPAWN[0],T.SPAWN[2],400); run(false,90); run(true,2); run(false,30); const a=P.sky&&P.sky.phase; // jump: glider out
    run(false,60); run(true,2); run(false,10); const b=P.sky&&P.sky.phase; // jump: let go
    run(false,50); run(true,2); run(false,10); const c=P.sky&&P.sky.phase; // jump: out again
-   for(let i=0;i<60*120&&P.sky;i++) run(false,1); return {a,b,c,landed:!P.sky,hp:P.hp}; });
+   P.pitch=-0.8; for(let i=0;i<60*120&&P.sky;i++) run(false,1); return {a,b,c,landed:!P.sky,hp:P.hp}; });
  console.log(JSON.stringify(r), r.a==='glide'&&r.b==='fall'&&r.c==='glide'&&r.landed&&r.hp===100?'PASS':'FAIL'); console.log(errs.join('\n')||'no errors'); await b.close(); })();

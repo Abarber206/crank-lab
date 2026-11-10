@@ -14,7 +14,7 @@ const {sleep,page,launch,open}=require('./h.js');
    out.deployAt=deployAt; out.maxV=maxV; out.landT=landT; out.hp=P.hp+'/'+hp0; out.onGround=P.onGround; out.dist=Math.hypot(P.pos.x-T.SPAWN[0],P.pos.z-T.SPAWN[2]);
    // second drop: no dive, jump to deploy early
    T.skyDrop(T.SPAWN[0],T.SPAWN[2],300); P.pitch=0; let t2=0; for(;t2<2;t2+=dt){ T.moveBody(P,0,0,t2>1.5,dt); T.physStep(dt);} out.earlyDeploy=P.sky&&P.sky.phase; 
-   for(let i=0;i<60*120&&P.sky;i++){ T.moveBody(P,0,0,false,dt); T.physStep(dt); T.stepFall(); } out.hp2=P.hp; out.sky2=P.sky;
+   P.pitch=-0.8; for(let i=0;i<60*120&&P.sky;i++){ T.moveBody(P,0,0,false,dt); T.physStep(dt); T.stepFall(); } out.hp2=P.hp; out.sky2=P.sky;
    return out; });
  console.log(JSON.stringify(r));
  const ok=r.start==='fall'&&r.h0>550&&r.place===false&&r.deployAt>60&&r.deployAt<90&&r.maxV>50&&r.landT&&r.hp.startsWith('100')&&r.onGround&&r.earlyDeploy==='glide'&&r.hp2===100&&r.sky2===null;

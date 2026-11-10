@@ -2858,23 +2858,26 @@ function skyDrop(x,z,h,E=P){ E.pos.set(x,terrainH(x,z)+h,z); E.vel.set(0,-6,0); 
   E.sky={phase:'fall',t:0,dive:0,jumpWas:true}; if(E===P){ if(edit) exitEdit(false); fireHeld=false; adsHeld=false; if(mode==='build') selectPick(); sfx('sky_start'); } }
 function skyGround(E){ const [g]=groundAt(E.pos.x,E.pos.z,E.pos.y+0.4,solidNear(E)); return g; }
 function deployGlider(E){ if(!E.sky||E.sky.phase!=='fall') return; E.sky.phase='glide'; E.sky.gt=0; E.sky.as=null; if(E===P){ sfx('glider_open'); shake=Math.max(shake,0.05); } }
-function endSky(E){ E.sky=null; E.fallTop=null; if(E.vel.y<-7) E.vel.y=-7; }
+function endSky(E){ const gl=E.sky&&E.sky.phase==='glide'; E.sky=null; E.fallTop=null; if(E.vel.y<-7) E.vel.y=-7;
+  if(E===P){ camDip=Math.min(camDip,-0.22); sfx('land'); skyFovK*=0.5; } if(E.pos.distanceTo(P.pos)<60) burst(E.pos.clone().setY(E.pos.y+0.1),gl?8:14,gl?2.4:4,0.08,typeof dustMat!=='undefined'?dustMat:undefined); }
 function skyMove(E,fw,st,jump,dt){ const S=E.sky; S.t+=dt;
   const fx=-Math.sin(E.yaw), fz=-Math.cos(E.yaw), rx=Math.cos(E.yaw), rz=-Math.sin(E.yaw), above=E.pos.y-skyGround(E);
   let tx, tz, ty, acc;
   if(S.phase==='fall'){
     S.dive+=((fw>0.3&&E.pitch<-0.45?1:0)-S.dive)*Math.min(1,dt*2.5);
-    const sp=12+12*S.dive; let wx=fx*fw+rx*st, wz=fz*fw+rz*st; const m=Math.hypot(wx,wz); if(m>1){ wx/=m; wz/=m; }
-    tx=wx*sp; tz=wz*sp; ty=-(38+22*S.dive); acc=9;
+    const sp=24-6*S.dive; let wx=fx*fw+rx*st, wz=fz*fw+rz*st; const m=Math.hypot(wx,wz); if(m>1){ wx/=m; wz/=m; }
+    tx=wx*sp; tz=wz*sp; ty=-(20+38*S.dive); acc=15;
     E.vel.y=Math.max(ty,E.vel.y-GRAV*dt); if(E.vel.y<ty) E.vel.y+=(ty-E.vel.y)*Math.min(1,dt*2);
     if((jump&&!S.jumpWas&&S.t>(S.released?0.5:1.0))||above<(S.released?40:SKY_AUTO)) deployGlider(E);
   } else { S.gt=(S.gt||0)+dt;
     if(jump&&!S.jumpWas&&S.gt>0.6&&above>30){ S.phase='fall'; S.t=0; S.released=true; S.jumpWas=jump; if(E===P) sfx('sky_start'); return; } // let go
     // flight path angle follows where you look (and W dives a little more, S flares); airspeed is energy:
     // diving adds speed, climbing spends it, drag pulls it back toward the trim speed; too slow and the nose won't stay up
-    const G0=-0.22, TRIM=13, VMAX=33, VMIN=6;
+    const G0=-0.15, TRIM=13, VMAX=33, VMIN=6;
     if(S.as==null){ S.as=Math.max(10,Math.min(20,Math.hypot(E.vel.x,E.vel.z)+6)); S.gam=G0; }
-    let gt=G0+(E.pitch||0)*1.15-(fw>0.3?0.14:0)+(fw<-0.3?0.16:0); gt=Math.max(-1.15,Math.min(0.42,gt));
+    const lp=(E.pitch||0)+0.14, lq=Math.abs(lp)<0.16?0:lp-Math.sign(lp)*0.16; // a dead band around 'ahead'
+    let gt=G0+lq*1.2-(fw>0.3?0.08:0)+(fw<-0.3?0.1:0); gt=Math.max(-1.15,Math.min(0.42,gt));
+    if(above<6&&gt<-0.06){ gt=Math.max(gt,-0.06-0.3*(above/6)); } // the flare
     const lift=Math.max(0,Math.min(1,(S.as-8)/9)); gt=Math.min(gt,G0+(0.42-G0)*lift); if(S.as<8.5) gt=Math.min(gt,G0-0.25*(1-S.as/8.5)); // stall: the nose drops
     S.gam+=(gt-S.gam)*Math.min(1,dt*(S.gt<0.6?2:3.2));
     S.as+=(0.6*GRAV*(Math.sin(G0)-Math.sin(S.gam))-0.22*(S.as-TRIM))*dt; S.as=Math.max(VMIN,Math.min(VMAX,S.as));
@@ -2914,8 +2917,9 @@ function makeGlider(col){ const g=new THREE.Group(), body=new THREE.Group(), spa
 const _skA=new THREE.Vector3(), _skB=new THREE.Vector3();
 function animateSky(H,S,dt){ const G=H.group, r=H.rig, A=H.anim, gl=S.sky==='glide', t=A.t;
   if(G.rotation.order!=='YXZ') G.rotation.order='YXZ';
-  const dive=gl?0:Math.max(0,Math.min(1,(-S.vel.y-38)/20)), gam=Math.atan2(S.vel.y,Math.hypot(S.vel.x,S.vel.z)+0.01), want=gl?Math.max(-0.95,Math.min(0.5,-0.2+(gam+0.22)*0.9)):-(1.18+0.32*dive);
-  A.skyX=lerp(A.skyX||0,want,Math.min(1,dt*(gl?5:3))); A.skyZ=lerp(A.skyZ||0,Math.max(-0.55,Math.min(0.55,-(A.yawRate||0)*(gl?0.2:0.07)))+(gl?Math.sin(A.t*1.1)*0.03:0),Math.min(1,dt*3));
+  const dive=gl?0:Math.max(0,Math.min(1,(-S.vel.y-22)/32)), gam=Math.atan2(S.vel.y,Math.hypot(S.vel.x,S.vel.z)+0.01), want=gl?Math.max(-0.95,Math.min(0.5,-0.2+(gam+0.15)*0.9)):-(1.18+0.32*dive);
+  const sRx=Math.cos(S.yaw), sRz=-Math.sin(S.yaw), lat=S.vel.x*sRx+S.vel.z*sRz, fwdV=-(S.vel.x*Math.sin(S.yaw)+S.vel.z*Math.cos(S.yaw));
+  A.skyX=lerp(A.skyX||0,want-(gl?0:Math.max(-0.2,Math.min(0.3,fwdV/60))),Math.min(1,dt*(gl?5:3))); A.skyZ=lerp(A.skyZ||0,Math.max(-0.7,Math.min(0.7,-(A.yawRate||0)*(gl?0.2:0.07)-lat*(gl?0.07:0.035)))+(gl?Math.sin(A.t*1.1)*0.03:Math.sin(A.t*2.3)*0.025),Math.min(1,dt*(gl?3:4.5)));
   const th=A.skyX, hu=0.94; G.rotation.x=th; G.rotation.z=A.skyZ;
   G.position.set(S.pos.x-hu*Math.sin(th)*Math.sin(S.yaw),S.pos.y+hu*(1-Math.cos(th)),S.pos.z-hu*Math.sin(th)*Math.cos(S.yaw));
   const sm=1-Math.exp(-dt*10), set=(o,ax,v)=>{ o.rotation[ax]=lerp(o.rotation[ax],v,sm); }, fl=Math.sin(t*9)*0.06*(1-dive), fl2=Math.sin(t*7.3+1)*0.05*(1-dive);
@@ -4959,8 +4963,19 @@ function animateHero(dt){
 /* ---------- camera ---------- */
 const tmpA=new THREE.Vector3(), tmpB=new THREE.Vector3();
 let camY=0, camDip=0, skyCamK=0, kartCamK=0;
-var downCamK=0;
+var downCamK=0, skyFovK=0, _skyFovApplied=0, windFx=null;
+function stepWind(dt){ const sp=P.sky?P.vel.length():0, want=P.sky?Math.max(0,Math.min(1,(sp-14)/40)):0; skyFovK+=(want-skyFovK)*Math.min(1,dt*2.5);
+  if(Math.abs(skyFovK-_skyFovApplied)>0.004){ _skyFovApplied=skyFovK; applyFov(); }
+  if(!windFx){ const N=46, g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.BufferAttribute(new Float32Array(N*6),3));
+    const l=new THREE.LineSegments(g,new THREE.LineBasicMaterial({color:0xffffff,transparent:true,opacity:0,fog:false,depthWrite:false})); l.frustumCulled=false; l.visible=false; scene.add(l); windFx={l,N,p:[...Array(N)].map(()=>({x:0,y:0,z:0,on:false}))}; }
+  const W=windFx, on=skyFovK>0.08&&sp>16; W.l.material.opacity+=((on?0.16+0.3*skyFovK:0)-W.l.material.opacity)*Math.min(1,dt*4); W.l.visible=W.l.material.opacity>0.01; if(!W.l.visible) return;
+  const vx=P.vel.x/sp||0, vy=P.vel.y/sp||-1, vz=P.vel.z/sp||0, len=Math.min(7,sp*0.11), c=camera.position, a=W.l.geometry.attributes.position;
+  // streaks hang in the air; you fall past them. One that's dropped behind is put back ahead, somewhere around your path
+  let ux=-vz, uy=0, uz=vx; const ul=Math.hypot(ux,uz); if(ul<1e-3){ ux=1; uz=0; } else { ux/=ul; uz/=ul; } const wx=vy*uz-vz*uy, wy=vz*ux-vx*uz, wz=vx*uy-vy*ux;
+  W.p.forEach((q,i)=>{ const dx=q.x-c.x, dy=q.y-c.y, dz=q.z-c.z, along=dx*vx+dy*vy+dz*vz; if(!q.on||along<-8||along>90||dx*dx+dy*dy+dz*dz>9000){ const d=on?12+Math.random()*60:1e4, r=2.5+Math.random()*13, t=Math.random()*6.283, cu=Math.cos(t)*r, cw=Math.sin(t)*r; q.x=c.x+vx*d+ux*cu+wx*cw; q.y=c.y+vy*d+uy*cu+wy*cw; q.z=c.z+vz*d+uz*cu+wz*cw; q.on=true; }
+    a.setXYZ(i*2,q.x,q.y,q.z); a.setXYZ(i*2+1,q.x-vx*len,q.y-vy*len,q.z-vz*len); }); a.needsUpdate=true; }
 function updateCamera(){
+  stepWind(lastDt);
   if(rbSpectate()) return;
   const eye=P.crouch?EYE_CROUCH:EYE_STAND;
   // smooth the camera height over stair steps and small bumps; follow fast for real jumps and falls
@@ -5283,6 +5298,7 @@ function scopeZoom(dir){ const n=Math.max(0,Math.min(SCOPE_STEPS.length-1,scopeL
 function applyFov(){
   let AW=null; try{ AW=WEAPONS[P.wpn]; }catch(e){} AW=AW||{pellets:1}; // (runs once before the weapon list exists)
   const a=camera.aspect||1, zoom=1-adsK*(AW.zoom!=null?AW.zoom:AW.pellets>1?0.15:0.3);
+  const zoom0=zoom; { const k=1+0.16*(typeof skyFovK==='number'?skyFovK:0); if(a>=1){ camera.fov=Math.min(118,settings.fov*zoom*k); if(AW.scope) camera.fov*=1+(SCOPE_STEPS[scopeLvl]-1)*adsK; camera.updateProjectionMatrix(); return; } }
   if(a>=1) camera.fov=settings.fov*zoom;
   else { const hf=Math.min(settings.fov,74)*Math.PI/180; camera.fov=Math.min(105,2*Math.atan(Math.tan(hf/2)/a)*180/Math.PI)*zoom; }
   if(AW.scope) camera.fov*=1+(SCOPE_STEPS[scopeLvl]-1)*adsK;
