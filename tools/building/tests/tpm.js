@@ -1,0 +1,11 @@
+const {sleep,page,launch,open}=require('./h.js');
+(async()=>{ const b=await launch(); const {pg,errs}=await open(b,page('/home/claude/crank-lab/index.html','scene,P,renderer,settings,TOWNS,terrainH,camera,horde'),{vp:{width:1100,height:640}});
+ await pg.waitForFunction(()=>window.T&&T.renderer,null,{timeout:180000});
+ await pg.evaluate(()=>{ T.settings.skyDrop=false; T.settings.hordeBot=false; const s=document.querySelector('#botSel'); s.value='off'; s.dispatchEvent(new Event('change')); document.querySelector('.mode[data-mode=horde]').click(); document.getElementById('play').click(); });
+ await pg.waitForFunction(()=>T.renderer.info.render.frame>5,null,{timeout:120000}); await sleep(6000);
+ await pg.evaluate(()=>{ T.horde.t=9999; const t=T.TOWNS[5]; T.P.pos.set(t.x-12,T.terrainH(t.x-12,t.z+3)+0.2,t.z+3); T.P.vel.set(0,0,0); T.P.yaw=-1.2; T.P.pitch=0; }); await sleep(5000); await pg.screenshot({path:'pm_road.png'});
+ await pg.evaluate(()=>{ window.cam=new THREE.PerspectiveCamera(60,1100/640,0.1,4000); const R0=T.renderer.render.bind(T.renderer); window.uc=true; T.renderer.render=(s,c)=>R0(s,c===T.camera&&uc?cam:c); const t=T.TOWNS[5]; cam.position.set(t.x+60,T.terrainH(t.x,t.z)+420,t.z+60); cam.lookAt(t.x,T.terrainH(t.x,t.z),t.z); });
+ await sleep(5000); await pg.screenshot({path:'pm_fog.png'});
+ await pg.evaluate(()=>{ uc=false; document.exitPointerLock&&document.exitPointerLock(); const m=document.getElementById('menu'); m.hidden=false; }); await pg.evaluate(()=>new Promise(r=>setTimeout(r,300)));
+ await pg.evaluate(()=>{ document.querySelector('[data-tab=play]').click(); }); await sleep(1500); await pg.screenshot({path:'pm_menu.png'});
+ console.log(errs.join('\n')||'no errors'); await b.close(); })();
