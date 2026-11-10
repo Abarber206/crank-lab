@@ -1,0 +1,10 @@
+const {sleep,page,launch,open}=require('./h.js');
+(async()=>{ const b=await launch(); const {pg,errs}=await open(b,page('/home/claude/crank-lab/index.html','scene,P,renderer,settings,pieces,addPiece,damagePiece,applyDamageLook,TOWNS,terrainH'),{vp:{width:1100,height:640}});
+ await pg.waitForFunction(()=>window.T&&T.renderer,null,{timeout:180000});
+ await pg.evaluate(()=>{ T.settings.skyDrop=false; const s=document.querySelector('#botSel'); s.value='off'; s.dispatchEvent(new Event('change')); document.getElementById('play').click(); });
+ await pg.waitForFunction(()=>T.renderer.info.render.frame>5,null,{timeout:120000}); await sleep(800);
+ await pg.evaluate(()=>{ ['wood','brick','metal'].forEach((m,k)=>{ const w=T.addPiece({type:'wall',axis:'z',i:k-1,j:-1,l:0,key:'wz'+(k-1)+'_-1_0',mat:m,owner:'me',dir:0,instant:true}); w.hp=w.maxHp; w.dmgTaken=w.maxHp*[0.45,0.7,0.7][k]; w.hp=w.maxHp*0.3; T.applyDamageLook(w); });
+   T.P.pos.set(2.5,0.1,3.2); T.P.vel.set(0,0,0); T.P.yaw=0; T.P.pitch=0.12; });
+ await sleep(4500); await pg.screenshot({path:'crack.png'});
+ await pg.evaluate(()=>{ const t=T.TOWNS[2]; T.P.pos.set(t.x+8,T.terrainH(t.x+8,t.z+3)+0.2,t.z+3); }); await sleep(3500); await pg.screenshot({path:'mini.png',clip:{x:940,y:0,width:160,height:160}});
+ console.log(errs.join('\n')||'no errors'); await b.close(); })();
