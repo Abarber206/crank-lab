@@ -5004,6 +5004,7 @@ function createHero(jacketHex,opts){
   const TR=(W,name,f0,f1,u0,u1,w,x=0)=>trim(rbox(w,Math.abs(f1-f0),Math.abs(u1-u0),.002),W,x,-(f0+f1)/2,-(u0+u1)/2,null,null,name); // rarity colour
   const MK=(name,m,g,mg)=>marks(name,[0,-m[0],-m[1]],g.length>2?g:[0,-g[0],-g[1]],mg.length>2?mg:[0,-mg[0],-mg[1]]);
   const mkW=(name)=>{ const g=grp(rig.armR.hand,0,0,0); rig[name]=g; return g; };
+  const MG=name=>rig['magG_'+name]=grp(rig[name],0,0,0);                                                   // the magazine, a part of its own: it comes out when you reload
   const railG=len=>{ const k='rail'+Math.round(len*1000); let g=rboxCache.get(k); if(g) return g; const L=[], b=new THREE.BoxGeometry(.017,len,.004); b.translate(0,0,-.002); L.push(b);
     for(let y=-len/2+.004;y<len/2-.003;y+=.0101){ const t=new THREE.BoxGeometry(.021,.0056,.0045); t.translate(0,y,-.00625); L.push(t); } g=mergeGeos(L); rboxCache.set(k,g); return g; };
   const RAIL=(W,f0,f1,u,m=mSD)=>p0(railG(f1-f0),m,W,0,-(f0+f1)/2,-u);                                         // a slotted accessory rail sitting on height u
@@ -5028,6 +5029,8 @@ function createHero(jacketHex,opts){
   const BIPOD=(W,f,u,len)=>{ BX(W,mSD,f-.015,f+.015,u-.012,u+.004,.04,.004); for(const sx of [-1,1]){ BX(W,mSD,f,f+len,u-.012,u-.003,.008,.003,sx*.019); BX(W,mR,f+len-.02,f+len,u-.014,u-.001,.012,.003,sx*.019); } };
   const SLOTS=(W,f0,n,step,len,u0,u1,hw)=>{ for(let q=0;q<n;q++) for(const sx of [-1,1]) BX(W,mHole,f0+q*step,f0+q*step+len,u0,u1,.003,.001,sx*hw); };
 
+  rig.heldMag=grp(rig.armL.hand,0,0,0); p0(rbox(.12,.05,.022,.004),mSD,rig.heldMag,.02,0,0); p0(rbox(.012,.056,.026,.003),mS,rig.heldMag,-.04,0,0); rig.heldMag.visible=false;   // a fresh magazine in the fist
+  rig.heldShell=grp(rig.armL.hand,0,0,0); p0(cylX(.011,.05,10),mShell,rig.heldShell,.025,0,0); p0(cylX(.0115,.014,10),mBrass,rig.heldShell,-.005,0,0); rig.heldShell.visible=false;
   // ---- assault rifle: a flat-top carbine, slim slotted handguard, red dot, collapsible stock, curved steel magazine
   rig.gun=grp(rig.armR.hand,0,0,0);
   { const W=rig.gun, ub=.058; GRIP(W,mP,.022);
@@ -5066,7 +5069,7 @@ function createHero(jacketHex,opts){
   { const W=mkW('smg'), ub=.05; GRIP(W,mP,.004);
     PF(W,mP,[[-.082,.036],[-.082,.0],[-.06,-.006],[.062,-.006],[.068,.036]],.04);
     PF(W,mS,[[-.086,.034],[.21,.034],[.21,.07],[.2,.082],[-.072,.082],[-.086,.07]],.042,.012); BX(W,mHole,.02,.075,.05,.066,.003,.001,.0215);
-    PF(W,mS,[[.07,.036],[.07,-.03],[.118,-.036],[.122,.036]],.034); MAGP(W,mSD,.096,-.03,.2,.036,.04,.36,.022);
+    PF(W,mS,[[.07,.036],[.07,-.03],[.118,-.036],[.122,.036]],.034); MAGP(MG('smg'),mSD,.096,-.03,.2,.036,.04,.36,.022);
     CY(W,mS,.0125,.2,.385,.074); CY(W,mSD,.014,.385,.392,.074); PIN(W,mSD,.006,.026,.33,.074,-.02); p0(sph(.009),mP,W,-.036,-.33,-.074);       // cocking tube and handle
     CY(W,mSD,.008,.2,.42,ub); CY(W,mSD,.0105,.398,.408,ub);
     PF(W,mP,[[.21,.02],[.36,.024],[.372,.04],[.372,.062],[.21,.062]],.046,.012);                                                 // handguard
@@ -5122,7 +5125,7 @@ function createHero(jacketHex,opts){
   // ---- pistol: polymer frame, steel slide with serrations, accessory rail
   { const W=mkW('pistol'); p0(prof(gripPts(.035,.007),.032,.006),mP,W,0,0,0); PF(W,mR,[[-.03,-.03],[-.058,-.03],[-.07,-.09],[-.042,-.09]],.0335,.001);
     PF(W,mP,[[-.072,.03],[.124,.03],[.124,.006],[.112,-.004],[.02,-.006],[-.02,.0],[-.072,.006]],.03,.004); TRIG(W,-.02,.007,.021);
-    for(let q=0;q<3;q++) BX(W,mHole,.078+q*.012,.084+q*.012,-.0075,-.005,.02,.001); BX(W,mSD,-.094,-.034,-.126,-.114,.03,.003);
+    for(let q=0;q<3;q++) BX(W,mHole,.078+q*.012,.084+q*.012,-.0075,-.005,.02,.001); BX(MG('pistol'),mSD,-.094,-.034,-.126,-.114,.03,.003);
     const SL=grp(W,0,0,0); rig.slide_pistol=SL;
     PF(SL,mS,[[-.072,.03],[.126,.03],[.126,.058],[.118,.066],[-.064,.066],[-.072,.058]],.034,.005);
     for(let q=0;q<6;q++) BX(SL,mSD,-.062+q*.007,-.059+q*.007,.034,.062,.0355,.001); for(let q=0;q<3;q++) BX(SL,mSD,.094+q*.007,.097+q*.007,.034,.062,.0355,.001);
@@ -5146,7 +5149,7 @@ function createHero(jacketHex,opts){
 
   // ---- hand cannon: bright steel, a heavy fixed barrel with a sloped nose and a short slide behind it
   { const W=mkW('hcannon'); p0(prof(gripPts(.035,.007),.038,.006),mR,W,0,0,0);
-    PF(W,mBr,[[-.076,.024],[.15,.024],[.15,.0],[.03,-.008],[-.02,.0],[-.076,.006]],.036,.004); TRIG(W,-.02,.007,.022); BX(W,mSD,-.096,-.034,-.128,-.114,.036,.003);
+    PF(W,mBr,[[-.076,.024],[.15,.024],[.15,.0],[.03,-.008],[-.02,.0],[-.076,.006]],.036,.004); TRIG(W,-.02,.007,.022); BX(MG('hcannon'),mSD,-.096,-.034,-.128,-.114,.036,.003);
     PF(W,mBr,[[.07,.03],[.205,.03],[.205,.058],[.196,.08],[.07,.08]],.036,.011); BX(W,mSD,.075,.19,.08,.086,.014,.002); CY(W,mSD,.011,.196,.207,.052,0,12); p0(cylY(.0075,.002,10),mHole,W,0,-.2076,-.052);
     const SL=grp(W,0,0,0); rig.slide_hcannon=SL; PF(SL,mBr,[[-.076,.024],[.07,.024],[.07,.082],[-.062,.082],[-.076,.068]],.04,.006);
     for(let q=0;q<6;q++) TILT(SL,mSG,-.058+q*.009,.052,.003,.05,.0415,.25,.001); BX(SL,mHole,.02,.06,.066,.083,.02,.002,.008);
@@ -5161,7 +5164,7 @@ function createHero(jacketHex,opts){
     BX(W,mSD,-.33,-.16,.09,.106,.034,.008); for(const f of [-.3,-.19]) POST(W,mS,.004,.082,.092,f); BX(W,mR,-.392,-.374,-.064,.088,.044,.006);   // cheek piece, butt pad
     CY(W,mS,.02,-.09,.2,.054,0,16); BX(W,mHole,.03,.1,.056,.07,.003,.001,.0195); RAIL(W,-.06,.17,.074);
     CN(W,mSD,.0135,.0105,.2,.72,ub,0,14); for(let q=0;q<4;q++){ const a=q*Math.PI/2+Math.PI/4; p0(rbox(.003,.34,.003,.001),mHole,W,Math.cos(a)*.0118,-.46,-ub+Math.sin(a)*.0118); }
-    BRAKE(W,.72,ub,.016,.07); PF(W,mSD,[[.062,-.006],[.13,-.004],[.134,-.055],[.07,-.058]],.03,.004); BIPOD(W,.34,.012,.22);
+    BRAKE(W,.72,ub,.016,.07); PF(MG('sniper'),mSD,[[.062,-.006],[.13,-.004],[.134,-.055],[.07,-.058]],.03,.004); BIPOD(W,.34,.012,.22);
     SCOPE(W,-.1,.25,.074,.028,.015);
     const BG=grp(W,0,.03,-.054); rig.bolt_sniper=BG; p0(cylY(.016,.07,12),mBr,BG,0,0,0); p0(cylX(.007,.05,8),mBr,BG,.04,.012,0); p0(sph(.013),mSD,BG,.068,.014,0);
     TR(W,'sniper',.16,.3,.022,.03,.0515); MK('sniper',[.79,ub],[.27,.004],[.1,-.09]); }
@@ -5182,7 +5185,7 @@ function createHero(jacketHex,opts){
     BX(W,mSD,-.3,-.16,.05,.074,.03,.01); BX(W,mSD,-.378,-.364,-.072,.054,.038,.004);
     PF(W,mLam,[[.16,.02],[.4,.026],[.4,.07],[.16,.074]],.044,.01); SLOTS(W,.2,4,.048,.026,.05,.06,.0222); BX(W,mSD,.39,.42,.02,.076,.046,.006);
     CY(W,mSD,.0075,.16,.66,ub); CY(W,mSD,.007,.42,.5,.073); BX(W,mSD,.49,.51,ub,.08,.014,.004); BX(W,mSD,.6,.615,ub,ub+.045,.01,.003); p0(new THREE.TorusGeometry(.011,.0025,6,14),mSD,W,0,-.6075,-(ub+.05),[Math.PI/2,0,0]);
-    FLASH(W,.66,ub,.0105,.07); PF(W,mSD,[[.03,-.004],[.088,-.004],[.104,-.088],[.05,-.094]],.026,.004); for(const k of [.25,.5,.75]) BX(W,mS,.04+k*.014,.09+k*.014,-.008-k*.082,-.004-k*.082,.0275,.001);
+    FLASH(W,.66,ub,.0105,.07); { const M=MG('dmr'); PF(M,mSD,[[.03,-.004],[.088,-.004],[.104,-.088],[.05,-.094]],.026,.004); for(const k of [.25,.5,.75]) BX(M,mS,.04+k*.014,.09+k*.014,-.008-k*.082,-.004-k*.082,.0275,.001); }
     BX(W,mSD,-.02,.11,.03,.082,.006,.002,-.0225); RAIL(W,-.03,.12,.078); SCOPE(W,-.07,.2,.078,.021,.012);
     TR(W,'dmr',.2,.33,.03,.037,.0455); MK('dmr',[.735,ub],[.28,.023],[.075,-.12]); }
 
@@ -5190,7 +5193,7 @@ function createHero(jacketHex,opts){
   { const W=mkW('burst'), ub=.062; GRIP(W,mTan,.0);
     PF(W,mTan,[[-.365,.09],[-.365,-.06],[-.34,-.068],[-.215,-.068],[-.2,-.03],[-.1,-.024],[-.085,.0],[.06,.0],[.075,.02],[.11,.026],[.11,.09]],.05,.01);
     TILT(W,mTan,.005,-.056,.15,.014,.03,.78,.006); BX(W,mR,-.38,-.363,-.062,.092,.052,.006);                                         // hand guard bow, butt pad
-    PF(W,mPG,[[-.2,-.06],[-.142,-.06],[-.128,-.19],[-.192,-.2]],.026,.004); for(const k of [.3,.6]) BX(W,mP,-.196+k*.01,-.138+k*.012,-.066-k*.13,-.06-k*.13,.0275,.001);   // magazine
+    { const M=MG('burst'); PF(M,mPG,[[-.2,-.06],[-.142,-.06],[-.128,-.19],[-.192,-.2]],.026,.004); for(const k of [.3,.6]) BX(M,mP,-.196+k*.01,-.138+k*.012,-.066-k*.13,-.06-k*.13,.0275,.001); }   // magazine
     PF(W,mSG,[[-.25,.09],[.13,.09],[.13,.104],[-.25,.104]],.04,.004); BX(W,mHole,-.2,-.13,.07,.086,.003,.001,.0255);
     for(const f of [-.06,.09]) BX(W,mSG,f-.012,f+.012,.1,.14,.022,.004); CY(W,mSG,.017,-.085,.115,.152,0,16); LENS(W,mLens,.0145,.1156,.152,true); LENS(W,mLens,.0145,-.0856,.152,false);
     CY(W,mSD,.009,.11,.38,ub); CY(W,mS,.016,.11,.15,ub,0,12); FLASH(W,.38,ub,.012,.05); CY(W,mS,.016,.155,.19,ub,0,12); BX(W,mP,.156,.19,-.06,.05,.03,.012);   // barrel, foregrip
@@ -5204,7 +5207,7 @@ function createHero(jacketHex,opts){
     PF(W,mLam,[[.19,.006],[.33,.014],[.33,.05],[.19,.05]],.044,.011); CY(W,mLam,.0145,.2,.32,.078,0,12); CY(W,mSD,.008,.32,.41,.078); PF(W,mSD,[[.39,ub],[.43,ub],[.42,.086],[.4,.086]],.02,.004);
     CY(W,mSD,.0085,.19,.57,ub); CY(W,mS,.0025,.33,.55,ub-.014,0,6); BX(W,mSD,.5,.52,ub,ub+.052,.012,.003); p0(new THREE.TorusGeometry(.011,.0025,6,14),mSD,W,0,-.51,-(ub+.05),[Math.PI/2,0,0]);
     CY(W,mSD,.0115,.57,.6,ub,0,10); TILT(W,mSD,.602,ub+.004,.012,.02,.02,.5,.003);                                               // slanted muzzle brake
-    BX(W,mS,.085,.15,-.012,.002,.036,.004); MAGP(W,mBake,.118,-.004,.2,.058,.1,.8,.026);
+    BX(W,mS,.085,.15,-.012,.002,.036,.004); MAGP(MG('heavyar'),mBake,.118,-.004,.2,.058,.1,.8,.026);
     PF(W,mLam,[[-.1,.046],[-.34,.02],[-.345,-.07],[-.325,-.076],[-.1,.004]],.036,.008); BX(W,mSD,-.356,-.342,-.072,.022,.038,.004);
     TR(W,'heavyar',-.04,.08,.008,.016,.0415); MK('heavyar',[.61,ub],[.265,.011],[.17,-.2]); }
 
@@ -5216,7 +5219,7 @@ function createHero(jacketHex,opts){
     BX(W,mSD,.6,.612,ub,ub+.04,.008,.002); for(const sx of [-1,1]) BX(W,mSD,.598,.614,ub+.012,ub+.045,.003,.001,sx*.009);         // front sight and its wings
     BX(W,mSD,-.072,-.04,.068,.078,.03,.004); for(const sx of [-1,1]) BX(W,mSD,-.07,-.05,.076,.094,.004,.001,sx*.013); POST(W,mSD,.006,.078,.09,-.058);
     BX(W,mS,.02,.16,.05,.058,.006,.002,.02); PIN(W,mS,.006,.024,.03,.054,.03); TRIG(W,-.026,.008);
-    PF(W,mSD,[[.02,-.008],[.085,-.008],[.092,-.1],[.03,-.106]],.028,.004); BX(W,mS,.026,.094,-.112,-.102,.03,.003);
+    { const M=MG('infantry'); PF(M,mSD,[[.02,-.008],[.085,-.008],[.092,-.1],[.03,-.106]],.028,.004); BX(M,mS,.026,.094,-.112,-.102,.03,.003); }
     TR(W,'infantry',.15,.25,.016,.024,.0455); MK('infantry',[.685,ub],[.25,.0],[.06,-.13]); }
 
   // ---- tactical shotgun: black, pistol grip and a tube stock, top rail with ghost-ring sights, shells in a side carrier
@@ -5256,7 +5259,7 @@ function createHero(jacketHex,opts){
   { const W=mkW('csmg'), ub=.045;
     PF(W,mS,[[-.12,.012],[.16,.012],[.16,.07],[.15,.078],[-.11,.078],[-.12,.07]],.044,.004); for(const u of [.03,.05]) BX(W,mSD,-.1,.14,u-.003,u+.003,.0455,.002);
     PF(W,mP,[[-.078,.014],[-.008,.014],[-.014,-.1],[-.072,-.1]],.036,.007); PF(W,mR,[[-.07,-.01],[-.018,-.01],[-.022,-.09],[-.066,-.09]],.0375,.001); TRIG(W,-.034,-.012,.022);
-    BX(W,mSD,-.064,-.022,-.235,-.1,.024,.003); BX(W,mS,-.068,-.018,-.243,-.232,.028,.003);
+    { const M=MG('csmg'); BX(M,mSD,-.064,-.022,-.235,-.1,.024,.003); BX(M,mS,-.068,-.018,-.243,-.232,.028,.003); }
     POST(W,mP,.009,.078,.096,.05); BX(W,mSD,.13,.142,.078,.098,.006,.002); for(const sx of [-1,1]){ BX(W,mSD,.126,.146,.078,.1,.003,.001,sx*.01); BX(W,mSD,-.1,-.08,.078,.1,.003,.001,sx*.01); }
     CY(W,mSD,.009,.16,.225,ub); CY(W,mS,.0165,.16,.186,ub,0,10); PF(W,mP,[[.02,.014],[.15,.014],[.15,-.012],[.035,-.012]],.042,.009);
     for(const sx of [-1,1]) BX(W,mSD,-.3,-.12,.05,.058,.006,.003,sx*.017); BX(W,mSD,-.312,-.298,.0,.078,.042,.004);
@@ -5269,7 +5272,7 @@ function createHero(jacketHex,opts){
     CY(W,mSG,.027,.12,.36,ub,0,18); for(let q=0;q<5;q++) for(const a of [-.5,.5,Math.PI-.5,Math.PI+.5]) p0(cylX(.0055,.006,8),mHole,W,Math.cos(a)*.026,-.15-q*.044,-ub+Math.sin(a)*.026,[0,-a,0]);
     SUPP(W,.36,ub,.021,.13,mSD);
     for(const sx of [-1,1]) CY(W,mSD,.005,-.26,-.09,.052,sx*.018,8); PF(W,mP,[[-.26,.082],[-.292,.082],[-.292,-.03],[-.272,-.036],[-.26,.0]],.046,.006);
-    PF(W,mSD,[[.064,-.03],[.1,-.03],[.108,-.17],[.07,-.172]],.022,.003); HOLO(W,.02,.0925);
+    PF(MG('ssmg'),mSD,[[.064,-.03],[.1,-.03],[.108,-.17],[.07,-.172]],.022,.003); HOLO(W,.02,.0925);
     TR(W,'ssmg',.0,.1,.036,.044,.0475); MK('ssmg',[.49,ub],[.24,.031],[.09,-.2]); }
 
   // ---- light machine gun: a flat pan magazine on top, perforated barrel shroud, cone flash hider, wooden stock, bipod
@@ -5312,6 +5315,7 @@ function animEvent(H,ev,arg){
 }
 
 // Two-bone IK: put the wrist of `arm` at targetW (world), elbow toward poleW, optional world hand orientation
+function magBack(r,mdl){ const mg=mdl==='ar'?r.arMag:mdl?r['magG_'+mdl]:null; if(mg) mg.visible=true; if(r.arMag) r.arMag.visible=true; if(r.heldMag) r.heldMag.visible=false; if(r.heldShell) r.heldShell.visible=false; }
 function ikArm(arm,targetW,poleW,handQ){
   const sh=arm.sh, a=arm.a||0.25, b=arm.b||0.23;
   sh.getWorldPosition(_ikS);
@@ -5358,7 +5362,7 @@ function poseHands(H,S,dt){ const r=H.rig; if(!r.armR||!r.armR.fj) return; const
     a.hg.rotation.y+=(ty-a.hg.rotation.y)*k; a.hg.rotation.z+=(tz-a.hg.rotation.z)*k; };
   const A_=H.anim, rest=(nm,a,ov)=>ov!=null?ov:nm==='relax'?a.side*1.3:0, nR=A_.handR||(held?'pgrip':tool||mdl==='nade'?'fist':S.editing?'flat':'relax'); // an emote says what its hands do; loose hands hang palm-in
   set(r.armR,nR,held?Math.PI/2:rest(nR,r.armR,A_.turnR),0);
-  const sp=held?GUN_SUPPORT[mdl]:0; const und=sp===undefined||sp===3, nL=A_.handL||(held?(sp===0?'relax':sp===3?'fist':sp?'wrap':'cradle'):two?'fist':S.editing?'flat':'relax'); set(r.armL,nL,held?(und?0.6:sp?-0.97:0):rest(nL,r.armL,A_.turnL),held&&und?1.35:0);
+  const sp=held?GUN_SUPPORT[mdl]:0; const und=sp===undefined||sp===3, rlp=held&&S.reload?S.reload.p:-1, busy=rlp>0.12&&rlp<0.9, nL=A_.handL||(held?(busy?'fist':sp===0?'relax':sp===3?'fist':sp?'wrap':'cradle'):two?'fist':S.editing?'flat':'relax'); set(r.armL,nL,held?(busy?0:und?0.6:sp?-0.97:0):rest(nL,r.armL,A_.turnL),held&&und&&!busy?1.35:0);
   const gh=held&&GUN_HOLD[mdl]||[0,0,0], hp=r.armR.hand.position, mx=held?-.032+gh[0]:0, my=held?-.092+gh[1]:-.098, mz=held?-.06+gh[2]:-.032; hp.x+=(mx-hp.x)*k; hp.y+=(my-hp.y)*k; hp.z+=(mz-hp.z)*k; }
 const _pkY=new THREE.Vector3(0,1,0), _p2c=new THREE.Vector3();
 function pickTwoHands(H,S){ const r=H.rig; if(!r.pick) return;
@@ -5617,13 +5621,14 @@ function animateRig0(H,S,dt){
       const p=rl.p;
       if(GW&&GW.shell){ const q=p<0.5?p/0.5:1-(p-0.5)/0.5; tgt=port.clone().lerp(pouch,Math.sin(q*Math.PI/2)); }
       else { tgt=p<0.25?gripW.clone().lerp(port,p/0.25):p<0.55?port.clone().lerp(pouch,(p-0.25)/0.3):p<0.8?pouch.clone().lerp(port,(p-0.55)/0.25):port.clone().lerp(gripW,(p-0.8)/0.2); }
-      if(r.arMag) r.arMag.visible=!(mdl==='ar'&&p>0.3&&p<0.62);
-    } else if(r.arMag) r.arMag.visible=true;
+      { const mg=mdl==='ar'?r.arMag:r['magG_'+mdl], sh=!!(GW&&GW.shell); if(mg) mg.visible=sh||!(p>0.25&&p<0.8); // out with the hand at a quarter, the new one home at four fifths
+        if(r.heldMag) r.heldMag.visible=!!mg&&!sh&&((p>0.25&&p<0.5)||(p>0.58&&p<0.8)); if(r.heldShell) r.heldShell.visible=sh&&p>0.5&&p<0.97; }
+    } else magBack(r,mdl);
     if(A.equip>0.4) tgt=tgt.clone().lerp(r.pouch.getWorldPosition(new THREE.Vector3()),Math.min(1,(A.equip-0.4)*2));
     r.armL.sh.getWorldPosition(_pole); _pole.addScaledVector(_up,-1).addScaledVector(_rt,-0.6);
     _hq2.copy(_hq).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),-0.6));
     ikArm(r.armL,tgt,_pole,_hq2);
-  } else if(r.arMag) r.arMag.visible=true;
+  } else magBack(r,null);
   // ----- secondary motion: backpack and hair bounce on springs -----
   const hy=r.hips.position.y, hv=(hy-A.prevHipY)/Math.max(dt,1e-3); A.prevHipY=hy;
   A.packV+=(-hv*0.9-vf*0.0-160*A.pack-11*A.packV)*dt; A.pack+=A.packV*dt; A.pack=Math.max(-0.35,Math.min(0.35,A.pack));
