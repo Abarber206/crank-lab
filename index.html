@@ -3588,7 +3588,7 @@ const _kc=new THREE.Vector3(), _kr=new THREE.Vector3(), _ku2=new THREE.Vector3()
 function animateRig(H,S,dt){
   if(S.seat){ const look=S.yaw, gunP=S.seat.s===1&&!!S.gun; S.seat.look=look; S.seat.gunP=gunP; if(!gunP){ S.gun=false; S.yaw=S.seat.k.yaw; S.reload=null; }
     S.vel=_ZV; S.onGround=true; S.crouch=false; S.emote=null; S.slope=0; S.building=false; S.editing=false; S.swingT=0; S.sky=null; S.item=false; }
-  animateRig0(H,S,dt); if(S.seat) seatPlace(H,S); else pickTwoHands(H,S); }
+  animateRig0(H,S,dt); if(S.seat) seatPlace(H,S); else pickTwoHands(H,S); poseHands(H,S,dt); }
 // engine: a single-cylinder putter that revs with speed, plus tyre skid; for your buggy or the nearest one running
 let kEng=null;
 function kartAudio(dt){ if(!AC||!karts) return;
@@ -4318,7 +4318,7 @@ float sh1(vec3 p){ p=fract(p*0.3183099+0.1); p*=17.0; return fract(p.x*p.y*p.z*(
 float sn(vec3 x){ vec3 i=floor(x), f=fract(x); f=f*f*(3.0-2.0*f);
   return mix(mix(mix(sh1(i),sh1(i+vec3(1,0,0)),f.x),mix(sh1(i+vec3(0,1,0)),sh1(i+vec3(1,1,0)),f.x),f.y),
              mix(mix(sh1(i+vec3(0,0,1)),sh1(i+vec3(1,0,1)),f.x),mix(sh1(i+vec3(0,1,1)),sh1(i+vec3(1,1,1)),f.x),f.y),f.z); }`)
-      .replace('void main() {','void main() {\n  float sSpec=1.0, sShin=1.0, sMetal=0.0;')
+      .replace('void main() {','void main() {\n  float sSpec=1.0, sShin=1.0, sMetal=0.0, sRim=0.0;')
       .replace('#include <color_fragment>',`#include <color_fragment>
   { float sK=floor(vSurf+0.5);
     if(sK>0.5){ vec3 p=vOP; float fine=sn(p*900.0), mid=sn(p*140.0);
@@ -4342,13 +4342,24 @@ float sn(vec3 x){ vec3 i=floor(x), f=fract(x); f=f*f*(3.0-2.0*f);
         float br=sn(vec3(p.x*2200.0,p.y*30.0,p.z*2200.0)); diffuseColor.rgb*=0.84+0.2*br; sSpec=2.6; sShin=4.5; sMetal=0.6; }
       else if(sK<7.5){ // brass
         diffuseColor.rgb*=0.88+0.18*fine; sSpec=2.6; sShin=4.0; sMetal=0.5; }
-      else { // glass: a lens
-        sSpec=8.0; sShin=8.0; sMetal=1.0; } } }`)
+      else if(sK<8.5){ // glass: a lens
+        sSpec=8.0; sShin=8.0; sMetal=1.0; }
+      else if(sK<9.5){ // cloth: soft, uneven, no shine
+        diffuseColor.rgb*=(0.9+0.12*fine)*(0.84+0.26*sn(p*vec3(26.0,9.0,26.0))); sSpec=0.2; sShin=0.5; }
+      else if(sK<10.5){ // denim: twill streaks, paler where it rubs
+        float st=sn(vec3(p.x*800.0,p.y*46.0,p.z*800.0)); diffuseColor.rgb*=(0.82+0.24*st)*(0.86+0.22*sn(p*vec3(20.0,7.0,20.0))); diffuseColor.rgb=mix(diffuseColor.rgb,diffuseColor.rgb*1.3+0.03,ed*0.5); sSpec=0.25; sShin=0.5; }
+      else if(sK<11.5){ // leather: creased, a dull shine, scuffed edges
+        diffuseColor.rgb*=0.8+0.3*sn(p*300.0)*mid+0.08*fine; diffuseColor.rgb=mix(diffuseColor.rgb,diffuseColor.rgb*1.35+0.04,ed*0.4); sSpec=1.7; sShin=1.5; }
+      else if(sK<12.5){ // skin: even, soft, light catching the edge
+        diffuseColor.rgb*=0.96+0.06*mid; sSpec=0.5; sShin=0.8; sRim=0.2; }
+      else { // hair: strands
+        float hs=sn(vec3(p.x*460.0,p.y*24.0,p.z*460.0)); diffuseColor.rgb*=0.72+0.52*hs; sSpec=1.6; sShin=2.5; } } }`)
       .replace('#include <lights_phong_fragment>','#include <lights_phong_fragment>\n  material.specularColor=specular*sSpec+vec3(0.26)*sMetal; material.specularShininess=shininess*sShin;')
       .replace('#include <envmap_fragment>',`#include <envmap_fragment>
   if(sMetal>0.0){ vec3 vd=normalize(vViewPosition); vec3 rw=inverseTransformDirection(reflect(-vd,normal),viewMatrix); float fr=pow(1.0-max(dot(normal,vd),0.0),3.0);
     vec3 env=mix(vec3(0.2,0.19,0.17),vec3(0.72,0.84,1.0),smoothstep(-0.15,0.5,rw.y))*(0.75+0.5*sn(rw*3.0));
-    outgoingLight+=env*surfEnv*sMetal*(0.07+0.45*fr)*(0.3+diffuseColor.rgb); }`)
+    outgoingLight+=env*surfEnv*sMetal*(0.07+0.45*fr)*(0.3+diffuseColor.rgb); }
+  if(sRim>0.0){ float fr=pow(1.0-max(dot(normal,normalize(vViewPosition)),0.0),3.0); outgoingLight+=diffuseColor.rgb*vec3(1.0,0.72,0.6)*fr*sRim*(0.35+0.65*surfEnv); }`)
       .replace('#include <tonemapping_fragment>',(glow?'gl_FragColor.rgb=mix(gl_FragColor.rgb,vColor*1.6,vGlow);\n':'')+'#include <tonemapping_fragment>'); }; }
 const surfMats=new Map();
 // a part's material by colour and surface: 1 gun steel, 2 polymer, 3 wood, 4 painted metal, 5 rubber/chequering, 6 bright steel, 7 brass, 8 glass
@@ -4471,6 +4482,38 @@ function reskin(H,o,pk){ pk=pk||'steel'; if(!o||(H.outfit===o.id&&H.pickaxe===pk
 const latheCache=new Map();
 function bodyLathe(prof,depth,seg=22){ const key=JSON.stringify(prof)+depth; let g=latheCache.get(key); if(g) return g;
   g=new THREE.LatheGeometry(prof.map(([r,y])=>new THREE.Vector2(r,y)),seg); g.scale(1,1,depth); g.computeVertexNormals(); latheCache.set(key,g); return g; }
+// A smooth organic solid through cross-sections [y, half-width, front depth, back depth, centre x, centre z] (front is -z),
+// rounded off at both ends: limbs, torsos, necks, boots.
+function organ(R,seg=18,sub=3){ const key='org'+JSON.stringify(R)+seg+'/'+sub; let g=rboxCache.get(key); if(g) return g;
+  const cr=(a,b,c,d,t)=>0.5*((2*b)+(-a+c)*t+(2*a-5*b+4*c-d)*t*t+(-a+3*b-3*c+d)*t*t*t), rings=[];
+  for(let i=0;i<R.length-1;i++){ const p0=R[Math.max(0,i-1)], p1=R[i], p2=R[i+1], p3=R[Math.min(R.length-1,i+2)];
+    for(let s=0;s<sub;s++){ const t=s/sub, q=[]; for(let k=0;k<6;k++) q.push(cr(p0[k]||0,p1[k]||0,p2[k]||0,p3[k]||0,t)); rings.push(q); } }
+  { const q=[]; for(let k=0;k<6;k++) q.push(R[R.length-1][k]||0); rings.push(q); }
+  const P=[], I=[], n=rings.length, down=rings[0][0]>rings[n-1][0]?1:-1;
+  const ring=(q,sc,dy)=>{ for(let k=0;k<seg;k++){ const a=k/seg*Math.PI*2, s=Math.sin(a); P.push(q[4]+q[1]*sc*Math.cos(a),q[0]+dy,q[5]+(s<0?q[2]:q[3])*sc*s); } };
+  { const q=rings[0], h=Math.min(q[1],q[2],q[3])*0.38*down; ring(q,0.45,h*0.85); ring(q,0.8,h*0.45); }                 // a rounded end
+  for(const q of rings) ring(q,1,0);
+  { const q=rings[n-1], h=Math.min(q[1],q[2],q[3])*0.38*down; ring(q,0.8,-h*0.45); ring(q,0.45,-h*0.85); }
+  const m=P.length/3/seg;
+  for(let i=0;i<m-1;i++) for(let k=0;k<seg;k++){ const a=i*seg+k, b=i*seg+(k+1)%seg, c=(i+1)*seg+(k+1)%seg, d=(i+1)*seg+k; I.push(a,b,c,a,c,d); }
+  { const q=rings[0], h=Math.min(q[1],q[2],q[3])*0.38*down, c=P.length/3; P.push(q[4],q[0]+h,q[5]); for(let k=0;k<seg;k++) I.push(c,(k+1)%seg,k); }
+  { const q=rings[n-1], h=Math.min(q[1],q[2],q[3])*0.38*down, c=P.length/3, o=(m-1)*seg; P.push(q[4],q[0]-h,q[5]); for(let k=0;k<seg;k++) I.push(c,o+k,o+(k+1)%seg); }
+  let vol=0; for(let i=0;i<I.length;i+=3){ const a=I[i]*3, b=I[i+1]*3, c=I[i+2]*3; vol+=P[a]*(P[b+1]*P[c+2]-P[b+2]*P[c+1])-P[a+1]*(P[b]*P[c+2]-P[b+2]*P[c])+P[a+2]*(P[b]*P[c+1]-P[b+1]*P[c]); }
+  if(vol<0) for(let i=0;i<I.length;i+=3){ const t=I[i+1]; I[i+1]=I[i+2]; I[i+2]=t; }                                    // faces point outwards
+  g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(P,3)); g.setIndex(I); g.computeVertexNormals(); rboxCache.set(key,g); return g; }
+// the same, lying along z (a foot): sections [distance forward, half-width, depth below, height above, centre x, centre height]
+function organZ(R,seg=16,sub=3){ const key='orz'+JSON.stringify(R)+seg+'/'+sub; let g=rboxCache.get(key); if(g) return g; g=organ(R,seg,sub).clone(); g.rotateX(-Math.PI/2); rboxCache.set(key,g); return g; }
+// a skull with a face on it: brow ridge, eye sockets, cheekbones, the swell round the mouth, a chin, the angle of the jaw
+let skull2=null;
+function headGeo2(){ if(skull2) return skull2; const g=new THREE.SphereGeometry(1,44,32), p=g.attributes.position, G=(a,s)=>Math.exp(-a*a/s);
+  for(let i=0;i<p.count;i++){ const x=p.getX(i), y=p.getY(i), z=p.getZ(i), lo=Math.max(0,-y), ax=Math.abs(x);
+    let X=x*0.112*(1-0.27*Math.pow(lo,2.2)), Z=z*(z>0?0.125*(1-0.45*lo):0.118*(1-0.1*lo*lo)), Y=y*(y<0?0.15:0.138);
+    if(z<0){ const f=-z;
+      Z+=f*(0.011*G(ax-0.40,0.035)*G(y-0.09,0.02)-0.005*G(y-0.30,0.012)*(1-0.5*G(ax,0.02))-0.004*G(ax-0.5,0.05)*G(y+0.12,0.03)-0.005*G(ax,0.10)*G(y+0.48,0.03)-0.008*G(ax,0.06)*G(y+0.84,0.02));
+      Y-=f*0.006*G(ax,0.08)*G(y+0.9,0.02); }
+    if(z<0.3) X*=1+0.04*G(y+0.55,0.03);
+    p.setXYZ(i,X,Y,Z); }
+  g.computeVertexNormals(); return skull2=g; }
 // an oval skull with a slightly narrower jaw
 let skullGeo=null;
 function headGeo(){ if(skullGeo) return skullGeo; const g=new THREE.SphereGeometry(1,28,22), p=g.attributes.position;
@@ -4488,34 +4531,35 @@ function createHero(jacketHex,opts){
   const C={jacket:jacketHex, jacketD:jD, jacketL:jL, pants:pC.getHex(), pantsD:pC.clone().multiplyScalar(.72).getHex(), boot:opts.boot||0x4a3426, sole:0x1c1c22, glove:opts.glove||0x2b2d34, skin:opts.skin||0xf1c7a0,
            hair:opts.hair||0x3a2418, pack:opts.pack||0xe8a62c, packD:opts.packD||(opts.pack?new THREE.Color(opts.pack).multiplyScalar(.7).getHex():0xb07a16), roll:0xd8c9a3, accent:opts.accent||0xff6a3d, lens:0x8fd6ff, metal:0x2a2f38, metalL:0x434b57, wood:0x8a5a2e, steel:0xc9d2dc};
   const top=opts.top||'jacket', headwear=opts.head||'goggles', hairStyle=opts.hairStyle||'spiky', back=opts.back||'pack';
+  const SURF_OF=new Map(); [[C.skin,12],[C.hair,13],[C.jacket,9],[C.jacketD,9],[C.jacketL,9],[C.pants,10],[C.pantsD,10],[C.boot,11],[C.sole,11],[C.glove,11],[C.pack,9],[C.packD,9],[C.roll,9],[C.wood,3],[C.steel,6],[C.metal,1],[C.metalL,1]].forEach(([c,s])=>{ if(!SURF_OF.has(c)) SURF_OF.set(c,s); });
   // part(geometry, color, parent, x,y,z, rotation, scale, inkWidth)
   const part=(geo,col,parent,x=0,y=0,z=0,rot,scl,w=0.011)=>{
-    const m=new THREE.Mesh(geo,toon(col)); m.position.set(x,y,z); if(rot) m.rotation.set(rot[0]||0,rot[1]||0,rot[2]||0); if(scl) m.scale.set(scl[0],scl[1],scl[2]);
+    const m=new THREE.Mesh(geo,typeof col==='number'&&SURF_OF.has(col)?gunSurf(col,SURF_OF.get(col)):toon(col)); m.position.set(x,y,z); if(rot) m.rotation.set(rot[0]||0,rot[1]||0,rot[2]||0); if(scl) m.scale.set(scl[0],scl[1],scl[2]);
     m.castShadow=true; parent.add(m);
     if(w>0){ const o=new THREE.Mesh(inkGeo(geo,w/(scl?Math.min(scl[0],scl[1],scl[2]):1)),inkMat); m.add(o); ink.push(o); }
     return m; };
   const grp=(parent,x=0,y=0,z=0)=>{ const g=new THREE.Group(); g.position.set(x,y,z); parent.add(g); return g; };
 
-  // pelvis
+  // pelvis: hips and seat, a belt with its buckle, the pouch on the hip
+  const pz=(geo,col,par,x=0,y=0,z=0,rot,scl)=>part(geo,col,par,x,y,z,rot,scl,0);
   rig.hips=grp(hero,0,0.94,0);
-  part(bodyLathe([[0,-.085],[.11,-.08],[.145,-.04],[.15,.02],[.138,.08],[0,.085]],.68),C.pants,rig.hips,0,0,0);
-  part(rbox(.28,.038,.195,.012),C.sole,rig.hips,0,.07,0,null,null,0.006);
-  part(rbox(.05,.036,.016,.006),C.steel,rig.hips,0,.07,-.1,null,null,0);
-  part(rbox(.06,.085,.045,.014),C.packD,rig.hips,.14,.0,.02,null,null,0.006); // hip pouch (shells/mags come from here)
-  rig.pouch=grp(rig.hips,.16,.0,-.02);
-  // torso
+  pz(organ([[.105,.146,.095,.104],[.06,.15,.098,.108],[.01,.158,.1,.12],[-.04,.161,.098,.124],[-.09,.146,.088,.112],[-.125,.09,.066,.08],[-.142,.05,.04,.05]],22),C.pants,rig.hips);
+  pz(organ([[.1,.155,.101,.111],[.056,.1585,.103,.1145]],22,1),C.sole,rig.hips); pz(rbox(.052,.038,.012,.004),C.steel,rig.hips,0,.078,-.103);
+  pz(rbox(.06,.09,.04,.014),C.packD,rig.hips,.172,.0,.02); // hip pouch (shells/mags come from here)
+  rig.pouch=grp(rig.hips,.19,.0,-.02);
+  // torso: a waist that narrows, a ribcage that fills out to the shoulders and slopes up into the neck
   rig.spine=grp(rig.hips,0,.09,0);
-  part(bodyLathe([[0,-.03],[.132,-.025],[.128,.05],[.136,.14],[0,.15]],.7),C.jacket,rig.spine,0,0,0); // waist
+  pz(organ([[-.045,.146,.096,.104],[.02,.136,.094,.098],[.09,.138,.096,.098],[.16,.146,.1,.102],[.2,.15,.1,.103]],22),C.jacket,rig.spine);
   rig.chest=grp(rig.spine,0,.16,0);
-  part(bodyLathe([[0,-.02],[.14,-.015],[.158,.06],[.172,.15],[.168,.2],[.14,.245],[.09,.27],[0,.272]],.62),C.jacket,rig.chest,0,0,0); // chest, tapering up into the shoulders
-  part(bodyLathe([[.143,0],[.146,.035],[0,.036]],.64),C.jacketD,rig.chest,0,.02,0,null,null,0); // hem band
-  part(new THREE.CylinderGeometry(.085,.11,.07,16,1,true),C.jacketD,rig.chest,0,.27,0,null,null,0.008);
+  pz(organ([[-.03,.14,.098,.102],[.03,.156,.104,.11],[.09,.17,.11,.118],[.15,.178,.112,.122],[.2,.176,.104,.12],[.235,.15,.088,.108],[.262,.095,.066,.086],[.285,.058,.052,.058]],22),C.jacket,rig.chest);
+  pz(organ([[.01,.1465,.1015,.1035],[-.026,.1425,.0995,.1015]],22,1),C.jacketD,rig.chest); // hem band
+  pz(new THREE.CylinderGeometry(.06,.074,.05,18,1,true),C.jacketD,rig.chest,0,.272,.004);
   if(top==='jacket'||top==='racer'){
     [-1,1].forEach(sx=>{ part(rbox(.075,.07,.02,.012),C.jacketL,rig.chest,sx*.11,.07,-.11,null,null,0.004); });
     part(rbox(.016,.34,.01,.004),C.jacketD,rig.chest,0,.07,-.112,null,null,0);
     part(rbox(.08,.06,.02,.015),C.jacketL,rig.chest,.09,.14,-.112,null,null,0.005);
     part(sph(.12),C.jacketD,rig.chest,0,.24,.1,null,[1.15,.6,.7]);
-    if(top==='racer'){ [-1,1].forEach(sx=>{ part(rbox(.035,.28,.23,.008),C.accent,rig.chest,sx*.12,.12,0,null,null,0); part(rbox(.03,.2,.21,.006),C.accent,rig.spine,sx*.1,.07,0,null,null,0); }); part(rbox(.39,.03,.226,.006),C.accent,rig.chest,0,.21,0,null,null,0); }
+    if(top==='racer'){ [-1,1].forEach(sx=>{ part(rbox(.035,.26,.238,.008),C.accent,rig.chest,sx*.12,.11,.002,null,null,0); part(rbox(.03,.2,.212,.006),C.accent,rig.spine,sx*.1,.07,.002,null,null,0); }); }
   } else if(top==='hoodie'){
     part(rbox(.22,.1,.03,.02),C.jacketD,rig.spine,0,.08,-.1,null,null,0.005); // front pocket
     [-1,1].forEach(sx=>part(limbGeo(.007,.007,.12),0xf0ece2,rig.chest,sx*.04,.24,-.112,null,null,0)); // drawstrings
@@ -4535,10 +4579,10 @@ function createHero(jacketHex,opts){
     part(rbox(.12,.04,.02,.008),0xd8d8d8,rig.chest,0,.16,-.122,null,null,0); // name tape
   } else if(top==='coat'){ // long coat: high collar and tails to mid-thigh
     part(new THREE.CylinderGeometry(.1,.12,.08,18,1,true),C.jacketD,rig.chest,0,.27,0,null,[1,1,.8]);
-    part(bodyLathe([[.15,.0],[.165,-.12],[.18,-.3]],.72),C.jacket,rig.hips,0,.04,0,null,null,0); // tails (open lathe)
+    part(bodyLathe([[.176,.0],[.186,-.12],[.198,-.3]],.72),C.jacket,rig.hips,0,.04,0,null,null,0); // tails (open lathe)
     part(rbox(.012,.38,.008,.004),C.jacketD,rig.chest,0,.08,-.108,null,null,0); [0,1,2].forEach(q=>part(sph(.01),0xd4af37,rig.chest,.025,.18-q*.07,-.112,null,null,0));
   } else if(top==='flannel'){ // checked shirt: darker bands around the body
-    [.03,.11,.19].forEach(y=>part(bodyLathe([[.162+y*.06,y],[.164+y*.06,y+.025]],.63),C.jacketD,rig.chest,0,0,0,null,null,0));
+    [.03,.11,.19].forEach(y=>part(bodyLathe([[.162+y*.1,y],[.164+y*.1,y+.025]],.67),C.jacketD,rig.chest,0,0,0,null,null,0));
     part(rbox(.012,.3,.008,.004),C.jacketD,rig.chest,0,.1,-.108,null,null,0);
   } else if(top==='tee'){
     part(new THREE.CylinderGeometry(.075,.09,.03,16,1,true),C.skin,rig.chest,0,.265,-.005,null,[1,1,.8]); // open neckline
@@ -4564,7 +4608,7 @@ function createHero(jacketHex,opts){
     part(rbox(.37,.04,.025,.01),C.accent,rig.pack,0,-.68,.03,[.1,0,0],null,0.004);
     [-1,1].forEach(sx=>part(sph(.03),0xd4af37,rig.chest,sx*.14,.25,-.09,null,null,0.005));
   } else if(back==='guitar'){
-    const gt=grp(rig.pack,0,-.2,.05); gt.rotation.z=.75;
+    const gt=grp(rig.pack,0,-.2,.012); gt.rotation.z=.75;
     const bd=new THREE.CylinderGeometry(.115,.115,.045,20); bd.rotateX(Math.PI/2); const bd2=new THREE.CylinderGeometry(.088,.088,.045,20); bd2.rotateX(Math.PI/2);
     part(bd,C.pack,gt,0,-.1,0); part(bd2,C.pack,gt,0,.04,0); part(rbox(.05,.04,.05,.012),C.pack,gt,.09,.11,0,[0,0,-.6],null,0.008); // offset horn
     const sh2=new THREE.CylinderGeometry(.03,.03,.05,12); sh2.rotateX(Math.PI/2); part(sh2,0x15161b,gt,0,-.02,.0,null,null,0);
@@ -4573,9 +4617,9 @@ function createHero(jacketHex,opts){
     part(rbox(.03,.5,.02,.008),C.packD,rig.chest,0,.12,-.112,[0,0,-.55],null,0.004);
   } else if(back==='shield'){
     const sd=new THREE.CylinderGeometry(.2,.2,.04,24); sd.rotateX(Math.PI/2);
-    part(sd,C.pack,rig.pack,0,-.07,.03); part(new THREE.TorusGeometry(.2,.018,8,24),C.packD,rig.pack,0,-.07,.03,null,null,0.004);
-    part(sph(.05),0xc9d2dc,rig.pack,0,-.07,.06,null,[1,1,.6],0.005);
-    [0,Math.PI/2].forEach(a=>part(rbox(.34,.025,.008,.004),C.accent,rig.pack,0,-.07,.053,[0,0,a],null,0));
+    part(sd,C.pack,rig.pack,0,-.07,.012); part(new THREE.TorusGeometry(.2,.018,8,24),C.packD,rig.pack,0,-.07,.012,null,null,0.004);
+    part(sph(.05),0xc9d2dc,rig.pack,0,-.07,.042,null,[1,1,.6],0.005);
+    [0,Math.PI/2].forEach(a=>part(rbox(.34,.025,.008,.004),C.accent,rig.pack,0,-.07,.035,[0,0,a],null,0));
     part(rbox(.03,.5,.02,.008),C.packD,rig.chest,0,.12,-.112,[0,0,.55],null,0.004);
   }
   else if(back==='quiver'){
@@ -4590,7 +4634,7 @@ function createHero(jacketHex,opts){
     part(limbGeo(.02,.02,.06),0x2a2f38,rig.pack,0,.17,.04); part(rbox(.06,.02,.02,.006),0x2a2f38,rig.pack,0,.16,.04,null,null,0);
     part(rbox(.16,.03,.02,.008),C.packD,rig.pack,0,-.05,-.04,null,null,0); part(rbox(.16,.03,.02,.008),C.packD,rig.pack,0,-.25,-.04,null,null,0);
   } else if(back==='sword'){
-    const sw=grp(rig.pack,0,-.05,.03); sw.rotation.z=.7;
+    const sw=grp(rig.pack,0,-.05,.01); sw.rotation.z=.7;
     part(rbox(.05,.62,.03,.012),0x2a1e16,sw,0,-.12,0); part(rbox(.052,.04,.032,.01),0xd4af37,sw,0,-.42,0,null,null,0);
     part(rbox(.16,.025,.035,.01),0xd4af37,sw,0,.2,0); part(limbGeo(.016,.016,.13),0x3a2a1e,sw,0,.34,0); part(sph(.022),0xd4af37,sw,0,.35,0);
     part(rbox(.03,.5,.02,.008),C.packD,rig.chest,0,.12,-.112,[0,0,-.6],null,0);
@@ -4598,17 +4642,20 @@ function createHero(jacketHex,opts){
     const bn=grp(rig.pack,.08,-.05,.04); part(limbGeo(.012,.012,.9),0x6b4423,bn,0,.55,0); part(sph(.02),0xd4af37,bn,0,.56,0);
     part(rbox(.22,.28,.008,.004),C.accent,bn,.115,.4,0); part(rbox(.06,.06,.01,.004),C.pack,bn,.115,.4,-.002,[0,0,.785],null,0);
   }
-  // head
+  // head: a neck with some width to it, a smaller skull, and a face (set-in eyes with irises, a nose with a bridge, lips)
   rig.neck=grp(rig.chest,0,.27,0);
-  part(limbGeo(.044,.05,.1),C.skin,rig.neck,0,.085,0,null,null,0.006);
-  rig.head=grp(rig.neck,0,.06,0); rig.head.scale.setScalar(.88); // a realistic head-to-body ratio
-  part(headGeo(),C.skin,rig.head,0,.135,0,null,null,0);
-  part(sph(.03),C.skin,rig.head,-.11,.12,.012,null,[.38,.9,.72],0); part(sph(.03),C.skin,rig.head,.11,.12,.012,null,[.38,.9,.72],0); // ears
-  part(sph(.022),C.skin,rig.head,0,.104,-.124,[-.35,0,0],[.82,1.15,1.05],0); // nose
-  rig.lids=[-1,1].map(sx=>{ const l=part(sph(.019),C.skin,rig.head,sx*.045,.163,-.112,null,[1.25,.2,.5],0); return l; });
-  rig.eyes=[-1,1].map(sx=>{ const e=grp(rig.head,sx*.045,.148,-.113); part(sph(.0165),0xe9e4dc,e,0,0,0,null,[1.2,.72,.4],0); part(sph(.0095),0x3b2a1e,e,0,0,-.006,null,[1,1,.55],0); return e; });
-  rig.brows=[-1,1].map(sx=>part(rbox(.046,.008,.012,.004),C.hair,rig.head,sx*.047,.182,-.121,[0,0,sx*-.12],null,0));
-  rig.mouth=part(rbox(.04,.006,.008,.003),0x8a4a40,rig.head,0,.058,-.118,null,null,0);
+  pz(organ([[-.03,.062,.054,.064],[.03,.051,.05,.056],[.09,.047,.05,.054],[.13,.05,.05,.05]],16),C.skin,rig.neck);
+  rig.head=grp(rig.neck,0,.07,0); rig.head.scale.set(.75,.81,.81); // a real head-to-body ratio (about seven and a half heads tall)
+  const skinD=new THREE.Color(C.skin).multiplyScalar(.8).getHex(), lipC=new THREE.Color(C.skin).lerp(new THREE.Color(0xa8504e),.5).getHex(); SURF_OF.set(skinD,12); SURF_OF.set(lipC,12);
+  pz(headGeo2(),C.skin,rig.head,0,.135,0);
+  [-1,1].forEach(sx=>{ pz(sph(.03),C.skin,rig.head,sx*.112,.126,.014,null,[.3,.95,.62]); pz(sph(.018),skinD,rig.head,sx*.119,.126,.008,null,[.22,.8,.55]); });             // ears
+  pz(organ([[.172,.0075,.005,.008,0,-.108],[.148,.009,.009,.009,0,-.112],[.126,.012,.016,.011,0,-.114],[.11,.0165,.022,.012,0,-.113],[.099,.0145,.014,.011,0,-.111]],12),C.skin,rig.head); // nose
+  [-1,1].forEach(sx=>pz(sph(.0095),C.skin,rig.head,sx*.0135,.105,-.119,null,[1,.8,1]));
+  pz(sph(.02),lipC,rig.head,0,.0645,-.1125,null,[1.05,.19,.42]); pz(sph(.02),lipC,rig.head,0,.0525,-.1115,null,[.9,.25,.44]);                                                   // lips
+  rig.lids=[-1,1].map(sx=>pz(sph(.019),C.skin,rig.head,sx*.044,.1635,-.106,null,[1.2,.42,.52]));
+  rig.eyes=[-1,1].map(sx=>{ const e=grp(rig.head,sx*.044,.148,-.106); pz(sph(.015),0xece8e1,e,0,0,0,null,[1.15,.66,.5]); pz(sph(.0075),opts.eye||0x4a3423,e,0,0,-.0058,null,[1,1,.4]); pz(sph(.0038),0x0c0a0a,e,0,0,-.0082,null,[1,1,.4]); pz(sph(.0016),0xffffff,e,.003,.003,-.0096); return e; });
+  rig.brows=[-1,1].map(sx=>pz(rbox(.044,.0065,.01,.003),C.hair,rig.head,sx*.046,.182,-.117,[0,0,sx*-.12]));
+  rig.mouth=pz(rbox(.036,.004,.008,.002),0x55292a,rig.head,0,.0585,-.117);
   rig.tuft=grp(rig.head,0,.28,.02);
   function hairCap(lift){ // the crown down to the hairline at the front, and further down the back of the head
     const top=new THREE.SphereGeometry(1,24,10,0,Math.PI*2,0,Math.PI*0.36), back=new THREE.SphereGeometry(1,16,10,0,Math.PI,Math.PI*0.3,Math.PI*0.38);
@@ -4648,7 +4695,7 @@ function createHero(jacketHex,opts){
     part(rbox(.285,.14,.285,.08),C.accent,rig.head,0,.25,.005);
     part(new THREE.CylinderGeometry(.148,.148,.05,20),new THREE.Color(C.accent).multiplyScalar(.8).getHex(),rig.head,0,.2,.005,null,null,0.006);
     part(sph(.05),0xf3efe4,rig.tuft,0,.06,-.02);
-    [-1,1].forEach(sx=>part(rbox(.03,.025,.012,.006),0x1a1f29,rig.head,sx*.07,.1,-.128,[0,0,sx*.3],null,0)); // face paint
+    [-1,1].forEach(sx=>part(rbox(.03,.02,.005,.002),0x1a1f29,rig.head,sx*.07,.1,-.097,[0,sx*-.7,sx*.3],null,0)); // face paint
   } else if(headwear==='helmet'){
     const dome=new THREE.SphereGeometry(.205,22,16); part(dome,C.jacket,rig.head,0,.13,0);
     part(sph(.12),0x1e2f56,rig.head,0,.12,-.14,null,[1.3,.95,.75],0.006); // tinted visor
@@ -4697,39 +4744,42 @@ function createHero(jacketHex,opts){
   }
   // ink lines on the face look odd under helmets and hoods that cover it
   if(headwear==='helmet'||headwear==='knight'){ rig.eyes.forEach(e=>e.visible=false); rig.lids.forEach(e=>e.visible=false); rig.brows.forEach(e=>e.visible=false); rig.mouth.visible=false; }
-  // arms
+  // arms: a shoulder that rounds into the upper arm, an elbow, a forearm that narrows to the wrist; and a hand with a palm,
+  // a thumb and four fingers of three joints each (palm side -z, thumb on the outside), posed by poseHands()
   const arm=sx=>{
-    const sh=grp(rig.chest,sx*.19,.21,0); sh.rotation.order='XZY';
-    part(sph(.062),C.jacket,sh,0,-.005,0,null,[1,1.05,1.1]);
-    part(limbGeo(.055,.046,.25),C.jacket,sh);
+    const sh=grp(rig.chest,sx*.19,.21,0); sh.rotation.order='XZY'; const UL=.29, FL=.26, G_=C.glove;
+    if(top==='tee'){ pz(organ([[.045,.045,.05,.052],[.02,.06,.062,.064],[-.04,.059,.064,.064],[-.1,.054,.058,.056],[-.135,.052,.056,.054]],16),C.jacket,sh); pz(organ([[-.09,.047,.052,.05],[-.2,.043,.047,.045],[-.27,.04,.042,.042],[-.31,.038,.04,.04]],16),C.skin,sh); }
+    else pz(organ([[.045,.045,.05,.052],[.02,.06,.062,.064],[-.04,.059,.064,.064],[-.12,.051,.057,.053],[-.2,.046,.049,.047],[-.27,.043,.045,.045],[-.31,.041,.043,.043]],16),C.jacket,sh);
     if(top==='armor') part(sph(.095),C.jacketL,sh,0,.0,0,null,[1.1,.75,1.1]);
-    if(top==='suit') part(new THREE.TorusGeometry(.06,.014,8,16),C.accent,sh,0,-.12,0,[Math.PI/2,0,0],null,0);
-    const el=grp(sh,0,-.25,0), fc=top==='tee'?C.skin:C.jacket;
-    part(sph(.047),fc,el,0,0,0,null,null,0.008);
-    part(limbGeo(.046,.035,.21),fc,el);
-    part(limbGeo(.038,.037,.035),C.jacketD,el,0,-.182,0,null,null,0.006);
-    const wr=grp(el,0,-.23,0);
-    part(limbGeo(.03,.034,.03),C.glove,wr,0,.012,0,null,null,0);                     // wrist
-    part(rbox(.064,.07,.036,.02),C.glove,wr,0,-.035,0,null,null,0.007);                // palm
-    const fing=grp(wr,0,-.068,0);
-    part(rbox(.06,.054,.032,.015),C.glove,fing,0,-.025,-.002,null,null,0.004);        // fingers, one soft mitten that curls
-    part(rbox(.024,.046,.025,.011),C.glove,wr,-sx*.036,-.046,-.016,[0,0,sx*.4],null,0.006); // thumb
-    const hand=grp(wr,0,-.06,0);
-    return {sh,el,wr,fing,hand,side:sx};
+    if(top==='suit') part(new THREE.TorusGeometry(.06,.014,8,16),C.accent,sh,0,-.14,0,[Math.PI/2,0,0],null,0);
+    const el=grp(sh,0,-UL,0), fc=top==='tee'?C.skin:C.jacket;
+    pz(organ([[.04,.04,.043,.045],[.0,.043,.045,.048],[-.05,.045,.047,.047],[-.12,.04,.041,.04],[-.19,.033,.032,.031],[-.245,.03,.027,.026]],16),fc,el);
+    if(top!=='tee') pz(organ([[-.2,.036,.0345,.0335],[-.246,.035,.032,.031]],16,1),C.jacketD,el);                         // cuff
+    const wr=grp(el,0,-FL,0), hg=grp(wr,0,0,0);
+    pz(organ([[.022,.031,.025,.025],[-.012,.031,.021,.022],[-.034,.038,.016,.018]],14),G_,hg);                              // wrist
+    pz(rbox(.084,.094,.03,.014),G_,hg,0,-.05,0); pz(rbox(.03,.052,.022,.011),G_,hg,sx*.028,-.036,-.012,[0,0,sx*.25]);        // palm, the pad at the base of the thumb
+    const FX=[.031,.0105,-.0105,-.031], KY=[-.094,-.098,-.095,-.088], L1=[.042,.046,.043,.034], L2=[.026,.029,.027,.02], L3=[.021,.023,.022,.019], FR=[.0098,.0102,.0096,.0086];
+    const fj={mcp:[],pip:[],dip:[]}, seg=(par,len,r)=>{ pz(limbGeo(r,r*.93,len),G_,par); pz(sph(r),G_,par); };
+    FX.forEach((x,i)=>{ const m=grp(hg,sx*x,KY[i],-.001); seg(m,L1[i],FR[i]); const p=grp(m,0,-L1[i],0); seg(p,L2[i],FR[i]*.93); const d=grp(p,0,-L2[i],0); seg(d,L3[i],FR[i]*.86); pz(sph(FR[i]*.82),G_,d,0,-L3[i],0);
+      fj.mcp.push(m); fj.pip.push(p); fj.dip.push(d); });
+    const t0=grp(hg,sx*.037,-.03,-.008), t1=grp(t0,0,-.038,0), t2=grp(t1,0,-.03,0); t0.rotation.order='ZXY';
+    pz(limbGeo(.0128,.0118,.038),G_,t0); pz(sph(.0128),G_,t0); pz(limbGeo(.0112,.0104,.03),G_,t1); pz(sph(.0114),G_,t1); pz(limbGeo(.0102,.0092,.026),G_,t2); pz(sph(.0102),G_,t2); pz(sph(.009),G_,t2,0,-.026,0);
+    const fing=grp(wr,0,-.068,0), hand=grp(wr,0,-.098,-.032);
+    return {sh,el,wr,fing,hand,hg,fj,th:[t0,t1,t2],side:sx,a:UL,b:FL};
   };
   rig.armL=arm(-1); rig.armR=arm(1);
-  // legs
+  // legs: thighs that angle in to the knee, a kneecap, a calf, a cuff over a boot with a real foot in it
   const leg=sx=>{
     const hp=grp(rig.hips,sx*.08,-.05,0); hp.rotation.order='XZY';
-    part(limbGeo(.085,.063,.4),C.pants,hp); part(sph(.083),C.pants,hp,0,-.02,0,null,[1,.75,1]);
+    pz(organ([[.05,.07,.08,.084,sx*.004],[-.03,.081,.09,.097,sx*.003],[-.12,.08,.088,.091,sx*.001],[-.24,.07,.076,.074,-sx*.006],[-.34,.06,.064,.062,-sx*.011],[-.4,.056,.062,.056,-sx*.013],[-.44,.052,.056,.052,-sx*.013]],18),C.pants,hp);
     const kn=grp(hp,0,-.4,0);
-    part(sph(.064),C.pants,kn,0,0,0,null,null,0.008);
-    part(limbGeo(.063,.045,.36),C.pants,kn); part(sph(.056),C.pants,kn,0,-.1,.008,null,[.95,1.6,1],0); // calf
+    pz(organ([[.05,.054,.058,.054,-sx*.013],[.0,.056,.064,.055,-sx*.013],[-.06,.054,.052,.062,-sx*.011],[-.13,.057,.047,.07,-sx*.009],[-.22,.048,.043,.056,-sx*.005],[-.31,.041,.039,.043,-sx*.002],[-.385,.041,.041,.043,0]],18),C.pants,kn);
+    pz(organ([[-.335,.0435,.0425,.0455,-sx*.001],[-.388,.0435,.0435,.0455,0]],18,1),C.pantsD,kn);                           // cuff
     const an=grp(kn,0,-.37,0);
-    part(limbGeo(.047,.05,.1),C.boot,an,0,.02,0);                                           // ankle collar
-    part(sph(.052),C.boot,an,0,-.075,.0,null,[.95,.85,1.15]);                              // heel
-    part(sph(.05),C.boot,an,0,-.088,-.11,null,[.95,.7,1.5]);                               // toe box
-    part(rbox(.098,.02,.25,.009),C.sole,an,0,-.12,-.05,null,null,0.006);
+    pz(organ([[.06,.046,.047,.05],[.01,.045,.047,.05],[-.045,.045,.05,.052],[-.09,.047,.056,.054]],16),C.boot,an);          // boot shaft
+    pz(organZ([[-.078,.03,.02,.03,0,-.09],[-.05,.045,.03,.05,0,-.088],[.0,.049,.031,.06,0,-.088],[.06,.051,.03,.046,0,-.09],[.12,.053,.028,.034,0,-.092],[.17,.049,.025,.03,0,-.094],[.2,.037,.02,.022,0,-.096]],16),C.boot,an); // the foot
+    pz(rbox(.108,.022,.292,.01),C.sole,an,0,-.119,-.062); pz(rbox(.098,.016,.085,.006),C.sole,an,0,-.128,.03);              // sole and heel
+    for(let q=0;q<3;q++) pz(rbox(.05,.006,.008,.003),C.sole,an,0,-.043-q*.012,-.062-q*.022,[-.75,0,0]);                    // laces
     const foot=grp(an,0,-.13,-.06);
     return {hp,kn,an,foot,side:sx};
   };
@@ -4946,7 +4996,7 @@ function createHero(jacketHex,opts){
     rig.arMag=grp(W,0,0,0); PF(rig.arMag,mSG,[[.074,-.04],[.124,-.04],[.142,-.16],[.136,-.192],[.092,-.186],[.082,-.15]],.022,.003);
     for(const k of [.3,.6]) PF(rig.arMag,mSD,[[.079+k*.012,-.06-k*.11],[.123+k*.017,-.062-k*.11],[.1235+k*.017,-.066-k*.11],[.0795+k*.012,-.064-k*.11]],.0235,.001);
     TR(W,'ar',.2,.3,.068,.076,.047); TR(W,'ar',-.28,-.2,.05,.057,.042);
-    rig.muzzleAR=grp(W,0,-.585,-ub); rig.gripAR=grp(W,0,-.3,-.012); rig.magAR=grp(W,0,-.115,.2); }
+    rig.muzzleAR=grp(W,0,-.585,-ub); rig.gripAR=grp(W,0,-.3,-.03); rig.magAR=grp(W,0,-.115,.2); }
 
   // ---- pump shotgun: walnut stock and a ribbed sliding fore-end on a blued steel receiver
   rig.pump=grp(rig.armR.hand,0,0,0);
@@ -4958,7 +5008,7 @@ function createHero(jacketHex,opts){
     CY(W,mSD,.0115,.19,.69,ub); CY(W,mS,.0105,.19,.6,ut); CY(W,mSD,.0125,.6,.615,ut); BX(W,mSD,.57,.585,ut-.012,ub+.013,.03,.006);    // barrel, magazine tube, clamp
     p0(sph(.0045),mBrass,W,0,-.682,-(ub+.0135)); for(const sx of [-1,1]) BX(W,mS,.19,.33,ut-.004,ut+.004,.003,.001,sx*.018);     // bead, action bars
     rig.slide=grp(W,0,-.33,-.025); p0(rbox(.05,.17,.054,.022),mWal,rig.slide,0,0,-.011); for(let q=0;q<7;q++) p0(rbox(.052,.006,.056,.003),mWalD,rig.slide,0,-.066+q*.022,-.011);
-    rig.gripPump=grp(rig.slide,0,0,.05);
+    rig.gripPump=grp(rig.slide,0,0,.016);
     TR(W,'pump',.02,.14,.0835,.0885,.03);
     rig.muzzlePump=grp(W,0,-.695,-ub); rig.portPump=grp(W,0,-.1,.04); }
   rig.muzzle=rig.muzzleAR;
@@ -4974,7 +5024,7 @@ function createHero(jacketHex,opts){
     BX(W,mSD,.375,.395,.084,.092,.016,.003); p0(new THREE.TorusGeometry(.014,.003,6,16),mSD,W,0,-.385,-.106,[Math.PI/2,0,0]); POST(W,mSD,.002,.092,.106,.385); // hooded front sight
     POST(W,mSD,.012,.082,.098,-.045,0,12); CY(W,mSD,.022,-.092,-.086,.058,0,14);                                                 // drum rear sight, end cap
     PF(W,mP,[[-.088,.078],[-.3,.07],[-.3,-.03],[-.28,-.036],[-.2,.03],[-.088,.04]],.036,.006); BX(W,mR,-.312,-.298,-.032,.072,.038,.004);
-    TR(W,'smg',.02,.12,.038,.045,.0435); MK('smg',[.425,ub],[.29,-.01],[.115,-.24]); }
+    TR(W,'smg',.02,.12,.038,.045,.0435); MK('smg',[.425,ub],[.29,.02],[.115,-.24]); }
 
   // ---- machine gun: belt-fed, feed cover on top, soft ammunition pouch, heat shield and a folded bipod
   { const W=mkW('mg'), ub=.05; GRIP(W,mP,.02);
@@ -4986,7 +5036,7 @@ function createHero(jacketHex,opts){
     BX(W,mSD,.31,.39,.108,.116,.012,.004,.03); for(const f of [.315,.385]) BX(W,mSD,f-.005,f+.005,.08,.11,.008,.002,.03);            // carrying handle
     BIPOD(W,.5,.0,.24);
     PF(W,mP,[[-.11,.076],[-.33,.07],[-.345,.055],[-.345,-.05],[-.32,-.058],[-.25,.005],[-.11,.012]],.042,.006); BX(W,mSD,-.33,-.25,.076,.086,.02,.004);
-    TR(W,'mg',-.06,.1,.082,.09,.0595); MK('mg',[.79,ub],[.4,-.03],[.1,-.18]); }
+    TR(W,'mg',-.06,.1,.082,.09,.0595); MK('mg',[.79,ub],[.4,-.006],[.1,-.18]); }
 
   // ---- minigun: six barrels in clamps on a motor housing, top handle, feed chute down to an ammunition can
   { const W=mkW('gatling'), u0=.02; p0(prof(gripPts(.06,.062),.036,.005),mP,W,0,0,0); p0(rbox(.006,.008,.022,.002),mSD,W,0,.012,.074,[-.3,0,0]);
@@ -4998,7 +5048,7 @@ function createHero(jacketHex,opts){
     CY(W,mSD,.011,0,.2,.15); for(const f of [.012,.188]) POST(W,mSD,.008,.085,.15,f);                                              // top handle
     BX(W,mOD,-.08,.09,-.15,-.03,.09,.012,-.105); BX(W,mODp,-.085,.095,-.04,-.026,.094,.005,-.105); for(let q=0;q<4;q++) TILT(W,mSG,-.01+q*.004,-.01+q*.016,.05,.014,.034,0,.004,-.07-q*.004); // can and chute
     trim(cylY(.0745,.03,22),W,0,.06,-u0,null,null,'gatling');
-    rig.muzzle_gatling=grp(W,0,-.72,-u0); rig.grip_gatling=grp(W,0,-.12,-.15); rig.mag_gatling=grp(W,-.12,0,.14); }
+    rig.muzzle_gatling=grp(W,0,-.72,-u0); rig.grip_gatling=grp(W,0,-.1,-.15); rig.mag_gatling=grp(W,-.12,0,.14); }
 
   // ---- rocket launcher: a slim tube with a flared venturi, wooden heat guard, optical sight and a bulbous warhead
   { const W=mkW('rpg'), ub=.05, mT=gunSurf(0x3b4136,4); GRIP(W,mWd,.0);
@@ -5009,7 +5059,7 @@ function createHero(jacketHex,opts){
     BX(W,mSD,.3,.31,.076,.1,.006,.002); BX(W,mSD,-.02,-.01,.076,.096,.012,.002);
     CY(W,mOD,.014,.45,.52,ub,0,14); CN(W,mOD,.014,.047,.52,.6,ub,0,18); CY(W,mOD,.047,.6,.7,ub,0,18); CN(W,mOD,.047,.014,.7,.86,ub,0,18); CY(W,mBr,.009,.86,.885,ub,0,10); CY(W,mSD,.0478,.62,.632,ub,0,18);
     trim(cylY(.0275,.05,18),W,0,-.22,-ub,null,null,'rpg');
-    MK('rpg',[.89,ub],[.26,.0],[-.4,ub]); }
+    MK('rpg',[.89,ub],[.26,.024],[-.4,ub]); }
 
   // ---- grenade: a segmented body, fuse, safety lever and pin
   { const W=mkW('nade'), mG=gunSurf(0x4a5a34,4);
@@ -5030,7 +5080,7 @@ function createHero(jacketHex,opts){
     BX(SL,mBr,.03,.076,.052,.0665,.018,.002,.009); BX(SL,mSD,.108,.116,.066,.074,.006,.002); BX(SL,mSD,-.066,-.056,.066,.074,.022,.002);
     CY(W,mBr,.0065,.12,.13,.045,0,12); p0(cylY(.004,.002,8),mHole,W,0,-.1306,-.045);
     TR(SL,'pistol',.02,.09,.036,.042,.0352);
-    marks('pistol',[0,-.135,-.045],[-.032,.035,.075],[0,.035,.11]); }
+    marks('pistol',[0,-.135,-.045],[0,0,0],[0,.035,.11]); }
 
   // ---- revolver: fluted cylinder in a steel frame, full underlug barrel with a rib, walnut grips
   { const W=mkW('revolver'), ub=.052;
@@ -5043,7 +5093,7 @@ function createHero(jacketHex,opts){
     PF(W,mWal,[[-.018,.012],[-.05,.03],[-.078,.0],[-.112,-.085],[-.1,-.102],[-.06,-.106],[-.045,-.092],[-.025,-.04],[-.002,-.01]],.036,.011); PIN(W,mBrass,.007,.0375,-.056,-.03);
     TRIG(W,-.012,-.003,.021);
     TR(W,'revolver',.11,.2,.03,.036,.02);
-    marks('revolver',[0,-.268,-ub],[-.032,.04,.08],[0,-.045,-.034]); }
+    marks('revolver',[0,-.268,-ub],[0,0,0],[0,-.045,-.034]); }
 
   // ---- hand cannon: bright steel, a heavy fixed barrel with a sloped nose and a short slide behind it
   { const W=mkW('hcannon'); p0(prof(gripPts(.035,.007),.038,.006),mR,W,0,0,0);
@@ -5053,7 +5103,7 @@ function createHero(jacketHex,opts){
     for(let q=0;q<6;q++) TILT(SL,mSG,-.058+q*.009,.052,.003,.05,.0415,.25,.001); BX(SL,mHole,.02,.06,.066,.083,.02,.002,.008);
     BX(SL,mSD,-.07,-.058,.082,.091,.024,.002); BX(W,mSD,.185,.193,.086,.094,.006,.002); PF(SL,mSD,[[-.078,.05],[-.07,.05],[-.074,.074],[-.086,.07]],.012,.002);
     TR(W,'hcannon',.09,.18,.036,.043,.0375);
-    marks('hcannon',[0,-.212,-.052],[-.032,.035,.075],[0,.035,.11]); }
+    marks('hcannon',[0,-.212,-.052],[0,0,0],[0,.035,.11]); }
 
   // ---- bolt-action sniper: olive thumbhole chassis, heavy fluted barrel, big brake, long scope, bipod
   { const W=mkW('sniper'), ub=.05; TRIG(W,-.028,.0);
@@ -5065,7 +5115,7 @@ function createHero(jacketHex,opts){
     BRAKE(W,.72,ub,.016,.07); PF(W,mSD,[[.062,-.006],[.13,-.004],[.134,-.055],[.07,-.058]],.03,.004); BIPOD(W,.34,.012,.22);
     SCOPE(W,-.1,.25,.074,.028,.015);
     const BG=grp(W,0,.03,-.054); rig.bolt_sniper=BG; p0(cylY(.016,.07,12),mBr,BG,0,0,0); p0(cylX(.007,.05,8),mBr,BG,.04,.012,0); p0(sph(.013),mSD,BG,.068,.014,0);
-    TR(W,'sniper',.16,.3,.022,.03,.0515); MK('sniper',[.79,ub],[.27,-.02],[.1,-.09]); }
+    TR(W,'sniper',.16,.3,.022,.03,.0515); MK('sniper',[.79,ub],[.27,.004],[.1,-.09]); }
 
   // ---- hunting rifle: a one-piece walnut sporter, slim blued barrel, open sights, brass fittings
   { const W=mkW('hunting'), ub=.05;
@@ -5074,7 +5124,7 @@ function createHero(jacketHex,opts){
     CY(W,mS,.017,-.07,.17,.052,0,16); BX(W,mHole,.03,.1,.054,.066,.003,.001,.0165); CN(W,mSD,.011,.008,.17,.7,ub);
     PF(W,mSD,[[.655,.058],[.69,.058],[.69,.062],[.68,.072]],.006,.001); p0(sph(.003),mBrass,W,0,-.683,-.073); BX(W,mSD,.24,.27,.06,.07,.014,.002); TRIG(W,-.026,.006); BX(W,mS,.02,.11,-.012,-.007,.024,.002);
     const BG=grp(W,0,.03,-.052); rig.bolt_hunting=BG; p0(cylY(.0145,.07,12),mBr,BG,0,0,0); p0(cylX(.006,.045,8),mBr,BG,.036,.012,0); p0(sph(.012),mBr,BG,.06,.014,0);
-    TR(W,'hunting',.3,.345,.021,.039,.0435); MK('hunting',[.705,ub],[.26,.0],[.06,-.04]); }
+    TR(W,'hunting',.3,.345,.021,.039,.0435); MK('hunting',[.705,ub],[.26,.009],[.06,-.04]); }
 
   // ---- scoped rifle: a skeleton laminate stock, slotted wooden handguard, long flash hider, ribbed magazine, side-mounted scope
   { const W=mkW('dmr'), ub=.055; GRIP(W,mLam,.004);
@@ -5085,7 +5135,7 @@ function createHero(jacketHex,opts){
     CY(W,mSD,.0075,.16,.66,ub); CY(W,mSD,.007,.42,.5,.073); BX(W,mSD,.49,.51,ub,.08,.014,.004); BX(W,mSD,.6,.615,ub,ub+.045,.01,.003); p0(new THREE.TorusGeometry(.011,.0025,6,14),mSD,W,0,-.6075,-(ub+.05),[Math.PI/2,0,0]);
     FLASH(W,.66,ub,.0105,.07); PF(W,mSD,[[.03,-.004],[.088,-.004],[.104,-.088],[.05,-.094]],.026,.004); for(const k of [.25,.5,.75]) BX(W,mS,.04+k*.014,.09+k*.014,-.008-k*.082,-.004-k*.082,.0275,.001);
     BX(W,mSD,-.02,.11,.03,.082,.006,.002,-.0225); RAIL(W,-.03,.12,.078); SCOPE(W,-.07,.2,.078,.021,.012);
-    TR(W,'dmr',.2,.33,.03,.037,.0455); MK('dmr',[.735,ub],[.28,.004],[.075,-.12]); }
+    TR(W,'dmr',.2,.33,.03,.037,.0455); MK('dmr',[.735,ub],[.28,.023],[.075,-.12]); }
 
   // ---- burst rifle: a bullpup, the magazine behind the grip in a one-piece body, built-in tube sight, folding foregrip
   { const W=mkW('burst'), ub=.062; GRIP(W,mTan,.0);
@@ -5095,7 +5145,7 @@ function createHero(jacketHex,opts){
     PF(W,mSG,[[-.25,.09],[.13,.09],[.13,.104],[-.25,.104]],.04,.004); BX(W,mHole,-.2,-.13,.07,.086,.003,.001,.0255);
     for(const f of [-.06,.09]) BX(W,mSG,f-.012,f+.012,.1,.14,.022,.004); CY(W,mSG,.017,-.085,.115,.152,0,16); LENS(W,mLens,.0145,.1156,.152,true); LENS(W,mLens,.0145,-.0856,.152,false);
     CY(W,mSD,.009,.11,.38,ub); CY(W,mS,.016,.11,.15,ub,0,12); FLASH(W,.38,ub,.012,.05); CY(W,mS,.016,.155,.19,ub,0,12); BX(W,mP,.156,.19,-.06,.05,.03,.012);   // barrel, foregrip
-    TR(W,'burst',-.33,-.24,.02,.03,.0515); MK('burst',[.43,ub],[.172,-.03],[-.165,-.21]); }
+    TR(W,'burst',-.33,-.24,.02,.03,.0515); MK('burst',[.43,ub],[.19,.03],[-.165,-.21]); }
 
   // ---- heavy rifle: stamped receiver with a ribbed cover, laminate furniture, gas tube over the barrel, deeply curved magazine
   { const W=mkW('heavyar'), ub=.056; GRIP(W,mLam,.0);
@@ -5107,7 +5157,7 @@ function createHero(jacketHex,opts){
     CY(W,mSD,.0115,.57,.6,ub,0,10); TILT(W,mSD,.602,ub+.004,.012,.02,.02,.5,.003);                                               // slanted muzzle brake
     BX(W,mS,.085,.15,-.012,.002,.036,.004); MAGP(W,mBake,.118,-.004,.2,.058,.1,.8,.026);
     PF(W,mLam,[[-.1,.046],[-.34,.02],[-.345,-.07],[-.325,-.076],[-.1,.004]],.036,.008); BX(W,mSD,-.356,-.342,-.072,.022,.038,.004);
-    TR(W,'heavyar',-.04,.08,.008,.016,.0415); MK('heavyar',[.61,ub],[.265,-.006],[.17,-.2]); }
+    TR(W,'heavyar',-.04,.08,.008,.016,.0415); MK('heavyar',[.61,ub],[.265,.011],[.17,-.2]); }
 
   // ---- infantry rifle: a full wooden stock with a handguard over the barrel, box magazine, long slotted flash hider, aperture sight
   { const W=mkW('infantry'), ub=.054, mFg=gunSurf(0x5a3a22,2);
@@ -5118,7 +5168,7 @@ function createHero(jacketHex,opts){
     BX(W,mSD,-.072,-.04,.068,.078,.03,.004); for(const sx of [-1,1]) BX(W,mSD,-.07,-.05,.076,.094,.004,.001,sx*.013); POST(W,mSD,.006,.078,.09,-.058);
     BX(W,mS,.02,.16,.05,.058,.006,.002,.02); PIN(W,mS,.006,.024,.03,.054,.03); TRIG(W,-.026,.008);
     PF(W,mSD,[[.02,-.008],[.085,-.008],[.092,-.1],[.03,-.106]],.028,.004); BX(W,mS,.026,.094,-.112,-.102,.03,.003);
-    TR(W,'infantry',.15,.25,.016,.024,.0455); MK('infantry',[.685,ub],[.25,-.006],[.06,-.13]); }
+    TR(W,'infantry',.15,.25,.016,.024,.0455); MK('infantry',[.685,ub],[.25,.0],[.06,-.13]); }
 
   // ---- tactical shotgun: black, pistol grip and a tube stock, top rail with ghost-ring sights, shells in a side carrier
   { const W=mkW('tac'), ub=.066, ut=.04; GRIP(W,mR,.0);
@@ -5129,7 +5179,7 @@ function createHero(jacketHex,opts){
     PF(W,mP,[[.2,.014],[.43,.02],[.43,.056],[.2,.056]],.05,.014); for(let q=0;q<6;q++) BX(W,mR,.225+q*.032,.24+q*.032,.016,.05,.0515,.003);
     BX(W,mSD,.635,.648,ub+.01,ub+.03,.006,.002); for(const sx of [-1,1]) BX(W,mSD,.63,.652,ub+.008,ub+.034,.003,.001,sx*.009);
     BX(W,mP,.01,.13,.008,.06,.008,.003,-.026); for(let q=0;q<5;q++){ POST(W,mShell,.0095,.014,.058,.024+q*.023,-.034); POST(W,mBrass,.0098,.008,.016,.024+q*.023,-.034); }
-    TR(W,'tac',.03,.15,.066,.074,.0455); MK('tac',[.665,ub],[.32,-.006],[.1,-.03]); }
+    TR(W,'tac',.03,.15,.066,.074,.0455); MK('tac',[.665,ub],[.32,.016],[.1,-.03]); }
 
   // ---- double barrel: side-by-side barrels on a bright engraved action with twin hammers, walnut stock and fore-end
   { const W=mkW('dbarrel');
@@ -5142,7 +5192,7 @@ function createHero(jacketHex,opts){
     p0(rbox(.046,.016,.122,.005),mSD,W,0,.342,-.001);
     p0(new THREE.TorusGeometry(.024,.004,6,12,Math.PI),mBr,W,0,-.03,-.005,GUARD); [-.026,-.012].forEach(y=>p0(rbox(.005,.006,.02,.002),mSD,W,0,y,.008,[-.3,0,0]));
     trim(rbox(.062,.05,.03,.004),W,0,-.06,-.035,null,null,'dbarrel');
-    rig.muzzle_dbarrel=grp(HB,0,-.465,-.038); rig.grip_dbarrel=grp(HB,0,-.12,.024); rig.mag_dbarrel=grp(W,0,-.1,-.05); }
+    rig.muzzle_dbarrel=grp(HB,0,-.465,-.038); rig.grip_dbarrel=grp(HB,0,-.12,.011); rig.mag_dbarrel=grp(W,0,-.1,-.05); }
 
   // ---- heavy shotgun: a long boxy one-piece body, big drum magazine, shrouded barrel, raised sight bar
   { const W=mkW('heavysg'), ub=.06; GRIP(W,mP,.0);
@@ -5151,7 +5201,7 @@ function createHero(jacketHex,opts){
     CY(W,mSD,.022,.26,.44,ub,0,16); for(let q=0;q<4;q++) for(const a of [-.6,.6,Math.PI-.6,Math.PI+.6]) p0(cylX(.005,.006,8),mHole,W,Math.cos(a)*.021,-.29-q*.04,-ub+Math.sin(a)*.021,[0,-a,0]);
     CY(W,mSD,.0145,.44,.5,ub); CY(W,mS,.017,.488,.5,ub,0,12); p0(cylY(.0105,.002,10),mHole,W,0,-.5006,-ub);
     BX(W,mSD,.055,.125,-.03,.0,.04,.004); p0(cylX(.074,.06,26),mSD,W,0,-.09,.085); p0(cylX(.03,.066,16),mS,W,0,-.09,.085); for(let q=0;q<8;q++) p0(rbox(.063,.004,.04,.001),mS,W,0,-.09-Math.sin(q*Math.PI/4)*.052,.085+Math.cos(q*Math.PI/4)*.052,[q*Math.PI/4,0,0]);
-    TR(W,'heavysg',-.3,-.16,.06,.07,.0595); MK('heavysg',[.505,ub],[.35,.01],[.09,-.18]); }
+    TR(W,'heavysg',-.3,-.16,.06,.07,.0595); MK('heavysg',[.505,ub],[.35,.038],[.09,-.18]); }
 
   // ---- compact SMG: a stamped box receiver with the magazine up through the grip, stubby barrel, wire stock
   { const W=mkW('csmg'), ub=.045;
@@ -5161,7 +5211,7 @@ function createHero(jacketHex,opts){
     POST(W,mP,.009,.078,.096,.05); BX(W,mSD,.13,.142,.078,.098,.006,.002); for(const sx of [-1,1]){ BX(W,mSD,.126,.146,.078,.1,.003,.001,sx*.01); BX(W,mSD,-.1,-.08,.078,.1,.003,.001,sx*.01); }
     CY(W,mSD,.009,.16,.225,ub); CY(W,mS,.0165,.16,.186,ub,0,10); PF(W,mP,[[.02,.014],[.15,.014],[.15,-.012],[.035,-.012]],.042,.009);
     for(const sx of [-1,1]) BX(W,mSD,-.3,-.12,.05,.058,.006,.003,sx*.017); BX(W,mSD,-.312,-.298,.0,.078,.042,.004);
-    TR(W,'csmg',-.05,.05,.058,.066,.0455); MK('csmg',[.23,ub],[.095,-.03],[-.043,-.25]); }
+    TR(W,'csmg',-.05,.05,.058,.066,.0455); MK('csmg',[.23,ub],[.095,-.012],[-.043,-.25]); }
 
   // ---- suppressed SMG: grey, a fat shrouded suppressor for a handguard, wire stock, straight magazine, holographic sight
   { const W=mkW('ssmg'), ub=.058; GRIP(W,mPG,.0);
@@ -5171,7 +5221,7 @@ function createHero(jacketHex,opts){
     SUPP(W,.36,ub,.021,.13,mSD);
     for(const sx of [-1,1]) CY(W,mSD,.005,-.26,-.09,.052,sx*.018,8); PF(W,mP,[[-.26,.082],[-.292,.082],[-.292,-.03],[-.272,-.036],[-.26,.0]],.046,.006);
     PF(W,mSD,[[.064,-.03],[.1,-.03],[.108,-.17],[.07,-.172]],.022,.003); HOLO(W,.02,.0925);
-    TR(W,'ssmg',.0,.1,.036,.044,.0475); MK('ssmg',[.49,ub],[.24,.012],[.09,-.2]); }
+    TR(W,'ssmg',.0,.1,.036,.044,.0475); MK('ssmg',[.49,ub],[.24,.031],[.09,-.2]); }
 
   // ---- light machine gun: a flat pan magazine on top, perforated barrel shroud, cone flash hider, wooden stock, bipod
   { const W=mkW('lmg'), ub=.05; GRIP(W,mWd,.0);
@@ -5181,7 +5231,7 @@ function createHero(jacketHex,opts){
     CY(W,mS,.02,.2,.5,ub,0,16); for(let q=0;q<6;q++) for(const a of [-.6,.6,Math.PI-.6,Math.PI+.6]) p0(cylX(.006,.006,8),mHole,W,Math.cos(a)*.019,-.23-q*.045,-ub+Math.sin(a)*.019,[0,-a,0]);
     CY(W,mSD,.0095,.5,.62,ub); CN(W,mSD,.011,.025,.62,.68,ub,0,16); CY(W,mSD,.009,.2,.52,ub-.031); BX(W,mSD,.55,.565,ub,ub+.04,.008,.002); for(const sx of [-1,1]) BX(W,mSD,.546,.569,ub+.012,ub+.044,.003,.001,sx*.009);
     BX(W,mSD,-.06,-.03,.062,.08,.02,.004); BIPOD(W,.5,ub-.04,.2);
-    TR(W,'lmg',-.06,.04,.012,.022,.0415); MK('lmg',[.685,ub],[.33,-.02],[.06,.1]); }
+    TR(W,'lmg',-.06,.04,.012,.022,.0415); MK('lmg',[.685,ub],[.33,.01],[.06,.1]); }
 
   // ---- grenade launcher: a six-chamber cylinder, short fat barrel, top rail with a reflex sight, foregrip, folding stock
   { const W=mkW('glauncher'), ub=.045; GRIP(W,mP,.01);
@@ -5191,7 +5241,7 @@ function createHero(jacketHex,opts){
     BX(W,mS,-.05,.3,ub+.068,ub+.078,.022,.003); RAIL(W,-.04,.29,ub+.078); HOLO(W,.06,ub+.0865);
     BX(W,mSD,.27,.33,.008,.02,.03,.004); TILT(W,mP,.3,-.036,.03,.09,.03,.12,.011);                                               // foregrip
     CY(W,mSD,.007,-.28,-.06,.06); BX(W,mR,-.3,-.28,-.02,.088,.04,.009);
-    TR(W,'glauncher',-.05,.05,.082,.09,.0455); MK('glauncher',[.48,ub],[.3,-.07],[.13,ub]); }
+    TR(W,'glauncher',-.05,.05,.082,.09,.0455); MK('glauncher',[.48,ub],[.315,.005],[.13,ub]); }
   ['smg','mg','gatling','rpg','nade','pistol','revolver','hcannon','sniper','hunting','dmr','burst','heavyar','infantry','tac','dbarrel','heavysg','csmg','ssmg','lmg','glauncher'].forEach(k=>rig[k].visible=false);
   rig.gun.visible=rig.pump.visible=rig.hammer.visible=rig.plan.visible=false;
   bakeStatic(hero,rig,'hero:'+jacketHex+':'+JSON.stringify(opts));
@@ -5214,7 +5264,7 @@ function animEvent(H,ev,arg){
 
 // Two-bone IK: put the wrist of `arm` at targetW (world), elbow toward poleW, optional world hand orientation
 function ikArm(arm,targetW,poleW,handQ){
-  const sh=arm.sh, a=0.25, b=0.23;
+  const sh=arm.sh, a=arm.a||0.25, b=arm.b||0.23;
   sh.getWorldPosition(_ikS);
   _ikD.subVectors(targetW,_ikS); let L=_ikD.length(); const maxL=(a+b)*0.998; if(L>maxL){ _ikD.multiplyScalar(maxL/L); L=maxL; } if(L<0.08){ _ikD.setLength(0.08); L=0.08; }
   const dn=_ikT.copy(_ikD).normalize();
@@ -5243,14 +5293,31 @@ function gunStockPush(r,mdl){ if(!mdl) return 0; let b=_gunBack.get(mdl);
     _gunBack.set(mdl,b); }
   return Math.max(0,b-0.22); }
 const _p2a=new THREE.Vector3(), _p2b=new THREE.Vector3(), _p2q=new THREE.Quaternion();
-const _pkY=new THREE.Vector3(0,1,0);
+// Hands. Each finger joint is turned towards a pose: loose at rest, a fist round a tool's handle, flat for editing; a gun's
+// grip is held with the hand turned upright beside it, the first finger lying along the trigger; the other hand comes in
+// from the side under the fore-end and curls up round it.
+const HAND_POSE={relax:[[.22,.32,.18],[.32,.42,.24],[.3,.55,.12,.15]],fist:[[1.0,1.45,.85],[1.05,1.5,.9],[.9,.1,.45,.6]],pgrip:[[.2,.9,.5],[1.25,1.3,.5],[.7,.22,.3,.35]],
+  cradle:[[1.2,.8,.4],[1.2,.8,.4],[1.15,.25,.55,.6]],wrap:[[1.25,1.3,.5],[1.25,1.3,.5],[.7,.22,.3,.35]],flat:[[.04,.08,.04],[.06,.1,.05],[.15,.85,.05,.05]]};
+// how the other hand joins in (0 not at all, 1 an upright foregrip, 2 cupping the firing hand; otherwise under the fore-end), and where a grip sits in the firing hand
+const GUN_SUPPORT={nade:0,burst:1,glauncher:1,pistol:2,revolver:2,hcannon:2,gatling:3}, GUN_HOLD={pump:[0,-.025,0],hunting:[0,-.025,0],infantry:[0,-.025,0],dbarrel:[0,-.025,0],sniper:[0,-.02,0],revolver:[0,-.02,0],gatling:[0,-.03,-.05]};
+const _gv1=new THREE.Vector3(), _gv2=new THREE.Vector3(), _gv3=new THREE.Vector3();
+function poseHands(H,S,dt){ const r=H.rig; if(!r.armR||!r.armR.fj) return; const k=1-Math.exp(-(dt||0.016)*18);
+  const emo=S.emote&&EMOTES[S.emote.id], building=!!S.building&&!emo, gun=!building&&!emo&&!S.editing&&!S.sky&&!S.down?S.gun:false, mdl=gun?modelOf(gun):null, held=gun&&mdl!=='nade';
+  const tool=!gun&&((r.pick&&r.pick.visible)||(r.hammer&&r.hammer.visible)), two=tool&&r.armL.fing.rotation.x>1.1;
+  const set=(a,name,ty,tz)=>{ const P=HAND_POSE[name], f=a.fj; for(let i=0;i<4;i++){ const q=P[i?1:0]; f.mcp[i].rotation.x+=(q[0]-f.mcp[i].rotation.x)*k; f.pip[i].rotation.x+=(q[1]-f.pip[i].rotation.x)*k; f.dip[i].rotation.x+=(q[2]-f.dip[i].rotation.x)*k; }
+    const t=P[2], T=a.th; T[0].rotation.x+=(t[0]-T[0].rotation.x)*k; T[0].rotation.z+=(a.side*t[1]-T[0].rotation.z)*k; T[1].rotation.x+=(t[2]-T[1].rotation.x)*k; T[2].rotation.x+=(t[3]-T[2].rotation.x)*k;
+    a.hg.rotation.y+=(ty-a.hg.rotation.y)*k; a.hg.rotation.z+=(tz-a.hg.rotation.z)*k; };
+  set(r.armR,held?'pgrip':tool||mdl==='nade'?'fist':S.editing?'flat':'relax',held?Math.PI/2:0,0);
+  const sp=held?GUN_SUPPORT[mdl]:0; const und=sp===undefined||sp===3; set(r.armL,held?(sp===0?'relax':sp===3?'fist':sp?'wrap':'cradle'):two?'fist':S.editing?'flat':'relax',held?(und?0.6:sp?-0.97:0):0,held&&und?1.35:0);
+  const gh=held&&GUN_HOLD[mdl]||[0,0,0], hp=r.armR.hand.position, mx=held?-.032+gh[0]:0, my=held?-.092+gh[1]:-.098, mz=held?-.06+gh[2]:-.032; hp.x+=(mx-hp.x)*k; hp.y+=(my-hp.y)*k; hp.z+=(mz-hp.z)*k; }
+const _pkY=new THREE.Vector3(0,1,0), _p2c=new THREE.Vector3();
 function pickTwoHands(H,S){ const r=H.rig; if(!r.pick) return;
   if(!r.pickQ0){ r.pickQ0=r.pick.quaternion.clone(); r.pickQ1=new THREE.Quaternion().setFromAxisAngle(_pkY,-Math.PI/2).multiply(r.pickQ0); }
   const grip=r.pick.visible&&!S.gun&&!S.building&&!S.editing&&!(S.emote&&EMOTES[S.emote.id])&&!S.sky&&!S.down&&!S.item;
   r.pick.quaternion.copy(grip?r.pickQ1:r.pickQ0); if(!grip) return;
   r.armR.wr.rotation.y=Math.PI/2; r.armR.fing.rotation.x=1.25;
   H.group.updateMatrixWorld(true); const t=r.pick.localToWorld(_p2a.set(0,0.11,0)), pole=H.group.localToWorld(_p2b.set(-0.7,0.6,0.3));
-  if(S.bare) return; r.armR.wr.getWorldQuaternion(_p2q); ikArm(r.armL,t,pole,_p2q); r.armL.fing.rotation.x=1.25; }
+  if(S.bare) return; r.armR.wr.getWorldQuaternion(_p2q); t.sub(_p2c.set(0,-.098,-.032).applyQuaternion(_p2q)); ikArm(r.armL,t,pole,_p2q); r.armL.fing.rotation.x=1.25; } // the wrist sits back from the handle so the fist closes on it
 function handQuat(out,fwd,up){ _ikY.copy(fwd).negate(); _ikZ.copy(up).addScaledVector(fwd,-up.dot(fwd)).normalize().negate(); _ikX.crossVectors(_ikY,_ikZ).normalize(); _ikM.makeBasis(_ikX,_ikY,_ikZ); return out.setFromRotationMatrix(_ikM); }
 
 // pickaxe swing keyframes (t 0..1): wind-up, strike, recover
@@ -5474,6 +5541,8 @@ function animateRig0(H,S,dt){
     G.updateMatrixWorld(true);
     const grip=mdl==='pump'?r.gripPump:(r['grip_'+mdl]||r.gripAR);
     grip.getWorldPosition(_ikT); const gripW=_ikT.clone();
+    if(r.armL.fj){ const sp=GUN_SUPPORT[mdl], gx=_gv1.set(1,0,0).applyQuaternion(_hq), gy=_gv2.set(0,1,0).applyQuaternion(_hq), gz=_gv3.set(0,0,1).applyQuaternion(_hq); // the wrist stands off from what the hand holds
+      if(sp===1) gripW.addScaledVector(gx,-.036).addScaledVector(gy,.092).addScaledVector(gz,.06); else if(sp===2) gripW.addScaledVector(gx,-.058).addScaledVector(gy,.085).addScaledVector(gz,.07); else if(sp===3) gripW.addScaledVector(gx,-.0956).addScaledVector(gy,.0215).addScaledVector(gz,.032); else if(sp===undefined) gripW.addScaledVector(gx,-.074).addScaledVector(gy,.011).addScaledVector(gz,.015); }
     let tgt=gripW;
     if(rl){
       const port=(mdl==='pump'?r.portPump:(r['mag_'+mdl]||r.magAR)).getWorldPosition(new THREE.Vector3()), pouch=r.pouch.getWorldPosition(new THREE.Vector3());
@@ -5490,14 +5559,14 @@ function animateRig0(H,S,dt){
   // ----- secondary motion: backpack and hair bounce on springs -----
   const hy=r.hips.position.y, hv=(hy-A.prevHipY)/Math.max(dt,1e-3); A.prevHipY=hy;
   A.packV+=(-hv*0.9-vf*0.0-160*A.pack-11*A.packV)*dt; A.pack+=A.packV*dt; A.pack=Math.max(-0.35,Math.min(0.35,A.pack));
-  r.pack.rotation.x=A.pack+0.06*k;
+  r.pack.rotation.x=A.pack*0.25+0.015*k;
   A.tuftV+=(-hv*1.4-120*A.tuft-9*A.tuftV+(S.onGround?0:S.vel.y*0.05))*dt; A.tuft+=A.tuftV*dt; A.tuft=Math.max(-0.4,Math.min(0.4,A.tuft));
-  r.tuft.rotation.x=-A.tuft*0.6;
+  r.tuft.rotation.x=-A.tuft*0.2;
   // ----- face -----
   A.blinkT-=dt; if(A.blinkT<-0.12) A.blinkT=1.8+Math.random()*3.5;
   const squint=A.hurt>0.3?0.35:1, blink=A.blinkT<0?0.1:squint;
   r.eyes.forEach(e=>e.scale.y=lerp(e.scale.y,blink,0.6));
-  r.lids.forEach(l=>{ l.position.y=lerp(l.position.y,.168-(1-blink)*.022,0.6); l.scale.y=lerp(l.scale.y,.2+(1-blink)*.9,0.6); });
+  r.lids.forEach(l=>{ l.position.y=lerp(l.position.y,.1635-(1-blink)*.016,0.6); l.scale.y=lerp(l.scale.y,.42+(1-blink)*.7,0.6); });
   const browY=0.198+(S.onGround?0:0.012)-(gun?0.006:0)-0.012*A.hurt;
   r.brows.forEach((b,i)=>{ b.position.y=lerp(b.position.y,browY,sm); b.rotation.z=lerp(b.rotation.z,(gun||A.hurt>0.2)?(i?-0.25:0.25):0,sm); });
   const mouthOpen=Math.max(A.hurt*3,!S.onGround&&S.vel.y<-10?1.8:0,1);
