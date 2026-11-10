@@ -2483,6 +2483,10 @@ const walkTex=(()=>{ const W=128, Hh=128, c=document.createElement('canvas'); c.
 function doorOf(h){ const C=CELL, a=Math.floor(h.w/2), b=Math.floor(h.d/2);
   if(h.side==='w') return {x:h.i0*C,z:(h.j0+b+0.5)*C,nx:-1,nz:0}; if(h.side==='e') return {x:(h.i0+h.w)*C,z:(h.j0+b+0.5)*C,nx:1,nz:0};
   if(h.side==='n') return {x:(h.i0+a+0.5)*C,z:h.j0*C,nx:0,nz:-1}; return {x:(h.i0+a+0.5)*C,z:(h.j0+h.d)*C,nx:0,nz:1}; }
+const BULB_R=6.8, BULB_IN=3;
+function townBulbs(t){ if(t.bulbs) return t.bulbs; const Ls=t.streetL;
+  t.dead=t.ends.map(e=>!WORLD.roads.some(r=>!r.street&&[r.pts[0],r.pts[r.pts.length-1]].some(p=>Math.hypot(SPAWN[0]+p[0]-e[0],SPAWN[2]+p[1]-e[1])<3)));
+  return t.bulbs=t.ends.map((e,k)=>{ const ox=(e[0]-t.x)/Ls, oz=(e[1]-t.z)/Ls; return t.dead[k]?[e[0]-ox*BULB_IN,e[1]-oz*BULB_IN,ox,oz]:null; }).filter(Boolean); }
 function buildSidewalks(){
   if(sidewalkMesh) return; const pos=[], nor=[], uv=[], idx=[], {GRASS:GR}=WORLD;
   const inHouse=(t,x,z)=>t.houses.some(h=>x>h.i0*CELL-0.9&&x<(h.i0+h.w)*CELL+0.9&&z>h.j0*CELL-0.9&&z<(h.j0+h.d)*CELL+0.9);
@@ -2495,7 +2499,13 @@ function buildSidewalks(){
     return v1; };
   for(const t of TOWNS){ const Ls=t.streetL, y=t.h+0.045;
     // a sidewalk down each side of both streets
-    for(const X of [true,false]) for(const sd of [-1,1]){ const off=sd*(ROAD_HW+WALK_W/2), a=X?[t.x-Ls,t.z+off]:[t.x+off,t.z-Ls], b=X?[t.x+Ls,t.z+off]:[t.x+off,t.z+Ls]; quad(a,b,y,0); SIDEWALKS.push([a,b]); }
+    const bulbs=townBulbs(t), dd=t.dead, cutB=Math.sqrt(BULB_R*BULB_R-ROAD_HW*ROAD_HW)+BULB_IN-0.25; // the sidewalks stop where the turnaround's ring takes over
+    for(const X of [true,false]) for(const sd of [-1,1]){ const off=sd*(ROAD_HW+WALK_W/2), c0=dd[X?0:2]?cutB:0, c1=dd[X?1:3]?cutB:0, a=X?[t.x-Ls+c0,t.z+off]:[t.x+off,t.z-Ls+c0], b=X?[t.x+Ls-c1,t.z+off]:[t.x+off,t.z+Ls-c1]; quad(a,b,y,0); SIDEWALKS.push([a,b]); }
+    for(const [cx,cz,ox,oz] of bulbs){ const th=Math.PI-Math.asin(ROAD_HW/BULB_R), n=36, rr=BULB_R+WALK_W/2, pt=k=>{ const a=-th+2*th*k/n, ca=Math.cos(a), sa=Math.sin(a); return [cx+(ox*ca-oz*sa)*rr,cz+(oz*ca+ox*sa)*rr]; };
+      let v=0; for(let k=0;k<n;k++){ const a=pt(k-0.04), b=pt(k+1.04); v=quad(a,b,y+0.001,v); SIDEWALKS.push([pt(k),pt(k+1)]); }
+      const R2=BULB_R+WALK_W+0.6; for(let u=-R2;u<=R2;u+=0.8) for(let w=-R2;w<=R2;w+=0.8) if(u*u+w*w<R2*R2){ const c=worldCell(cx+u,cz+w); if(c>=0) GR[c]=0; }
+      const cg=new THREE.CircleGeometry(BULB_R+0.12,44); cg.rotateX(-Math.PI/2); const P_=cg.attributes.position, U_=cg.attributes.uv; for(let q=0;q<P_.count;q++) U_.setXY(q,(cx+P_.getX(q))/7.2,(cz+P_.getZ(q))/24);
+      const cm=new THREE.Mesh(cg,new THREE.MeshLambertMaterial({map:roadPlainTex,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-4*(8+WORLD.roads.length)})); cm.position.set(cx,t.h+0.03,cz); cm.receiveShadow=true; cm.updateMatrix(); cm.matrixAutoUpdate=false; scene.add(cm); }
     // and a front path from every door straight out to the sidewalk of the street it faces
     for(const h of t.houses){ const D=doorOf(h), a=[D.x+D.nx*0.14,D.z+D.nz*0.14], X=h.side==='n'||h.side==='s', across=X?a[1]-t.z:a[0]-t.x, edge=Math.sign(across)*(ROAD_HW+WALK_W-0.1);
       const b=X?[a[0],t.z+edge]:[t.x+edge,a[1]]; quad(a,b,y+0.002,0); SIDEWALKS.push([a,b]); }
@@ -6809,7 +6819,35 @@ function initProps(){
     const x=SPAWN[0]+rd.pts[q][0]-tz*5.4*side, z=SPAWN[2]+rd.pts[q][1]+tx*5.4*side;
     if(rd.skip[q]||townAt(x,z,3)||roadDistAt(x,z)<4.8||Math.abs(terrainH(x,z)-rd.pts[q][2])>0.6||!roomy(x,z,'car')) continue;
     add('car',x,z,1,Math.atan2(-tz,tx)+(r()<0.5?Math.PI:0)); parked++; }
+  { const r2=seeded(77120311); let lane=0, kerb=0; const perTown=new Map();
+    for(let t=0;t<1500&&(lane<9||kerb<16)&&roads.length;t++){ const rd=roads[Math.floor(r2()*roads.length)], n=rd.pts.length; if(n<9) continue;
+      const q=4+Math.floor(r2()*(n-8)), a=rd.pts[q-3], b=rd.pts[q+3], side=r2()<0.5?-1:1, flip=r2()<0.5?Math.PI:0; let tx=b[0]-a[0], tz=b[1]-a[1]; const tl=Math.hypot(tx,tz)||1; tx/=tl; tz/=tl;
+      const off=rd.street?2.45:1.9, x=SPAWN[0]+rd.pts[q][0]-tz*off*side, z=SPAWN[2]+rd.pts[q][1]+tx*off*side;
+      if(rd.street){ const tw=rd.town, dc=Math.hypot(x-tw.x,z-tw.z); if(kerb>=16||(perTown.get(tw)||0)>=2||dc<11||dc>tw.streetL-12||!roomy(x,z,'car')) continue;
+        const p=add('car',x,z,1,Math.atan2(-tz,tx)+(side>0?Math.PI:0)); p.yard=true; perTown.set(tw,(perTown.get(tw)||0)+1); kerb++; }
+      else { if(lane>=9||rd.skip[q]||townAt(x,z,14)||Math.abs(terrainH(x,z)-rd.pts[q][2])>0.5||!roomy(x,z,'car')) continue; if(typeof nearOther==='function'&&nearOther(roads.indexOf(rd),x,z)<30) continue;
+        add('car',x,z,1,Math.atan2(-tz,tx)+flip+(r2()-0.5)*0.5); lane++; } } }
 }
+/* Guard rails: posts and a steel beam along the side of a road where the ground drops away, and a few more at random. */
+function buildRails(){ const parts=[], roads=WORLD.roads, OFF=ROAD_HW+1.15;
+  roads.forEach((rd,k)=>{ if(rd.street) return; const p=rd.pts, n=p.length;
+    for(const side of [-1,1]){ const want=new Uint8Array(n), at=[];
+      for(let q=0;q<n;q++){ const a=p[Math.max(0,q-1)], b=p[Math.min(n-1,q+1)]; let tx=b[0]-a[0], tz=b[1]-a[1]; const tl=Math.hypot(tx,tz)||1; tx/=tl; tz/=tl;
+        const nx=-tz*side, nz=tx*side, x=SPAWN[0]+p[q][0], z=SPAWN[2]+p[q][1]; at.push([x+nx*OFF,z+nz*OFF]);
+        if(rd.skip[q]||q<3||q>n-4||townAt(x,z,10)||nearOther(k,x,z)<16) continue;
+        const drop=p[q][2]-terrainH(x+nx*10,z+nz*10), here=Math.abs(terrainH(x+nx*OFF,z+nz*OFF)-p[q][2]);
+        if(here<0.7&&(drop>1.7||gnoise(q*0.045+k*7.3,side*3.1+k,9127)>0.52)) want[q]=1; }
+      for(let q=1;q<n-1;q++) if(!want[q]&&want[q-1]&&want[q+1]&&!rd.skip[q]) want[q]=1; // close single gaps
+      let q=0; while(q<n){ if(!want[q]){ q++; continue; } let e=q; while(e+1<n&&want[e+1]) e++;
+        if(e-q>=5) for(let j=q;j<=e;j++){ const [x,z]=at[j], y=terrainH(x,z);
+          const post=new THREE.BoxGeometry(0.13,0.82,0.13); post.translate(x,y+0.41,z); parts.push(post);
+          if(j<e){ const [x2,z2]=at[j+1], y2=terrainH(x2,z2), dx=x2-x, dz=z2-z, dy=y2-y, L=Math.hypot(dx,dz), L3=Math.hypot(L,dy);
+            for(const [th,hh,yy] of [[0.07,0.3,0.6],[0.11,0.07,0.6]]){ const beam=new THREE.BoxGeometry(th,hh,L3+0.02); beam.rotateX(-Math.asin(dy/L3)); beam.rotateY(Math.atan2(dx,dz)); beam.translate((x+x2)/2,(y+y2)/2+yy,(z+z2)/2); parts.push(beam); }
+            const boxes=[]; for(let s=0;s<3;s++){ const f0=s/3, f1=(s+1)/3, xa=x+dx*f0, xb=x+dx*f1, za=z+dz*f0, zb=z+dz*f1, yb=Math.min(y,y2); boxes.push([Math.min(xa,xb)-0.08,yb-0.3,Math.min(za,zb)-0.08,Math.max(xa,xb)+0.08,Math.max(y,y2)+0.82,Math.max(za,zb)+0.08]); }
+            STATICS.push({x:(x+x2)/2,z:(z+z2)/2,solid:{boxes,key:'rail'+STATICS.length}}); } }
+        q=e+1; } } });
+  if(!parts.length) return; const g=mergeGeos(parts); g.computeBoundingSphere();
+  const m=new THREE.Mesh(g,new THREE.MeshPhongMaterial({color:0xb4bac2,shininess:55,specular:0x555a60})); m.castShadow=true; m.receiveShadow=true; m.matrixAutoUpdate=false; m.frustumCulled=false; scene.add(m); }
 function propsNear(x,z,out,rad=1){ const cx=Math.floor(x/PCELL), cz=Math.floor(z/PCELL);
   for(let i=-rad;i<=rad;i++) for(let j=-rad;j<=rad;j++){ const set=propCells.get((cx+i)+','+(cz+j)); if(set) set.forEach(p=>{ if(p.alive) out.add?out.add(p):out.push(p); }); } return out; }
 function propMeshesNear(x,z){ const out=[]; propsNear(x,z,[]).forEach(p=>{ if(p.lazy){ treeMesh(p); if(!p.g.parent) p.g.updateMatrixWorld(true); } p.g.traverse(m=>{ if(m.isMesh&&m.userData.piece) out.push(m); }); }); return out; }
@@ -7734,7 +7772,7 @@ function drawMini(){
     for(const rd of WORLD.roads){ const bx=rd.box; if(bx[2]<ox-R||bx[0]>ox+R||bx[3]<oz-R||bx[1]>oz+R) continue; g.beginPath(); let on=false;
       for(const p of rd.pts){ const x=SPAWN[0]+p[0], z=SPAWN[2]+p[1]; if(Math.abs(x-ox)<R+10&&Math.abs(z-oz)<R+10){ if(on) g.lineTo(tx(x),tz(z)); else { g.moveTo(tx(x),tz(z)); on=true; } } else on=false; }
       g.stroke(); }
-    g.fillStyle=col; TOWNS.forEach(t=>{ if(Math.abs(t.x-ox)<R+10&&Math.abs(t.z-oz)<R+10){ g.beginPath(); g.arc(tx(t.x),tz(t.z),(PLAZA_R+(w-ROAD_HW*2)/2)*sc,0,7); g.fill(); } }); }
+    g.fillStyle=col; TOWNS.forEach(t=>{ if(Math.abs(t.x-ox)<R+60&&Math.abs(t.z-oz)<R+60){ g.beginPath(); g.arc(tx(t.x),tz(t.z),(PLAZA_R+(w-ROAD_HW*2)/2)*sc,0,7); g.fill(); for(const b of townBulbs(t)){ g.beginPath(); g.arc(tx(b[0]),tz(b[1]),(BULB_R+(w-ROAD_HW*2)/2)*sc,0,7); g.fill(); } } }); }
   g.strokeStyle='#c9c6be'; g.lineWidth=WALK_W*sc; // sidewalks
   for(const w of SIDEWALKS){ if(Math.abs(w[0][0]-ox)>R+30||Math.abs(w[0][1]-oz)>R+30) continue; g.beginPath(); w.forEach((p,k)=>k?g.lineTo(tx(p[0]),tz(p[1])):g.moveTo(tx(p[0]),tz(p[1]))); g.stroke(); }
   g.lineCap='butt';
@@ -7789,7 +7827,8 @@ function renderBigMapImage(){
   g.lineCap='round'; g.lineJoin='round';
   for(const [w,col] of [[14,'#26282c'],[7.2,'#9a9ea4']]){ g.strokeStyle=col; g.lineWidth=w;
     for(const rd of WORLD.roads){ g.beginPath(); rd.pts.forEach((p,k)=>k?g.lineTo(X(p[0]),X(p[1])):g.moveTo(X(p[0]),X(p[1]))); g.stroke(); }
-    g.fillStyle=col; WORLD.towns.forEach(t=>{ g.beginPath(); g.arc(X(t.u),X(t.v),(PLAZA_R/mpp)+w/2+1,0,7); g.fill(); }); }
+    g.fillStyle=col; WORLD.towns.forEach(t=>{ g.beginPath(); g.arc(X(t.u),X(t.v),(PLAZA_R/mpp)+w/2+1,0,7); g.fill(); });
+    TOWNS.forEach(t=>{ for(const b of townBulbs(t)){ g.beginPath(); g.arc(X(b[0]-SPAWN[0]),X(b[1]-SPAWN[2]),BULB_R/mpp+(w-7.2)/2,0,7); g.fill(); } }); }
   g.setLineDash([]);
   return c;
 }
@@ -7874,7 +7913,7 @@ function warmBuildShaders(){ try{ const g=new THREE.Group(), geo=new THREE.BoxGe
   const gw=makeGlider(0xff6a3d); gw.visible=true; gw.scale.setScalar(0.003); g.add(gw);
   g.position.copy(camera.position); scene.add(g); renderer.compile(scene,camera); scene.remove(g); }catch(e){ console.warn('shader warm-up skipped',e); } }
 setTimeout(warmBuildShaders,1500);
-initProps(); props.forEach(p=>{ if(!p.yard&&townAt(p.x,p.z,6)){ p.gone=true; p.alive=false; p.g.visible=false; } }); syncMats();
+initProps(); props.forEach(p=>{ if(!p.yard&&townAt(p.x,p.z,6)){ p.gone=true; p.alive=false; p.g.visible=false; } }); syncMats(); buildRails();
 buildWorld(); initChests(); spawnFloorLoot(); initKarts(); initVans(); initForest(); { const hb=$('hordeBot'); hb.checked=!!settings.hordeBot; hb.addEventListener('change',()=>{ settings.hordeBot=hb.checked; saveSettings(); }); syncModeCards(); } buildGardens();
 syncBot();
 // locker: render a portrait of every outfit once, then build the cards
