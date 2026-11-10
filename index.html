@@ -8154,16 +8154,20 @@ function allyReboot(v){ const a=Math.random()*6.283; allySpawnNear(v.x+Math.cos(
 const _abE=new THREE.Vector3(), _abD=new THREE.Vector3();
 function allyFire(z){ const eye=_abE.set(AB.pos.x,AB.pos.y+1.5,AB.pos.z), tgt=new THREE.Vector3(z.pos.x,z.pos.y+1.1*z.sc,z.pos.z), dist=tgt.distanceTo(eye);
   const d=_abD.copy(tgt).sub(eye).normalize(); d.x+=(Math.random()-.5)*0.04; d.y+=(Math.random()-.5)*0.03; d.z+=(Math.random()-.5)*0.04; d.normalize();
-  const r=castShot(eye,d,dist,0.05,null), blocked=r.kind==='piece'&&r.t<dist-0.8;
+  const r=castShot(eye,d,dist,0.05,null), blocked=r.kind==='piece'&&r.t<dist-0.8; if(blocked){ AB.los=false; AB.fireT=0.25; return; }
   AB.h.rig.muzzle&&AB.h.rig.muzzle.getWorldPosition(_abE); tracer(_abE.clone(),blocked?r.point:eye.copy(_abE).addScaledVector(d,dist),0x9fd4ff); muzzleFlash(AB.h); sfxAt((WEAPONS[AB.wpn]&&WEAPONS[AB.wpn].snd)||'shot',AB.pos); animEvent(AB.h,'fire',AB.wpn||'ar');
   const W=WEAPONS[AB.wpn]||WEAPONS.ar; if(!blocked&&Math.random()<Math.max(0.35,0.9-dist/70)) zombieHurt(z,Math.round(W.dmg*(W.pellets>1?Math.min(W.pellets,8)*0.7:1)*0.85),'ally');
   AB.ammo--; AB.fireT=Math.max(0.14,W.rate)+Math.random()*0.08; if(AB.ammo<=0){ AB.reloadT=Math.min(2.6,W.reload||2.1); AB.ammo=W.mag||30; } }
 function allyRange(){ const W=WEAPONS[AB.wpn]; return !W?2.3:W.pellets>1?16:W.range>150?45:35; }
 const allyGunOk=w=>{ const W=WEAPONS[w]; return !!W&&!W.throw&&w!=='rpg'&&w!=='glauncher'&&w!=='nade'; };
 const allyRank=w=>['common','uncommon','rare','epic','legendary'].indexOf((WEAPONS[w]||{}).rarity);
-function allyPickTarget(){ let best=null, bs=1e9; const pd=P.down&&!isDead();
+function allySees(z){ const eye=new THREE.Vector3(AB.pos.x,AB.pos.y+1.5,AB.pos.z), t=new THREE.Vector3(z.pos.x,z.pos.y+1.1*z.sc,z.pos.z), dist=t.distanceTo(eye), r=castShot(eye,t.sub(eye).normalize(),dist,0.05,null); return !(r.kind==='piece'&&r.t<dist-0.6); }
+function allyLook(){ const z=AB.tgt, now=performance.now(); if(z&&z.alive){ AB.los=allySees(z); if(AB.los) AB.noLosT=0; else { AB.noLosT=(AB.noLosT||0)+0.3; if(AB.noLosT>2.4){ z.hideUntil=now+4000; AB.noLosT=0; } } } else { AB.los=true; AB.noLosT=0; }
+  // a closed door right in front of it: open it
+  if(!AB.down&&!AB.sky) near(AB.pos.x,AB.pos.z,1).forEach(p=>{ if(!p.doors||Math.abs(p.l*LVL-AB.pos.y)>2.2) return; p.doors.forEach((dr,c)=>{ if(!dr||dr.open) return; const q=doorCenter(p,c); if(Math.hypot(q.x-AB.pos.x,q.z-AB.pos.z)<1.9&&Math.hypot(AB.vel.x,AB.vel.z)<2.5) toggleDoor(p,c,false); }); }); }
+function allyPickTarget(){ let best=null, bs=1e9; const pd=P.down&&!isDead(), nowT=performance.now();
   horde.zs.forEach(z=>{ if(!z.alive||(z.rise||0)>0.5) return; const dA=z.pos.distanceTo(AB.pos), dP=z.pos.distanceTo(P.pos); if(dA>48) return;
-    let s=Math.min(dA,dP*(pd?0.4:0.8)); if(z.type==='hurler') s-=6; if(z.type==='runner'&&dP<12) s-=3; if(z===AB.tgt) s-=2; if(s<bs){ bs=s; best=z; } }); return best; }
+    let s=Math.min(dA,dP*(pd?0.4:0.8)); if(z.hideUntil>nowT) s+=25; if(z.type==='hurler') s-=6; if(z.type==='runner'&&dP<12) s-=3; if(z===AB.tgt) s-=2; if(s<bs){ bs=s; best=z; } }); return best; }
 function allyAnim(dt,extra){ animateRig(AB.h,Object.assign({slope:slopeFor(AB),pos:AB.pos,vel:AB.vel,yaw:AB.yaw,pitch:AB.pitch,onGround:AB.onGround,crouch:false,building:false,editing:false,gun:AB.wpn||false,ads:0,swingT:0,emote:null,
     reload:AB.reloadT>0&&AB.wpn?{w:AB.wpn,p:Math.max(0,1-AB.reloadT/2.1)}:null},extra),dt); }
 function stepAlly(dt){
@@ -8176,7 +8180,7 @@ function stepAlly(dt){
   if(!AB.down&&now-(AB.hurtAt||0)>6000&&AB.hp<100) AB.hp=Math.min(100,AB.hp+6*dt); // catches its breath out of a fight
   if(AB.kart){ const k=AB.kart.k;
     if(!P.kart||P.kart.k!==k||k.dead||AB.down||isDead()||!karts.includes(k)){ if(k.seats[1]==='ally') k.seats[1]=null; AB.kart=null; kartPoint(k,1.8,0.3,0.2,AB.pos); AB.vel.set(0,0,0); AB.onGround=false; }
-    else { seatWorld(k,1,AB.pos); AB.vel.set(0,0,0); AB.onGround=true; AB.thinkT-=dt; if(AB.thinkT<=0){ AB.thinkT=0.3; AB.tgt=allyPickTarget(); }
+    else { seatWorld(k,1,AB.pos); AB.vel.set(0,0,0); AB.onGround=true; AB.thinkT-=dt; if(AB.thinkT<=0){ AB.thinkT=0.3; AB.tgt=allyPickTarget(); allyLook(); }
       if(AB.reloadT>0) AB.reloadT-=dt; AB.fireT-=dt; let look=k.yaw; const tg=AB.tgt&&AB.tgt.alive?AB.tgt:null;
       if(tg){ look=Math.atan2(-(tg.pos.x-AB.pos.x),-(tg.pos.z-AB.pos.z)); AB.yaw=look; if(AB.wpn&&AB.reloadT<=0&&AB.fireT<=0&&tg.pos.distanceTo(AB.pos)<allyRange()) allyFire(tg); } else AB.yaw=k.yaw;
       AB.pitch=0; allyAnim(dt,{yaw:tg&&AB.wpn?look:k.yaw,gun:tg&&AB.wpn?AB.wpn:false,seat:{k,s:1,look}}); AB.h.rig.pick.visible=false; return; } }
@@ -8188,11 +8192,11 @@ function stepAlly(dt){
   else if(RB.wait&&card&&!card.holder) goal={x:card.x,z:card.z,r:1.1,act:'grab',T:RB_GRAB_T,card};
   else if(RB.wait&&card&&card.holder==='ally'){ let v=null, bd=1e9; (VANS||[]).forEach(q=>{ const d=Math.hypot(q.tx-AB.pos.x,q.tz-AB.pos.z); if(d<bd){ bd=d; v=q; } }); if(v) goal={x:v.tx,z:v.tz,r:1.3,act:'boot',T:RB_BOOT_T,v}; }
   else { // follow you and fight
-    AB.thinkT-=dt; if(AB.thinkT<=0){ AB.thinkT=0.3; AB.tgt=allyPickTarget(); }
+    AB.thinkT-=dt; if(AB.thinkT<=0){ AB.thinkT=0.3; AB.tgt=allyPickTarget(); allyLook(); }
     const dp=Math.hypot(P.pos.x-AB.pos.x,P.pos.z-AB.pos.z);
     // left far behind (or wedged somewhere for a while): catch up, arriving just behind you
-    AB.lostT=(dp>14&&Math.hypot(AB.vel.x,AB.vel.z)<1)?(AB.lostT||0)+dt:0;
-    if((dp>75||AB.lostT>5)&&!P.sky){ const bx=P.pos.x+Math.sin(P.yaw)*4, bz=P.pos.z+Math.cos(P.yaw)*4, [gy]=groundAt(bx,bz,P.pos.y+1.2,near(bx,bz)); AB.pos.set(bx,Math.max(gy,terrainH(bx,bz))+0.05,bz); AB.vel.set(0,0,0); AB.lostT=0; AB.stuckT=0; }
+    AB.lostT=(dp>10&&Math.hypot(AB.vel.x,AB.vel.z)<1)?(AB.lostT||0)+dt:0;
+    if((dp>75||AB.lostT>3.5)&&!P.sky){ const bx=P.pos.x+Math.sin(P.yaw)*4, bz=P.pos.z+Math.cos(P.yaw)*4, [gy]=groundAt(bx,bz,P.pos.y+1.2,near(bx,bz)); AB.pos.set(bx,Math.max(gy,terrainH(bx,bz))+0.05,bz); AB.vel.set(0,0,0); AB.lostT=0; AB.stuckT=0; }
     // you're driving: get in the passenger seat
     if(P.kart&&P.kart.seat===0&&!P.kart.k.seats[1]&&!P.kart.k.dead){ const k=P.kart.k, dk=Math.hypot(k.x-AB.pos.x,k.z-AB.pos.z);
       if(dk<4.5){ AB.kart={k,seat:1}; k.seats[1]='ally'; sfxAt('kart_in',AB.pos); return; } goal={x:k.x,z:k.z,r:2.5}; }
@@ -8205,6 +8209,7 @@ function stepAlly(dt){
         else { goal={x:L.x,z:L.z,r:L.kind==='chest'?1.6:1.0,act:L.kind==='chest'?'chest':'take',T:L.kind==='chest'?1.2:0.25,L}; } } }
     if(!goal&&(dp>8||(isDead()&&dp>4))) goal={x:P.pos.x,z:P.pos.z,r:5};
     if(AB.wpn&&AB.tgt&&AB.tgt.alive&&!(goal&&goal.act)){ const dzz=AB.tgt.pos.distanceTo(AB.pos); if(dzz<6.5&&dp<16) kite=Math.atan2(AB.tgt.pos.x-AB.pos.x,AB.tgt.pos.z-AB.pos.z); else if(dzz<allyRange()&&!goal) strafe=Math.sin(now/650+1)>0?0.5:-0.5; }
+    if(AB.wpn&&AB.tgt&&AB.tgt.alive&&AB.los===false&&!goal&&dp<25){ goal={x:AB.tgt.pos.x,z:AB.tgt.pos.z,r:3}; kite=null; strafe=0; }
     if(AB.tgt&&AB.tgt.alive){ face=Math.atan2(-(AB.tgt.pos.x-AB.pos.x),-(AB.tgt.pos.z-AB.pos.z)); if(!AB.wpn&&!goal&&AB.tgt.pos.distanceTo(AB.pos)<14&&AB.tgt.pos.distanceTo(AB.pos)>zReach(AB.tgt)+0.5) goal={x:AB.tgt.pos.x,z:AB.tgt.pos.z,r:zReach(AB.tgt)+0.5}; } }
   // walk toward the goal, facing a zombie it's shooting at if it has one
   let a=null; if(goal){ const dx=goal.x-AB.pos.x, dz=goal.z-AB.pos.z, d=Math.hypot(dx,dz); if(d>goal.r) a=Math.atan2(-dx,-dz); }
@@ -8231,7 +8236,7 @@ function stepAlly(dt){
   if(AB.reloadT>0) AB.reloadT-=dt; AB.fireT-=dt;
   if(AB.swingT>0) AB.swingT-=dt;
   if(!AB.down&&!AB.sky&&(!(goal&&goal.act)||(goal.act==='revive'&&a==null))&&AB.tgt&&AB.tgt.alive&&AB.reloadT<=0&&AB.fireT<=0&&(Math.abs(dy)<0.45||(goal&&goal.act))){ const dz=AB.tgt.pos.distanceTo(AB.pos);
-    if(AB.wpn&&dz<allyRange()) allyFire(AB.tgt);
+    if(AB.wpn&&dz<allyRange()&&AB.los!==false) allyFire(AB.tgt);
     else if(!AB.wpn&&dz<zReach(AB.tgt)+0.9){ AB.swingT=SWING_T; AB.fireT=PICK_CD+0.05; setTimeout(()=>{ if(AB&&AB.tgt&&AB.tgt.alive&&AB.tgt.pos.distanceTo(AB.pos)<zReach(AB.tgt)+1.2){ zombieHurt(AB.tgt,30,'ally'); sfxAt('hit',AB.tgt.pos); } },PICK_IMPACT*1000); } }
   AB.pitch=AB.tgt&&AB.tgt.alive?Math.max(-0.6,Math.min(0.6,Math.atan2(AB.tgt.pos.y+1-(AB.pos.y+1.5),Math.hypot(AB.tgt.pos.x-AB.pos.x,AB.tgt.pos.z-AB.pos.z)))):0;
   animateRig(AB.h,{slope:slopeFor(AB),pos:AB.pos,vel:AB.vel,yaw:AB.yaw,pitch:AB.pitch,onGround:AB.onGround,crouch:!!(goal&&goal.act&&a==null),building:false,editing:false,gun:AB.down||AB.sky||!AB.wpn?false:AB.wpn,ads:0,swingT:Math.max(0,AB.swingT),emote:null,
