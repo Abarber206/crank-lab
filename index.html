@@ -778,10 +778,16 @@ renderer.toneMapping=THREE.CustomToneMapping; renderer.toneMappingExposure=1.0;
    1x on computers), and creeps back up when there's headroom. A level that was too slow becomes the ceiling. */
 const dynRes={max:Math.min(devicePixelRatio, isTouch?1.5:2), min:Math.min(devicePixelRatio,isTouch?0.75:1), acc:0, n:0, upAt:0, ceil:9, cur:0};
 dynRes.cur=dynRes.max; renderer.setPixelRatio(dynRes.cur);
+const PERF={reflect:true,ao:true,far:true,slow:0};
+function perfShed(){ const say=m=>{ try{ toast(m); }catch(e){} };
+  if(PERF.reflect&&settings.reflect!==false){ PERF.reflect=false; say('Water reflections off to keep the game smooth'); return true; } PERF.reflect=false;
+  if(PERF.ao&&settings.ao!==false&&AO.ok){ PERF.ao=false; say('Soft shading off to keep the game smooth'); return true; } PERF.ao=false;
+  if(PERF.far&&sunFar.castShadow){ PERF.far=false; sunFar.castShadow=false; say('Far shadows off to keep the game smooth'); return true; } PERF.far=false; return false; }
 function stepDynRes(raw,now){
   if(raw>250){ dynRes.acc=0; dynRes.n=0; return; } // tab was hidden
   dynRes.acc+=raw; dynRes.n++; if(dynRes.acc<2000) return;
   const avg=dynRes.acc/dynRes.n; dynRes.acc=0; dynRes.n=0;
+  if(settings.autoRes&&avg>30&&dynRes.cur<=dynRes.min+1e-3){ if(++PERF.slow>=2){ PERF.slow=0; perfShed(); } } else if(avg<26) PERF.slow=0; // still slow at the lowest resolution for four seconds: drop an extra
   let next=dynRes.cur;
   if(!settings.autoRes){ next=dynRes.max; }
   else if(avg>24&&dynRes.cur>dynRes.min){ if(now-dynRes.upAt<6000) dynRes.ceil=dynRes.cur-0.05; next=Math.max(dynRes.min,dynRes.cur-0.25); }
@@ -1663,7 +1669,7 @@ function aoInit(w,h){ if(AO.rt){ AO.rt.dispose(); AO.ao.dispose(); }
   AO.matA.uniforms.tDepth.value=rt.depthTexture; AO.matA.uniforms.tColor.value=rt.texture; AO.matA.uniforms.res.value.set(aw,ah); AO.matC.uniforms.tColor.value=rt.texture; AO.matC.uniforms.tAO.value=ao.texture; AO.matC.uniforms.res.value.set(w,h); AO.matC.uniforms.ares.value.set(aw,ah);
   const gl=renderer.getContext(); for(let i=0;i<8&&gl.getError()!==gl.NO_ERROR;i++); AO.n=0; }
 // the picture: straight to the screen, or by way of the buffers above
-function renderMain(){ if(!AO.ok||settings.ao===false||!scene.visible){ renderer.render(scene,camera); return; }
+function renderMain(){ if(!AO.ok||settings.ao===false||!PERF.ao||!scene.visible){ renderer.render(scene,camera); return; }
   renderer.getDrawingBufferSize(AO.sz); const w=AO.sz.x, h=AO.sz.y;
   if(!AO.rt||AO.rt.width!==w||AO.rt.height!==h){ try{ aoInit(w,h); }catch(e){ console.warn('ambient occlusion unavailable',e); AO.ok=false; renderer.render(scene,camera); return; } }
   renderer.setRenderTarget(AO.rt); renderer.render(scene,camera);
@@ -1672,7 +1678,7 @@ function renderMain(){ if(!AO.ok||settings.ao===false||!scene.visible){ renderer
   if(AO.n<3&&++AO.n===3){ const gl=renderer.getContext(); if(gl.getError()!==gl.NO_ERROR){ console.warn('ambient occlusion switched off: the graphics driver refused it'); AO.ok=false; } } } // (checked once, after the first few frames)
 const REFL={rt:null,cam:new THREE.PerspectiveCamera(),m:new THREE.Matrix4(),plane:new THREE.Plane(),clip:new THREE.Vector4(),q:new THREE.Vector4(),sz:new THREE.Vector2(),t:new THREE.Vector3(),hid:[]};
 function renderReflection(){ if(!WATER.mat) return; const u=WATER.mat.uniforms; u.reflK.value=0;
-  if(settings.reflect===false||!WATER.lv||!scene.visible) return;
+  if(settings.reflect===false||!PERF.reflect||!WATER.lv||!scene.visible) return;
   const cp=camera.position, LN=WATER.LN, i=Math.max(0,Math.min(LN-1,Math.floor((cp.x-SPAWN[0]+WHALF)/WATER.LC))), j=Math.max(0,Math.min(LN-1,Math.floor((cp.z-SPAWN[2]+WHALF)/WATER.LC))), lvl=WATER.lv[j*LN+i], off=WATER.ld[j*LN+i], hgt=cp.y-lvl;
   if(lvl<-999||off>300||hgt<0.12||hgt>180) return; // no water near, or too high up for it to matter
   const K=(1-sstep(180,300,off))*(1-sstep(120,180,hgt)); if(K<0.01) return;
@@ -6146,7 +6152,7 @@ function hostData(from,m){
 function onShot(m){
   const pl=net.players.get(m.id); if(!pl||!pl.alive) return;
   animEvent(pl.h,'fire',m.w); pl.h.rig.muzzle.getWorldPosition(muzzleV);
-  (m.e||[]).forEach(e=>tracer(muzzleV,new THREE.Vector3(e[0],e[1],e[2]),0xffb070));
+  (m.e||[]).forEach(e=>tracer(muzzleV,new THREE.Vector3(e[0],e[1],e[2]),0xffb070)); if(m.b) ghostBullet(m,muzzleV);
   muzzleFlash(pl.h); sfxAt((WEAPONS[m.w]&&WEAPONS[m.w].snd)||'shot',pl.pos);
 }
 // you got hit: you apply your own damage (no disagreements about your health)
@@ -6552,12 +6558,16 @@ function fireBullet(W,tgts,spread){
   const v=d.clone().addScaledVector(_bN,Math.tan(ph)).normalize().multiplyScalar(b[0]), p=o.clone().addScaledVector(d,nearT);
   const g=new THREE.BufferGeometry().setFromPoints([muzzleV.clone(),muzzleV.clone()]), l=new THREE.Line(g,new THREE.LineBasicMaterial({color:0xfff0b0,transparent:true,opacity:0.95})); l.frustumCulled=false; scene.add(l);
   bullets.push({p,v,W,wpn:P.wpn,dist:nearT,t:0,l,off:muzzleV.clone().sub(p),tail:p.clone().add(muzzleV.clone().sub(p))});
-  return out; }
+  out.ends=[]; out.b=[+p.x.toFixed(2),+p.y.toFixed(2),+p.z.toFixed(2),+v.x.toFixed(1),+v.y.toFixed(1),+v.z.toFixed(1)]; return out; }
+// someone else's bullet: seen, not felt (their own game decides what it hit)
+function ghostBullet(m,from){ const W=WEAPONS[m.w]; if(!W||!m.b||m.b.length!==6||bullets.length>80) return; const p=new THREE.Vector3(m.b[0],m.b[1],m.b[2]), v=new THREE.Vector3(m.b[3],m.b[4],m.b[5]); if(!isFinite(p.lengthSq()+v.lengthSq())||v.length()>600) return;
+  const g=new THREE.BufferGeometry().setFromPoints([from.clone(),from.clone()]), l=new THREE.Line(g,new THREE.LineBasicMaterial({color:0xffb070,transparent:true,opacity:0.95})); l.frustumCulled=false; scene.add(l);
+  bullets.push({p,v,W,wpn:m.w,dist:0,t:0,l,off:from.clone().sub(p),tail:from.clone(),ghost:true}); }
 function endBullet(i){ const b=bullets[i]; scene.remove(b.l); b.l.geometry.dispose(); b.l.material.dispose(); bullets.splice(i,1); }
 function stepBullets(dt){ if(!bullets.length) return; dt=Math.min(dt,0.05); const tgts=bulletTargets();
   for(let i=bullets.length-1;i>=0;i--){ const b=bullets[i], W=b.W; b.t+=dt;
     _bD.copy(b.v).multiplyScalar(dt); _bD.y-=0.5*BULLET_G*dt*dt; const len=_bD.length(); _bD.multiplyScalar(1/len);
-    const r=castShot(b.p,_bD,len,0,tgts); let tHit=r.kind==='none'?Infinity:r.t, what=r.kind;
+    const r=castShot(b.p,_bD,len,0,b.ghost?[]:tgts); let tHit=r.kind==='none'?Infinity:r.t, what=r.kind;
     // the ground, and water lying on it
     { const ex=b.p.x+_bD.x*len, ey=b.p.y+_bD.y*len, ez=b.p.z+_bD.z*len, gy=terrainH(ex,ez), wy=waterAt(ex,ez), top=Math.max(gy,wy>-999?wy:-1e9);
       if(ey<top){ let lo=0, hi=len; for(let q=0;q<6;q++){ const m=(lo+hi)/2, x=b.p.x+_bD.x*m, z=b.p.z+_bD.z*m, w2=waterAt(x,z); if(b.p.y+_bD.y*m<Math.max(terrainH(x,z),w2>-999?w2:-1e9)) hi=m; else lo=m; }
@@ -6568,7 +6578,8 @@ function stepBullets(dt){ if(!bullets.length) return; dt=Math.min(dt,0.05); cons
     { const k=Math.max(0,1-b.dist/28), head=_c.copy(b.p).addScaledVector(b.off,k), pa=b.l.geometry.attributes.position, tl=Math.min(b.dist,9+b.W.dmg*0.04);
       b.tail.copy(head).addScaledVector(_bD,-tl); pa.setXYZ(0,b.tail.x,b.tail.y,b.tail.z); pa.setXYZ(1,head.x,head.y,head.z); pa.needsUpdate=true; b.l.material.opacity=0.95*Math.min(1,0.35+b.dist/40); }
     if(hit){ const pt=b.p.clone(), dmg=bulletDamage(W,flown);
-      if(what==='body'){ const dd=dmg*(r.head?W.head:1); creditHit(r.who,{dmg:dd,head:r.head,pt},B?B.sh:0,b.wpn); }
+      if(b.ghost){ if(what==='water') burst(pt,5,3.2,0.07,splashMat); else if(what==='ground') burst(pt,4,2.4,0.06,dustMat); }
+      else if(what==='body'){ const dd=dmg*(r.head?W.head:1); creditHit(r.who,{dmg:dd,head:r.head,pt},B?B.sh:0,b.wpn); }
       else if(what==='piece') damagePiece(r.piece,dmg*(W.build||1),pt);
       else if(what==='water'){ burst(pt,5,3.2,0.07,splashMat); if(pt.distanceTo(P.pos)<60) sfxAt('step_water',pt); }
       else burst(pt,4,2.4,0.06,dustMat);
@@ -6598,7 +6609,7 @@ function playerShoot(cont){
   const tgts=[]; if(B&&B.active&&B.alive) tgts.push(B); net.players.forEach(pl=>{ if(pl.alive&&!sameTeam(pl)) tgts.push(pl); }); horde.zs.forEach(z=>{ if(z.alive) tgts.push(z); });
   const shBefore=B?B.sh:0;
   const live=W.pellets===1&&BALL[W.model], r=live?fireBullet(W,tgts,spread):fireWeapon(P,localHero,camera.position.clone(),aimDir(),P.wpn,camDist+0.4,tgts,spread);
-  if(net.role) netSend({type:'shot',id:net.id,w:P.wpn,e:r.ends});
+  if(net.role) netSend(r.b?{type:'shot',id:net.id,w:P.wpn,e:r.ends,b:r.b}:{type:'shot',id:net.id,w:P.wpn,e:r.ends});
   sfx(W.snd||'shot'); animEvent(localHero,'fire',P.wpn); stat('s'); P.shotN=first||W.pellets>1?0:(P.shotN||0)+1; P.kick=(W.kick||0.014)*(1-0.55*adsK)*(1+0.35*Math.min(1,P.shotN/8)); P.yaw+=(Math.sin(P.shotN*1.9+0.6)*0.55+(Math.random()-.5)*0.7)*(W.pellets>1||W.kick>0.05?0.01:0.007)*(1-0.6*adsK);
   r.bodies.forEach((e,who)=>creditHit(who,e,shBefore,P.wpn));
   if(P.ammo[P.wpn]<=0) startReload();
@@ -7440,6 +7451,13 @@ function initChests(){
     const cr=seeded(t.seed+h.id*977+5); s.chest.forEach(p=>{ if(cr()>0.45) return; const yaw=Math.atan2(t.x-p.x,t.z-p.z)+Math.PI; addChest(p.x,p.y,p.z,yaw); });
     if(cr()<0.35){ const top=h.L+h.floors, x=(h.i0+h.w/2)*CELL+(h.w%2?0:CELL*0.5), z=(h.j0+h.d/2)*CELL+(h.d%2?0:CELL*0.5), [gy]=groundAt(x,z,top*LVL+0.8,near(x,z)); // up in the attic
       if(gy>top*LVL-0.3) addChest(x,gy,z,h.w>=h.d?0:Math.PI/2); } }
+  // one strongbox at the foot of each town's landmark, on the side facing the town
+  buildLandmarks();
+  for(const t of TOWNS){ const L=t.poi; if(!L) continue; const a0=Math.atan2(t.x-L.x,t.z-L.z); let x=0, z=0, dx=0, dz=0, ok=false;
+    const clear=(x,z,y)=>{ for(const s of STATICS){ if(!s.solid||Math.abs(s.x-x)>14||Math.abs(s.z-z)>14) continue; for(const b of s.solid.boxes){ if(b[4]<y+0.2||b[1]>y+1.5) continue; if(Math.hypot(Math.max(b[0]-x,0,x-b[3]),Math.max(b[2]-z,0,z-b[5]))<1.3) return false; } } return !propsNear(x,z,[],1).some(q=>!q.gone&&Math.hypot(q.x-x,q.z-z)<1.8); };
+    for(const R of [6.6,7.3,5.8,8.2]){ for(const da of [0,0.6,-0.6,1.2,-1.2,1.9,-1.9,3.14]){ dx=Math.sin(a0+da); dz=Math.cos(a0+da); x=L.x+dx*R; z=L.z+dz*R; if(clear(x,z,terrainH(x,z))){ ok=true; break; } } if(ok) break; }
+    const c=addChest(x,terrainH(x,z),z,Math.atan2(-dx,-dz)+Math.PI);
+    c.big=true; c.g.scale.setScalar(1.3); const bm=new THREE.Mesh(new THREE.CylinderGeometry(0.3,1.1,26,14,1,true),new THREE.MeshBasicMaterial({color:0xffd060,transparent:true,opacity:0.3,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide,fog:false})); bm.position.set(x,c.y+13.4,z); bm.renderOrder=3; scene.add(bm); c.beam=bm; }
   // a few in the wild, under trees and on hilltops
   const r=seeded(99173), RC=MAP_R-30; let made=0;
   for(let k=0;k<3000&&made<35;k++){ const u=(r()*2-1)*RC, v=(r()*2-1)*RC, d2=u*u+v*v; if(d2<60*60||d2>RC*RC) continue;
@@ -7447,6 +7465,9 @@ function initChests(){
     if(c<0||shoreAt(x,z)||townAt(x,z,8)||roadDistAt(x,z)<7||WORLD.SNOW[c]>30||WORLD.ROCK[c]>150||chests.some(q=>Math.hypot(q.x-x,q.z-z)<70)||propsNear(x,z,[],1).some(q=>Math.hypot(q.x-x,q.z-z)<2.6)) continue;
     addChest(x,terrainH(x,z),z,r()*6.28); made++; }
 }
+function lootWeaponMin(luck,minIdx){ for(let q=0;q<40;q++){ const id=lootWeapon(luck); if(RARITIES.indexOf(WEAPONS[id].rarity)>=minIdx) return id; } return lootWeapon(luck); }
+function rollBigLoot(){ const a=lootWeaponMin(2.4,2), b=lootWeapon(1.5), am=ammoFor(a); return [[a,WEAPONS[a].mag],[am[0],am[1]*2],[b,WEAPONS[b].mag],ammoFor(b),['mini',3]]; }
+function stepBigChests(){ const t=performance.now()/1000; for(const c of chests){ if(!c.beam) continue; const on=!c.open&&c.g.visible; c.beam.visible=on; if(on){ c.beam.material.opacity=0.27+0.08*Math.sin(t*2.1); c.beam.rotation.y=t*0.3; } } }
 function rollChestLoot(){
   const id=lootWeapon(1.15), out=[[id,WEAPONS[id].mag],ammoFor(id)], r=Math.random();
   if(r<0.3) out.push(Math.random()<0.6?['bandage',3]:['mini',2]); else if(r<0.5) out.push(['nade',2]); else if(r<0.75){ const k=['light','medium','shells','heavy'][Math.floor(Math.random()*4)]; out.push([k,AMMO_PACK[k]]); }
@@ -7457,10 +7478,10 @@ function openChest(c,authority){
   if(p.distanceTo(P.pos)<60){ sfxAt('chest_open',p); burst(p,10,4,0.05,chestMats.gold); dustAt(p,'wood',2,1); }
   if(!authority) return;
   const fx=-Math.sin(c.yaw), fz=-Math.cos(c.yaw);
-  rollChestLoot().forEach(([item,n],q)=>{ const sp=(q-1)*0.9; netDrop(item,n,new THREE.Vector3(c.x+fx*0.5,c.y+0.9,c.z+fz*0.5),new THREE.Vector3(fx*2.6-fz*sp,4.2+q*0.4,fz*2.6+fx*sp)); });
+  (c.big?rollBigLoot():rollChestLoot()).forEach(([item,n],q)=>{ const sp=(q-(c.big?2:1))*0.8; netDrop(item,n,new THREE.Vector3(c.x+fx*0.5,c.y+0.9,c.z+fz*0.5),new THREE.Vector3(fx*2.6-fz*sp,4.2+q*0.4,fz*2.6+fx*sp)); });
   if(net.role==='host') netSend({type:'chestOpen',id:c.id});
 }
-function closeChest(c){ c.open=false; c.prog=0; c.respawnT=0; c.goneT=0; c.poofed=false; c.g.scale.setScalar(1); c.lidA=0; }
+function closeChest(c){ c.open=false; c.prog=0; c.respawnT=0; c.goneT=0; c.poofed=false; c.g.scale.setScalar(c.big?1.3:1); c.lidA=0; }
 function requestChest(c){
   if(net.role==='client'){ if(!c.pending){ c.pending=true; netSend({type:'chest',d:c.id}); setTimeout(()=>{ c.pending=false; },1500); } return; }
   openChest(c,true);
@@ -7497,7 +7518,7 @@ function stepChests(dt){
     c.glow.visible=!c.open; if(!c.open){ c.glow.material.opacity=0.38+0.14*Math.sin(performance.now()/260+c.id); if(d<bd){ bd=d; best=c; } }
     if(!c.open&&useTgt&&useTgt.c===c&&useHeld){ c.prog+=dt/CHEST_OPEN_T; if(c.prog>=1) requestChest(c); }
     else c.prog=Math.max(0,c.prog-dt*3);
-    if(c.open){ c.goneT=(c.goneT||0)+dt; const f=Math.max(0,Math.min(1,(c.goneT-1.6)/0.6)); if(f>0){ c.g.scale.setScalar(1-0.85*f); c.g.position.y=c.y-0.5*f; if(f>=1) c.g.visible=false; if(!c.poofed){ c.poofed=true; if(d<60) burst(new THREE.Vector3(c.x,c.y+0.4,c.z),8,2.5,0.06,chestMats.gold); } } }
+    if(c.open){ c.goneT=(c.goneT||0)+dt; const f=Math.max(0,Math.min(1,(c.goneT-1.6)/0.6)); if(f>0){ c.g.scale.setScalar((c.big?1.3:1)*(1-0.85*f)); c.g.position.y=c.y-0.5*f; if(f>=1) c.g.visible=false; if(!c.poofed){ c.poofed=true; if(d<60) burst(new THREE.Vector3(c.x,c.y+0.4,c.z),8,2.5,0.06,chestMats.gold); } } }
   }
   // the prompt: what Interact would do here (and how far along opening a chest is)
   showing=!!useTgt; if(showing){ const lt=useTgt.kind==='chest'&&useTgt.c.prog>0?'Opening chest':(useTgt.busy&&useTgt.busy())||useTgt.label; if($('useT').textContent!==lt) $('useT').textContent=lt; const kl=codeName(settings.binds.interact||'KeyV'); if($('useK').textContent!==kl) $('useK').textContent=kl;
@@ -9360,7 +9381,7 @@ function frame(now){
   } else { P.vel.x*=0.8; P.vel.z*=0.8; }
   if(swingT>0) swingT-=dt;
   stepClouds(dt); stepDoors(dt); stepAmbience(dt); stepPick(dt); stepSpin(dt); stepProjs(dt); stepDrops(dt); stepProps(dt); if(playing||net.role) hordeUpdate(dt); stepDusk(dt); updateHordeHUD(); stepUse(dt); updateUseBar();
-  stepGrass(dt); stepChests(dt); stepReboot(dt); stepAlly(dt); stepAnims(now); stepChunks(dt); stepFallers(dt); stepShakes(dt); stepLootGlow(dt); stepZFlash(dt); stepKarts(dt); stepPlayers(dt); stepTracers(dt); stepBullets(dt); if(B&&B.active) animateBot(dt);
+  stepGrass(dt); stepChests(dt); stepReboot(dt); stepAlly(dt); stepAnims(now); stepChunks(dt); stepFallers(dt); stepShakes(dt); stepLootGlow(dt); stepZFlash(dt); stepKarts(dt); stepPlayers(dt); stepTracers(dt); stepBullets(dt); stepBigChests(); if(B&&B.active) animateBot(dt);
   if(!playing&&net.role==='host'&&B&&B.active){ botUpdate(dt); const n=Math.max(1,Math.ceil(dt/0.008)); for(let k=0;k<n;k++) physStep(dt/n,B); }
   if(net.role){ net.sendT-=dt; if(net.sendT<=0){ net.sendT=0.05; netSend(myState()); if(net.role==='host'&&B&&B.active) netSend(botState()); }
     if(net.role==='host'){ party.syncT-=dt; if(party.syncT<=0){ party.syncT=2; partySync(); }
