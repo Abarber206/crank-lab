@@ -7,7 +7,7 @@ const html=page('/home/claude/crank-lab/index.html','scene,toggleDoor,P,net,piec
  const H=await open(b,html,{name:'H',fast:true,norender:true}), C=await open(b,html,{name:'C',fast:true,norender:true});
  for(const X of [H,C]){ await X.pg.waitForFunction(()=>window.T&&T.pieces,null,{timeout:120000}); await X.pg.evaluate(()=>{ const s=document.querySelector('#botSel'); s.value='off'; s.dispatchEvent(new Event('change')); }); }
  await H.pg.evaluate(()=>document.getElementById('hostBtn').click()); await H.pg.waitForFunction(()=>T.net.code,null,{timeout:30000}); const code=await H.pg.evaluate(()=>T.net.code);
- await C.pg.fill('#jcode',code); await C.pg.evaluate(()=>document.getElementById('joinBtn').click()); await C.pg.waitForFunction(()=>T.net.role==='client'&&T.net.id,null,{timeout:60000});
+ await C.pg.evaluate(([i,v])=>{ document.getElementById(i).value=v; },['jcode',code]); await C.pg.evaluate(()=>document.getElementById('joinBtn').click()); await C.pg.waitForFunction(()=>T.net.role==='client'&&T.net.id,null,{timeout:60000});
  await sleep(1500);
  await C.pg.evaluate(()=>{ const d=T.pieces.delete.bind(T.pieces); T.pieces.delete=k=>{ if(k==='wx3_0_0') console.error('DEL '+new Error().stack.split('\n').slice(4,12).join(' <- ')); return d(k); }; });
  // the guest builds through the normal path (placed by the guest, checked by the host)

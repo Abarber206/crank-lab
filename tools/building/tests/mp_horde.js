@@ -7,7 +7,7 @@ const html=page('/home/claude/crank-lab/index.html','scene,P,net,horde,newZombie
  const H=await open(b,html,{name:'H',fast:true,norender:true}), C=await open(b,html,{name:'C',fast:true,norender:true});
  for(const X of [H,C]) await X.pg.waitForFunction(()=>window.T,null,{timeout:120000});
  await H.pg.evaluate(()=>{ document.querySelector('.mode[data-mode=horde]').click(); document.getElementById('hostBtn').click(); }); await H.pg.waitForFunction(()=>T.net.code,null,{timeout:30000}); const code=await H.pg.evaluate(()=>T.net.code);
- await C.pg.fill('#jcode',code); await C.pg.evaluate(()=>document.getElementById('joinBtn').click()); await C.pg.waitForFunction(()=>T.net.role==='client'&&T.net.id,null,{timeout:60000});
+ await C.pg.evaluate(([i,v])=>{ document.getElementById(i).value=v; },['jcode',code]); await C.pg.evaluate(()=>document.getElementById('joinBtn').click()); await C.pg.waitForFunction(()=>T.net.role==='client'&&T.net.id,null,{timeout:60000});
  await sleep(2000); console.log('before start: guest',await C.pg.evaluate(()=>T.net.role));
  await C.pg.evaluate(()=>document.getElementById('readyBtn').click()); await sleep(1500); await H.pg.evaluate(()=>{ document.getElementById('startMatch').click(); }); await sleep(1000);
  await H.pg.evaluate(()=>document.getElementById('play').click()); await C.pg.evaluate(()=>document.getElementById('play').click());

@@ -515,6 +515,66 @@ body.touch #tFire{width:74px;height:74px}
 body.touch #tJump{width:62px;height:62px}
 body.touch #stickHint{width:100px;height:100px;opacity:.6}
 #toast{transition:none}}
+
+/* ---------- the 3D lobby ---------- */
+body.lobby3d .hud,body.lobby3d #tui,body.lobby3d #vitals{visibility:hidden!important}
+#menu.lobby{background:transparent}
+#menu.lobby::before{display:none}
+#menu.lobby::after{height:30vh;background:linear-gradient(transparent,rgba(2,10,30,.45))}
+#menu.lobby:not(.l3d)::before{display:block;content:"";position:fixed;inset:0;background:rgba(4,12,38,.6);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);-webkit-mask:none;mask:none}
+#menu.lobby .mhead h1{font-size:clamp(20px,2.4vw,28px)}
+#menu.lobby .mtabs{margin:0 auto 10px;background:rgba(6,14,40,.55);border-radius:12px;padding:5px;overflow-x:auto;scrollbar-width:none;max-width:100%}
+#menu.lobby .mtabs::-webkit-scrollbar{display:none}
+#menu.lobby .mtabs button{font:800 italic 17px/1 var(--font-hud);letter-spacing:.04em;text-transform:uppercase;color:#fff;padding:11px 16px 9px;white-space:nowrap;flex:0 0 auto}
+#menu.lobby .mtabs button.on{color:#141000;background:linear-gradient(#fff36b,#ffd21a);box-shadow:0 3px 0 #b98d00}
+#menu.lobby.l3d .mtab[data-tab=play]{display:block;min-height:0}
+#menu.lobby.l3d .mtab[data-tab=play]>*:not(#lobbyDock):not(#partyDock):not(#lobbyPlates){display:none!important}
+#lobbyPlates{position:fixed;inset:0;pointer-events:none;z-index:0}
+#lobbyPlates span{position:absolute;transform:translate(-50%,-100%);font:900 italic 15px/1 var(--font-hud);letter-spacing:.06em;text-transform:uppercase;color:#fff;background:rgba(6,14,40,.72);padding:6px 10px 5px;border-radius:6px;white-space:nowrap}
+#lobbyPlates span.me{color:#141000;background:#ffd21a}
+#lobbyPlates span i{display:block;font:700 11px/1.2 var(--font-ui,system-ui);font-style:normal;letter-spacing:.02em;opacity:.85;text-transform:none;margin-top:2px}
+#lobbyDock{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:max(16px,env(safe-area-inset-bottom,0px));display:flex;align-items:stretch;gap:10px;z-index:2}
+#lobbyDock #play{margin:0;min-width:min(34vw,300px);font:900 italic clamp(30px,4vw,46px)/1 var(--font-hud);letter-spacing:.05em;text-transform:uppercase;padding:18px 26px 16px;color:#141000;background:linear-gradient(#fff685,#ffd61f 55%,#ffc400);border:0;border-radius:10px;box-shadow:0 6px 0 #b98d00,0 10px 26px rgba(0,0,30,.45)}
+#lobbyDock #play:active{transform:translateY(4px);box-shadow:0 2px 0 #b98d00}
+#modeBtn{display:flex;flex-direction:column;justify-content:center;align-items:flex-start;gap:4px;min-width:150px;padding:10px 16px;border-radius:10px;border:2px solid rgba(255,255,255,.85);background:rgba(6,14,40,.62);color:#fff;cursor:pointer;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+#modeBtn small{font:700 11px/1 var(--font-ui,system-ui);letter-spacing:.14em;opacity:.75}
+#modeBtn b{font:900 italic 20px/1 var(--font-hud);letter-spacing:.04em;text-transform:uppercase}
+#modePop{position:absolute;right:0;bottom:calc(100% + 10px);width:min(560px,92vw);padding:12px;border-radius:12px;background:rgba(6,14,40,.86);border:1px solid rgba(255,255,255,.18);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+#modePop h3{margin:0 0 8px;color:#fff;font:900 italic 18px/1 var(--font-hud);text-transform:uppercase;letter-spacing:.05em}
+#modePop .modes{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+#modePop .allyopt{margin-top:8px}
+#partyDock{position:fixed;left:max(16px,env(safe-area-inset-left,0px));bottom:max(16px,env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;align-items:flex-start;gap:8px;z-index:2;max-width:42vw}
+#partyDock .pdlist{display:flex;flex-direction:column;gap:4px}
+#partyDock .pdlist span{color:#fff;background:rgba(6,14,40,.62);padding:6px 10px;border-radius:6px;font:700 14px/1.2 var(--font-ui,system-ui)}
+#partyDock .pdlist span em{font-style:normal;opacity:.7;margin-left:6px;font-size:12px}
+#partyDock .btn{background:rgba(6,14,40,.62);color:#fff;border:1px solid rgba(255,255,255,.35)}
+#menu:not(.lobby) #modeBtn,#menu:not(.lobby) #partyDock,#menu:not(.lobby) #lobbyPlates,#menu:not(.lobby) #modePop{display:none}
+#menu:not(.lobby) #lobbyDock{position:static;margin:8px 0}
+body.touch #pdFs{display:none}
+#menu.lobby .mtab[data-tab=friends],#menu.lobby .mtab[data-tab=profile]{max-width:760px;margin:0 auto}
+.mtab[data-tab=profile] .pcard,.mtab[data-tab=friends] .pcard{background:rgba(4,18,64,.55);border:1px solid rgba(255,255,255,.16);border-radius:10px;padding:16px;margin-bottom:12px;color:#fff}
+.pcard h2,.pcard h3{margin:0 0 10px;font:900 italic 20px/1 var(--font-hud);text-transform:uppercase;letter-spacing:.05em;color:#fff}
+.pcard .acct{font:900 34px/1 var(--font-hud);letter-spacing:.12em;color:#ffd21a}
+.pcard .row{display:flex;flex-wrap:wrap;gap:10px;align-items:end}
+.pcard p{color:rgba(225,236,255,.82);margin:8px 0 0}
+#toLobby{display:none}
+#menu:not(.lobby):not(.inparty) #toLobby{display:inline-block}
+@media (max-height:500px){ #lobbyDock #play{font-size:30px;padding:12px 18px 10px;min-width:170px} #modeBtn{min-width:120px;padding:6px 12px} #modeBtn b{font-size:16px} #menu.lobby .mtabs button{font-size:14px;padding:8px 11px 7px} #menu.lobby .mtabs{margin-bottom:4px} }
+
+#friendsCard .frow{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;background:rgba(255,255,255,.06);margin-top:6px}
+#friendsCard .frow .dot{width:10px;height:10px;border-radius:50%;background:#6b7385;flex:0 0 auto}
+#friendsCard .frow .dot.on{background:#3ee07a;box-shadow:0 0 8px #3ee07a}
+#friendsCard .frow .fn{flex:1;min-width:0}
+#friendsCard .frow .fn b{display:block;color:#fff;font:800 15px/1.2 var(--font-ui,system-ui);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#friendsCard .frow .fn small{color:rgba(225,236,255,.7);letter-spacing:.06em}
+#friendsCard .frow .btn{padding:7px 12px}
+#friendsCard h3{margin-top:14px}
+#friendsCard .addrow{display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-top:8px}
+#friendsCard .addrow input{font:800 18px/1 var(--font-hud);letter-spacing:.12em;width:11em}
+#fStatus{min-height:1.2em}
+#invitePop{position:fixed;left:50%;top:max(14px,env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:60;display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;background:rgba(6,14,40,.92);border:2px solid #ffd21a;color:#fff;box-shadow:0 10px 30px rgba(0,0,0,.45);font:700 15px/1.3 var(--font-ui,system-ui);max-width:94vw}
+#invitePop b{color:#ffd21a}
+#invitePop .btn{padding:8px 14px}
 </style>
 </head>
 <body>
@@ -606,6 +666,7 @@ body.touch #stickHint{width:100px;height:100px;opacity:.6}
   <button class="tb" id="tReload" data-act="reload" aria-label="Reload"><svg viewBox="0 0 24 24"><path d="M19 12a7 7 0 1 1-2-5" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><path d="M18 3v5h-5" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
 </div>
 
+<div id="invitePop" hidden><span id="invText"></span><button class="btn primary" id="invJoin" type="button">Join</button><button class="btn" id="invNo" type="button">No thanks</button></div>
 <div id="menu" class="lobby">
   <div class="panel">
     <header class="mhead">
@@ -613,9 +674,11 @@ body.touch #stickHint{width:100px;height:100px;opacity:.6}
       <div class="wallet" title="Points: earned by taking down zombies. Spend them in the Locker."><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="#ffcf4a"/><circle cx="12" cy="12" r="7" fill="none" stroke="#b07a16" stroke-width="2"/><path d="M12 7v10M9 9.5h4.5a1.8 1.8 0 0 1 0 3.6h-3a1.8 1.8 0 0 0 0 3.6H15" fill="none" stroke="#7a520c" stroke-width="1.8" stroke-linecap="round"/></svg><b id="ptsV">0</b><span>pts</span></div>
     </header>
     <nav class="mtabs" role="tablist" aria-label="Menu">
-      <button type="button" role="tab" data-tab="play" class="on">Play</button>
+      <button type="button" role="tab" data-tab="play" class="on" id="tabPlay">Lobby</button>
       <button type="button" role="tab" data-tab="locker">Locker</button>
       <button type="button" role="tab" data-tab="shop">Item Shop</button>
+      <button type="button" role="tab" data-tab="friends">Friends</button>
+      <button type="button" role="tab" data-tab="profile">Profile</button>
       <button type="button" role="tab" data-tab="settings">Settings</button>
       <button type="button" role="tab" data-tab="controls">Controls</button>
     </nav>
@@ -629,9 +692,9 @@ body.touch #stickHint{width:100px;height:100px;opacity:.6}
       </div>
       <label class="allyopt" id="allyOpt" hidden><input type="checkbox" id="hordeBot"><span><b>Bot teammate</b><small>Plays horde with you · revives and reboots you, and you can do the same for it</small></span></label>
       <select id="modeSel" hidden><option value="fight">Build fight</option><option value="horde">Zombie horde</option></select>
-      <div class="actions"><button class="btn primary" id="play">Play</button><button class="btn" id="respawn">Respawn</button><button class="btn" id="clear">Clear builds</button><button class="btn" id="fs">Fullscreen</button></div>
+      <div class="actions"><button class="btn primary" id="play">Play</button><button class="btn" id="respawn">Respawn</button><button class="btn" id="clear">Clear builds</button><button class="btn" id="fs">Fullscreen</button><button class="btn" id="toLobby" type="button">Back to lobby</button></div>
       <section class="mp" id="partyBox">
-        <h2>Party</h2>
+        <h2>Party code</h2><p class="sub" style="margin:0 0 8px">Or play with anyone using a party code.</p>
         <div id="roomIdle" class="mprow">
           <label class="field" for="pname">Name<input id="pname" maxlength="16" placeholder="Player" autocomplete="off"></label>
           <button class="btn" id="hostBtn" type="button">Create party</button>
@@ -657,6 +720,17 @@ body.touch #stickHint{width:100px;height:100px;opacity:.6}
         <div class="mprow"><label class="field" for="teamSel">Team <select id="teamSel"><option value="0">No team</option><option value="1">Team 1 (blue)</option><option value="2">Team 2 (red)</option><option value="3">Team 3 (green)</option><option value="4">Team 4 (gold)</option></select></label><span class="info">Teammates can't hurt each other. In zombie horde everyone is on one side.</span></div>
         <p id="roomStatus" class="status" role="status"></p>
       </section>
+    </section>
+    <section class="mtab" data-tab="friends" hidden>
+      <div class="pcard" id="friendsCard"><h2>Friends</h2><p>Add a friend with the account number on their Profile tab.</p>
+        <div class="addrow"><label class="field" for="fAdd">Friend's account number<input id="fAdd" inputmode="numeric" maxlength="9" placeholder="1234 5678" autocomplete="off"></label><button class="btn primary" id="fAddBtn" type="button">Add friend</button></div>
+        <p id="fStatus" role="status"></p>
+        <div id="fReqs"></div><div id="fList"></div><div id="fSent"></div></div>
+    </section>
+    <section class="mtab" data-tab="profile" hidden>
+      <div class="pcard"><h2>Profile</h2><div class="row" id="profName"></div></div>
+      <div class="pcard"><h3>Your account number</h3><div class="row"><span class="acct" id="acctNum">—</span><button class="btn" id="acctCopy" type="button">Copy</button></div><p>Friends type this in on their Friends tab to add you.</p></div>
+      <div class="pcard"><h3>Team</h3><div class="row" id="profTeam"></div></div>
     </section>
     <section class="mtab" data-tab="locker" hidden>
       <section class="locker">
@@ -5988,6 +6062,7 @@ const menu=$('menu'); let _lobbySkip=0;
 function openMenu(){ if(mapOpen) toggleMap(false); menu.hidden=false; setTimeout(syncLobby,0); playing=false; releaseAll(); touchJump=false; stick.x=stick.y=0; $('play').textContent='Resume'; }
 function startPlay(){
   audioInit();
+  if(menu.classList.contains('lobby')&&net.role&&!party.live){ if(net.role==='host') startMatch(); else $('readyBtn').click(); setTimeout(lobbyLabels,50); return; }
   if(isTouch){ menu.hidden=true; playing=true; return; }
   try{ const r=canvas.requestPointerLock(); if(r&&r.catch) r.catch(()=>{ lockFailed=true; menu.hidden=true; playing=true; toast('Mouse lock is blocked here. Move the mouse to look'); }); }
   catch(e){ lockFailed=true; menu.hidden=true; playing=true; }
@@ -9206,11 +9281,134 @@ syncBot();
   }catch(e){} },60);
 })();
 
+/* ---------- friends ----------
+   Your account number is made up once and kept. Your game listens for friends on a PeerJS id built from it; friends'
+   games connect to that to see you're online, send friend requests and invites. The list is kept on this device. */
+const FR={names:new Map(),acct:'',list:[],peer:null,conns:new Map(),online:new Set(),pollT:0,inv:null,retryT:0};
+(function(){ try{ FR.acct=localStorage.getItem('cranklab.acct')||''; }catch(e){}
+  if(!/^\d{8}$/.test(FR.acct)){ FR.acct=String(10000000+Math.floor(Math.random()*90000000)); try{ localStorage.setItem('cranklab.acct',FR.acct); }catch(e){} }
+  try{ FR.list=JSON.parse(localStorage.getItem('cranklab.friends')||'[]').filter(f=>f&&/^\d{8}$/.test(f.id)); }catch(e){ FR.list=[]; } })();
+const fmtAcct=a=>String(a).replace(/^(\d{4})(\d{4})$/,'$1 $2'), FR_ID=a=>PREFIX+'u-'+a;
+function frSave(){ try{ localStorage.setItem('cranklab.friends',JSON.stringify(FR.list.map(f=>({id:f.id,name:f.name||'',st:f.st})))); }catch(e){} }
+function frGet(id){ return FR.list.find(f=>f.id===id); }
+function frName(){ return ($('pname').value.trim()||net.name||'Player').slice(0,16); }
+function frStatus(t){ $('fStatus').textContent=t||''; }
+function frHello(c){ try{ c.send({t:'hi',id:FR.acct,name:frName(),o:outfitIdx(settings.outfit)}); }catch(e){} }
+function frSend(id,m){ const c=FR.conns.get(id); if(c&&c.open){ try{ c.send(m); return true; }catch(e){} } return false; }
+function frWire(c,id0){ let id=id0;
+  c.on('open',()=>{ frHello(c); });
+  c.on('data',m=>{ if(!m||typeof m!=='object') return;
+    if(m.t==='hi'&&/^\d{8}$/.test(m.id)){ id=String(m.id); FR.conns.set(id,c); FR.online.add(id); if(m.name) FR.names.set(id,String(m.name).slice(0,16)); const f=frGet(id); if(f){ if(m.name) f.name=String(m.name).slice(0,16); if(f.st==='sent') c.send({t:'req'}); frSave(); } frRender(); return; }
+    if(!id) return; const f=frGet(id);
+    if(m.t==='req'){ if(f&&(f.st==='sent'||f.st==='friend')){ f.st='friend'; frSave(); c.send({t:'acc'}); toast((f.name||fmtAcct(id))+' is now your friend'); } else if(!f){ FR.list.push({id,name:FR.names.get(id)||'',st:'in'}); frSave(); sfx('confirm'); toast('Friend request from '+(FR.names.get(id)||fmtAcct(id))); } frRender(); }
+    else if(m.t==='acc'){ if(f&&f.st!=='friend'){ f.st='friend'; frSave(); toast((f.name||fmtAcct(id))+' accepted your friend request'); frRender(); } }
+    else if(m.t==='bye'){ if(f){ FR.list=FR.list.filter(x=>x!==f); frSave(); frRender(); } }
+    else if(m.t==='inv'&&f&&f.st==='friend'&&typeof m.code==='string'&&/^[A-Z0-9]{4,6}$/.test(m.code)){ frInvited(f,m.code); } });
+  const gone=()=>{ if(id&&FR.conns.get(id)===c){ FR.conns.delete(id); FR.online.delete(id); frRender(); } };
+  c.on('close',gone); c.on('error',gone); }
+function frStart(){ if(typeof Peer==='undefined'||FR.peer||window.CRANK_NO_MP) return;
+  const p=new Peer(FR_ID(FR.acct),PEER_OPTS); FR.peer=p;
+  p.on('open',()=>{ FR.pollT=0; });
+  p.on('connection',c=>frWire(c,null));
+  p.on('error',err=>{ if(err.type==='peer-unavailable'){ const m=/u-(\d{8})/.exec(err.message||''); if(m){ FR.online.delete(m[1]); FR.conns.delete(m[1]); frRender(); } return; }
+    if(err.type==='unavailable-id'){ try{ p.destroy(); }catch(e){} FR.peer=null; FR.retryT=30; return; } }); // this account is open in another tab: try again later
+  p.on('disconnected',()=>{ try{ p.reconnect(); }catch(e){} }); }
+// every so often, look in on each friend (and anyone you've sent a request to) who isn't connected
+function frPoll(dt){ if(!FR.peer){ if(FR.retryT>0&&(FR.retryT-=dt)<=0) frStart(); return; } if(!FR.peer.open) return; FR.pollT-=dt; if(FR.pollT>0) return; FR.pollT=20;
+  for(const f of FR.list){ if(f.st==='in'||FR.conns.has(f.id)) continue; try{ const c=FR.peer.connect(FR_ID(f.id),{reliable:true}); frWire(c,f.id); c.on('open',()=>{ FR.conns.set(f.id,c); FR.online.add(f.id); frRender(); }); }catch(e){} } }
+function frAdd(){ const id=$('fAdd').value.replace(/\D/g,''); if(!/^\d{8}$/.test(id)){ frStatus('An account number is 8 digits.'); return; } if(id===FR.acct){ frStatus("That's your own number."); return; }
+  let f=frGet(id); if(f&&f.st==='friend'){ frStatus('Already friends.'); return; }
+  if(f&&f.st==='in'){ frAccept(id); return; }
+  if(!f){ f={id,name:'',st:'sent'}; FR.list.push(f); frSave(); } $('fAdd').value=''; frStatus('Friend request sent to '+fmtAcct(id)+'. It arrives when they are online.');
+  if(!frSend(id,{t:'req'})){ FR.pollT=0; } frRender(); }
+function frAccept(id){ const f=frGet(id); if(!f) return; f.st='friend'; frSave(); frSend(id,{t:'acc'}); FR.pollT=0; frRender(); }
+function frRemove(id){ frSend(id,{t:'bye'}); FR.list=FR.list.filter(f=>f.id!==id); frSave(); const c=FR.conns.get(id); if(c){ try{ c.close(); }catch(e){} } FR.conns.delete(id); FR.online.delete(id); frRender(); }
+// invite: into the party you're in, or a new one you lead
+function frInvite(id){ const f=frGet(id); if(!f||!FR.online.has(id)) return;
+  const go=()=>{ if(frSend(id,{t:'inv',code:net.code,name:frName()})) toast('Invite sent to '+(f.name||fmtAcct(id))); else toast((f.name||fmtAcct(id))+' just went offline'); };
+  if(net.role&&net.code){ go(); return; }
+  readName(); hostGame(); let n=0; const w=setInterval(()=>{ if(net.role==='host'&&net.code){ clearInterval(w); go(); renderParty(); } else if(++n>60){ clearInterval(w); toast("Couldn't start a party. Try again."); } },250); }
+function frInvited(f,code){ if(net.code===code) return; FR.inv={code,from:f}; $('invText').innerHTML='<b></b> invited you to their lobby'; $('invText').querySelector('b').textContent=f.name||fmtAcct(f.id); $('invitePop').hidden=false; sfx('confirm');
+  clearTimeout(frInvited.t); frInvited.t=setTimeout(()=>{ $('invitePop').hidden=true; FR.inv=null; },30000); }
+$('invJoin').addEventListener('click',()=>{ const v=FR.inv; $('invitePop').hidden=true; FR.inv=null; if(!v) return; if(playing) openMenu(); P.everPlayed=false; $('jcode').value=v.code; joinGame(); showTab('play'); });
+$('invNo').addEventListener('click',()=>{ $('invitePop').hidden=true; FR.inv=null; });
+function frRender(){ const box=(el,html)=>{ $(el).innerHTML=html; }, esc=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const reqs=FR.list.filter(f=>f.st==='in'), fr=FR.list.filter(f=>f.st==='friend').sort((a,b)=>FR.online.has(b.id)-FR.online.has(a.id)), sent=FR.list.filter(f=>f.st==='sent');
+  box('fReqs',reqs.length?'<h3>Friend requests</h3>'+reqs.map(f=>`<div class="frow"><span class="dot${FR.online.has(f.id)?' on':''}"></span><span class="fn"><b>${esc(f.name||'Player')}</b><small>${fmtAcct(f.id)}</small></span><button class="btn primary" data-acc="${f.id}">Accept</button><button class="btn" data-rm="${f.id}">Decline</button></div>`).join(''):'');
+  box('fList','<h3>Friends</h3>'+(fr.length?fr.map(f=>{ const on=FR.online.has(f.id); return `<div class="frow"><span class="dot${on?' on':''}"></span><span class="fn"><b>${esc(f.name||'Player')}</b><small>${fmtAcct(f.id)} · ${on?'Online':'Offline'}</small></span><button class="btn${on?' primary':''}" data-inv="${f.id}" ${on?'':'disabled'}>Invite to lobby</button><button class="btn" data-rm="${f.id}" aria-label="Remove friend">✕</button></div>`; }).join(''):'<p>No friends yet.</p>'));
+  box('fSent',sent.length?'<h3>Sent</h3>'+sent.map(f=>`<div class="frow"><span class="dot"></span><span class="fn"><b>${fmtAcct(f.id)}</b><small>Waiting for them to accept</small></span><button class="btn" data-rm="${f.id}">Cancel</button></div>`).join(''):'');
+  const n=reqs.length, tb=document.querySelector('.mtabs button[data-tab=friends]'); if(tb) tb.textContent=n?'Friends ('+n+')':'Friends'; }
+$('friendsCard').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; if(b.dataset.acc) frAccept(b.dataset.acc); else if(b.dataset.rm) frRemove(b.dataset.rm); else if(b.dataset.inv) frInvite(b.dataset.inv); });
+$('fAddBtn').addEventListener('click',frAdd); $('fAdd').addEventListener('keydown',e=>{ if(e.key==='Enter') frAdd(); });
+$('acctNum').textContent=fmtAcct(FR.acct);
+$('acctCopy').addEventListener('click',()=>{ const t=FR.acct, done=()=>toast('Account number copied'); if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(done,()=>toast('Your number: '+fmtAcct(t))); else toast('Your number: '+fmtAcct(t)); });
+frRender(); setTimeout(frStart,1500);
+
+/* ---------- the 3D lobby: out on the water off the coastal town, looking at the lighthouse ---------- */
+const LOBBY={on:false,spot:null,heroes:[],key:'',pads:[],fixTOD:false,_v:new THREE.Vector3(),_f:new THREE.Vector3()};
+function lobbySpot(){ if(LOBBY.spot) return LOBBY.spot; const S=WGEN.sea(), t=TOWNS[0];
+  let L=t&&t.poi&&t.poi.shore?t.poi:null, nx=S?S.nx:0, nz=S?S.nz:1, Y=S?S.Y:0;
+  if(!L||!S){ const x=SPAWN[0], z=SPAWN[2]; LOBBY.spot={cam:new THREE.Vector3(x+30,terrainH(x+30,z)+3,z),look:new THREE.Vector3(x,terrainH(x,z)+4,z),pads:[],water:false}; return LOBBY.spot; }
+  let d=14; while(d<160&&terrainH(L.x+nx*d,L.z+nz*d)>Y-0.4) d+=2; // out past the beach into water
+  const side=-0.28, fx=-nx, fz=-nz, rx=-fz, rz=fx; // look back at the shore, a little from one side
+  const cx=L.x+nx*(d+15)+rx*side*12, cz=L.z+nz*(d+15)+rz*side*12, cam=new THREE.Vector3(cx,Y+2.0,cz), look=new THREE.Vector3(L.x+rx*side*4,Y+6.2,L.z+rz*side*4);
+  const dir=new THREE.Vector3(look.x-cx,0,look.z-cz).normalize(), rgt=new THREE.Vector3(-dir.z,0,dir.x), base=cam.clone().addScaledVector(dir,7.4); base.y=Y;
+  const pads=[[0,0],[-2.5,1.3],[2.5,1.3],[-4.8,2.7]].map(([a,b])=>new THREE.Vector3(base.x+rgt.x*a+dir.x*b,Y,base.z+rgt.z*a+dir.z*b));
+  LOBBY.spot={cam,look,pads,Y,dir,water:true}; return LOBBY.spot; }
+let _padGeo=null, _padMat=null, _ringMat=null;
+function lobbyPad(){ if(!_padGeo){ _padGeo=new THREE.CylinderGeometry(1.05,0.9,0.32,40); _padMat=new THREE.MeshPhongMaterial({color:0x1fb6a6,shininess:70,specular:0x3a6a66,emissive:0x0a3a36}); _ringMat=new THREE.MeshBasicMaterial({color:0x9ffff0}); }
+  const g=new THREE.Group(), p=new THREE.Mesh(_padGeo,_padMat); p.position.y=-0.08; p.receiveShadow=true; p.castShadow=true; g.add(p);
+  const r=new THREE.Mesh(new THREE.TorusGeometry(1.0,0.035,8,64),_ringMat); r.rotation.x=Math.PI/2; r.position.y=0.085; g.add(r); scene.add(g); return g; }
+function lobbyActive(){ return !menu.hidden&&menu.classList.contains('lobby'); } // behind every lobby tab (blurred behind the others)
+function lobbySync(){ const L=stageLineup(), key=L.map(x=>x.o+'/'+x.pk+'/'+x.name+'/'+(x.ready?1:0)+'/'+(x.lead?1:0)).join('|'); if(key===LOBBY.key) return; LOBBY.key=key;
+  LOBBY.heroes.forEach(e=>scene.remove(e.h.group)); LOBBY.heroes=[]; const pl=$('lobbyPlates'); pl.innerHTML='';
+  L.forEach((x,i)=>{ const h=heroFor(OUTFITS[x.o]||OUTFITS[0],x.pk); h.group.traverse(o=>{ if(o.isMesh){ o.castShadow=true; o.receiveShadow=true; } }); scene.add(h.group);
+    const sp=document.createElement('span'); sp.className=x.me?'me':''; sp.textContent=x.name; if(!x.me) sp.insertAdjacentHTML('beforeend','<i>'+(x.lead?'Leader':x.ready?'Ready':'Not ready')+'</i>'); pl.appendChild(sp);
+    LOBBY.heroes.push({h,plate:sp,i}); }); }
+function lobbyView(dt){ const on=lobbyActive(); document.body.classList.toggle('lobby3d',on); menu.classList.toggle('l3d',on&&!document.querySelector('.mtab[data-tab=play]').hidden);
+  if(!on){ if(LOBBY.on){ LOBBY.on=false; LOBBY.heroes.forEach(e=>e.h.group.visible=false); LOBBY.pads.forEach(p=>p.visible=false); hero.visible=true; if(LOBBY.fixTOD){ TOD.fix=null; LOBBY.fixTOD=false; } camera.near=0.08; applyFov(); } return; }
+  const S=lobbySpot(); LOBBY.on=true; lobbySync(); if(TOD.fix==null){ TOD.fix=0.2; LOBBY.fixTOD=true; } // a bright morning
+  camera.position.copy(S.cam); camera.lookAt(S.look); camera.updateMatrixWorld(); { const fv=camera.aspect<1?62:46; if(camera.near!==0.08||Math.abs(camera.fov-fv)>0.01){ camera.near=0.08; camera.fov=fv; camera.updateProjectionMatrix(); } }
+  hero.visible=false; skyDome.position.copy(camera.position);
+  // the shadow boxes follow the pads, not you
+  { const foc=S.pads[0]||S.look, st=(sc.right-sc.left)/sun.shadow.mapSize.x, a=Math.round(foc.dot(_lX)/st)*st, b=Math.round(foc.dot(_lY)/st)*st, c=foc.dot(SUN_DIR);
+    sun.target.position.set(0,0,0).addScaledVector(_lX,a).addScaledVector(_lY,b).addScaledVector(SUN_DIR,c); sun.position.copy(sun.target.position).addScaledVector(SUN_DIR,65); placeFarShadow(foc); }
+  const t=performance.now()*0.001, n=LOBBY.heroes.length, w=innerWidth, h=innerHeight;
+  while(LOBBY.pads.length<n) LOBBY.pads.push(lobbyPad());
+  LOBBY.pads.forEach((p,i)=>{ p.visible=i<n; });
+  LOBBY.heroes.forEach((e,i)=>{ const pp=S.pads[i]||S.pads[0]||S.look, bob=S.water?Math.sin(t*1.3+i*1.7)*0.05:0, y=(S.water?S.Y+0.2:pp.y)+bob, pad=LOBBY.pads[i];
+    pad.position.set(pp.x,y-0.0,pp.z); pad.rotation.z=Math.sin(t*1.1+i)*0.025; pad.rotation.x=Math.cos(t*0.9+i)*0.025;
+    e.h.group.visible=true; const yaw=Math.atan2(S.cam.x-pp.x,S.cam.z-pp.z)+Math.PI+(i===0?0:i===1?0.25:-0.25);
+    const st={bare:true,pos:LOBBY._v.set(pp.x,y+0.09,pp.z),vel:_stZ,yaw,pitch:-0.05,onGround:true,crouch:false,building:false,editing:false,gun:false,ads:0,swingT:0,emote:null};
+    animateRig(e.h,st,dt); e.h.group.updateMatrixWorld(true);
+    const v=LOBBY._f.set(pp.x,y+2.3,pp.z).project(camera); e.plate.style.left=((v.x+1)/2*w)+'px'; e.plate.style.top=((1-v.y)/2*h)+'px'; e.plate.hidden=v.z>1; }); }
+// the dock in the bottom right (the mode, Play), your party bottom left; the party box goes to the Friends tab, name and team to Profile
+(function lobbyDom(){ const sec=document.querySelector('.mtab[data-tab=play]');
+  const plates=document.createElement('div'); plates.id='lobbyPlates'; sec.appendChild(plates);
+  const dock=document.createElement('div'); dock.id='lobbyDock'; dock.innerHTML='<div id="modePop" hidden><h3>Mode</h3></div><button type="button" id="modeBtn"><small>MODE</small><b id="modeName">Build fight</b></button>'; sec.appendChild(dock);
+  const pop=$('modePop'); pop.appendChild($('modeCards')); pop.appendChild($('allyOpt')); dock.appendChild($('play'));
+  $('modeBtn').addEventListener('click',e=>{ e.stopPropagation(); pop.hidden=!pop.hidden; });
+  document.addEventListener('click',e=>{ if(!pop.hidden&&!pop.contains(e.target)&&e.target!==$('modeBtn')) pop.hidden=true; });
+  $('modeCards').addEventListener('click',()=>setTimeout(()=>{ pop.hidden=true; lobbyLabels(); },0));
+  const pd=document.createElement('div'); pd.id='partyDock'; pd.innerHTML='<div class="pdlist" id="pdList"></div><div class="row" style="display:flex;gap:8px"><button class="btn" type="button" id="pdInvite">Invite friends</button><button class="btn" type="button" id="pdLeave" hidden>Leave party</button><button class="btn" type="button" id="pdFs">Fullscreen</button></div>'; sec.appendChild(pd);
+  $('pdInvite').addEventListener('click',()=>showTab('friends')); $('pdLeave').addEventListener('click',()=>leaveGame());
+  // the party box (codes, the member list) lives on the Friends tab now
+  document.querySelector('.mtab[data-tab=friends]').appendChild($('partyBox'));
+  $('profName').appendChild($('pname').closest('label')); $('profTeam').appendChild($('teamSel').closest('label'));
+  $('toLobby').addEventListener('click',()=>{ if(net.role) return; if(horde.on) hordeStop(); P.everPlayed=false; respawn(); syncLobby(); showTab('play'); lobbyLabels(); });
+  $('pdFs').addEventListener('click',()=>$('fs').click());
+  setInterval(lobbyLabels,500); })();
+function lobbyLabels(){ const lob=menu.classList.contains('lobby'), m=net.role==='client'?(party.mode||settings.mode):settings.mode; $('modeName').textContent=m==='horde'?'Zombie horde':'Build fight';
+  $('tabPlay').textContent=lob?'Lobby':'Game';
+  if(lob){ $('play').textContent=net.role&&!party.live?(net.role==='host'?'Play':(party.readyMe?'Ready ✓':'Ready')):'Play'; }
+  const L=stageLineup(); $('pdList').innerHTML=''; if(net.role) L.forEach(x=>{ const s=document.createElement('span'); s.textContent=x.name+(x.me?' (you)':''); if(!x.me) s.insertAdjacentHTML('beforeend','<em>'+(x.lead?'Leader':x.ready?'Ready':'Not ready')+'</em>'); $('pdList').appendChild(s); });
+  $('pdLeave').hidden=!net.role; }
+
 /* ---------- lobby stage: your hero (and party) on a lit pad, rendered on its own small canvas while the lobby shows ---------- */
 var _stage=null;
 function inLobby(){ return !P.everPlayed||(!!net.role&&!party.live); }
 function syncLobby(){ const lob=inLobby(); menu.classList.toggle('lobby',lob); menu.classList.toggle('inparty',!!net.role); if(!lob){ const cur=document.querySelector('.mtabs button.on'); if(cur&&(cur.dataset.tab==='locker'||cur.dataset.tab==='shop')) showTab('play'); } if(lob&&!menu.hidden) stageStart(); }
-function stageVisible(){ const st=$('stage'); return !menu.hidden&&menu.classList.contains('lobby')&&!!st&&!st.parentNode.hidden; }
+function stageVisible(){ const st=$('stage'); return !menu.hidden&&menu.classList.contains('lobby')&&!!st&&!st.parentNode.hidden&&st.parentNode.dataset.tab!=='play'; }
 function stageInit(){ const c=$('stageC'), r=new THREE.WebGLRenderer({canvas:c,antialias:true,alpha:true}); r.setClearColor(0,0); r.setPixelRatio(Math.min(devicePixelRatio,2));
   r.shadowMap.enabled=true; r.shadowMap.type=THREE.PCFSoftShadowMap;
   const sc=new THREE.Scene(); sc.add(new THREE.HemisphereLight(0xdfe9ff,0x2a3a7a,0.75));
@@ -9677,8 +9875,8 @@ function frame(now){
   if(net.role){ net.sendT-=dt; if(net.sendT<=0){ net.sendT=0.05; netSend(myState()); if(net.role==='host'&&B&&B.active) netSend(botState()); }
     if(net.role==='host'){ party.syncT-=dt; if(party.syncT<=0){ party.syncT=2; partySync(); }
       net.pingT-=dt; if(net.pingT<=0){ net.pingT=1; const t=performance.now(); net.conns.forEach((c,id)=>{ if(t-(net.seen.get(id)||t)>9000&&c._gone){ c._gone(); return; } if(c.open) try{c.send({type:'ping',t});}catch(e){} }); } } }
-  fitView(); updateCamera(); stepTerrain(camera.position.x,camera.position.z); animateHero(dt); updateGhost(); updateHUD();
-  if(!(menu.classList.contains('lobby')&&!menu.hidden&&(++_lobbySkip%4))){ renderClouds(); renderReflection(); renderMain(); }
+  frPoll(dt); fitView(); updateCamera(); lobbyView(dt); stepTerrain(camera.position.x,camera.position.z); animateHero(dt); if(LOBBY.on) hero.visible=false; updateGhost(); updateHUD();
+  if(LOBBY.on?!(isTouch&&(++_lobbySkip%2)):!(menu.classList.contains('lobby')&&!menu.hidden&&(++_lobbySkip%4))){ renderClouds(); renderReflection(); renderMain(); }
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

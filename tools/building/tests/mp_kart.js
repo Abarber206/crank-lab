@@ -5,7 +5,7 @@ const html=page('/home/claude/crank-lab/index.html','scene,P,net,karts,enterKart
 (async()=>{ const b=await launch(); const H=await open(b,html,{name:'H',fast:true,norender:true,url:'http://127.0.0.1:9104/'}), C=await open(b,html,{name:'C',fast:true,norender:true,url:'http://127.0.0.1:9104/'});
  for(const X of [H,C]){ await X.pg.waitForFunction(()=>window.T&&T.karts,null,{timeout:120000}); await X.pg.evaluate(()=>{ const s=document.querySelector('#botSel'); s.value='off'; s.dispatchEvent(new Event('change')); }); }
  await H.pg.evaluate(()=>document.getElementById('hostBtn').click()); await H.pg.waitForFunction(()=>T.net.code,null,{timeout:30000}); const code=await H.pg.evaluate(()=>T.net.code);
- await C.pg.fill('#jcode',code); await C.pg.evaluate(()=>document.getElementById('joinBtn').click()); await C.pg.waitForFunction(()=>T.net.role==='client'&&T.net.id,null,{timeout:60000}); await sleep(2000);
+ await C.pg.evaluate(([i,v])=>{ document.getElementById(i).value=v; },['jcode',code]); await C.pg.evaluate(()=>document.getElementById('joinBtn').click()); await C.pg.waitForFunction(()=>T.net.role==='client'&&T.net.id,null,{timeout:60000}); await sleep(2000);
  await H.pg.evaluate(()=>{ const k=T.karts[0]; T.enterKart(k,0); window.__d=setInterval(()=>T.simKart(k,{fw:1,st:0.25,hb:false},0.03),30); });
  await sleep(6000);
  const a=await C.pg.evaluate(()=>{ const k=T.karts[0], pl=[...T.net.players.values()][0]; return {driver:k.driver,moved:+Math.hypot(k.x-k.home.x,k.z-k.home.z).toFixed(1),seated:!!(pl&&pl.kart&&pl.kart.seat===0)}; });

@@ -30,3 +30,6 @@ Run with Node and Playwright (Chromium), from a folder that has `three` and `pee
 - `tboat.js` — boats are moored in water deep enough; drive one (top speed, turning), it never goes up onto land, and getting out in deep water leaves you swimming.
 - `twbuild.js` — building from the water starts on the seabed (walls and stairs below level 0, floors no lower than the bed); on land nothing changes.
 - `tperf.js` — draw calls and triangles of each pass (main, reflection) at a riverside view, plus a picture.
+- `tlocker.js` — Locker preview pictures: a pickaxe just picked and a second later, and emotes (EMOTES=salute,groove).
+- `tlobby3d.js` — pictures of the 3D lobby (desktop and phone landscape), the Friends, Profile and Locker tabs, and the Mode pop-up.
+- `mp_friends.js` — friends: B adds A by account number, A accepts, both see each other online with names; A invites B to the lobby and B joins A's party and stands on A's pads. Needs the `peer` and `express` packages.

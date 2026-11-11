@@ -8,9 +8,9 @@ const html=page('/home/claude/crank-lab/index.html','scene,P,net,RB,onHit,useDow
  const H=await open(b,html,{name:'H',fast:true,norender:true}), C=await open(b,html,{name:'C',fast:true,norender:true});
  for(const X of [H,C]) await X.pg.waitForFunction(()=>window.T&&T.renderer,null,{timeout:180000});
  for(const X of [H,C]) await X.pg.evaluate(()=>{ T.settings.skyDrop=false; const s=document.querySelector('#botSel'); s.value='off'; s.dispatchEvent(new Event('change')); });
- await H.pg.fill('#pname','Austin'); await C.pg.fill('#pname','Buddy');
+ await H.pg.evaluate(([i,v])=>{ document.getElementById(i).value=v; },['pname','Austin']); await C.pg.evaluate(([i,v])=>{ document.getElementById(i).value=v; },['pname','Buddy']);
  await H.pg.evaluate(()=>{ document.querySelector('.mode[data-mode=horde]').click(); document.getElementById('hostBtn').click(); }); await H.pg.waitForFunction(()=>T.net.code,null,{timeout:30000}); const code=await H.pg.evaluate(()=>T.net.code);
- await C.pg.fill('#jcode',code); await C.pg.evaluate(()=>document.getElementById('joinBtn').click()); await C.pg.waitForFunction(()=>T.net.role==='client'&&T.net.id,null,{timeout:60000});
+ await C.pg.evaluate(([i,v])=>{ document.getElementById(i).value=v; },['jcode',code]); await C.pg.evaluate(()=>document.getElementById('joinBtn').click()); await C.pg.waitForFunction(()=>T.net.role==='client'&&T.net.id,null,{timeout:60000});
  await sleep(2000); await C.pg.evaluate(()=>document.getElementById('readyBtn').click()); await sleep(1500); await H.pg.evaluate(()=>document.getElementById('startMatch').click()); await sleep(1000);
  await H.pg.evaluate(()=>document.getElementById('play').click()); await C.pg.evaluate(()=>document.getElementById('play').click()); await sleep(3000);
  const gid=await C.pg.evaluate(()=>T.net.id);
