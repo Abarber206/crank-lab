@@ -21,3 +21,11 @@ Run with Node and Playwright (Chromium), from a folder that has `three` and `pee
 - `tzdie.js` — a killed monster is obliterated (gone within a moment).
 - `tmapz.js` — the full map zooms in toward the cursor and shows the real houses and garages.
 - `tkdmg.js` — crashing a buggy again and again wrecks it and throws the driver clear.
+- `ttracer.js` — tracers and bullet streaks leave from the muzzle (standing, running, every gun), stepped at 60 fps.
+- `tcrawl.js` — knocked down on flat ground, up, down and across a slope, lying still and crawling: nothing sinks in, the chest rests on the ground, the body follows the slope.
+- `tskyview.js` — pictures from high in the sky (FOV=6 zooms on a town: roofs must not flicker); GLIDE=1 with the glider out.
+- `tupview.js` — pictures from the top of the stairs in two-storey houses: the hallway and the doors off it.
+- `tswim.js` — dropped into deep water from 30 m: no damage, you swim with your head out, can't shoot or aim, swim slower than you run, and climb out onto the beach.
+- `tswimai.js` — a monster wades and swims out to you; Buddy swims after you and holds fire.
+- `tboat.js` — boats are moored in water deep enough; drive one (top speed, turning), it never goes up onto land, and getting out in deep water leaves you swimming.
+- `twbuild.js` — building from the water starts on the seabed (walls and stairs below level 0, floors no lower than the bed); on land nothing changes.
