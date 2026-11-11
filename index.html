@@ -74,7 +74,7 @@ body:not(.touch) #matStock i{width:22px;height:22px}
 @media (prefers-reduced-motion:reduce){#hurtfx.low{animation:none;box-shadow:inset 0 0 140px 20px rgba(255,40,40,.3)}}
 @media (orientation:portrait){#compass{display:none}}
 #cloudFx{position:fixed;inset:0;pointer-events:none;z-index:4;overflow:hidden;background:radial-gradient(ellipse at 50% 60%,#ffffff 0%,#eef4fb 55%,#d9e6f3 100%);opacity:0}
-#cloudFx i{position:absolute;border-radius:50%;background:radial-gradient(closest-side,rgba(255,255,255,1) 0%,rgba(255,255,255,.92) 45%,rgba(240,246,252,.55) 70%,rgba(240,246,252,0) 100%);filter:blur(6px);will-change:transform,opacity}
+#cloudFx i{position:absolute;border-radius:50%;background:radial-gradient(closest-side,rgba(255,255,255,1) 0%,rgba(255,255,255,.92) 45%,rgba(240,246,252,.55) 70%,rgba(240,246,252,0) 100%);will-change:transform,opacity}
 #cloudFx.go{animation:cloudIn 2.3s ease-in forwards}
 #cloudFx.go i{animation:puffUp 2.3s cubic-bezier(.5,0,.75,.4) forwards}
 @keyframes cloudIn{0%{opacity:1}35%{opacity:1}100%{opacity:0}}
@@ -978,7 +978,10 @@ const sunFar=new THREE.DirectionalLight(0x000000,0); sunFar.castShadow=settings.
 { const fc=sunFar.shadow.camera, hb=204.8; fc.left=-hb; fc.right=hb; fc.top=hb; fc.bottom=-hb; fc.near=1; fc.far=1100; sunFar.shadow.bias=-0.0009; sunFar.shadow.normalBias=1.1; /* generous: its texels are 20 cm, and a wall seen edge-on by the light would speckle with less */ sunFar.shadow.autoUpdate=false; sunFar.shadow.needsUpdate=true; }
 scene.add(sunFar); scene.add(sunFar.target);
 const FARS={a:1e9,b:1e9,t:0,dir:new THREE.Vector3()};
-function placeFarShadow(pos){ if(!sunFar.castShadow) return; const now=performance.now(), st=8, a=Math.round(pos.dot(_lX)/st)*st, b=Math.round(pos.dot(_lY)/st)*st; // it follows you in 8 m steps (40 of its texels)
+const _fsG=new THREE.Vector3();
+function placeFarShadow(pos){ if(!sunFar.castShadow) return; const air=P.sky&&pos===P.pos; if(air) pos=_fsG.set(P.pos.x,terrainH(P.pos.x,P.pos.z),P.pos.z);
+  const now=performance.now(), st=air?24:8, a=Math.round(pos.dot(_lX)/st)*st, b=Math.round(pos.dot(_lY)/st)*st; // it follows you in 8 m steps (40 of its texels)
+  if(air&&now-FARS.t<1100) return;
   if(a===FARS.a&&b===FARS.b&&now-FARS.t<(FARS.dir.equals(SUN_DIR)?420:300)) return; FARS.a=a; FARS.b=b; FARS.t=now; FARS.dir.copy(SUN_DIR);
   sunFar.target.position.set(0,0,0).addScaledVector(_lX,a).addScaledVector(_lY,b).addScaledVector(SUN_DIR,pos.dot(SUN_DIR)); sunFar.position.copy(sunFar.target.position).addScaledVector(SUN_DIR,520); sunFar.shadow.needsUpdate=true; }
 const _lX=new THREE.Vector3(0,1,0).cross(SUN_DIR).normalize(), _lY=SUN_DIR.clone().cross(_lX).normalize(); // light-space axes for shadow snapping
@@ -1617,11 +1620,11 @@ for(let cj=0;cj<TNC;cj++) for(let ci=0;ci<TNC;ci++){ const x0=SPAWN[0]-WHALF+ci*
 // far away, 2×2 chunks that are all at the coarsest level are drawn as one mesh (fewer draw calls)
 TERR.blocks=[]; for(let bj=0;bj<TNC;bj+=2) for(let bi=0;bi<TNC;bi+=2){ const cs=TERR.chunks.filter(c=>c.ci>=bi&&c.ci<bi+2&&c.cj>=bj&&c.cj<bj+2);
   TERR.blocks.push({cs,i0:bi*TCH,j0:bj*TCH,na:(Math.min(TNC,bi+2)-bi)*TCH,nb:(Math.min(TNC,bj+2)-bj)*TCH,m:null}); }
-const TLOD=[170,480];
-function stepTerrain(cx,cz,force){
+const TLOD=[170,480]; var CAMH=0; // how high the camera is above the ground under it
+function stepTerrain(cx,cz,force){ CAMH=Math.max(0,camera.position.y-Math.max(terrainH(cx,cz),waterAt(cx,cz))-3); const h2=CAMH*CAMH;
   let budget=force?1e9:2; // a couple of new meshes a frame at most, so walking never hitches
   for(const c of TERR.chunks){
-    const dx=Math.max(c.x0-cx,0,cx-c.x1), dz=Math.max(c.z0-cz,0,cz-c.z1), d=Math.sqrt(dx*dx+dz*dz);
+    const dx=Math.max(c.x0-cx,0,cx-c.x1), dz=Math.max(c.z0-cz,0,cz-c.z1), d=Math.sqrt(dx*dx+dz*dz+h2);
     let want=d<TLOD[0]?0:d<TLOD[1]?1:2;
     if(c.lod>=0&&want!==c.lod&&Math.abs(d-TLOD[Math.min(want,c.lod)])<12) want=c.lod; // a little hysteresis at the boundaries
     if(!c.m[want]){ if(budget>0){ budget--; c.m[want]=chunkMesh(c,want); c.m[want].visible=false; } else want=c.lod; }
@@ -8224,12 +8227,12 @@ function initForest(){ const trees=props.filter(p=>p.lazy), mk=(geo,mat,n,shadow
     FOREST.mid[kind]=FOREST.far[kind].map(f=>{ const m=mk(f.geometry,f.material,f.instanceMatrix.count,true); m.customDepthMaterial=midDepth; return m; }); }
   FOREST.trees=trees; forestDirty=true; }
 const _fc=new THREE.Color(), _fm=new THREE.Matrix4();
-function stepForest(dt){ if(!FOREST.near) return; FOREST.t-=dt; const cx=camera.position.x, cz=camera.position.z;
-  const moved=Math.hypot(cx-FOREST.lastX,cz-FOREST.lastZ);
+function stepForest(dt){ if(!FOREST.near) return; FOREST.t-=dt; const cx=camera.position.x, cz=camera.position.z, ch=CAMH*CAMH;
+  const moved=Math.max(Math.hypot(cx-FOREST.lastX,cz-FOREST.lastZ),Math.abs(CAMH-(FOREST.lastH||0))); if(moved>6&&FOREST.t<=0) FOREST.lastH=CAMH;
   if(!(forestDirty&&FOREST.t<=0)&&!(moved>6&&FOREST.t<=0)) return; FOREST.t=0.2; forestDirty=false; FOREST.lastX=cx; FOREST.lastZ=cz;
   const cnt=new Map(); const push=(m,p)=>{ const i=cnt.get(m)||0; p.g.updateMatrix(); _fm.copy(p.g.matrix); m.setMatrixAt(i,_fm); const t=p.tint||1; m.setColorAt(i,_fc.setRGB(t,t*(0.97+0.06*((p.id*37)%10)/10),t)); cnt.set(m,i+1); };
   const N2=NEAR_TREE*NEAR_TREE, F2=FAR_TREE*FAR_TREE;
-  for(const p of FOREST.trees){ if(p.gone||!p.alive||p.g.parent) continue; const dx=p.x-cx, dz=p.z-cz, d2=dx*dx+dz*dz; if(d2>F2) continue;
+  for(const p of FOREST.trees){ if(p.gone||!p.alive||p.g.parent) continue; const dx=p.x-cx, dz=p.z-cz, d2=dx*dx+dz*dz+ch; if(d2>F2) continue;
     if(d2<N2) push(FOREST.near[p.kind][p.id%8],p); else if(d2<46000) push(FOREST.mid[p.kind][p.id%4],p); else if(d2<420000||(d2<1000000?p.id%2===0:p.id%3===0)) push(FOREST.far[p.kind][p.id%4],p); } // deep in the haze, every other (then every third) tree is plenty
   for(const set of [FOREST.near,FOREST.mid,FOREST.far]) for(const kind in set) for(const m of set[kind]){ const n=cnt.get(m)||0; m.count=n; if(n){ m.instanceMatrix.needsUpdate=true; m.instanceColor.needsUpdate=true; } } }
 // a tree's own mesh (for the pickaxe to hit, and while it shakes, falls or grows)

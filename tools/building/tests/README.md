@@ -36,3 +36,4 @@ Run with Node and Playwright (Chromium), from a folder that has `three` and `pee
 - `temowheel.js` — the emote wheel: in the lobby (tap one, the hero does it on its pad), in a match (hold the key, move the mouse, let go; a quick tap plays the Locker emote); the other lobby tabs are solid.
 - `tvan.js` — pictures of a Reboot Van from each side, its terminal and its roof (VIEWS=side,roof).
 - `tprof.js` — Chrome's sampling profiler over standing, skydiving and gliding: ms per frame by function.
+- `tdraw.js` — drawing work per frame (calls, triangles, far-shadow redraws, terrain meshes built) standing, skydiving and gliding.
