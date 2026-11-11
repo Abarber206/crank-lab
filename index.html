@@ -6200,7 +6200,7 @@ function hostData(from,m){
 function onShot(m){
   const pl=net.players.get(m.id); if(!pl||!pl.alive) return;
   animEvent(pl.h,'fire',m.w); pl.h.rig.muzzle.getWorldPosition(muzzleV);
-  (m.e||[]).forEach(e=>tracer(muzzleV,new THREE.Vector3(e[0],e[1],e[2]),0xffb070)); if(m.b) ghostBullet(m,muzzleV);
+  (m.e||[]).forEach(e=>tracer(muzzleV,new THREE.Vector3(e[0],e[1],e[2]),0xffb070,pl.h)); if(m.b) ghostBullet(m,muzzleV,pl.h);
   muzzleFlash(pl.h); sfxAt((WEAPONS[m.w]&&WEAPONS[m.w].snd)||'shot',pl.pos);
 }
 // you got hit: you apply your own damage (no disagreements about your health)
@@ -6490,13 +6490,15 @@ const GUN=WEAPONS.ar;
 Object.assign(P,{hp:100, sh:100, wpn:'ar', ammo:{ar:30,pump:5}, reloadT:0, reloadDur:0, bloom:0, gunT:0, equipT:0, lastWeapon:'ar'});
 const muzzleV=new THREE.Vector3(), _c=new THREE.Vector3(), _d=new THREE.Vector3();
 const tracers=[];
-function tracer(a,b,col){
+function tracer(a,b,col,H){
   const g=new THREE.BufferGeometry().setFromPoints([a.clone(),b.clone()]);
   const m=new THREE.LineBasicMaterial({color:col||0xffe08a,transparent:true,opacity:.95});
-  const l=new THREE.Line(g,m); scene.add(l); tracers.push({l,t:0.08});
+  const l=new THREE.Line(g,m); l.frustumCulled=false; scene.add(l); tracers.push({l,t:0.08,H:H&&H.rig&&H.rig.muzzle?H:null});
 }
+const _trM=new THREE.Vector3();
 function stepTracers(dt){
   for(let i=tracers.length-1;i>=0;i--){ const t=tracers[i]; t.t-=dt; t.l.material.opacity=Math.max(0,t.t/0.08);
+    if(t.H&&t.t>0){ t.H.rig.muzzle.getWorldPosition(_trM); const pa=t.l.geometry.attributes.position; pa.setXYZ(0,_trM.x,_trM.y,_trM.z); pa.needsUpdate=true; } // it stays on the gun
     if(t.t<=0){ scene.remove(t.l); t.l.geometry.dispose(); t.l.material.dispose(); tracers.splice(i,1); } }
 }
 const flashGeo=new THREE.BoxGeometry(.13,.13,.13), flashMat=new THREE.MeshBasicMaterial({color:0xffd060});
@@ -6573,7 +6575,7 @@ function fireWeapon(E,H,o,base,w,nearT,target,spread,tracerCol){
     // your shots aim from the camera, but must also be clear from your own eyes to the aim point
     if(E===P){ const eye=new THREE.Vector3(P.pos.x,P.pos.y+(P.crouch?1.12:1.6),P.pos.z), d2=r.point.clone().sub(eye), len=d2.length();
       if(len>0.05){ d2.multiplyScalar(1/len); const r2=castShot(eye,d2,len+0.05,0.05,target); if(r2.kind==='piece'&&r2.t<len-0.05) r={...r2,t:r.t-len+r2.t}; } }
-    if(W.pellets===1||k<4){ tracer(muzzleV,r.point,tracerCol); ends.push([+r.point.x.toFixed(2),+r.point.y.toFixed(2),+r.point.z.toFixed(2)]); }
+    if(W.pellets===1||k<4){ tracer(muzzleV,r.point,tracerCol,H); ends.push([+r.point.x.toFixed(2),+r.point.y.toFixed(2),+r.point.z.toFixed(2)]); }
     const fall=r.t<=W.f0?1:r.t>=W.f1?W.fmin:1-(1-W.fmin)*(r.t-W.f0)/(W.f1-W.f0), dmg=W.dmg*fall;
     if(r.kind==='body'){ const dd=dmg*(r.head?W.head:1); total+=dd; head=head||r.head; hit=true; hitPt=r.point;
       const e=bodies.get(r.who)||{dmg:0,head:false,pt:r.point}; e.dmg+=dd; e.head=e.head||r.head; bodies.set(r.who,e); }
@@ -6596,7 +6598,7 @@ function fireBullet(W,tgts,spread){
   { const eye=new THREE.Vector3(P.pos.x,P.pos.y+(P.crouch?1.12:1.6),P.pos.z), d2=r.point.clone().sub(eye), len=d2.length(); // clear from your own eyes to the aim point
     if(len>0.05){ d2.multiplyScalar(1/len); const r2=castShot(eye,d2,len+0.05,0.05,tgts); if(r2.kind==='piece'&&r2.t<len-0.05) r={...r2,t:r.t-len+r2.t}; } }
   out.ends.push([+r.point.x.toFixed(2),+r.point.y.toFixed(2),+r.point.z.toFixed(2)]);
-  if(r.kind!=='none'){ tracer(muzzleV,r.point); const dmg=bulletDamage(W,r.t); // point blank: it is there already
+  if(r.kind!=='none'){ tracer(muzzleV,r.point,undefined,localHero); const dmg=bulletDamage(W,r.t); // point blank: it is there already
     if(r.kind==='body'){ const dd=dmg*(r.head?W.head:1); out.hit=true; out.head=r.head; out.dmg=Math.round(dd); out.point=r.point; out.bodies.set(r.who,{dmg:dd,head:r.head,pt:r.point}); }
     else damagePiece(r.piece,dmg*(W.build||1),r.point);
     return out; }
@@ -6605,12 +6607,12 @@ function fireBullet(W,tgts,spread){
   _bN.set(0,1,0).addScaledVector(d,-d.y); if(_bN.lengthSq()<1e-6) _bN.set(0,0,0); else _bN.normalize();
   const v=d.clone().addScaledVector(_bN,Math.tan(ph)).normalize().multiplyScalar(b[0]), p=o.clone().addScaledVector(d,nearT);
   const g=new THREE.BufferGeometry().setFromPoints([muzzleV.clone(),muzzleV.clone()]), l=new THREE.Line(g,new THREE.LineBasicMaterial({color:0xfff0b0,transparent:true,opacity:0.95})); l.frustumCulled=false; scene.add(l);
-  bullets.push({p,v,W,wpn:P.wpn,dist:nearT,t:0,l,off:muzzleV.clone().sub(p),tail:p.clone().add(muzzleV.clone().sub(p))});
+  bullets.push({p,v,W,wpn:P.wpn,dist:nearT,t:0,l,off:muzzleV.clone().sub(p),tail:p.clone().add(muzzleV.clone().sub(p)),m0:muzzleV.clone(),H:localHero});
   out.ends=[]; out.b=[+p.x.toFixed(2),+p.y.toFixed(2),+p.z.toFixed(2),+v.x.toFixed(1),+v.y.toFixed(1),+v.z.toFixed(1)]; return out; }
 // someone else's bullet: seen, not felt (their own game decides what it hit)
-function ghostBullet(m,from){ const W=WEAPONS[m.w]; if(!W||!m.b||m.b.length!==6||bullets.length>80) return; const p=new THREE.Vector3(m.b[0],m.b[1],m.b[2]), v=new THREE.Vector3(m.b[3],m.b[4],m.b[5]); if(!isFinite(p.lengthSq()+v.lengthSq())||v.length()>600) return;
+function ghostBullet(m,from,H){ const W=WEAPONS[m.w]; if(!W||!m.b||m.b.length!==6||bullets.length>80) return; const p=new THREE.Vector3(m.b[0],m.b[1],m.b[2]), v=new THREE.Vector3(m.b[3],m.b[4],m.b[5]); if(!isFinite(p.lengthSq()+v.lengthSq())||v.length()>600) return;
   const g=new THREE.BufferGeometry().setFromPoints([from.clone(),from.clone()]), l=new THREE.Line(g,new THREE.LineBasicMaterial({color:0xffb070,transparent:true,opacity:0.95})); l.frustumCulled=false; scene.add(l);
-  bullets.push({p,v,W,wpn:m.w,dist:0,t:0,l,off:from.clone().sub(p),tail:from.clone(),ghost:true}); }
+  bullets.push({p,v,W,wpn:m.w,dist:0,t:0,l,off:from.clone().sub(p),tail:from.clone(),ghost:true,m0:from.clone(),H:H||null}); }
 function endBullet(i){ const b=bullets[i]; scene.remove(b.l); b.l.geometry.dispose(); b.l.material.dispose(); bullets.splice(i,1); }
 function stepBullets(dt){ if(!bullets.length) return; dt=Math.min(dt,0.05); const tgts=bulletTargets();
   for(let i=bullets.length-1;i>=0;i--){ const b=bullets[i], W=b.W; b.t+=dt;
@@ -6624,8 +6626,10 @@ function stepBullets(dt){ if(!bullets.length) return; dt=Math.min(dt,0.05); cons
     b.p.addScaledVector(_bD,adv); b.v.y-=BULLET_G*dt; b.dist=flown;
     // the streak: it leaves from the muzzle and joins the true path within a few metres
     { const k=Math.max(0,1-b.dist/28), head=_c.copy(b.p).addScaledVector(b.off,k), pa=b.l.geometry.attributes.position, tl=Math.min(b.dist,9+b.W.dmg*0.04);
-      b.tail.copy(head).addScaledVector(_bD,-tl); pa.setXYZ(0,b.tail.x,b.tail.y,b.tail.z); pa.setXYZ(1,head.x,head.y,head.z); pa.needsUpdate=true; b.l.material.opacity=0.95*Math.min(1,0.35+b.dist/40); }
-    if(hit){ const pt=b.p.clone(), dmg=bulletDamage(W,flown);
+      if(b.H&&b.H.rig&&b.H.rig.muzzle&&b.t<0.25) b.H.rig.muzzle.getWorldPosition(b.m0); // the gun it left, while it is still close
+      if(b.m0&&head.distanceTo(b.m0)<=tl) b.tail.copy(b.m0); else b.tail.copy(head).addScaledVector(_bD,-tl); // never further back than the muzzle
+      pa.setXYZ(0,b.tail.x,b.tail.y,b.tail.z); pa.setXYZ(1,head.x,head.y,head.z); pa.needsUpdate=true; b.l.material.opacity=0.95*Math.min(1,0.35+b.dist/40); }
+    if(hit){ const pt=b.p.clone(), dmg=bulletDamage(W,flown); if(b.tail.distanceToSquared(pt)>0.04) tracer(b.tail,pt,b.l.material.color.getHex(),b.m0&&b.tail.equals(b.m0)?b.H:null);
       if(b.ghost){ if(what==='water') burst(pt,5,3.2,0.07,splashMat); else if(what==='ground') burst(pt,4,2.4,0.06,dustMat); }
       else if(what==='body'){ const dd=dmg*(r.head?W.head:1); creditHit(r.who,{dmg:dd,head:r.head,pt},B?B.sh:0,b.wpn); }
       else if(what==='piece') damagePiece(r.piece,dmg*(W.build||1),pt);
@@ -8665,7 +8669,7 @@ function botUpdate(dt){
       if(r.kind==='piece'){
         // its own wall in the way: edit a door instead of shooting it
         if(r.piece.owner==='bot'&&r.piece.type==='wall'&&s>0.25){ botEditWall(r.piece,511&~18); B.stuckT=0; B.fireT=0.25; }
-        else { damagePiece(r.piece,GUN.dmg*(WEAPONS.ar.build||1),r.point); B.fireT=GUN.rate*1.5; tracer(eye,r.point,0xff9f80); sfxAt('shot',B.pos); } } }
+        else { damagePiece(r.piece,GUN.dmg*(WEAPONS.ar.build||1),r.point); B.fireT=GUN.rate*1.5; if(B.h&&B.h.rig.muzzle){ B.h.rig.muzzle.getWorldPosition(muzzleV); tracer(muzzleV,r.point,0xff9f80,B.h); } else tracer(eye,r.point,0xff9f80); sfxAt('shot',B.pos); } } }
   } else B.stuckT=0;
   moveBody(B,fw,st,jump,dt);
   if(B.peek){ B.peek.t-=dt; if(B.peek.t<=0){ if(B.peek.p.mask===(511&~40)) botEditWall(B.peek.p,511); B.peek=null; } }
@@ -9277,7 +9281,7 @@ const _abE=new THREE.Vector3(), _abD=new THREE.Vector3();
 function allyFire(z){ const eye=_abE.set(AB.pos.x,AB.pos.y+1.5,AB.pos.z), tgt=new THREE.Vector3(z.pos.x,z.pos.y+1.1*z.sc,z.pos.z), dist=tgt.distanceTo(eye);
   const d=_abD.copy(tgt).sub(eye).normalize(); d.x+=(Math.random()-.5)*0.04; d.y+=(Math.random()-.5)*0.03; d.z+=(Math.random()-.5)*0.04; d.normalize();
   const r=castShot(eye,d,dist,0.05,null), blocked=r.kind==='piece'&&r.t<dist-0.8; if(blocked){ AB.los=false; AB.fireT=0.25; return; }
-  AB.h.rig.muzzle&&AB.h.rig.muzzle.getWorldPosition(_abE); tracer(_abE.clone(),blocked?r.point:eye.copy(_abE).addScaledVector(d,dist),0x9fd4ff); muzzleFlash(AB.h); sfxAt((WEAPONS[AB.wpn]&&WEAPONS[AB.wpn].snd)||'shot',AB.pos); animEvent(AB.h,'fire',AB.wpn||'ar');
+  AB.h.rig.muzzle&&AB.h.rig.muzzle.getWorldPosition(_abE); tracer(_abE.clone(),blocked?r.point:eye.copy(_abE).addScaledVector(d,dist),0x9fd4ff,AB.h); muzzleFlash(AB.h); sfxAt((WEAPONS[AB.wpn]&&WEAPONS[AB.wpn].snd)||'shot',AB.pos); animEvent(AB.h,'fire',AB.wpn||'ar');
   const W=WEAPONS[AB.wpn]||WEAPONS.ar; if(!blocked&&Math.random()<Math.max(0.35,0.9-dist/70)) zombieHurt(z,Math.round(W.dmg*(W.pellets>1?Math.min(W.pellets,8)*0.7:1)*0.85),'ally');
   AB.ammo--; AB.fireT=Math.max(0.14,W.rate)+Math.random()*0.08; if(AB.ammo<=0){ AB.reloadT=Math.min(2.6,W.reload||2.1); AB.ammo=W.mag||30; } }
 function allyRange(){ const W=WEAPONS[AB.wpn]; return !W?2.3:W.pellets>1?16:W.range>150?45:35; }
