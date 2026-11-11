@@ -5653,7 +5653,7 @@ function animateRig0(H,S,dt){
     set(r.armL.sh,'x',2.45+0.42*c1*mvK); set(r.armR.sh,'x',2.45+0.42*c2*mvK); set(r.armL.sh,'z',-0.5-0.12*N1*mvK); set(r.armR.sh,'z',0.5+0.12*N2*mvK); set(r.armL.sh,'y',0); set(r.armR.sh,'y',0);
     set(r.armL.el,'x',1.25-0.75*P1*mvK+0.45*N1*mvK); set(r.armR.el,'x',1.25-0.75*P2*mvK+0.45*N2*mvK); set(r.armL.wr,'x',0.35); set(r.armR.wr,'x',0.35);
     // legs: the knee opposite the reaching arm comes up and out, then straightens to push
-    for(const [L,up,sx] of [[r.legL,P2,-1],[r.legR,P1,1]]){ set(L.hp,'x',-0.05+0.15*up*mvK); set(L.hp,'z',sx*(0.12+0.8*up*mvK)); set(L.hp,'y',sx*1.4*up*mvK); set(L.kn,'x',-0.2-1.2*up*mvK); set(L.an,'x',0.75); }
+    for(const [L,up,sx] of [[r.legL,P2,-1],[r.legR,P1,1]]){ const u=up*mvK; set(L.hp,'x',-0.05+0.1*u); set(L.hp,'z',sx*(0.1+1.0*u)); set(L.hp,'y',sx*-1.5*Math.min(1,u*2.5)); set(L.kn,'x',-0.15-1.5*u); set(L.an,'x',0.2+0.3*u); }
     A.handL=A.handR='flat'; A.turnL=A.turnR=0;
     for(const k of GUN_MODELS) if(r[k]) r[k].visible=false; r.gun.visible=r.pump.visible=r.hammer.visible=r.plan.visible=false; r.pick.visible=false;
     if(H.glider) H.glider.visible=false; downFit(H,S,dt,e); return; }
