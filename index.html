@@ -5767,6 +5767,8 @@ function updateCamera(){
   camera.rotation.set(P.pitch,P.yaw,0);
   if(shake>0){ camera.position.x+=(Math.random()-.5)*shake; camera.position.y+=(Math.random()-.5)*shake; shake=Math.max(0,shake-lastDt*1.6); }
   camDist=dist; hero.visible=dist>0.85&&!scopeOn; // through a scope you see what the scope sees
+  { let nr=0.08; if(P.sky){ const clr=camera.position.y-Math.max(skyGround(P),terrainH(camera.position.x,camera.position.z)); nr=Math.max(0.08,Math.min(camDist*0.4,clr*0.15,2.5)); }
+    if(Math.abs(nr-camera.near)>0.004){ camera.near=nr; camera.updateProjectionMatrix(); } } // high up, the near plane moves out for depth precision far away
   // the shadow box follows you in whole shadow-map texels, so shadow edges don't crawl as you move
   { const st=(sc.right-sc.left)/sun.shadow.mapSize.x, a=Math.round(P.pos.dot(_lX)/st)*st, b=Math.round(P.pos.dot(_lY)/st)*st, c=P.pos.dot(SUN_DIR);
     sun.target.position.set(0,0,0).addScaledVector(_lX,a).addScaledVector(_lY,b).addScaledVector(SUN_DIR,c); sun.position.copy(sun.target.position).addScaledVector(SUN_DIR,65); placeFarShadow(P.pos); }
