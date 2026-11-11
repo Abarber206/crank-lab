@@ -575,6 +575,21 @@ body.touch #pdFs{display:none}
 #invitePop{position:fixed;left:50%;top:max(14px,env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:60;display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;background:rgba(6,14,40,.92);border:2px solid #ffd21a;color:#fff;box-shadow:0 10px 30px rgba(0,0,0,.45);font:700 15px/1.3 var(--font-ui,system-ui);max-width:94vw}
 #invitePop b{color:#ffd21a}
 #invitePop .btn{padding:8px 14px}
+
+#menu.lobby:not(.l3d)::before{background:radial-gradient(ellipse 90% 70% at 50% 0%,#18307e 0%,#0c1c55 45%,#060e2c 100%);-webkit-backdrop-filter:none;backdrop-filter:none}
+#emoWheel{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;background:rgba(2,8,24,.35);touch-action:none}
+#emoWheel[hidden]{display:none}
+#emoWheel .ring{position:relative;width:min(78vmin,440px);height:min(78vmin,440px);border-radius:50%;background:radial-gradient(circle,rgba(6,14,40,.2) 0 27%,rgba(6,14,40,.86) 28% 100%);border:2px solid rgba(255,255,255,.28);box-shadow:0 12px 40px rgba(0,0,0,.45)}
+#emoWheel .sl{position:absolute;left:50%;top:50%;width:22%;height:22%;transform:translate(-50%,-50%);border:0;border-radius:50%;background:rgba(255,255,255,.06);color:#fff;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0;transition:background .08s,transform .08s}
+#emoWheel .sl .emo{width:62%;height:62%}
+#emoWheel .sl.on{background:linear-gradient(#ffe866,#ffc61a);transform:translate(-50%,-50%) scale(1.12)}
+#emoWheel .sl.on .emo g{stroke:#1a1300}#emoWheel .sl.on .emo circle{fill:#1a1300}
+#emoWheel .mid{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:26%;text-align:center;color:#fff;font:900 italic clamp(14px,2.4vmin,20px)/1.1 var(--font-hud);text-transform:uppercase;letter-spacing:.04em;pointer-events:none}
+#emoWheel .mid small{display:block;margin-top:4px;font:600 11px/1.2 var(--font-ui,system-ui);font-style:normal;text-transform:none;letter-spacing:0;opacity:.7}
+#lobbyEmote{display:flex;align-items:center;gap:6px}
+#partyDock .btn{white-space:nowrap}
+@media (max-height:500px){ #partyDock .btn{padding:8px 11px;font-size:13px} #lobbyEmote svg{width:16px;height:16px} }
+#lobbyEmote svg{width:20px;height:20px}
 </style>
 </head>
 <body>
@@ -666,6 +681,7 @@ body.touch #pdFs{display:none}
   <button class="tb" id="tReload" data-act="reload" aria-label="Reload"><svg viewBox="0 0 24 24"><path d="M19 12a7 7 0 1 1-2-5" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><path d="M18 3v5h-5" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
 </div>
 
+<div id="emoWheel" hidden><div class="ring" id="emoRing"><div class="mid" id="emoMid">Emotes</div></div></div>
 <div id="invitePop" hidden><span id="invText"></span><button class="btn primary" id="invJoin" type="button">Join</button><button class="btn" id="invNo" type="button">No thanks</button></div>
 <div id="menu" class="lobby">
   <div class="panel">
@@ -6059,7 +6075,7 @@ function updateHUD(){
 
 /* ---------- menu / settings ---------- */
 const menu=$('menu'); let _lobbySkip=0;
-function openMenu(){ if(mapOpen) toggleMap(false); menu.hidden=false; setTimeout(syncLobby,0); playing=false; releaseAll(); touchJump=false; stick.x=stick.y=0; $('play').textContent='Resume'; }
+function openMenu(){ if(typeof EW!=='undefined'&&EW.open&&EW.how!=='lobby') emoClose(); if(mapOpen) toggleMap(false); menu.hidden=false; setTimeout(syncLobby,0); playing=false; releaseAll(); touchJump=false; stick.x=stick.y=0; $('play').textContent='Resume'; }
 function startPlay(){
   audioInit();
   if(menu.classList.contains('lobby')&&net.role&&!party.live){ if(net.role==='host') startMatch(); else $('readyBtn').click(); setTimeout(lobbyLabels,50); return; }
@@ -6148,11 +6164,12 @@ function pressAction(a){
   else if(a==='reset'){ if(edit) resetEdit(); }
   else if(a==='rotate'){ P.rot=(P.rot+1)%4; ghostKey=''; }
   else if(a==='crouch') P.crouch=true;
-  else if(a==='emote') startEmote(settings.emote);
+  else if(a==='emote') emoKeyDown();
   else if(a==='map') toggleMap();
   else if(a==='interact') useDown();
 }
 function releaseAction(a){
+  if(a==='emote') emoKeyUp();
   if(a==='interact') useUp();
   if(a==='aim') adsHeld=false;
   if(a==='fire') fireUp('desk');
@@ -6209,7 +6226,7 @@ addEventListener('wheel',e=>{
 },{passive:false});
 addEventListener('contextmenu',e=>e.preventDefault());
 addEventListener('mousemove',e=>{
-  if(isTouch||!playing||(!locked&&!lockFailed)) return;
+  if(isTouch||!playing||(!locked&&!lockFailed)||EW.open) return;
   const s=0.0022*settings.sens*(1-0.4*adsK)*(scopeOn?0.45*Math.sqrt(SCOPE_STEPS[scopeLvl]):1)*(edit?settings.editSens:1);
   if(isDead()) return; P.yaw-=e.movementX*s; P.pitch=Math.max(-1.45,Math.min(1.45,P.pitch-e.movementY*s));
 });
@@ -6293,7 +6310,7 @@ document.querySelectorAll('.tb').forEach(b=>{
     else if(act==='build') toggleBuild();
     else if(act==='inventory') toggleInv();
     else if(act==='fire') fireDown('touch');
-    else if(act==='emote') startEmote(settings.emote);
+    else if(act==='emote'){ if(P.kart||P.sky||P.down) startEmote(settings.emote); else emoOpen('touch'); }
     else if(act==='use') useDown();
   });
   const up=()=>{ b.classList.remove('down'); const act=b.dataset.act;
@@ -6403,7 +6420,7 @@ function dropPlayer(id){ kartLeft(id); rbLeft(id); const pl=net.players.get(id);
 // flags: 1 ground, 2 crouch, 4 building, 8 dead, 16 editing, 32 aiming; weapon in s[10]; shield in s[11]
 function myState(){
   const f=(P.onGround?1:0)|(P.crouch?2:0)|(mode==='build'&&!edit?4:0)|(net.dead?8:0)|(edit?16:0)|(adsK>0.5?32:0)|(P.sky?(P.sky.phase==='glide'?128:64):0)|(P.down?256:0);
-  return {type:'st',id:net.id,n:net.name,t:+settings.team||0,o:outfitIdx(settings.outfit),p:pickIdx(settings.pickaxe),s:[+P.pos.x.toFixed(3),+P.pos.y.toFixed(3),+P.pos.z.toFixed(3),+P.vel.x.toFixed(2),+P.vel.y.toFixed(2),+P.vel.z.toFixed(2),+P.yaw.toFixed(3),+P.pitch.toFixed(3),f,net.lastSwing,mode==='gun'&&!edit?WCODE[P.wpn]:0,Math.round(P.sh),P.emote?EMOTE_IDS.indexOf(P.emote.id)+1:0],k:kartNet(),kp:kartParkNet()};
+  return {type:'st',id:net.id,n:net.name,t:+settings.team||0,o:outfitIdx(settings.outfit),p:pickIdx(settings.pickaxe),s:[+P.pos.x.toFixed(3),+P.pos.y.toFixed(3),+P.pos.z.toFixed(3),+P.vel.x.toFixed(2),+P.vel.y.toFixed(2),+P.vel.z.toFixed(2),+P.yaw.toFixed(3),+P.pitch.toFixed(3),f,net.lastSwing,mode==='gun'&&!edit?WCODE[P.wpn]:0,Math.round(P.sh),P.emote?EMOTE_IDS.indexOf(P.emote.id)+1:0],le:LOBBY.emote?[EMOTE_IDS.indexOf(LOBBY.emote.id),LOBBY.emote.n|0]:undefined,k:kartNet(),kp:kartParkNet()};
 }
 function onState(m){
   if(m.id===net.id) return;
@@ -6411,6 +6428,7 @@ function onState(m){
   if(m.o!=null&&OUTFITS[m.o]){ if(pl.o!==m.o&&net.role==='host') party.syncT=0; pl.o=m.o; reskin(pl.h,OUTFITS[m.o],(PICKAXES[m.p]||PICKAXES[0]).id); }
   pl.tgt.set(s[0],s[1],s[2]); pl.vel.set(s[3],s[4],s[5]); pl.yaw=s[6]; pl.pitch=s[7]; pl.flags=s[8];
   pl.crouch=!!(s[8]&2); pl.wpn=WNAME[s[10]||0]; pl.sh=s[11]??100;
+  { const le=m.le; if(Array.isArray(le)&&EMOTE_IDS[le[0]]){ if(!pl.lobEmo||pl.lobEmoN!==le[1]){ pl.lobEmo={id:EMOTE_IDS[le[0]],t:0,beat:-1}; pl.lobEmoN=le[1]; } } else if(!le){ pl.lobEmoN=-1; } }
   { const ei=s[12]|0, eid=ei?EMOTE_IDS[ei-1]:null; if(!eid) pl.emote=null; else if(!pl.emote||pl.emote.id!==eid) pl.emote={id:eid,t:0}; } if((m.t|0)!==pl.team){ pl.team=m.t|0; teamMarker(pl); }
   const alive=!(s[8]&8); if(alive!==pl.alive){ pl.alive=alive; pl.h.group.visible=alive; if(alive){ pl.pos.copy(pl.tgt); animEvent(pl.h,'revive'); } }
   if(s[9]&&s[9]!==pl.swingId){ pl.swingId=s[9]; if(!pl.fresh) pl.swingT=SWING_T; }
@@ -9344,6 +9362,26 @@ $('acctNum').textContent=fmtAcct(FR.acct);
 $('acctCopy').addEventListener('click',()=>{ const t=FR.acct, done=()=>toast('Account number copied'); if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(done,()=>toast('Your number: '+fmtAcct(t))); else toast('Your number: '+fmtAcct(t)); });
 frRender(); setTimeout(frStart,1500);
 
+/* ---------- the emote wheel ---------- */
+const EW={open:false,sel:-1,ids:[],mx:0,my:0,how:null,t0:0};
+function emoOwned(){ const L=window._locker; const ids=EMOTE_LIST.filter(e=>!L||L.owned('e',e)).map(e=>e.id); const fav=settings.emote; ids.sort((a,b)=>(b===fav)-(a===fav)); return ids.slice(0,8); }
+function emoBuild(){ const ring=$('emoRing'); ring.querySelectorAll('.sl').forEach(b=>b.remove()); const ids=EW.ids=emoOwned(), n=ids.length;
+  ids.forEach((id,k)=>{ const a=-Math.PI/2+k*2*Math.PI/n, b=document.createElement('button'); b.type='button'; b.className='sl'; b.dataset.k=k;
+    b.style.left=(50+Math.cos(a)*36)+'%'; b.style.top=(50+Math.sin(a)*36)+'%'; b.innerHTML=emoteIcon(id); b.title=EMOTES[id].name;
+    b.addEventListener('pointerenter',()=>emoSel(k)); b.addEventListener('click',e=>{ e.stopPropagation(); emoPick(k); }); ring.appendChild(b); }); emoSel(-1); }
+function emoSel(k){ EW.sel=k; $('emoRing').querySelectorAll('.sl').forEach(b=>b.classList.toggle('on',+b.dataset.k===k)); const id=EW.ids[k];
+  $('emoMid').innerHTML=id?EMOTES[id].name:'Emotes'+(EW.how==='key'?'<small>move the mouse, let go</small>':EW.how==='lobby'||EW.how==='touch'?'<small>tap one</small>':''); }
+function emoOpen(how){ if(EW.open) return; EW.how=how; emoBuild(); if(!EW.ids.length){ toast('No emotes yet'); return; } EW.open=true; EW.mx=EW.my=0; EW.t0=performance.now(); $('emoWheel').hidden=false; if(how!=='key') emoSel(-1); }
+function emoClose(){ EW.open=false; $('emoWheel').hidden=true; }
+function emoPick(k){ const id=EW.ids[k], how=EW.how; emoClose(); if(!id) return; emoPlay(id,how); }
+function emoPlay(id,how){ if(how==='lobby'){ LOBBY.emote={id,t:0,beat:-1,n:((LOBBY.emote&&LOBBY.emote.n)|0)+1}; audioInit(); return; } P.emote=null; startEmote(id); }
+$('emoWheel').addEventListener('click',e=>{ if(e.target.id==='emoWheel'||e.target.id==='emoRing') emoClose(); });
+// the computer in a match: hold the key, move the mouse toward an emote, let go; a quick tap plays your Locker emote
+function emoKeyDown(){ if(!playing||isDead()||P.down||P.sky||P.kart) { startEmote(settings.emote); return; } emoOpen('key'); }
+function emoKeyUp(){ if(!EW.open||EW.how!=='key') return; const quick=performance.now()-EW.t0<300&&EW.sel<0; const k=EW.sel; emoClose(); if(quick) startEmote(settings.emote); else if(k>=0) emoPlay(EW.ids[k],'key'); }
+addEventListener('mousemove',e=>{ if(!EW.open||EW.how!=='key') return; EW.mx+=e.movementX||0; EW.my+=e.movementY||0; const r=Math.hypot(EW.mx,EW.my); if(r>220){ EW.mx*=220/r; EW.my*=220/r; }
+  if(r<36) { if(EW.sel!==-1) emoSel(-1); return; } const n=EW.ids.length, a=Math.atan2(EW.my,EW.mx)+Math.PI/2, k=((Math.round(a/(2*Math.PI/n))%n)+n)%n; if(k!==EW.sel) emoSel(k); },true);
+
 /* ---------- the 3D lobby: out on the water off the coastal town, looking at the lighthouse ---------- */
 const LOBBY={on:false,spot:null,heroes:[],key:'',pads:[],fixTOD:false,_v:new THREE.Vector3(),_f:new THREE.Vector3()};
 function lobbySpot(){ if(LOBBY.spot) return LOBBY.spot; const S=WGEN.sea(), t=TOWNS[0];
@@ -9351,9 +9389,9 @@ function lobbySpot(){ if(LOBBY.spot) return LOBBY.spot; const S=WGEN.sea(), t=TO
   if(!L||!S){ const x=SPAWN[0], z=SPAWN[2]; LOBBY.spot={cam:new THREE.Vector3(x+30,terrainH(x+30,z)+3,z),look:new THREE.Vector3(x,terrainH(x,z)+4,z),pads:[],water:false}; return LOBBY.spot; }
   let d=14; while(d<160&&terrainH(L.x+nx*d,L.z+nz*d)>Y-0.4) d+=2; // out past the beach into water
   const side=-0.28, fx=-nx, fz=-nz, rx=-fz, rz=fx; // look back at the shore, a little from one side
-  const cx=L.x+nx*(d+15)+rx*side*12, cz=L.z+nz*(d+15)+rz*side*12, cam=new THREE.Vector3(cx,Y+2.0,cz), look=new THREE.Vector3(L.x+rx*side*4,Y+6.2,L.z+rz*side*4);
-  const dir=new THREE.Vector3(look.x-cx,0,look.z-cz).normalize(), rgt=new THREE.Vector3(-dir.z,0,dir.x), base=cam.clone().addScaledVector(dir,7.4); base.y=Y;
-  const pads=[[0,0],[-2.5,1.3],[2.5,1.3],[-4.8,2.7]].map(([a,b])=>new THREE.Vector3(base.x+rgt.x*a+dir.x*b,Y,base.z+rgt.z*a+dir.z*b));
+  const cx=L.x+nx*(d+15)+rx*side*12, cz=L.z+nz*(d+15)+rz*side*12, cam=new THREE.Vector3(cx,Y+1.45,cz), look=new THREE.Vector3(L.x+rx*side*4,Y+3.6,L.z+rz*side*4);
+  const dir=new THREE.Vector3(look.x-cx,0,look.z-cz).normalize(), rgt=new THREE.Vector3(-dir.z,0,dir.x), base=cam.clone().addScaledVector(dir,3.7); base.y=Y;
+  const pads=[[0,0],[-1.7,1.1],[1.7,1.1],[-3.2,2.2]].map(([a,b])=>new THREE.Vector3(base.x+rgt.x*a+dir.x*b,Y,base.z+rgt.z*a+dir.z*b));
   LOBBY.spot={cam,look,pads,Y,dir,water:true}; return LOBBY.spot; }
 let _padGeo=null, _padMat=null, _ringMat=null;
 function lobbyPad(){ if(!_padGeo){ _padGeo=new THREE.CylinderGeometry(1.05,0.9,0.32,40); _padMat=new THREE.MeshPhongMaterial({color:0x1fb6a6,shininess:70,specular:0x3a6a66,emissive:0x0a3a36}); _ringMat=new THREE.MeshBasicMaterial({color:0x9ffff0}); }
@@ -9364,11 +9402,17 @@ function lobbySync(){ const L=stageLineup(), key=L.map(x=>x.o+'/'+x.pk+'/'+x.nam
   LOBBY.heroes.forEach(e=>scene.remove(e.h.group)); LOBBY.heroes=[]; const pl=$('lobbyPlates'); pl.innerHTML='';
   L.forEach((x,i)=>{ const h=heroFor(OUTFITS[x.o]||OUTFITS[0],x.pk); h.group.traverse(o=>{ if(o.isMesh){ o.castShadow=true; o.receiveShadow=true; } }); scene.add(h.group);
     const sp=document.createElement('span'); sp.className=x.me?'me':''; sp.textContent=x.name; if(!x.me) sp.insertAdjacentHTML('beforeend','<i>'+(x.lead?'Leader':x.ready?'Ready':'Not ready')+'</i>'); pl.appendChild(sp);
-    LOBBY.heroes.push({h,plate:sp,i}); }); }
+    LOBBY.heroes.push({h,plate:sp,i,id:x.id,me:!!x.me}); }); }
+// who on the pads is emoting: you (LOBBY.emote), or a party member (their state carries it)
+function lobbyEmoteOf(e,i,dt){ let em=null;
+  if(e.me) em=LOBBY.emote; else { const pl=e.id&&net.players.get(e.id); if(pl&&pl.lobEmo){ em=pl.lobEmo; } }
+  if(!em) return null; em.t+=dt; const E=EMOTES[em.id]; if(!E||em.t>E.dur){ if(e.me) LOBBY.emote=null; else { const pl=net.players.get(e.id); if(pl) pl.lobEmo=null; } return null; }
+  if(e.me&&E.beat&&AC){ const b=Math.floor(em.t*E.beat); if(b!==em.beat){ em.beat=b; emoteBeat(em.id,b); } }
+  return em; }
 function lobbyView(dt){ const on=lobbyActive(); document.body.classList.toggle('lobby3d',on); menu.classList.toggle('l3d',on&&!document.querySelector('.mtab[data-tab=play]').hidden);
   if(!on){ if(LOBBY.on){ LOBBY.on=false; LOBBY.heroes.forEach(e=>e.h.group.visible=false); LOBBY.pads.forEach(p=>p.visible=false); hero.visible=true; if(LOBBY.fixTOD){ TOD.fix=null; LOBBY.fixTOD=false; } camera.near=0.08; applyFov(); } return; }
   const S=lobbySpot(); LOBBY.on=true; lobbySync(); if(TOD.fix==null){ TOD.fix=0.2; LOBBY.fixTOD=true; } // a bright morning
-  camera.position.copy(S.cam); camera.lookAt(S.look); camera.updateMatrixWorld(); { const fv=camera.aspect<1?62:46; if(camera.near!==0.08||Math.abs(camera.fov-fv)>0.01){ camera.near=0.08; camera.fov=fv; camera.updateProjectionMatrix(); } }
+  camera.position.copy(S.cam); if(S.dir&&innerHeight<560){ camera.position.addScaledVector(S.dir,-1.3); camera.position.y+=0.12; } camera.lookAt(S.look); camera.updateMatrixWorld(); { const fv=camera.aspect<1?62:46; if(camera.near!==0.08||Math.abs(camera.fov-fv)>0.01){ camera.near=0.08; camera.fov=fv; camera.updateProjectionMatrix(); } }
   hero.visible=false; skyDome.position.copy(camera.position);
   // the shadow boxes follow the pads, not you
   { const foc=S.pads[0]||S.look, st=(sc.right-sc.left)/sun.shadow.mapSize.x, a=Math.round(foc.dot(_lX)/st)*st, b=Math.round(foc.dot(_lY)/st)*st, c=foc.dot(SUN_DIR);
@@ -9379,9 +9423,10 @@ function lobbyView(dt){ const on=lobbyActive(); document.body.classList.toggle('
   LOBBY.heroes.forEach((e,i)=>{ const pp=S.pads[i]||S.pads[0]||S.look, bob=S.water?Math.sin(t*1.3+i*1.7)*0.05:0, y=(S.water?S.Y+0.2:pp.y)+bob, pad=LOBBY.pads[i];
     pad.position.set(pp.x,y-0.0,pp.z); pad.rotation.z=Math.sin(t*1.1+i)*0.025; pad.rotation.x=Math.cos(t*0.9+i)*0.025;
     e.h.group.visible=true; const yaw=Math.atan2(S.cam.x-pp.x,S.cam.z-pp.z)+Math.PI+(i===0?0:i===1?0.25:-0.25);
-    const st={bare:true,pos:LOBBY._v.set(pp.x,y+0.09,pp.z),vel:_stZ,yaw,pitch:-0.05,onGround:true,crouch:false,building:false,editing:false,gun:false,ads:0,swingT:0,emote:null};
+    const le=lobbyEmoteOf(e,i,dt);
+    const st={bare:true,pos:LOBBY._v.set(pp.x,y+0.09,pp.z),vel:_stZ,yaw,pitch:-0.05,onGround:true,crouch:false,building:false,editing:false,gun:false,ads:0,swingT:0,emote:le};
     animateRig(e.h,st,dt); e.h.group.updateMatrixWorld(true);
-    const v=LOBBY._f.set(pp.x,y+2.3,pp.z).project(camera); e.plate.style.left=((v.x+1)/2*w)+'px'; e.plate.style.top=((1-v.y)/2*h)+'px'; e.plate.hidden=v.z>1; }); }
+    const v=LOBBY._f.set(pp.x,y+2.3,pp.z).project(camera); e.plate.style.left=((v.x+1)/2*w)+'px'; e.plate.style.top=Math.max(LOBBY.tabB||0,(1-v.y)/2*h)+'px'; e.plate.hidden=v.z>1; }); { const tb=document.querySelector('#menu .mtabs'); LOBBY.tabB=tb?tb.getBoundingClientRect().bottom+30:0; } }
 // the dock in the bottom right (the mode, Play), your party bottom left; the party box goes to the Friends tab, name and team to Profile
 (function lobbyDom(){ const sec=document.querySelector('.mtab[data-tab=play]');
   const plates=document.createElement('div'); plates.id='lobbyPlates'; sec.appendChild(plates);
@@ -9390,8 +9435,8 @@ function lobbyView(dt){ const on=lobbyActive(); document.body.classList.toggle('
   $('modeBtn').addEventListener('click',e=>{ e.stopPropagation(); pop.hidden=!pop.hidden; });
   document.addEventListener('click',e=>{ if(!pop.hidden&&!pop.contains(e.target)&&e.target!==$('modeBtn')) pop.hidden=true; });
   $('modeCards').addEventListener('click',()=>setTimeout(()=>{ pop.hidden=true; lobbyLabels(); },0));
-  const pd=document.createElement('div'); pd.id='partyDock'; pd.innerHTML='<div class="pdlist" id="pdList"></div><div class="row" style="display:flex;gap:8px"><button class="btn" type="button" id="pdInvite">Invite friends</button><button class="btn" type="button" id="pdLeave" hidden>Leave party</button><button class="btn" type="button" id="pdFs">Fullscreen</button></div>'; sec.appendChild(pd);
-  $('pdInvite').addEventListener('click',()=>showTab('friends')); $('pdLeave').addEventListener('click',()=>leaveGame());
+  const pd=document.createElement('div'); pd.id='partyDock'; pd.innerHTML='<div class="pdlist" id="pdList"></div><div class="row" style="display:flex;gap:8px"><button class="btn" type="button" id="lobbyEmote"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="#fff" stroke-width="2"/><circle cx="9" cy="10" r="1.3" fill="#fff"/><circle cx="15" cy="10" r="1.3" fill="#fff"/><path d="M8 14.5c1.2 1.6 6.8 1.6 8 0" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>Emote</button><button class="btn" type="button" id="pdInvite">Invite friends</button><button class="btn" type="button" id="pdLeave" hidden>Leave party</button><button class="btn" type="button" id="pdFs">Fullscreen</button></div>'; sec.appendChild(pd);
+  $('pdInvite').addEventListener('click',()=>showTab('friends')); $('lobbyEmote').addEventListener('click',e=>{ e.stopPropagation(); emoOpen('lobby'); }); $('pdLeave').addEventListener('click',()=>leaveGame());
   // the party box (codes, the member list) lives on the Friends tab now
   document.querySelector('.mtab[data-tab=friends]').appendChild($('partyBox'));
   $('profName').appendChild($('pname').closest('label')); $('profTeam').appendChild($('teamSel').closest('label'));
@@ -9400,6 +9445,7 @@ function lobbyView(dt){ const on=lobbyActive(); document.body.classList.toggle('
   setInterval(lobbyLabels,500); })();
 function lobbyLabels(){ const lob=menu.classList.contains('lobby'), m=net.role==='client'?(party.mode||settings.mode):settings.mode; $('modeName').textContent=m==='horde'?'Zombie horde':'Build fight';
   $('tabPlay').textContent=lob?'Lobby':'Game';
+  if(LOBBY.on&&!menu.classList.contains('l3d')&&EW.open) emoClose();
   if(lob){ $('play').textContent=net.role&&!party.live?(net.role==='host'?'Play':(party.readyMe?'Ready ✓':'Ready')):'Play'; }
   const L=stageLineup(); $('pdList').innerHTML=''; if(net.role) L.forEach(x=>{ const s=document.createElement('span'); s.textContent=x.name+(x.me?' (you)':''); if(!x.me) s.insertAdjacentHTML('beforeend','<em>'+(x.lead?'Leader':x.ready?'Ready':'Not ready')+'</em>'); $('pdList').appendChild(s); });
   $('pdLeave').hidden=!net.role; }
@@ -9424,9 +9470,9 @@ function stageInit(){ const c=$('stageC'), r=new THREE.WebGLRenderer({canvas:c,a
   c.addEventListener('pointerdown',e=>{ _stage.drag={x:e.clientX}; c.setPointerCapture(e.pointerId); });
   c.addEventListener('pointermove',e=>{ if(!_stage.drag) return; const dx=e.clientX-_stage.drag.x; _stage.drag.x=e.clientX; _stage.spin+=dx*0.012; _stage.spinV=dx*0.012*60; });
   const up=()=>{ _stage.drag=null; }; c.addEventListener('pointerup',up); c.addEventListener('pointercancel',up); }
-function stageLineup(){ // who stands on the stage: you in the middle, party to either side
+function stageLineup(){ // who stands on the stage: you in the middle, party to either side (with their ids)
   const lk=window._stageLook||{}, me={me:true,name:(net.role?net.name:($('pname').value.trim()||net.name))||'Player',o:lk.o!=null?lk.o:outfitIdx(settings.outfit),pk:lk.pk||settings.pickaxe,ready:true};
-  const out=[me]; if(net.role){ const list=net.role==='host'?partyMembers():party.list; list.forEach(x=>{ if(x.id!==net.id) out.push({name:x.name,o:x.o|0,pk:'steel',ready:x.ready,lead:x.lead}); }); }
+  const out=[me]; if(net.role){ const list=net.role==='host'?partyMembers():party.list; list.forEach(x=>{ if(x.id!==net.id) out.push({id:x.id,name:x.name,o:x.o|0,pk:'steel',ready:x.ready,lead:x.lead}); }); }
   return out.slice(0,4); }
 function stageSync(){ const S=_stage, L=stageLineup(), key=L.map(x=>x.o+'/'+x.pk+'/'+x.name+'/'+(x.ready?1:0)).join('|');
   if(key===S.key) return; S.key=key;
@@ -9876,7 +9922,8 @@ function frame(now){
     if(net.role==='host'){ party.syncT-=dt; if(party.syncT<=0){ party.syncT=2; partySync(); }
       net.pingT-=dt; if(net.pingT<=0){ net.pingT=1; const t=performance.now(); net.conns.forEach((c,id)=>{ if(t-(net.seen.get(id)||t)>9000&&c._gone){ c._gone(); return; } if(c.open) try{c.send({type:'ping',t});}catch(e){} }); } } }
   frPoll(dt); fitView(); updateCamera(); lobbyView(dt); stepTerrain(camera.position.x,camera.position.z); animateHero(dt); if(LOBBY.on) hero.visible=false; updateGhost(); updateHUD();
-  if(LOBBY.on?!(isTouch&&(++_lobbySkip%2)):!(menu.classList.contains('lobby')&&!menu.hidden&&(++_lobbySkip%4))){ renderClouds(); renderReflection(); renderMain(); }
+  if(LOBBY.on&&!menu.classList.contains('l3d')){ /* a solid tab covers the world */ }
+  else if(LOBBY.on?!(isTouch&&(++_lobbySkip%2)):!(menu.classList.contains('lobby')&&!menu.hidden&&(++_lobbySkip%4))){ renderClouds(); renderReflection(); renderMain(); }
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

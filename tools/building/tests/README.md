@@ -33,3 +33,4 @@ Run with Node and Playwright (Chromium), from a folder that has `three` and `pee
 - `tlocker.js` — Locker preview pictures: a pickaxe just picked and a second later, and emotes (EMOTES=salute,groove).
 - `tlobby3d.js` — pictures of the 3D lobby (desktop and phone landscape), the Friends, Profile and Locker tabs, and the Mode pop-up.
 - `mp_friends.js` — friends: B adds A by account number, A accepts, both see each other online with names; A invites B to the lobby and B joins A's party and stands on A's pads. Needs the `peer` and `express` packages.
+- `temowheel.js` — the emote wheel: in the lobby (tap one, the hero does it on its pad), in a match (hold the key, move the mouse, let go; a quick tap plays the Locker emote); the other lobby tabs are solid.
