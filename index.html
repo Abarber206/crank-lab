@@ -3761,7 +3761,27 @@ function animateRig(H,S,dt){
   if(S.swimW!==null){ S.gun=false; S.building=false; S.editing=false; S.reload=null; S.emote=null; S.item=false; S.swingT=0; S.crouch=false; }
   if(S.seat){ const look=S.yaw, gunP=S.seat.s===1&&!!S.gun; S.seat.look=look; S.seat.gunP=gunP; if(!gunP){ S.gun=false; S.yaw=S.seat.k.yaw; S.reload=null; }
     S.vel=_ZV; S.onGround=true; S.crouch=false; S.emote=null; S.slope=0; S.building=false; S.editing=false; S.swingT=0; S.sky=null; S.item=false; }
-  footRestore(H); animateRig0(H,S,dt); if(S.seat) seatPlace(H,S); else pickTwoHands(H,S); poseHands(H,S,dt); footPlant(H,S); }
+  footRestore(H); animateRig0(H,S,dt); if(S.seat) seatPlace(H,S); else if(S.showPick) showPickPose(H,S); else pickTwoHands(H,S); if(S.emote&&S.emote.id==='salute'&&EMOTES.salute) saluteHand(H,S); poseHands(H,S,dt); footPlant(H,S); }
+const _slA=new THREE.Vector3(), _slB=new THREE.Vector3(), _slQ=new THREE.Quaternion(), _slQ2=new THREE.Quaternion(), _slQ3=new THREE.Quaternion(), _slF=new THREE.Vector3(), _slU=new THREE.Vector3(), _slS=new THREE.Quaternion(), _slW=new THREE.Quaternion(), _slM=new THREE.Matrix4();
+// a point in the body's own frame (x right, y up, z back), from its group
+const bodyPt=(H,x,y,z,out)=>out.set(x,y,z).applyQuaternion(H.group.quaternion).add(H.group.position);
+const bodyDir=(H,x,y,z,out)=>out.set(x,y,z).applyQuaternion(H.group.quaternion).normalize();
+function saluteHand(H,S){ const r=H.rig, E=EMOTES.salute, t=S.emote.t, cl=x=>Math.max(0,Math.min(1,x)), ez=x=>x*x*(3-2*x), up=ez(cl(t*4))*ez(cl((E.dur-t)*5)); if(up<0.01) return;
+  H.group.updateMatrixWorld(true); r.head.getWorldPosition(_slA); const hq=r.head.getWorldQuaternion(_slQ3);
+  const tgt=_slB.set(0.17,0.12,-0.05).applyQuaternion(hq).add(_slA);           // the wrist, out beside the right brow
+  const pole=bodyPt(H,0.75,1.25,-0.35,_slF);                                                                           // the elbow out to the side
+  const fwd=_slU.set(-0.8,0.35,-0.3).applyQuaternion(hq).normalize(), upv=bodyDir(H,0,0.2,-1,_slA.clone());
+  handQuat(_slW,fwd,upv); const s0=r.armR.sh.quaternion.clone(), e0=r.armR.el.quaternion.clone(), w0=r.armR.wr.quaternion.clone();
+  ikArm(r.armR,tgt,pole,_slW); if(up<0.999){ r.armR.sh.quaternion.copy(s0.slerp(r.armR.sh.quaternion,up)); r.armR.el.quaternion.copy(e0.slerp(r.armR.el.quaternion,up)); r.armR.wr.quaternion.copy(w0.slerp(r.armR.wr.quaternion,up)); } }
+// the Locker's pickaxe preview: held low at the side, the head forward by the shins
+function showPickPose(H,S){ const r=H.rig; if(!r.pick) return; r.pick.visible=true; H.group.updateMatrixWorld(true);
+  const tgt=bodyPt(H,0.27,0.9,-0.12,_slB), pole=bodyPt(H,0.6,0.7,0.2,_slF);
+  const hf=bodyDir(H,0,-1,-0.3,_slU), hu=bodyDir(H,0,0,-1,_slA);
+  handQuat(_slW,hf,hu); ikArm(r.armR,tgt,pole,_slW); r.armR.fing.rotation.x=1.25;
+  // the pick itself: the handle angled down and forward from the hand
+  r.armR.hand.updateMatrixWorld(true); const hy=bodyDir(H,-0.12,0.62,0.78,_slA), hx=bodyDir(H,1,0,0,_slU.clone()); hx.addScaledVector(hy,-hx.dot(hy)).normalize(); const hz=_slF.crossVectors(hx,hy).normalize();
+  _slM.makeBasis(hx,hy,hz); _slQ.setFromRotationMatrix(_slM); r.armR.hand.getWorldQuaternion(_slQ2); r.pick.quaternion.copy(_slQ2.invert().multiply(_slQ));
+  r.armL.sh.rotation.set(0.05,0,-0.12); r.armL.el.rotation.set(0.15,0,0); }
 const _fpM0=new THREE.Matrix4(), _fpMi=new THREE.Matrix4(), _fpG=[new THREE.Vector3(),new THREE.Vector3()], _fpT=new THREE.Vector3(), _fpJ=new THREE.Vector3(), _fpQ=[new THREE.Quaternion(),new THREE.Quaternion()], _fpQa=new THREE.Quaternion(), _fpQb=new THREE.Quaternion(), _fpW=[0,0];
 // the solved legs are put back to their animated angles before the next frame, so the animation's own smoothing never sees them
 function footRestore(H){ const f=H.anim.fk; if(!f||!f.on) return; const r=H.rig, v=f.v; f.on=false; r.hips.position.y=f.hy; let i=0;
@@ -5745,11 +5765,11 @@ function animateRig0(H,S,dt){
       pose({shL:2.45+0.4*s,shR:2.45-0.4*s,shLz:-0.4,shRz:0.4,elL:0.95-0.85*Math.max(0,s),elR:0.95-0.85*Math.max(0,-s),nkX:-0.22,chX:-0.08,knL:-0.35*(1-j),knR:-0.35*(1-j),hpL:0.17*(1-j),hpR:0.17*(1-j)});
       T.hop=0.07*j*K; plant(); A.handL=A.handR='fist'; A.turnL=A.turnR=0; }
     else if(id==='salute'){ const up=ez(cl(t*4))*ez(cl((E.dur-t)*5)); // standing straight, the flat hand to the brow, then snapped down
-      T.shR=lerp(T.shR,1.95,up); T.shRz=lerp(T.shRz,0.8,up); T.elR=lerp(T.elR,2.45,up); T.shL=lerp(T.shL,0,up); T.shLz=lerp(T.shLz,-0.04,up); T.elL=lerp(T.elL,0.06,up); T.chX-=0.07*up; T.spX-=0.03*up; T.nkX-=0.04*up; A.handR='flat'; }
+      T.shR=lerp(T.shR,1.95,up); T.shRz=lerp(T.shRz,0.8,up); T.elR=lerp(T.elR,2.45,up); T.shL=lerp(T.shL,0.02,up); T.shLz=lerp(T.shLz,-0.14,up); T.elL=lerp(T.elL,0.1,up); T.chX-=0.07*up; T.spX-=0.03*up; T.nkX-=0.04*up; A.handR='flat'; }
     else if(id==='dance'){ const W=sw4; // a two-step: the weight rocks from foot to foot over four beats, the free foot taps in, the arms swing across, fingers snap on two and four
       pose({hipX:0.06*W,hipsZ:0.09*W,spZ:-0.05*W,chZ:-0.05*W,chY:0.2*W,hipsY:-0.1*W,nkZ:0.05*W,nkX:0.07*dip-0.03,
         knL:-0.22*dip-0.3*Math.max(0,W)*(1-dip),knR:-0.22*dip-0.3*Math.max(0,-W)*(1-dip),hpL:0.1*dip+0.16*Math.max(0,W)*(1-dip),hpR:0.1*dip+0.16*Math.max(0,-W)*(1-dip),hpLz:-0.06-0.05*Math.max(0,-W),hpRz:0.06+0.05*Math.max(0,W),
-        shL:0.35+0.45*W,shR:0.35-0.45*W,shLz:-0.28,shRz:0.28,shLy:-0.35,shRy:0.35,elL:1.3+0.3*dip,elR:1.3+0.3*dip}); plant(); A.handL=A.handR=(Math.floor(bt)%2?'fist':'relax'); }
+        shL:0.55+0.38*W,shR:0.55-0.38*W,shLz:-0.36,shRz:0.36,shLy:-0.2,shRy:0.2,elL:1.1+0.25*dip,elR:1.1+0.25*dip}); plant(); A.handL=A.handR=(Math.floor(bt)%2?'fist':'relax'); }
     else if(id==='floss'){ const b=t*TAU*1.6, s=Math.sin(b), q=Math.sin(b*2); // straight arms swing to one side, one in front of the body and one behind, as the hips swing the other way
       pose({shL:0.7*s,shR:-0.7*s,shLz:-0.25+0.75*s,shRz:0.25+0.75*s,elL:0.1,elR:0.1,hipX:-0.05*s,hipsZ:-0.14*s,hipsY:0.1*q,chZ:0.07*s,spZ:0.05*s,knL:-0.12-0.14*Math.max(0,s),knR:-0.12-0.14*Math.max(0,-s),hpL:0.06+0.07*Math.max(0,s),hpR:0.06+0.07*Math.max(0,-s),nkZ:-0.06*s});
       plant(); A.handL=A.handR='fist'; }
@@ -9226,7 +9246,7 @@ function stageFrame(now){ const S=_stage; if(!S||!S.on) return; if(!stageVisible
   const n=S.heroes.length, wide=n>1?Math.min(1,0.55+n*0.15):0; // pull the camera back a little for a party
   S.cam.position.set(0.2,1.2+wide*0.3,-5.1-wide*3.6); S.cam.lookAt(0,0.78,wide*0.5);
   if(!S.drag){ S.spinV*=Math.exp(-3*dt); S.spin+=S.spinV*dt*0.2; S.spin*=Math.exp(-0.9*dt); }
-  S.heroes.forEach((e,i)=>{ const st={bare:!(i===0&&(window._stagePickT||0)>now),pos:e.pos,vel:_stZ,yaw:e.yaw+(i===0?S.spin:0),pitch:-0.05,onGround:true,crouch:false,building:false,editing:false,gun:false,ads:0,swingT:0,emote:i===0&&window._stagePrev&&EMOTES[_stagePrev.id]&&performance.now()-_stagePrev.t0<EMOTES[_stagePrev.id].dur*1000?{id:_stagePrev.id,t:(performance.now()-_stagePrev.t0)/1000}:null};
+  S.heroes.forEach((e,i)=>{ const st={showPick:i===0&&(window._stagePickT||0)>now,bare:!(i===0&&(window._stagePickT||0)>now),pos:e.pos,vel:_stZ,yaw:e.yaw+(i===0?S.spin:0),pitch:-0.05,onGround:true,crouch:false,building:false,editing:false,gun:false,ads:0,swingT:0,emote:i===0&&window._stagePrev&&EMOTES[_stagePrev.id]&&performance.now()-_stagePrev.t0<EMOTES[_stagePrev.id].dur*1000?{id:_stagePrev.id,t:(performance.now()-_stagePrev.t0)/1000}:null};
     animateRig(e.h,st,dt); e.h.rig.pick.visible=i===0&&(window._stagePickT||0)>now&&!st.emote;
     if(i===0&&st.emote&&EMOTES[st.emote.id].beat){ const bb=Math.floor(st.emote.t*EMOTES[st.emote.id].beat); if(bb!==S.beat){ S.beat=bb; if(AC) emoteBeat(st.emote.id,bb); } }
     e.h.group.updateMatrixWorld(true); _stH.copy(e.pos); _stH.y+=2.15; _stH.project(S.cam);
