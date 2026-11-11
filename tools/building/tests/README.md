@@ -29,3 +29,4 @@ Run with Node and Playwright (Chromium), from a folder that has `three` and `pee
 - `tswimai.js` — a monster wades and swims out to you; Buddy swims after you and holds fire.
 - `tboat.js` — boats are moored in water deep enough; drive one (top speed, turning), it never goes up onto land, and getting out in deep water leaves you swimming.
 - `twbuild.js` — building from the water starts on the seabed (walls and stairs below level 0, floors no lower than the bed); on land nothing changes.
+- `tperf.js` — draw calls and triangles of each pass (main, reflection) at a riverside view, plus a picture.

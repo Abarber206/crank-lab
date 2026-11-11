@@ -781,13 +781,14 @@ const dynRes={max:Math.min(devicePixelRatio, isTouch?1.5:2), min:Math.min(device
 dynRes.cur=dynRes.max; renderer.setPixelRatio(dynRes.cur);
 const PERF={reflect:true,ao:true,far:true,slow:0};
 function perfShed(){ const say=m=>{ try{ toast(m); }catch(e){} };
-  if(PERF.reflect&&settings.reflect!==false){ PERF.reflect=false; say('Water reflections off to keep the game smooth'); return true; } PERF.reflect=false;
+  if(PERF.reflect&&settings.reflect!==false){ PERF.reflect=false; PERF.shedAt=performance.now(); say('Water reflections off to keep the game smooth'); return true; } PERF.reflect=false;
   if(PERF.ao&&settings.ao!==false&&AO.ok){ PERF.ao=false; say('Soft shading off to keep the game smooth'); return true; } PERF.ao=false;
   if(PERF.far&&sunFar.castShadow){ PERF.far=false; sunFar.castShadow=false; say('Far shadows off to keep the game smooth'); return true; } PERF.far=false; return false; }
 function stepDynRes(raw,now){
   if(raw>250){ dynRes.acc=0; dynRes.n=0; return; } // tab was hidden
   dynRes.acc+=raw; dynRes.n++; if(dynRes.acc<2000) return;
   const avg=dynRes.acc/dynRes.n; dynRes.acc=0; dynRes.n=0;
+  if(!PERF.reflect&&settings.reflect!==false&&PERF.shedAt&&(PERF.back||0)<3&&now-PERF.shedAt>30000&&avg<14&&dynRes.cur>=Math.min(dynRes.max,dynRes.ceil)-1e-3){ PERF.reflect=true; PERF.back=(PERF.back||0)+1; PERF.shedAt=0; }
   if(settings.autoRes&&avg>30&&dynRes.cur<=dynRes.min+1e-3){ if(++PERF.slow>=2){ PERF.slow=0; perfShed(); } } else if(avg<26) PERF.slow=0; // still slow at the lowest resolution for four seconds: drop an extra
   let next=dynRes.cur;
   if(!settings.autoRes){ next=dynRes.max; }
@@ -1595,7 +1596,7 @@ function shoreAt(x,z){ const c=worldCell(x,z); return c>=0&&(WORLD.WS[c]>-999||W
         float fg=min(1.0-exp(-dist*0.0011),0.92);
         vec3 mir=TM(mix(mix(hor,zen,pow(R.y,0.55)),fogCol,fg));                                              // with no mirror image: the sky, by angle
         if(reflK>0.0){ vec4 rc=reflM*vec4(vW,1.0); vec2 ruv=rc.xy/rc.w+a*vec2(0.022,0.05)/(1.0+dist*0.03);   // the mirror image, wobbled by the ripples
-          mir=mix(mir,texture2D(reflT,clamp(ruv,0.003,0.997)).rgb,reflK*(1.0-smoothstep(0.35,1.4,abs(vW.y-reflY)))); } // (only water at the mirror's own level shows it)
+          mir=mix(mir,texture2D(reflT,clamp(ruv,0.003,0.997)).rgb,reflK*(1.0-smoothstep(0.6,2.2,abs(vW.y-reflY)))); } // (only water at the mirror's own level shows it)
         vec3 body=TM(mix(mix(vec3(0.20,0.62,0.66),vec3(0.03,0.22,0.36),smoothstep(0.0,4.5,D))*lum,fogCol,fg));
         vec3 col=mix(body,mir,F);
         float sr=max(dot(R,sunDir),0.0); col+=sunCol*(pow(sr,220.0)*2.2+pow(sr,28.0)*0.1)*(1.0-fg);          // glitter
@@ -1681,10 +1682,16 @@ function renderMain(){ if(!AO.ok||settings.ao===false||!PERF.ao||!scene.visible)
   AO.matA.uniforms.projInv.value.copy(camera.projectionMatrixInverse); AO.matA.uniforms.pscale.value=AO.ao.height*0.5*camera.projectionMatrix.elements[5];
   renderer.setRenderTarget(AO.ao); renderer.render(AO.sA,AO.cam); renderer.setRenderTarget(null); renderer.render(AO.sC,AO.cam);
   if(AO.n<3&&++AO.n===3){ const gl=renderer.getContext(); if(gl.getError()!==gl.NO_ERROR){ console.warn('ambient occlusion switched off: the graphics driver refused it'); AO.ok=false; } } } // (checked once, after the first few frames)
-const REFL={rt:null,cam:new THREE.PerspectiveCamera(),m:new THREE.Matrix4(),plane:new THREE.Plane(),clip:new THREE.Vector4(),q:new THREE.Vector4(),sz:new THREE.Vector2(),t:new THREE.Vector3(),hid:[]};
+const REFL={lvl:-1e4,skip:0,ok:false,K:0,rt:null,cam:new THREE.PerspectiveCamera(),m:new THREE.Matrix4(),plane:new THREE.Plane(),clip:new THREE.Vector4(),q:new THREE.Vector4(),sz:new THREE.Vector2(),t:new THREE.Vector3(),hid:[]};
 function renderReflection(){ if(!WATER.mat) return; const u=WATER.mat.uniforms; u.reflK.value=0;
   if(settings.reflect===false||!PERF.reflect||!WATER.lv||!scene.visible) return;
-  const cp=camera.position, LN=WATER.LN, i=Math.max(0,Math.min(LN-1,Math.floor((cp.x-SPAWN[0]+WHALF)/WATER.LC))), j=Math.max(0,Math.min(LN-1,Math.floor((cp.z-SPAWN[2]+WHALF)/WATER.LC))), lvl=WATER.lv[j*LN+i], off=WATER.ld[j*LN+i], hgt=cp.y-lvl;
+  const cp=camera.position, LN=WATER.LN, i=Math.max(0,Math.min(LN-1,Math.floor((cp.x-SPAWN[0]+WHALF)/WATER.LC))), j=Math.max(0,Math.min(LN-1,Math.floor((cp.z-SPAWN[2]+WHALF)/WATER.LC)));
+  let lvl=WATER.lv[j*LN+i], off=WATER.ld[j*LN+i];
+  { camera.getWorldDirection(_rfD); const hl=Math.hypot(_rfD.x,_rfD.z); if(hl>0.05){ const dx=_rfD.x/hl, dz=_rfD.z/hl; // the water ahead of you, if there is some
+      for(let s=1;s<=140;s+=s<20?1.5:4){ const x=cp.x+dx*s, z=cp.z+dz*s, w=waterAt(x,z); if(w>-999&&w<cp.y-0.1){ lvl=w; off=Math.min(off,s*0.5); break; } } } }
+  const hgt=cp.y-lvl;
+  if(Math.abs(lvl-REFL.lvl)>0.02) REFL.skip=0; REFL.lvl=lvl; if(REFL.skip>0&&REFL.ok){ REFL.skip--; u.reflM.value.copy(REFL.m); u.reflK.value=REFL.K; u.reflY.value=lvl; return; } // the last mirror image still serves
+  REFL.ok=false;
   if(lvl<-999||off>300||hgt<0.12||hgt>180) return; // no water near, or too high up for it to matter
   const K=(1-sstep(180,300,off))*(1-sstep(120,180,hgt)); if(K<0.01) return;
   renderer.getDrawingBufferSize(REFL.sz); const w=Math.max(64,Math.round(REFL.sz.x*0.5)), h=Math.max(64,Math.round(REFL.sz.y*0.5));
@@ -1700,11 +1707,13 @@ function renderReflection(){ if(!WATER.mat) return; const u=WATER.mat.uniforms; 
   q.set((Math.sign(cl.x)+pe[8])/pe[0],(Math.sign(cl.y)+pe[9])/pe[5],-1,(1+pe[10])/pe[14]); cl.multiplyScalar(2/cl.dot(q));
   pe[2]=cl.x; pe[6]=cl.y; pe[10]=cl.z+1-0.003; pe[14]=cl.w;
   const hid=REFL.hid; hid.length=0; for(const o of [...WATER.meshes,VCLOUD.sky,grassMesh,flowerMesh]) if(o&&o.visible){ o.visible=false; hid.push(o); }
+  if(FOREST.far) for(const kind in FOREST.far) for(const o of FOREST.far[kind]) if(o.visible){ o.visible=false; hid.push(o); } // the far trees: too far off to matter in a rippled mirror
   const prev=renderer.getRenderTarget(), au=renderer.shadowMap.autoUpdate; renderer.shadowMap.autoUpdate=false; // the shadow maps from the last frame serve
   renderer.setRenderTarget(REFL.rt); renderer.clear(); renderer.render(scene,vc); renderer.setRenderTarget(prev); renderer.shadowMap.autoUpdate=au;
   for(const o of hid) o.visible=true;
-  u.reflM.value.copy(REFL.m); u.reflK.value=K; u.reflY.value=lvl;
+  u.reflM.value.copy(REFL.m); u.reflK.value=K; u.reflY.value=lvl; REFL.K=K; REFL.ok=true; REFL.skip=1;
 }
+const _rfD=new THREE.Vector3();
 
 /* ---------- roads: asphalt with white edge lines and a dashed yellow centre, plus a paved square in each town ---------- */
 let roadPlainTex=null;
