@@ -16,14 +16,15 @@ const {sleep,page,launch,open}=require('./h.js');
        const seen=new Uint8Array(nx*nz), Q=[]; const start=(x,z)=>{ const c=cell(x,z); if(c>=0&&c<nx*nz&&!seen[c]){ seen[c]=1; Q.push(c); } };
        if(l===h.L) start(D.x-D.nx*0.8,D.z-D.nz*0.8); else for(const [i,j] of st) start((i+.5)*C,(j+.5)*C);
        while(Q.length){ const c=Q.pop(), i=c%nx, j=(c-i)/nx; for(const [a,b2] of [[1,0],[-1,0],[0,1],[0,-1]]){ const u=i+a, v=j+b2; if(u<0||v<0||u>=nx||v>=nz) continue; const k=u+nx*v; if(seen[k]||blk[k]) continue; seen[k]=1; Q.push(k); } }
-       for(const rm of R.rooms){ out.rooms++; out.types[rm.type]=(out.types[rm.type]||0)+1; have[rm.type]=1;
+       if(l>h.L&&(R.walls.length<3||R.rooms.length<3||!R.rooms.some(r=>r.type==='hall'))) out.openUp=(out.openUp||0)+1; // upstairs: a hallway and at least two rooms off it
+       for(const rm of R.rooms){ out.rooms++; out.types[rm.type]=(out.types[rm.type]||0)+1; have[rm.type]=1; if(rm.type==='hall') continue;
          const inRoom=p=>rm.cells.some(([i,j])=>p.x>i*C&&p.x<(i+1)*C&&p.z>j*C&&p.z<(j+1)*C); const ps=mine.filter(inRoom); if(!ps.length) out.emptyRooms++;
          for(const p of ps){ if(!OK[rm.type].includes(p.ft)){ out.wrong++; if(out.sample.length<6) out.sample.push([rm.type,p.ft]); }
            // somewhere free and reached within a step of the piece
            const bx=p.boxes[0]; let near=false; for(let x=bx[0]-0.9;x<=bx[3]+0.9&&!near;x+=S) for(let z=bx[2]-0.9;z<=bx[5]+0.9;z+=S){ if(x<=x0||z<=z0||x>=x0+W||z>=z0+Dd) continue; if(seen[cell(x,z)]){ near=true; break; } }
-           if(!near){ out.unreached++; if(out.sample.length<6) out.sample.push(['unreached',rm.type,p.ft,h.w,h.d,h.floors,l-h.L]); } }
+           if(!near){ out.unreached++; if(out.sample.length<6) out.sample.push(['unreached',rm.type,p.ft,h.w,h.d,h.floors,l-h.L,h.i0,h.j0,+p.x.toFixed(1),+p.z.toFixed(1)]); } }
          if(rm.type==='kitchen'&&!ps.some(p=>p.ft===3)) out.noCook++; if((rm.type==='bed'||rm.type==='bed2')&&!ps.some(p=>p.ft===4)) out.noSleep++; if(rm.type==='bath'&&!ps.some(p=>p.ft===11)) out.noBath++; if(rm.type==='living'&&!ps.some(p=>p.ft===0||p.ft===6)) out.noSit++; } }
      if(!have.living) out.noSit++; if(!have.kitchen) out.noCook++; if(!have.bed&&!have.bed2) out.noSleep++; }
    return out; });
- const ok=r.wrong===0&&r.unreached===0&&r.noSit===0&&r.noCook===0&&r.noSleep===0&&r.noBath===0&&r.emptyRooms===0&&r.types.bath>10;
+ const ok=!r.openUp&&r.wrong===0&&r.unreached===0&&r.noSit===0&&r.noCook===0&&r.noSleep===0&&r.noBath===0&&r.emptyRooms===0&&r.types.bath>10;
  console.log(JSON.stringify(r), ok?'PASS':'FAIL'); console.log(errs.join('\n')||'no errors'); await b.close(); })();
