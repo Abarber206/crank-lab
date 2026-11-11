@@ -27,10 +27,12 @@ Run with Node and Playwright (Chromium), from a folder that has `three` and `pee
 - `tupview.js` — pictures from the top of the stairs in two-storey houses: the hallway and the doors off it.
 - `tswim.js` — dropped into deep water from 30 m: no damage, you swim with your head out, can't shoot or aim, swim slower than you run, and climb out onto the beach.
 - `tswimai.js` — a monster wades and swims out to you; Buddy swims after you and holds fire.
-- `tboat.js` — boats are moored in water deep enough; drive one (top speed, turning), it never goes up onto land, and getting out in deep water leaves you swimming.
+- `tboat.js` — boats moored in deep enough water; drive one (top speed, turning); driven at a beach it slides up, sticks and carves tracks; it drives up a stream; it rocks on the sea; out in deep water you swim.
 - `twbuild.js` — building from the water starts on the seabed (walls and stairs below level 0, floors no lower than the bed); on land nothing changes.
 - `tperf.js` — draw calls and triangles of each pass (main, reflection) at a riverside view, plus a picture.
 - `tlocker.js` — Locker preview pictures: a pickaxe just picked and a second later, and emotes (EMOTES=salute,groove).
 - `tlobby3d.js` — pictures of the 3D lobby (desktop and phone landscape), the Friends, Profile and Locker tabs, and the Mode pop-up.
 - `mp_friends.js` — friends: B adds A by account number, A accepts, both see each other online with names; A invites B to the lobby and B joins A's party and stands on A's pads. Needs the `peer` and `express` packages.
 - `temowheel.js` — the emote wheel: in the lobby (tap one, the hero does it on its pad), in a match (hold the key, move the mouse, let go; a quick tap plays the Locker emote); the other lobby tabs are solid.
+- `tvan.js` — pictures of a Reboot Van from each side, its terminal and its roof (VIEWS=side,roof).
+- `tprof.js` — Chrome's sampling profiler over standing, skydiving and gliding: ms per frame by function.

@@ -1,7 +1,7 @@
 // boats: moored on the sea and rivers; you get in and drive (top speed, turning), it never goes up onto land (it runs
 // aground and stops), and getting out in deep water leaves you swimming. node tboat.js [shots-prefix]
 const {sleep,page,launch,open}=require('./h.js');
-(async()=>{ const b=await launch(); const shots=process.argv[2]; const {pg,errs}=await open(b,page('/home/claude/crank-lab/index.html','scene,P,renderer,settings,TOWNS,terrainH,waterAt,waterDepth,boatDepth,camera,karts,enterKart,exitKart,SPAWN,RUN,BOAT_MIN'),shots?{vp:{width:900,height:560}}:{fast:true,norender:true});
+(async()=>{ const b=await launch(); const shots=process.argv[2]; const {pg,errs}=await open(b,page('/home/claude/crank-lab/index.html','scene,P,renderer,settings,TOWNS,terrainH,waterAt,waterDepth,boatDepth,camera,karts,enterKart,exitKart,SPAWN,RUN,BOAT_MIN,BTRK,WORLD'),shots?{vp:{width:900,height:560}}:{fast:true,norender:true});
  await pg.waitForFunction(()=>window.T&&T.renderer&&T.karts,null,{timeout:180000});
  await pg.evaluate(()=>{ T.settings.skyDrop=false; const s=document.querySelector('#botSel'); s.value='off'; s.dispatchEvent(new Event('change')); document.getElementById('play').click(); }); await sleep(1500);
  const info=await pg.evaluate(()=>{ const bs=T.karts.filter(k=>k.boat); return {n:bs.length,boats:bs.map(k=>({id:k.id,x:+k.x.toFixed(1),z:+k.z.toFixed(1),dep:+T.boatDepth(k.x,k.z,k.yaw).toFixed(2),wd:+T.waterDepth(k.x,k.z).toFixed(2),fromSpawn:Math.round(Math.hypot(k.x-T.SPAWN[0],k.z-T.SPAWN[2]))}))}; });
@@ -19,11 +19,22 @@ const {sleep,page,launch,open}=require('./h.js');
  const y0=await pg.evaluate(id=>T.karts[id].yaw,pick.id); await pg.keyboard.down('KeyA'); await sleep(1500); await pg.keyboard.up('KeyA'); const y1=await pg.evaluate(id=>T.karts[id].yaw,pick.id);
  // aim at the nearest shore and hold full throttle for a while: it must stay afloat
  await pg.evaluate(id=>{ const k=T.karts[id]; let best=null; for(let q=0;q<36;q++){ const a=q/36*Math.PI*2; for(let s=2;s<200;s+=2){ if(T.waterDepth(k.x-Math.sin(a)*s,k.z-Math.cos(a)*s)<0.05){ if(!best||s<best.s) best={a,s}; break; } } } k.yaw=best.a; window.__shore=best.s; },pick.id);
- let minDep=99, landed=false; for(let i=0;i<24;i++){ await sleep(500); const s=await pg.evaluate(id=>{ const k=T.karts[id]; return [T.boatDepth(k.x,k.z,k.yaw),T.waterAt(k.x,k.z)<-999||T.waterDepth(k.x,k.z)<0.05]; },pick.id); minDep=Math.min(minDep,s[0]); if(s[1]) landed=true; }
+ const beach=[]; for(let i=0;i<24;i++){ await sleep(500); beach.push(await pg.evaluate(id=>{ const k=T.karts[id]; return [k.x,k.z,Math.hypot(k.vx,k.vz),T.waterDepth(k.x,k.z),k.gnd||0,k.pitch]; },pick.id)); }
+ const last=beach[beach.length-1], prev=beach[beach.length-5], landed=last[4]>=0.5, stuck=Math.hypot(last[0]-prev[0],last[1]-prev[1])<0.3, minDep=0;
+ const tracks=await pg.evaluate(()=>window.__trk=(T.BTRK&&T.BTRK.n)||0);
+ if(shots){ await pg.evaluate(id=>{ window.__hold=id; if(!window.__hk2){ window.__hk2=1; const R=T.renderer.render.bind(T.renderer); T.renderer.render=(s,c)=>{ if(c===T.camera&&window.__hold!=null){ const k=T.karts[window.__hold]; c.position.set(k.x+Math.cos(k.yaw+2.2)*6,k.y+2.4,k.z-Math.sin(k.yaw+2.2)*6); c.lookAt(k.x,k.y+0.3,k.z); c.updateMatrixWorld(); } R(s,c); }; } },pick.id); await sleep(2500); await pg.screenshot({path:shots+'_beach.png',timeout:200000}); await pg.evaluate(()=>{ window.__hold=null; }); }
  await pg.keyboard.up('KeyW');
  // back out into deep water and get out: swimming
  await pg.evaluate(id=>{ const k=T.karts[id]; let best=null; for(let s=0;s<400000&&!best;s++){ const a=s*2.399, d=(s%3000)*0.1, x=k.x+Math.cos(a)*d, z=k.z+Math.sin(a)*d; if(T.boatDepth(x,z,k.yaw)>2.2) best=[x,z]; } if(best){ k.x=best[0]; k.z=best[1]; k.vx=k.vz=0; } },pick.id);
  await sleep(800); await pg.evaluate(()=>T.exitKart(true)); await sleep(1500); const after=await pg.evaluate(()=>({kart:!!T.P.kart,swim:!!T.P.swim}));
- const res={...r,top:+top.toFixed(1),turned:+Math.abs(y1-y0).toFixed(2),shore:await pg.evaluate(()=>window.__shore),minDep:+minDep.toFixed(2),landed,...after}; console.log(JSON.stringify(res));
- const ok=info.n>=4&&info.boats.every(b=>b.dep>=0.3)&&res.inBoat&&res.top>9&&res.turned>0.4&&!landed&&minDep>0.2&&!res.kart&&res.swim;
+ // up a stream: a boat set in a small river, pointed upstream, full throttle for 6 s
+ const riv=await pg.evaluate(async(id)=>{ const k=T.karts[id], S=T.SPAWN; const rv=T.WORLD.rivers.find(r=>!r.main&&r.into!==undefined)||T.WORLD.rivers[1]; const q=Math.floor(rv.pts.length*0.5), p=rv.pts[q], n=rv.pts[q-4];
+   if(T.P.kart) T.exitKart(false); k.x=S[0]+p[0]; k.z=S[2]+p[1]; k.y=T.waterAt(k.x,k.z); k.yaw=Math.atan2(-(n[0]-p[0]),-(n[1]-p[1])); k.vx=k.vz=0; k.dead=0;
+   T.P.pos.set(k.x,k.y,k.z); T.enterKart(k,0); return {x0:k.x,z0:k.z,depth:+T.waterDepth(k.x,k.z).toFixed(2),width:p[3]}; },pick.id);
+ await pg.keyboard.down('KeyW'); await sleep(6000); await pg.keyboard.up('KeyW');
+ const up=await pg.evaluate(([id,r])=>{ const k=T.karts[id]; return +Math.hypot(k.x-r.x0,k.z-r.z0).toFixed(1); },[pick.id,riv]);
+ // rocking on the sea: idle, its pitch and roll keep moving
+ const rock=await pg.evaluate(async(id)=>{ const k=T.karts[id]; if(T.P.kart) T.exitKart(false); k.x=k.home.x; k.z=k.home.z; k.yaw=k.home.yaw; k.vx=k.vz=0; T.P.pos.set(k.x+6,T.waterAt(k.x,k.z)-1.3,k.z); T.P.vel.set(0,0,0); const a=[]; for(let i=0;i<30;i++){ await new Promise(r=>setTimeout(r,100)); a.push(k.pitch,k.roll); } const m=a.reduce((x,y)=>x+y,0)/a.length; return +Math.sqrt(a.reduce((x,y)=>x+(y-m)*(y-m),0)/a.length).toFixed(4); },info.boats.find(b=>b.wd>1).id);
+ const res={...r,top:+top.toFixed(1),turned:+Math.abs(y1-y0).toFixed(2),shore:await pg.evaluate(()=>window.__shore),beached:landed,stuck,slid:+(last[3]).toFixed(2),tracks,riv,up,rock,...after}; console.log(JSON.stringify(res));
+ const ok=info.n>=4&&info.boats.every(b=>b.dep>=0.3)&&res.inBoat&&res.top>9&&res.turned>0.4&&res.beached&&res.stuck&&res.tracks>5&&!res.kart&&res.swim&&res.up>15&&res.rock>0.004;
  console.log(ok?'PASS':'FAIL'); console.log(errs.join('\n')||'no errors'); await b.close(); })();

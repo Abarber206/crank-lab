@@ -590,6 +590,11 @@ body.touch #pdFs{display:none}
 #partyDock .btn{white-space:nowrap}
 @media (max-height:500px){ #partyDock .btn{padding:8px 11px;font-size:13px} #lobbyEmote svg{width:16px;height:16px} }
 #lobbyEmote svg{width:20px;height:20px}
+body.touch #kartHud{bottom:auto;top:calc(env(safe-area-inset-top,0px) + 58px)}
+
+#vanMark{position:fixed;left:0;top:0;z-index:6;pointer-events:none;display:flex;flex-direction:column;align-items:center;gap:2px;transform:translate(-50%,-100%);color:#fff;font:900 italic 14px/1 var(--font-hud);text-shadow:0 1px 3px #000;letter-spacing:.04em}
+#vanMark i{display:block;width:30px;height:30px;border-radius:50%;background:#1f5fd8 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M18 12a6 6 0 1 1-1.8-4.3' fill='none' stroke='%23fff' stroke-width='2.6' stroke-linecap='round'/%3E%3Cpath d='M17.5 3.5v4.5H13' fill='none' stroke='%23fff' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/62% no-repeat;border:2px solid #fff;box-shadow:0 0 12px rgba(80,170,255,.8)}
+#vanMark.edge i{opacity:.85}
 </style>
 </head>
 <body>
@@ -682,6 +687,7 @@ body.touch #pdFs{display:none}
 </div>
 
 <div id="emoWheel" hidden><div class="ring" id="emoRing"><div class="mid" id="emoMid">Emotes</div></div></div>
+<div id="vanMark" hidden><i></i><span id="vanMarkD"></span></div>
 <div id="invitePop" hidden><span id="invText"></span><button class="btn primary" id="invJoin" type="button">Join</button><button class="btn" id="invNo" type="button">No thanks</button></div>
 <div id="menu" class="lobby">
   <div class="panel">
@@ -3614,6 +3620,8 @@ function buildBoatGeo(){ const h=boatHull(), V=(x,y,z)=>new THREE.Vector3(x,y,z)
   for(const s of [-1,1]) for(const z of [-1.2,1.9]) put('chrome',new THREE.BoxGeometry(0.05,0.04,0.2),s*(h.half((z+2.3)/4.6)-0.06),h.sheer((z+2.3)/4.6)+0.02,z);
   put('white',new THREE.BoxGeometry(1.5,0.4,0.08),0,0.28,1.98);
   const out={}; for(const k in bins) out[k]=mergeGeos(bins[k]); out.outer=h.outer; out.inner=h.inner; out.top=h.top;
+  { const pos=[], N=24, Y=0.42; let prev=null; for(let n=0;n<=N;n++){ const t=0.06+0.94*n/N, w=Math.max(0.02,h.half(t)*0.94-0.07), z=h.zOf(t), cur=[[-w,Y,z],[w,Y,z]]; if(prev) pos.push(prev[0],cur[0],prev[1], prev[1],cur[0],cur[1]); prev=cur; }
+    const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(pos.flat(),3)); out.cap=g; }
   // the outboard: cowling, a leg down into the water, the propeller
   const mo=[]; const pm=(geo,x,y,z,rx=0)=>{ const q=geo.clone(); q.applyMatrix4(new THREE.Matrix4().compose(V(x,y,z),new THREE.Quaternion().setFromEuler(new THREE.Euler(rx,0,0)),V(1,1,1))); mo.push(q); };
   pm(rbox(0.42,0.5,0.52,0.1),0,0.62,0.18); pm(new THREE.BoxGeometry(0.44,0.08,0.54),0,0.38,0.18); pm(new THREE.BoxGeometry(0.12,0.75,0.2),0,0.0,0.16); pm(new THREE.CylinderGeometry(0.07,0.09,0.32,10),0,-0.38,0.12,Math.PI/2);
@@ -3627,7 +3635,8 @@ function makeBoatModel(pi){ if(!boatGeo) boatGeo=buildBoatGeo(); const G=boatGeo
     glass:kMat('glass',()=>new THREE.MeshPhongMaterial({color:0x9fc4d6,transparent:true,opacity:0.38,shininess:120,specular:0xffffff,depthWrite:false})),motor:kMat('motor',()=>new THREE.MeshPhongMaterial({color:0x202226,shininess:70,specular:0x444444}))};
   const g=new THREE.Group(), body=new THREE.Group(); g.rotation.order='YXZ'; g.add(body);
   const mesh=(geo,mat,par)=>{ const m=new THREE.Mesh(geo,mat); m.castShadow=mat!==M.glass; m.receiveShadow=true; (par||body).add(m); return m; };
-  mesh(G.outer,M.hull); mesh(G.inner,M.inner); mesh(G.top,M.white); for(const k of ['paint','dark','deck','white','chrome','metal','seat','glass']) if(G[k]) mesh(G[k],M[k]);
+  mesh(G.outer,M.hull); mesh(G.inner,M.inner); mesh(G.top,M.white);
+  { const cap=new THREE.Mesh(G.cap,kMat('bcap',()=>new THREE.MeshBasicMaterial({colorWrite:false,depthWrite:true,transparent:true,side:THREE.DoubleSide}))); cap.renderOrder=1; cap.castShadow=false; body.add(cap); } for(const k of ['paint','dark','deck','white','chrome','metal','seat','glass']) if(G[k]) mesh(G[k],M[k]);
   const sw=new THREE.Group(); sw.position.set(0,0.88,0.58); sw.rotation.x=-0.75; body.add(sw); const swm=mesh(G.sw,M.dark,sw);
   const motor=new THREE.Group(); motor.position.set(0,0,2.06); body.add(motor); mesh(G.motor,M.motor,motor); const prop=new THREE.Group(); prop.position.set(0,-0.38,0.3); motor.add(prop); mesh(G.prop,M.metal,prop);
   return {g,body,sw:swm,motor,prop}; }
@@ -3649,42 +3658,73 @@ function initBoats(){ const spots=[], free=(x,z)=>spots.every(s=>Math.hypot(s[0]
   for(const t of TOWNS){ const s=tryNear(t.x,t.z,t.R+10,t.R+220); if(s){ spots.push(s); } }
   const S=WGEN.sea&&WGEN.sea(); if(S) for(let n=0;n<4;n++){ const lat=(n-1.5)*220, x=SPAWN[0]+S.nx*S.C0+(-S.nz)*lat, z=SPAWN[2]+S.nz*S.C0+S.nx*lat; const s=tryNear(x,z,0,90); if(s) spots.push(s); }
   spots.forEach((s,i)=>karts.push(newBoat(karts.length,(i*3+2)%KART_PAINT.length,s[0],s[1],s[2]))); }
+// the hull's five points: [x, z, keel height] in the boat's own frame (forward is -z)
+const BPTS=[[0,-1.85,0.02],[0,1.95,-0.28],[-0.72,0.35,-0.14],[0.72,0.35,-0.14],[0,0,-0.24]], BFLOAT=0.07;
+function boatSwell(x,z,t,sea){ return sea?0.075*Math.sin(x*0.31+t*1.15)+0.055*Math.sin(z*0.27-t*0.92+1.3)+0.03*Math.sin((x+z)*0.6+t*2.1):0.012*Math.sin(x*0.9+t*2.4)+0.01*Math.sin(z*1.1-t*1.9); }
+// for each hull point: the height the boat's origin would need to be held up there, and whether it's water or ground
+function boatSupport(k,x,z,yaw,t,out){ const fx=-Math.sin(yaw), fz=-Math.cos(yaw), rx=Math.cos(yaw), rz=-Math.sin(yaw), S=WGEN.sea&&WGEN.sea(); let wet=0;
+  for(let i=0;i<5;i++){ const p=BPTS[i], px=x+rx*p[0]-fx*p[1], pz=z+rz*p[0]-fz*p[1], g=terrainH(px,pz), w=waterAt(px,pz);
+    const sea=w>-999&&S&&Math.abs(w-S.Y)<0.05, fl=w>-999?w+boatSwell(px,pz,t,sea)-BFLOAT:-1e9, gr=g-p[2]+0.02;
+    const o=out[i]||(out[i]={}); o.h=Math.max(fl,gr); o.ground=gr>=fl; o.depth=w>-999?w-g:-1; o.x=px; o.z=pz; if(!o.ground) wet++; }
+  return wet; }
+const _bs=[], _bs2=[];
+const boatGnd=B=>B.reduce((a,p)=>a+(p.ground?(p.depth>0.12?0.15:1):0),0)/5; // how much of the hull sits on dry ground
 function simBoat(k,inp,dt){ const fx=-Math.sin(k.yaw), fz=-Math.cos(k.yaw), rx=Math.cos(k.yaw), rz=-Math.sin(k.yaw);
-  let vf=k.vx*fx+k.vz*fz, vl=k.vx*rx+k.vz*rz; const dep=boatDepth(k.x,k.z,k.yaw), afloat=dep>=BOAT_MIN-0.05;
-  if(afloat){
-    if(inp.fw>0.1) vf+=BACC*inp.fw*dt*Math.max(0,Math.min(1,1.1-vf/BMAX))*(vf<-0.3?2.2:1);
-    else if(inp.fw<-0.1){ if(vf>0.3) vf-=BACC*1.4*(-inp.fw)*dt; else vf=Math.max(-BREV,vf-BACC*0.6*(-inp.fw)*dt); }
-    vf-=vf*((inp.fw>0.1?0.05:0.3)+0.006*Math.abs(vf))*dt;      // water drag: off the throttle it slows, but coasts a good way
-    vl*=Math.exp(-(inp.hb?0.8:2.6)*dt);                                       // and slips sideways in a turn
-    const sMax=0.62; k.steer+=(inp.st*sMax-k.steer)*Math.min(1,dt*4);
-    k.yaw-=k.steer*1.25*Math.max(0.35,Math.min(1,(Math.abs(vf)+1.2)/6))*(vf<-0.2?-1:1)*dt; }
-  else { vf*=Math.exp(-5*dt); vl*=Math.exp(-5*dt); k.steer*=Math.exp(-dt*3); } // aground: it grinds to a stop
-  k.slip=Math.abs(vl); k.vf=vf; k.thr=inp.fw; k.brk=false;
+  k.bobT+=dt; let vf=k.vx*fx+k.vz*fz, vl=k.vx*rx+k.vz*rz; boatSupport(k,k.x,k.z,k.yaw,k.bobT,_bs);
+  const gnd=boatGnd(_bs), prop=_bs[1].depth>0.12, vf0=vf;
+  // the motor pushes only with the propeller in the water
+  if(prop){ if(inp.fw>0.1) vf+=BACC*inp.fw*dt*Math.max(0,Math.min(1,1.1-vf/BMAX))*(vf<-0.3?2.2:1);
+    else if(inp.fw<-0.1){ if(vf>0.3) vf-=BACC*1.4*(-inp.fw)*dt; else vf=Math.max(-BREV,vf-BACC*0.6*(-inp.fw)*dt); } }
+  vf-=vf*((inp.fw>0.1&&prop?0.05:0.3)+0.006*Math.abs(vf))*dt;                  // water drag
+  if(gnd>0){ const c=(gnd*11+1)*dt; vf=Math.abs(vf)<=c?0:vf-Math.sign(vf)*c; vl*=Math.exp(-gnd*10*dt); } // the keel dragging on the ground
+  vl*=Math.exp(-(inp.hb?0.8:2.6)*dt);
+  const sMax=0.62; k.steer+=(inp.st*sMax-k.steer)*Math.min(1,dt*4);
+  if(gnd<0.6) k.yaw-=k.steer*1.25*Math.max(0.35,Math.min(1,(Math.abs(vf)+1.2)/6))*(vf<-0.2?-1:1)*(1-gnd)*dt;
+  k.slip=Math.abs(vl); k.vf=vf; k.thr=prop?inp.fw:0; k.brk=false; k.acc=(k.acc||0)+((vf-vf0)/Math.max(dt,1e-3)-(k.acc||0))*Math.min(1,dt*6);
   k.vx=fx*vf+rx*vl; k.vz=fz*vf+rz*vl;
   const sp0=Math.hypot(k.vx,k.vz), ox=k.x, oz=k.z, nx=ox+k.vx*dt, nz=oz+k.vz*dt;
-  // it stays in water deep enough to float in (backing off a bank is always allowed)
-  const okD=(x,z)=>{ const d=boatDepth(x,z,k.yaw); return d>=BOAT_MIN||d>dep+1e-4; };
-  if(okD(nx,nz)&&!kartHits(k,nx,nz,k.yaw,ox,oz)){ k.x=nx; k.z=nz; }
-  else if(okD(nx,oz)&&!kartHits(k,nx,oz,k.yaw,ox,oz)){ k.x=nx; k.vz*=0.3; }
-  else if(okD(ox,nz)&&!kartHits(k,ox,nz,k.yaw,ox,oz)){ k.z=nz; k.vx*=0.3; }
+  // a bank too steep to slide up (a cliff, a rock) stops it like a wall
+  const steep=(x,z)=>{ boatSupport(k,x,z,k.yaw,k.bobT,_bs2); return _bs2[0].ground&&_bs2[0].h-k.y>0.55; };
+  if(!steep(nx,nz)&&!kartHits(k,nx,nz,k.yaw,ox,oz)){ k.x=nx; k.z=nz; }
+  else if(!steep(nx,oz)&&!kartHits(k,nx,oz,k.yaw,ox,oz)){ k.x=nx; k.vz*=0.3; }
+  else if(!steep(ox,nz)&&!kartHits(k,ox,nz,k.yaw,ox,oz)){ k.z=nz; k.vx*=0.3; }
   else { if(sp0>3){ sfxAt('kart_bump',_kz.set(k.x,k.y+0.3,k.z)); if(P.kart&&P.kart.k===k) shake=Math.max(shake,Math.min(0.2,sp0*0.02)); } k.vx*=-0.15; k.vz*=-0.15; }
   { const lost=sp0-Math.hypot(k.vx,k.vz); if(lost>6) kartDamage(k,(lost-6)*12); }
   { const dx=k.x-SPAWN[0], dz=k.z-SPAWN[2], d=Math.hypot(dx,dz); if(d>WORLD_EDGE){ k.x=SPAWN[0]+dx/d*WORLD_EDGE; k.z=SPAWN[2]+dz/d*WORLD_EDGE; k.vx*=0.3; k.vz*=0.3; } }
-  boatFloat(k,dt,vf); kartRam(k,vf); }
-// riding the water: a spring toward the surface (higher when planing), a gentle bob, the nose up at speed, a lean into turns
-function boatFloat(k,dt,vf){ k.bobT+=dt; const w=waterAt(k.x,k.z), plane=Math.max(0,Math.min(1,(vf-4)/(BMAX-4)));
-  const tgt=w>-999?w-BDRAFT+0.09*plane+0.035*Math.sin(k.bobT*1.6+k.x*0.21):terrainH(k.x,k.z)+0.28;
-  k.vy+=(55*(tgt-k.y)-7*k.vy)*dt; k.y+=k.vy*dt; k.air=false;
-  const pt=0.075*plane+0.02*Math.sin(k.bobT*1.15+k.z*0.17)-(k.thr>0.1&&vf<4?-0.035:0), rt=k.steer*Math.min(1,Math.abs(vf)/BMAX)*0.22+0.025*Math.sin(k.bobT*0.9);
-  k.pitch+=(pt-k.pitch)*Math.min(1,dt*3); k.roll+=(rt-k.roll)*Math.min(1,dt*3); }
-function settleBoat(k,dt){ k.vf=0; k.thr=0; k.slip=0; k.steer*=Math.exp(-dt*3);
-  if(Math.hypot(k.vx,k.vz)>0.05){ const c=Math.exp(-dt*1.2); k.vx*=c; k.vz*=c; const nx=k.x+k.vx*dt, nz=k.z+k.vz*dt; if(boatDepth(nx,nz,k.yaw)>=BOAT_MIN&&!kartHits(k,nx,nz,k.yaw,k.x,k.z)){ k.x=nx; k.z=nz; } else { k.vx=k.vz=0; } } else { k.vx=k.vz=0; }
-  boatFloat(k,dt,0); }
+  boatFloat(k,dt,vf,inp); boatTracks(k); kartRam(k,vf); }
+// the hull settles on its points: height, pitch and roll each on a soft spring, so it bobs and rocks rather than snapping
+function boatFloat(k,dt,vf,inp){ const t=k.bobT; boatSupport(k,k.x,k.z,k.yaw,t,_bs); const B=_bs;
+  const plane=Math.max(0,Math.min(1,(vf-4)/(BMAX-4))), gnd=boatGnd(B);
+  const hMid=(B[0].h+B[1].h)/2*0.35+(B[2].h+B[3].h)/2*0.35+B[4].h*0.3;
+  const yT=Math.max(hMid+0.08*plane*(1-gnd),Math.max(...B.map(p=>p.ground?p.h:-1e9))-0.03);
+  let pT=Math.atan2(B[0].h-B[1].h,3.8)+(1-gnd)*(0.085*plane+Math.max(-0.05,Math.min(0.07,(k.acc||0)*0.012))), rT=Math.atan2(B[3].h-B[2].h,1.44);
+  if(gnd<0.6) rT-=(k.steer||0)*Math.min(1,Math.abs(vf)/BMAX)*0.26*(1-gnd);   // leans into the turn
+  const stiff=gnd>0.2?60:24, damp=gnd>0.2?14:4.5;
+  k.vy+=(stiff*(yT-k.y)-damp*k.vy)*dt; k.y+=k.vy*dt; if(k.y<yT-0.25){ k.y=yT-0.25; k.vy=Math.max(0,k.vy); }
+  k.pv=(k.pv||0)+((stiff*0.55)*(pT-k.pitch)-damp*0.8*(k.pv||0))*dt; k.rv=(k.rv||0)+((stiff*0.5)*(rT-k.roll)-damp*0.75*(k.rv||0))*dt;
+  k.pitch+=k.pv*dt; k.roll+=k.rv*dt; k.air=false; k.gnd=gnd;
+  // a sudden drop on to a wave or the beach: a splash and a jolt
+  if(k.vy<-1.2&&B.some(p=>!p.ground)&&k.y<yT-0.05&&dt>0){ if(!k.slapT||k.slapT<k.bobT-0.4){ k.slapT=k.bobT; const w=waterAt(k.x,k.z); if(w>-999){ const p=kartPoint(k,0,0,-1.5,_ku); p.y=w+0.1; burst(p,8,3,0.08,splashMat); sfxAt('step_water',p); } } } }
+function settleBoat(k,dt){ k.vf=0; k.thr=0; k.slip=0; k.steer*=Math.exp(-dt*3); k.acc=0; k.bobT+=dt;
+  if(Math.hypot(k.vx,k.vz)>0.05){ const c=Math.exp(-dt*(1.2+(k.gnd||0)*10)); k.vx*=c; k.vz*=c; const nx=k.x+k.vx*dt, nz=k.z+k.vz*dt; if(!kartHits(k,nx,nz,k.yaw,k.x,k.z)){ k.x=nx; k.z=nz; } else { k.vx=k.vz=0; } } else { k.vx=k.vz=0; }
+  boatFloat(k,dt,0,null);
+  // stranded on the beach with nobody near for a minute: back to its mooring
+  if((k.gnd||0)>=0.6&&!k.seats[0]&&!k.seats[1]&&Math.hypot(P.pos.x-k.x,P.pos.z-k.z)>40){ k.beachT=(k.beachT||0)+dt; if(k.beachT>60){ k.beachT=0; Object.assign(k,{x:k.home.x,y:k.home.y,z:k.home.z,yaw:k.home.yaw,pitch:0,roll:0,vx:0,vz:0,vy:0,pv:0,rv:0}); kartPose(k); } } else k.beachT=0; }
+// grooves the keel cuts in sand and mud: dark, damp marks, the newest few hundred kept
+const BTRK={m:null,n:0,max:360,last:new Map()};
+function boatTracks(k){ if(!(k.gnd>0)) return; const sp=Math.hypot(k.vx,k.vz); if(sp<0.4) return;
+  if(!BTRK.m){ const g=new THREE.PlaneGeometry(0.34,0.62); g.rotateX(-Math.PI/2); const m=new THREE.MeshLambertMaterial({color:0x5b4a33,transparent:true,opacity:0.55,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-6});
+    BTRK.m=new THREE.InstancedMesh(g,m,BTRK.max); BTRK.m.count=0; BTRK.m.frustumCulled=false; BTRK.m.receiveShadow=true; BTRK.m.renderOrder=1; scene.add(BTRK.m); }
+  const L=BTRK.last.get(k)||[]; BTRK.last.set(k,L);
+  for(let i=0;i<5;i++){ const p=_bs[i]; if(!p||!p.ground) continue; const l=L[i]; if(l&&Math.hypot(l[0]-p.x,l[1]-p.z)<0.5) continue; L[i]=[p.x,p.z];
+    const y=terrainH(p.x,p.z)+0.015, [sl,gx,gz]=slopeAt(p.x,p.z); _bm.makeRotationY(k.yaw); _bq.setFromUnitVectors(_ZUP,_bn.set(-gx,1,-gz).normalize()); _bm.premultiply(_bm2.makeRotationFromQuaternion(_bq)); _bm.setPosition(p.x,y,p.z);
+    const s_=i===1?1.3:i===4?1.1:0.8; _bm.scale(_bv.set(s_,1,1)); BTRK.m.setMatrixAt(BTRK.n%BTRK.max,_bm); BTRK.n++; BTRK.m.count=Math.min(BTRK.max,BTRK.n); BTRK.m.instanceMatrix.needsUpdate=true; } }
+const _bm=new THREE.Matrix4(), _bm2=new THREE.Matrix4(), _bq=new THREE.Quaternion(), _bn=new THREE.Vector3(), _bv=new THREE.Vector3();
 function boatModel(k,dt,dCam){ kartPose(k); k.g.visible=dCam<300; if(dCam>110) return;
   if(k.hp<KART_HP*0.5&&Math.random()<dt*(k.hp<KART_HP*0.25?14:6)){ const p=kartPoint(k,0,0.9,2.1,_ku); kartPuff(p,k.hp<KART_HP*0.25?0x2a2a2a:0x8f8f8f,new THREE.Vector3((Math.random()-.5)*0.4,1.2,(Math.random()-.5)*0.4),0.35,1.6); }
   const vf=k.vf||0; k.motor.rotation.y=k.steer*0.9; k.sw.rotation.z=k.steer*2.4; k.spinA+=(k.driver?(6+Math.abs(vf)*3)*(k.thr<-0.1?-1:1):0)*dt; k.prop.rotation.z=k.spinA;
   // the wake: foam thrown from the stern and spray at the bow when it's moving
-  k.wakeT-=dt; const sp=Math.hypot(k.vx,k.vz); if(k.wakeT<=0&&dCam<80&&sp>1.2){ k.wakeT=sp>6?0.04:0.09; const w=waterAt(k.x,k.z); if(w>-999){
+  k.wakeT-=dt; const sp=Math.hypot(k.vx,k.vz); if(k.wakeT<=0&&dCam<80&&sp>1.2&&(k.gnd||0)<0.8){ k.wakeT=sp>6?0.04:0.09; const w=waterAt(k.x,k.z); if(w>-999){
     for(const sx of [-0.7,0.7]){ const p=kartPoint(k,sx,0,2.2,_ku); p.y=w+0.05; kartPuff(p,0xf4f8fb,new THREE.Vector3(sx*0.9+(Math.random()-.5)*0.6,0.3+Math.random()*0.4,0).applyAxisAngle(_ZUP,k.yaw),0.32+sp*0.03,0.6+sp*0.05); }
     if(sp>5){ const p=kartPoint(k,(Math.random()<0.5?-1:1)*0.5,0,-1.9,_ku); p.y=w+0.1; kartPuff(p,0xffffff,new THREE.Vector3((Math.random()-.5)*2,0.8+Math.random(),0).applyAxisAngle(_ZUP,k.yaw),0.22,0.5); } } } }
 const _ZUP=new THREE.Vector3(0,1,0);
@@ -3838,6 +3878,7 @@ function seatPose(T,S,A){ const st=S.seat.k.steer||0, drive=S.seat.s===0, look=M
   if(S.seat.gunP) return;
   T.chX=0.02; T.chY=look*0.3; T.nkY=look*0.55; T.nkX=S.pitch*0.35; T.nkZ=0; T.wrR=0;
   if(drive){ T.shL=1.05-st*0.3; T.shR=1.05+st*0.3; T.shLz=-0.14; T.shRz=0.14; T.elL=T.elR=0.8; T.chZ=-st*0.07; }
+  else if(S.seat.k.boat){ T.shL=0.35; T.shLz=-0.32; T.elL=0.9; T.shR=0.3; T.shRz=0.62; T.elR=0.55; T.chZ=0.02; }
   else { T.shL=0.4; T.shLz=-0.2; T.elL=1.0; T.shR=2.55; T.shRz=0.42; T.elR=0.75; T.chZ=0.04; } }
 function seatPlace(H,S){ const k=S.seat.k, G=H.group, r=H.rig; seatWorld(k,S.seat.s,_ku);
   G.rotation.set(k.pitch,S.yaw,k.roll); _kz.set(0,1,0).applyEuler(G.rotation); G.position.copy(_ku).addScaledVector(_kz,-0.94);
@@ -9033,7 +9074,7 @@ function squadTick(){ const el=$('squad'); if(!el||isTouch) return; const on=!$(
 function updateCombatHUD(){
   stepDmgNums(lastDt); squadTick();
   drawCompass();
-  const xa=$('xAmmo'), showA=mode==='gun'&&!edit&&playing; xa.hidden=!showA;
+  const xa=$('xAmmo'), showA=mode==='gun'&&!edit&&playing&&!(P.kart&&P.kart.seat===0); xa.hidden=!showA;
   if(showA){ const W=WEAPONS[P.wpn]; xa.textContent=W.throw?'×'+P.nades:P.reloadT>0?'···':P.ammo[P.wpn]+' | '+(infiniteAmmo()?'∞':(P.res[W.ammo]|0)); xa.classList.toggle('low',!W.throw&&P.ammo[P.wpn]<=Math.ceil(W.mag*0.25)); }
   $('hurtfx').classList.toggle('low',!!(B&&B.active)&&P.hp<35&&round.state==='fight');
   const vis=!$('vitals').hidden;
@@ -9626,37 +9667,76 @@ var _vanMats;
 function vanScreen(ready){ const cv=document.createElement('canvas'); cv.width=256; cv.height=128; const g=cv.getContext('2d'); const gr=g.createLinearGradient(0,0,0,128); gr.addColorStop(0,ready?'#1c5cff':'#3a3f4a'); gr.addColorStop(1,ready?'#0a1f6a':'#1a1d24'); g.fillStyle=gr; g.fillRect(0,0,256,128);
   g.strokeStyle=ready?'#9fe0ff':'#8a8f99'; g.lineWidth=4; g.strokeRect(6,6,244,116); g.save(); g.translate(58,64); g.lineWidth=7; g.strokeStyle='#fff'; g.beginPath(); g.arc(0,0,26,0.5,5.6); g.stroke(); g.fillStyle='#fff'; g.beginPath(); g.moveTo(26*Math.cos(5.6)+12,26*Math.sin(5.6)-2); g.lineTo(26*Math.cos(5.6)-9,26*Math.sin(5.6)-14); g.lineTo(26*Math.cos(5.6)-6,26*Math.sin(5.6)+12); g.fill(); g.restore();
   g.fillStyle='#fff'; g.font='900 italic 34px "Arial Black",Arial,sans-serif'; g.textAlign='left'; g.textBaseline='middle'; g.fillText(ready?'REBOOT':'CHARGING',100,64); const t=new THREE.CanvasTexture(cv); return new THREE.MeshBasicMaterial({map:t}); }
-function makeVan(x,y,z,yaw){ if(!_vanMats) _vanMats={white:new THREE.MeshPhongMaterial({color:0xf1f3f6,shininess:60,specular:0x444444}),blue:new THREE.MeshPhongMaterial({color:0x1f5fd8,shininess:70,specular:0x555555}),orange:new THREE.MeshPhongMaterial({color:0xff7a1a,shininess:40}),
-    dark:new THREE.MeshPhongMaterial({color:0x22262d,shininess:30}),glass:new THREE.MeshPhongMaterial({color:0x2a4466,shininess:120,specular:0xaaccff}),rub:new THREE.MeshLambertMaterial({color:0x18191c}),metal:new THREE.MeshPhongMaterial({color:0xb8bec6,shininess:90,specular:0x888888}),
-    lamp:new THREE.MeshBasicMaterial({color:0x9fe0ff}),ready:vanScreen(true),wait:vanScreen(false)};
-  const M=_vanMats, g=new THREE.Group(), add=(geo,mat,px,py,pz,rx=0,ry=0,rz=0)=>{ const m=new THREE.Mesh(geo,mat); m.position.set(px,py,pz); m.rotation.set(rx,ry,rz); m.castShadow=m.receiveShadow=true; g.add(m); return m; };
-  const B=(w,h,d)=>new THREE.BoxGeometry(w,h,d);
-  add(B(2.0,0.35,4.3),M.dark,0,0.62,0);                       // chassis
-  add(B(2.12,2.05,2.9),M.white,0,1.82,0.55);                  // the box at the back
-  add(B(2.14,0.26,2.92),M.blue,0,1.32,0.55); add(B(2.15,0.07,2.93),M.orange,0,1.5,0.55); // livery stripes
-  add(B(2.0,1.45,1.35),M.white,0,1.52,-1.5);                  // cab
-  add(B(2.02,0.5,1.37),M.blue,0,0.98,-1.5);
-  add(B(1.84,0.62,0.06),M.glass,0,1.92,-2.17,-0.18); for(const s of [-1,1]) add(B(0.06,0.55,0.9),M.glass,s*1.005,1.95,-1.55);
-  add(B(2.1,0.22,0.12),M.metal,0,0.8,-2.2); for(const s of [-1,1]){ add(new THREE.CylinderGeometry(0.11,0.11,0.05,14).rotateX(Math.PI/2),M.lamp,s*0.75,1.2,-2.19); add(B(0.16,0.1,0.04),new THREE.MeshBasicMaterial({color:0xd01818}),s*0.9,1.25,2.01); }
-  for(const [wx,wz] of [[-1,-1.45],[1,-1.45],[-1,1.35],[1,1.35]]){ add(new THREE.CylinderGeometry(0.46,0.46,0.32,20).rotateZ(Math.PI/2),M.rub,wx*0.92,0.46,wz); add(new THREE.CylinderGeometry(0.26,0.26,0.34,12).rotateZ(Math.PI/2),M.metal,wx*0.92,0.46,wz); }
-  // the roof: a dish on a mast and a light bar that blazes when someone's rebooted
-  add(new THREE.CylinderGeometry(0.05,0.05,0.7,8),M.metal,0.4,3.2,0.9); const dish=add(new THREE.SphereGeometry(0.62,20,10,0,Math.PI*2,0,Math.PI*0.42),M.white,0.4,3.55,0.9,-0.9,0,0.3); dish.material=M.white;
-  add(new THREE.CylinderGeometry(0.04,0.04,0.5,6),M.metal,0.4,3.55,0.55,-0.9);
-  const beacon=add(B(0.9,0.14,0.22),M.lamp,-0.35,2.93,-0.1);
-  // the terminal on the kerb side: a screen and two handles
-  const term=new THREE.Group(); term.position.set(1.07,1.62,0.55); g.add(term);
-  const panel=new THREE.Mesh(B(0.08,0.95,1.5),M.dark); term.add(panel); const scr=new THREE.Mesh(new THREE.PlaneGeometry(1.32,0.66),M.ready); scr.rotation.y=Math.PI/2; scr.position.x=0.045; scr.position.y=0.06; term.add(scr);
-  { const cv=document.createElement('canvas'); cv.width=512; cv.height=128; const q=cv.getContext('2d'); q.fillStyle='#1f5fd8'; q.fillRect(0,0,512,128); q.fillStyle='#ff7a1a'; q.fillRect(0,112,512,16);
+function vanBodyGeo(){ const V=(x,y,z)=>new THREE.Vector3(x,y,z), W=2.06;
+  // the side profile, u along the van (front at -2.25), v up; wheel arches cut in at the front and back wheels
+  const P=new THREE.Shape(); P.moveTo(2.1,0.48); P.lineTo(2.1,2.62); P.quadraticCurveTo(2.1,2.86,1.86,2.86); P.lineTo(-0.72,2.86); P.quadraticCurveTo(-0.95,2.86,-1.02,2.62);
+  P.lineTo(-1.82,1.5); P.quadraticCurveTo(-1.9,1.38,-2.05,1.36); P.lineTo(-2.18,1.32); P.quadraticCurveTo(-2.27,1.29,-2.27,1.15); P.lineTo(-2.27,0.58); P.quadraticCurveTo(-2.27,0.48,-2.17,0.48);
+  P.lineTo(-2.0,0.48); P.absarc(-1.45,0.48,0.55,Math.PI,0,true); P.lineTo(0.8,0.48); P.absarc(1.35,0.48,0.55,Math.PI,0,true); P.lineTo(2.1,0.48);
+  const body=new THREE.ExtrudeGeometry(P,{depth:W,bevelEnabled:true,bevelThickness:0.05,bevelSize:0.05,bevelSegments:2,curveSegments:10}); body.rotateY(-Math.PI/2); body.translate(W/2,0,0);
+  // the blue skirt and orange stripe: the lower body again, a hair wider, cut off flat on top
+  const band=(v0,v1,grow)=>{ const S=new THREE.Shape(); S.moveTo(2.15+grow,v0); S.lineTo(2.15+grow,v1); S.lineTo(-2.32-grow,v1); S.lineTo(-2.32-grow,v0);
+    if(v0<0.6){ S.lineTo(-2.0-grow,v0); S.absarc(-1.45,0.48,0.55-0.015,Math.PI,0,true); S.lineTo(0.8,v0); S.absarc(1.35,0.48,0.55-0.015,Math.PI,0,true); } S.lineTo(2.15+grow,v0);
+    const g=new THREE.ExtrudeGeometry(S,{depth:W+0.12+grow*2,bevelEnabled:false,curveSegments:10}); g.rotateY(-Math.PI/2); g.translate((W+0.12+grow*2)/2,0,0); return g; };
+  return {body,skirt:band(0.43,1.22,0.008),stripe:band(1.22,1.31,0.012)}; }
+function makeVan(x,y,z,yaw){ if(!_vanMats) _vanMats={white:new THREE.MeshPhongMaterial({color:0xf3f5f8,shininess:70,specular:0x555555}),blue:new THREE.MeshPhongMaterial({color:0x1f5fd8,shininess:80,specular:0x666666}),orange:new THREE.MeshPhongMaterial({color:0xff7a1a,shininess:50}),
+    dark:new THREE.MeshPhongMaterial({color:0x22262d,shininess:30}),glass:new THREE.MeshPhongMaterial({color:0x1d3048,shininess:140,specular:0xbfd8ff}),glass2:new THREE.MeshPhongMaterial({color:0x1d3048,shininess:140,specular:0xbfd8ff,side:THREE.DoubleSide}),rub:new THREE.MeshLambertMaterial({color:0x18191c}),metal:new THREE.MeshPhongMaterial({color:0xb8bec6,shininess:90,specular:0x888888}),
+    lamp:new THREE.MeshBasicMaterial({color:0x9fe0ff}),head:new THREE.MeshBasicMaterial({color:0xfff6d8}),tail:new THREE.MeshBasicMaterial({color:0xd01818}),amber:new THREE.MeshBasicMaterial({color:0xffa31a}),liner:new THREE.MeshLambertMaterial({color:0x111214,side:THREE.BackSide})};
+  if(!_vanMats.geo) _vanMats.geo=vanBodyGeo();
+  const M=_vanMats, G=M.geo, g=new THREE.Group(), add=(geo,mat,px,py,pz,rx=0,ry=0,rz=0)=>{ const m=new THREE.Mesh(geo,mat); m.position.set(px,py,pz); m.rotation.set(rx,ry,rz); m.castShadow=m.receiveShadow=true; g.add(m); return m; };
+  const B=(w,h,d)=>new THREE.BoxGeometry(w,h,d), X=1.09; // X: just outside the body's sides
+  add(G.body,M.white,0,0,0); add(G.skirt,M.blue,0,0,0); add(G.stripe,M.orange,0,0,0);
+  add(B(1.9,0.28,4.0),M.dark,0,0.5,0);                                                   // underside
+  // glass: the windscreen along the slope, cab side windows, a small rear window in each back door
+  { const ws=add(B(1.9,1.3,0.04),M.glass,0,2.07,-1.47,0.95,0,0); ws.castShadow=false; }
+  for(const s of [-1,1]){ const sw=new THREE.Shape(); sw.moveTo(-1.08,1.6); sw.lineTo(-1.08,2.42); sw.lineTo(-1.2,2.42); sw.lineTo(-1.74,1.6); const gg=new THREE.ShapeGeometry(sw); gg.rotateY(-Math.PI/2); const m=add(gg,M.glass2,s*X,0,0); m.castShadow=false;
+    add(B(0.02,0.82,0.03),M.dark,s*X,2.0,-1.02); }                                         // the door pillar
+  for(const s of [-1,1]) add(B(0.62,0.44,0.03),M.glass,s*0.42,2.25,2.16);
+  // doors: seams of the sliding side door (both sides) and the twin rear doors, with handles
+  for(const s of [-1,1]){ for(const zz of [-0.7,0.55]) add(B(0.012,1.9,0.025),M.dark,s*(X+0.002),1.48,zz); add(B(0.012,0.03,1.25),M.dark,s*(X+0.002),2.42,-0.08); add(B(0.03,0.05,0.2),M.metal,s*(X+0.02),1.45,0.38); }
+  add(B(0.025,2.2,0.012),M.dark,0,1.6,2.165); for(const s of [-1,1]) add(B(0.04,0.22,0.05),M.metal,s*0.14,1.45,2.18);
+  // front: grille, bumper, headlights, indicators; back: bumper, tail lights; mirrors on stalks
+  add(B(1.3,0.42,0.05),M.dark,0,0.95,-2.3); for(let k=0;k<4;k++) add(B(1.2,0.03,0.06),M.metal,0,0.8+k*0.1,-2.31);
+  add(B(2.16,0.24,0.2),M.dark,0,0.58,-2.3); add(B(2.16,0.2,0.18),M.dark,0,0.56,2.2);
+  for(const s of [-1,1]){ add(B(0.36,0.2,0.05),M.head,s*0.82,1.06,-2.31); add(B(0.12,0.12,0.05),M.amber,s*0.98,0.82,-2.31); add(B(0.12,0.4,0.05),M.tail,s*0.94,1.0,2.18);
+    add(B(0.3,0.04,0.04),M.dark,s*1.22,2.0,-1.12); add(B(0.05,0.32,0.18),M.dark,s*1.38,2.02,-1.14); }
+  // roof: a rack, the ladder up the back, the light bar, the dish on its mast
+  for(const zz of [-0.3,0.6,1.5]) add(B(1.9,0.05,0.06),M.metal,0,2.94,zz); for(const s of [-1,1]) add(B(0.05,0.05,2.0),M.metal,s*0.92,2.98,0.6);
+  for(const s of [-1,1]) add(B(0.04,2.3,0.04),M.metal,0.62+s*0.2,1.6,2.24); for(let k=0;k<7;k++) add(B(0.42,0.03,0.03),M.metal,0.62,0.7+k*0.32,2.24);
+  add(new THREE.CylinderGeometry(0.05,0.05,0.7,8),M.metal,0.4,3.2,0.9);
+  // the dish: a bowl turned up to the sky (open side up), with the feed arm reaching out of its middle
+  const dish=new THREE.Group(); dish.position.set(0.4,3.58,0.9); g.add(dish); { const tilt=new THREE.Group(); tilt.rotation.x=-0.75; dish.add(tilt);
+    const bowl=new THREE.Mesh(new THREE.SphereGeometry(0.62,22,10,0,Math.PI*2,Math.PI*0.62,Math.PI*0.38),_vanMats.dishM||(_vanMats.dishM=new THREE.MeshPhongMaterial({color:0xf3f5f8,shininess:60,specular:0x555555,side:THREE.DoubleSide}))); bowl.position.y=0.55; bowl.castShadow=true; tilt.add(bowl);
+    const arm=new THREE.Mesh(new THREE.CylinderGeometry(0.025,0.025,0.55,6),M.metal); arm.position.y=0.27; tilt.add(arm); const feed=new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.04,0.12,8),M.dark); feed.position.y=0.56; tilt.add(feed); }
+  add(B(1.25,0.1,0.3),M.dark,0,2.93,-0.62); const beacon=add(B(1.1,0.14,0.24),M.lamp,0,3.03,-0.62); beacon.castShadow=false;
+  // wheels: tyre, rim and hub, in dark arch liners
+  for(const [wz] of [[-1.45],[1.35]]){ const lin=add(new THREE.CylinderGeometry(0.56,0.56,2.0,20,1,true,-Math.PI/2,Math.PI).rotateZ(Math.PI/2),M.liner,0,0.48,wz); lin.castShadow=false;
+    for(const s of [-1,1]){ add(new THREE.CylinderGeometry(0.47,0.47,0.3,22).rotateZ(Math.PI/2),M.rub,s*0.9,0.47,wz); add(new THREE.CylinderGeometry(0.28,0.28,0.32,16).rotateZ(Math.PI/2),M.metal,s*0.9,0.47,wz); add(new THREE.CylinderGeometry(0.09,0.09,0.34,10).rotateZ(Math.PI/2),M.dark,s*0.9,0.47,wz); } }
+  // the terminal on the kerb side: a recessed panel, a live screen, a handle each side
+  const term=new THREE.Group(); term.position.set(X,1.62,0.55); g.add(term);
+  const panel=new THREE.Mesh(B(0.08,1.0,1.56),M.dark); term.add(panel); for(const s of [-1,1]){ const h=new THREE.Mesh(B(0.08,0.5,0.05),M.metal); h.position.set(0.06,-0.05,s*0.86); term.add(h); }
+  const cv=document.createElement('canvas'); cv.width=256; cv.height=128; const tex=new THREE.CanvasTexture(cv); const scr=new THREE.Mesh(new THREE.PlaneGeometry(1.36,0.68),new THREE.MeshBasicMaterial({map:tex})); scr.rotation.y=Math.PI/2; scr.position.x=0.045; scr.position.y=0.06; term.add(scr);
+  { const cv2=document.createElement('canvas'); cv2.width=512; cv2.height=128; const q=cv2.getContext('2d'); q.clearRect(0,0,512,128);
     q.save(); q.translate(64,60); q.lineWidth=11; q.strokeStyle='#fff'; q.beginPath(); q.arc(0,0,34,0.5,5.6); q.stroke(); q.fillStyle='#fff'; q.beginPath(); q.moveTo(34*Math.cos(5.6)+16,34*Math.sin(5.6)-2); q.lineTo(34*Math.cos(5.6)-12,34*Math.sin(5.6)-18); q.lineTo(34*Math.cos(5.6)-8,34*Math.sin(5.6)+16); q.fill(); q.restore();
     q.fillStyle='#fff'; q.font='900 italic 74px "Arial Black",Arial,sans-serif'; q.textBaseline='middle'; q.fillText('REBOOT',128,62);
-    const sign=new THREE.Mesh(new THREE.PlaneGeometry(2.5,0.62),new THREE.MeshPhongMaterial({map:new THREE.CanvasTexture(cv),shininess:50})); sign.rotation.y=-Math.PI/2; sign.position.set(-1.066,2.1,0.55); g.add(sign); }
+    const sign=new THREE.Mesh(new THREE.PlaneGeometry(2.3,0.58),new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(cv2),transparent:true})); sign.rotation.y=-Math.PI/2; sign.position.set(-X-0.005,0.86,0.45); g.add(sign); }
   const pad=new THREE.Mesh(new THREE.RingGeometry(0.55,0.72,40).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({color:0x7fc8ff,transparent:true,opacity:0.35,blending:THREE.AdditiveBlending,depthWrite:false,fog:false})); pad.position.set(1.75,0.09,0.55); g.add(pad);
-  const holo=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.7,0.03),new THREE.MeshBasicMaterial({color:0x9fd8ff,transparent:true,opacity:0.75,blending:THREE.AdditiveBlending,depthWrite:false,fog:false})); holo.position.set(-0.35,3.75,-0.1); holo.visible=false; g.add(holo);
+  const holo=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.7,0.03),new THREE.MeshBasicMaterial({color:0x9fd8ff,transparent:true,opacity:0.75,blending:THREE.AdditiveBlending,depthWrite:false,fog:false})); holo.position.set(0,3.75,-0.62); holo.visible=false; g.add(holo);
   g.position.set(x,y,z); g.rotation.y=yaw; scene.add(g);
   const flare=new THREE.Mesh(new THREE.CylinderGeometry(0.55,0.55,46,20,1,true).translate(0,23,0),new THREE.MeshBasicMaterial({color:0x7fc8ff,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide,fog:false})); flare.position.y=2.9; flare.visible=false; g.add(flare);
-  const c=Math.round(Math.cos(yaw)), s=Math.round(Math.sin(yaw)), hx=Math.abs(c)*1.08+Math.abs(s)*2.2, hz=Math.abs(s)*1.08+Math.abs(c)*2.2;
-  const tx=x+c*1.75, tz=z-s*1.75; // where you stand to use the terminal (local +x, rotated)
-  return {x,y,z,yaw,g,scr,beacon,flare,dish,pad,holo,cd:0,prog:0,req:0,flash:0,tx,tz,solid:{boxes:[[x-hx,y,z-hz,x+hx,y+2.85,z+hz]],key:'van'+Math.round(x)+'_'+Math.round(z),isVan:true}}; }
+  const c=Math.round(Math.cos(yaw)), s_=Math.round(Math.sin(yaw)), hx=Math.abs(c)*1.1+Math.abs(s_)*2.3, hz=Math.abs(s_)*1.1+Math.abs(c)*2.3;
+  const tx=x+c*1.75, tz=z-s_*1.75;
+  const v={x,y,z,yaw,g,scr,scrCv:cv,scrTex:tex,scrKey:'',beacon,flare,dish,pad,holo,cd:0,prog:0,req:0,flash:0,tx,tz,solid:{boxes:[[x-hx,y,z-hz,x+hx,y+2.9,z+hz]],key:'van'+Math.round(x)+'_'+Math.round(z),isVan:true}};
+  vanDrawScreen(v,0); return v; }
+// the terminal: READY with a pulsing ring, CHARGING with the seconds left, or a bar filling while you reboot
+function vanDrawScreen(v,now){ const ready=now>=v.cd, left=Math.ceil(Math.max(0,v.cd-now)/1000), pr=v.prog>0?Math.round(v.prog*40):0, key=(ready?'r':'c'+left)+'/'+pr; if(key===v.scrKey) return; v.scrKey=key;
+  const g=v.scrCv.getContext('2d'), gr=g.createLinearGradient(0,0,0,128); gr.addColorStop(0,ready?'#1c5cff':'#3a3f4a'); gr.addColorStop(1,ready?'#0a1f6a':'#1a1d24'); g.fillStyle=gr; g.fillRect(0,0,256,128);
+  g.strokeStyle=ready?'#9fe0ff':'#8a8f99'; g.lineWidth=4; g.strokeRect(6,6,244,116);
+  g.save(); g.translate(50,58); g.lineWidth=7; g.strokeStyle='#fff'; g.beginPath(); g.arc(0,0,24,0.5,5.6); g.stroke(); g.fillStyle='#fff'; g.beginPath(); g.moveTo(24*Math.cos(5.6)+11,24*Math.sin(5.6)-2); g.lineTo(24*Math.cos(5.6)-8,24*Math.sin(5.6)-13); g.lineTo(24*Math.cos(5.6)-6,24*Math.sin(5.6)+11); g.fill(); g.restore();
+  g.fillStyle='#fff'; g.textAlign='left'; g.textBaseline='middle'; g.font='900 italic 30px "Arial Black",Arial,sans-serif';
+  if(pr){ g.fillText('REBOOTING',88,46); g.fillStyle='rgba(255,255,255,.2)'; g.fillRect(88,74,146,18); g.fillStyle='#9fe0ff'; g.fillRect(88,74,146*pr/40,18); }
+  else if(ready){ g.fillText('READY',88,50); g.font='700 16px Arial,sans-serif'; g.fillStyle='#cfe6ff'; g.fillText('Hold to reboot',90,86); }
+  else { g.fillText('CHARGING',88,50); g.font='700 18px Arial,sans-serif'; g.fillStyle='#d6d9e0'; g.fillText(left+'s',90,86); }
+  v.scrTex.needsUpdate=true; }
 // ---- interact: grab a card (hold), reboot at a van (hold) ----
 function rbTargets(consider){ if(!net.role&&!(AB&&AB.active)) return; const now=performance.now();
   rbPeople().forEach(pl=>{ if(pl.id==='bot'||!pl.alive||!(pl.flags&256)||!sameTeam(pl)) return; const rv=RB.rev.get(pl.id)||0;
@@ -9687,7 +9767,7 @@ function stepReboot(dt){ const now=performance.now(), T=now/1000;
         v.pad.material.opacity=(carry?0.6+0.3*Math.sin(T*5):0.22)*(now>=v.cd?1:0.4); const ps=carry?1+0.08*Math.sin(T*5):1; v.pad.scale.set(ps,1,ps);
         v.holo.visible=need&&now>=v.cd; if(v.holo.visible){ v.holo.rotation.y+=dt*2.2; v.holo.position.y=3.75+0.1*Math.sin(T*2.4+v.id); v.holo.material.opacity=0.55+0.25*Math.sin(T*6+v.id); }
         if(dv<14&&AC){ v.humT=(v.humT||0)-dt; if(v.humT<=0){ v.humT=1.9; sfxAt('van_hum',new THREE.Vector3(v.x,v.y+1.5,v.z)); } } } }
-    const ready=now>=v.cd; if(v.scr.material!==(ready?_vanMats.ready:_vanMats.wait)) v.scr.material=ready?_vanMats.ready:_vanMats.wait;
+    const ready=now>=v.cd; if(Math.hypot(v.x-P.pos.x,v.z-P.pos.z)<70) vanDrawScreen(v,now);
     const lit=v.prog>0?0.6+0.4*Math.sin(T*18):ready?0.55+0.25*Math.sin(T*2.2+v.id):0.15; v.beacon.scale.set(1,1,1); v.beacon.material.color.setHSL(0.56,1,0.35+0.4*lit);
     if(v.flash>0||v.prog>0){ v.flash=Math.max(0,v.flash-dt); v.flare.visible=true; v.flare.material.opacity=Math.max(v.prog*0.35,Math.min(1,v.flash)*0.7); } else if(v.flare.visible) v.flare.visible=false; }
   // cards bob, spin and shimmer
@@ -9711,9 +9791,17 @@ function stepReboot(dt){ const now=performance.now(), T=now/1000;
       if($('rbMsg').textContent!==msg) $('rbMsg').textContent=msg; const who=RB.spec.who&&net.players.get(RB.spec.who), sub=(who?'Spectating '+(who.name||'teammate')+' · ':'')+'card expires in '+Math.floor(left/60)+':'+String(Math.floor(left%60)).padStart(2,'0');
       if($('rbSub').textContent!==sub) $('rbSub').textContent=sub; $('rbBar').style.transform='scaleX('+(left/RB.wait.ttl).toFixed(3)+')'; } }
   if(!RB.wait&&!P.down&&!el.hidden) el.hidden=true;
+  vanMarker(now);
   // you, carrying
   const ce=$('rbCarry'); if(RB.carry.size&&!isDead()){ const names=[...RB.carry].map(id=>(RB.cards.get(id)||{}).n||'teammate').join(' & '), t='Carrying '+names+"'s card · find a Reboot Van";
     if(ce.hidden) ce.hidden=false; if($('rbCarryT').textContent!==t) $('rbCarryT').textContent=t; } else if(!ce.hidden) ce.hidden=true; }
+const _vmV=new THREE.Vector3();
+function vanMarker(now){ const el=$('vanMark'); if(!RB.carry.size||isDead()||!VANS||!VANS.length||!playing){ if(!el.hidden) el.hidden=true; return; }
+  let v=null, bd=1e9; for(const q of VANS){ const d=Math.hypot(q.x-P.pos.x,q.z-P.pos.z)+(now>=q.cd?0:400); if(d<bd){ bd=d; v=q; } } if(!v){ el.hidden=true; return; }
+  const d=Math.hypot(v.x-P.pos.x,v.z-P.pos.z); if(d<6){ el.hidden=true; return; }
+  _vmV.set(v.x,v.y+4.4,v.z).project(camera); const W=innerWidth, H=innerHeight; let x=(_vmV.x+1)/2*W, y=(1-_vmV.y)/2*H; const behind=_vmV.z>1;
+  if(behind){ x=W-x; y=H-40; } const m=40, edge=behind||x<m||x>W-m||y<m+30||y>H-m; x=Math.max(m,Math.min(W-m,x)); y=Math.max(m+30,Math.min(H-m,y));
+  el.hidden=false; el.classList.toggle('edge',edge); el.style.left=x.toFixed(0)+'px'; el.style.top=y.toFixed(0)+'px'; const t=Math.round(d)+' m'+(now>=v.cd?'':' · charging'); if($('vanMarkD').textContent!==t) $('vanMarkD').textContent=t; }
 // waiting for a reboot: watch a teammate (the one carrying your card first), orbiting slowly behind them
 function rbSpectate(){ if(!RB.wait) return false; const mine=RB.cards.get(net.id); let pl=mine&&mine.holder&&net.players.get(mine.holder);
   if(mine&&mine.holder==='ally'&&AB&&AB.active) pl=AB;
