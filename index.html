@@ -3631,7 +3631,27 @@ const _kc=new THREE.Vector3(), _kr=new THREE.Vector3(), _ku2=new THREE.Vector3()
 function animateRig(H,S,dt){
   if(S.seat){ const look=S.yaw, gunP=S.seat.s===1&&!!S.gun; S.seat.look=look; S.seat.gunP=gunP; if(!gunP){ S.gun=false; S.yaw=S.seat.k.yaw; S.reload=null; }
     S.vel=_ZV; S.onGround=true; S.crouch=false; S.emote=null; S.slope=0; S.building=false; S.editing=false; S.swingT=0; S.sky=null; S.item=false; }
-  animateRig0(H,S,dt); if(S.seat) seatPlace(H,S); else pickTwoHands(H,S); poseHands(H,S,dt); }
+  footRestore(H); animateRig0(H,S,dt); if(S.seat) seatPlace(H,S); else pickTwoHands(H,S); poseHands(H,S,dt); footPlant(H,S); }
+const _fpM0=new THREE.Matrix4(), _fpMi=new THREE.Matrix4(), _fpG=[new THREE.Vector3(),new THREE.Vector3()], _fpT=new THREE.Vector3(), _fpJ=new THREE.Vector3(), _fpQ=[new THREE.Quaternion(),new THREE.Quaternion()], _fpQa=new THREE.Quaternion(), _fpQb=new THREE.Quaternion(), _fpW=[0,0];
+// the solved legs are put back to their animated angles before the next frame, so the animation's own smoothing never sees them
+function footRestore(H){ const f=H.anim.fk; if(!f||!f.on) return; const r=H.rig, v=f.v; f.on=false; r.hips.position.y=f.hy; let i=0;
+  for(const L of [r.legL,r.legR]){ L.hp.rotation.x=v[i++]; L.hp.rotation.z=v[i++]; L.kn.rotation.x=v[i++]; L.an.rotation.set(v[i++],v[i++],v[i++]); } }
+function footPlant(H,S){ if(!(S.emote&&EMOTES[S.emote.id])||S.seat||S.down||S.sky||H.anim.dead||S.onGround===false) return;
+  const r=H.rig, hips=r.hips, legs=[r.legL,r.legR], f=H.anim.fk||(H.anim.fk={v:[],on:false}), v=f.v, A=0.4, B=0.37, LM=A+B-0.004; if(!legs[0].an) return;
+  const em=S.emote, fresh=f.id!==em.id||em.t<(f.t||0); f.id=em.id; f.t=em.t; if(fresh) f.anc=null; const slide=em.id==='shuffle'; // the running man slides its feet on purpose
+  f.on=true; f.hy=hips.position.y; let i=0; for(const L of legs){ v[i++]=L.hp.rotation.x; v[i++]=L.hp.rotation.z; v[i++]=L.kn.rotation.x; v[i++]=L.an.rotation.x; v[i++]=L.an.rotation.y; v[i++]=L.an.rotation.z; }
+  hips.updateMatrix(); _fpM0.makeRotationX(hips.rotation.x).setPosition(0,hips.position.y,hips.position.z); _fpQa.setFromRotationMatrix(_fpM0); let drop=0;
+  for(let q=0;q<2;q++){ const L=legs[q]; L.hp.updateMatrix(); L.kn.updateMatrix(); const a=_fpT.copy(L.an.position).applyMatrix4(L.kn.matrix).applyMatrix4(L.hp.matrix), g=_fpG[q].copy(a).applyMatrix4(_fpM0); // where the foot stands under a level pelvis
+    if(!slide){ if(!f.anc) f.anc=[null,null]; if(!f.anc[q]) f.anc[q]=g.clone(); g.x=f.anc[q].x; g.z=f.anc[q].z; } // each foot keeps the spot it stood on when the emote began
+    const u=Math.max(0,Math.min(1,(g.y-0.155)/0.08)), w=_fpW[q]=1-u*u*(3-2*u); a.applyMatrix4(hips.matrix); g.lerpVectors(a,g,w);
+    _fpQ[q].copy(_fpQa).multiply(L.hp.quaternion).multiply(L.kn.quaternion).multiply(L.an.quaternion);                    // and how it is turned
+    drop=Math.max(drop,w*(g.distanceTo(_fpJ.copy(L.hp.position).applyMatrix4(hips.matrix))-LM)); }
+  if(drop>0){ hips.position.y-=Math.min(drop,0.08); hips.updateMatrix(); } _fpMi.copy(hips.matrix).invert();
+  for(let q=0;q<2;q++){ const L=legs[q], w=_fpW[q]; if(w<0.002) continue; const d=_fpT.copy(_fpG[q]).applyMatrix4(_fpMi).sub(L.hp.position), len=Math.max(0.3,Math.min(LM,d.length())); d.setLength(len);
+    const k=-(Math.PI-Math.acos(Math.max(-1,Math.min(1,(A*A+B*B-len*len)/(2*A*B))))), e0z=-B*Math.sin(k), ey=-A-B*Math.cos(k), hy=L.hp.rotation.y, ex=e0z*Math.sin(hy), ez=e0z*Math.cos(hy);
+    const rr=Math.hypot(ex,ey), c=Math.max(-1,Math.min(1,d.x/rr)), yy=-rr*Math.sqrt(1-c*c); let ps=-Math.acos(c)-Math.atan2(ey,ex), th=Math.atan2(d.z,d.y)-Math.atan2(ez,yy);
+    ps=Math.atan2(Math.sin(ps),Math.cos(ps)); th=Math.atan2(Math.sin(th),Math.cos(th)); L.hp.rotation.x=th; L.hp.rotation.z=ps; L.kn.rotation.x=k;
+    _fpQb.copy(hips.quaternion).multiply(L.hp.quaternion).multiply(L.kn.quaternion).invert().multiply(_fpQ[q]); L.an.quaternion.slerp(_fpQb,w); } }
 // engine: a single-cylinder putter that revs with speed, plus tyre skid; for your buggy or the nearest one running
 let kEng=null;
 function kartAudio(dt){ if(!AC||!karts) return;
@@ -4941,8 +4961,8 @@ function createHero(jacketHex,opts){
     for(let q=0;q<5;q++) part(rbox(.016,.035-q*.003,.07,.006),0xc9d2dc,ph,0,.015*q*q-.005,-.06-.06*q,[-.12-q*.17,0,0]);
     part(rbox(.012,.06,.09,.004),0xc9d2dc,ph,0,.01,.07,[.3,0,0]); part(rbox(.014,.01,.06,.003),0xff6a3d,ph,0,.04,0,null,null,0);
   } else if(pk==='shovel'){ // Trench Shovel: D-grip, ash shaft, steel spade in line with the handle
-    part(new THREE.TorusGeometry(.045,.01,8,16,Math.PI),0x2a2f38,rig.pick,0,.17,0,[0,Math.PI/2,0],null,0); part(limbGeo(.01,.01,.09),0x2a2f38,rig.pick,0,.17,0,[0,0,Math.PI/2],null,0);
-    part(limbGeo(.02,.022,.66),0xb98a52,rig.pick,0,.13,0,null,null,0.006); part(limbGeo(.026,.03,.09),0x4d5560,rig.pick,0,-.48,0,null,null,0);
+    part(new THREE.TorusGeometry(.045,.011,8,16,Math.PI),0x2a2f38,rig.pick,0,.215,0,[Math.PI,Math.PI/2,0],null,0); part(limbGeo(.012,.012,.112),0x2a2f38,rig.pick,0,.215,.056,[Math.PI/2,0,0],null,0);
+    part(limbGeo(.02,.022,.7),0xb98a52,rig.pick,0,.17,0,null,null,0.006); part(limbGeo(.024,.024,.03),0x2a2f38,rig.pick,0,.185,0,null,null,0); part(limbGeo(.026,.03,.09),0x4d5560,rig.pick,0,-.48,0,null,null,0);
     const sp=new THREE.BoxGeometry(.18,.22,.012); const pa=sp.attributes.position; for(let i=0;i<pa.count;i++){ const y=pa.getY(i); if(y<0) pa.setX(i,pa.getX(i)*(1+y*1.6)); } sp.computeVertexNormals();
     part(sp,0x7d8792,ph,0,-.12,0,[0,Math.PI/2,0],[1,1,1]); part(rbox(.03,.12,.02,.006),0x4d5560,ph,0,.02,0,[0,Math.PI/2,0],null,0);
   } else if(pk==='crowbar'){ // Crowbar: one bent bar of red steel with a split claw
@@ -5349,11 +5369,12 @@ const _p2a=new THREE.Vector3(), _p2b=new THREE.Vector3(), _p2q=new THREE.Quatern
 // Hands. Each finger joint is turned towards a pose: loose at rest, a fist round a tool's handle, flat for editing; a gun's
 // grip is held with the hand turned upright beside it, the first finger lying along the trigger; the other hand comes in
 // from the side under the fore-end and curls up round it.
-const HAND_POSE={relax:[[.22,.32,.18],[.32,.42,.24],[.3,.55,.12,.15]],fist:[[1.0,1.45,.85],[1.05,1.5,.9],[.9,.1,.45,.6]],pgrip:[[.2,.9,.5],[1.25,1.3,.5],[.7,.22,.3,.35]],
+const HAND_POSE={tool:[[1.12,1.25,.6],[1.15,1.28,.62],[.75,.3,.4,.45]],relax:[[.22,.32,.18],[.32,.42,.24],[.3,.55,.12,.15]],fist:[[1.0,1.45,.85],[1.05,1.5,.9],[.9,.1,.45,.6]],pgrip:[[.2,.9,.5],[1.25,1.3,.5],[.7,.22,.3,.35]],
   cradle:[[1.2,.8,.4],[1.2,.8,.4],[1.15,.25,.55,.6]],wrap:[[1.25,1.3,.5],[1.25,1.3,.5],[.7,.22,.3,.35]],point:[[.04,.06,.04],[1.2,1.5,.9],[.9,.1,.45,.6]],flat:[[.04,.08,.04],[.06,.1,.05],[.15,.85,.05,.05]]};
 // how the other hand joins in (0 not at all, 1 an upright foregrip, 2 cupping the firing hand; otherwise under the fore-end), and where a grip sits in the firing hand
 const GUN_SUPPORT={nade:0,burst:1,glauncher:1,pistol:2,revolver:2,hcannon:2,gatling:3}, GUN_HOLD={pump:[0,-.025,0],hunting:[0,-.025,0],infantry:[0,-.025,0],dbarrel:[0,-.025,0],sniper:[0,-.02,0],revolver:[0,-.02,0],gatling:[0,-.03,-.05]};
 const _gv1=new THREE.Vector3(), _gv2=new THREE.Vector3(), _gv3=new THREE.Vector3();
+const TOOL_ROLL=-0.62, TOOL_AT=[-.049,-.069,-.037], HAMMER_AT=[-.037,0,.085]; // a tool handle lies across the palm, tipped the way the pickaxe sits in the hand
 function poseHands(H,S,dt){ const r=H.rig; if(!r.armR||!r.armR.fj) return; const k=1-Math.exp(-(dt||0.016)*18);
   const emo=S.emote&&EMOTES[S.emote.id], building=!!S.building&&!emo, gun=!building&&!emo&&!S.editing&&!S.sky&&!S.down?S.gun:false, mdl=gun?modelOf(gun):null, held=gun&&mdl!=='nade';
   const tool=!gun&&((r.pick&&r.pick.visible)||(r.hammer&&r.hammer.visible)), two=tool&&r.armL.fing.rotation.x>1.1;
@@ -5361,17 +5382,20 @@ function poseHands(H,S,dt){ const r=H.rig; if(!r.armR||!r.armR.fj) return; const
     const t=P[2], T=a.th; T[0].rotation.x+=(t[0]-T[0].rotation.x)*k; T[0].rotation.z+=(a.side*t[1]-T[0].rotation.z)*k; T[1].rotation.x+=(t[2]-T[1].rotation.x)*k; T[2].rotation.x+=(t[3]-T[2].rotation.x)*k;
     a.hg.rotation.y+=(ty-a.hg.rotation.y)*k; a.hg.rotation.z+=(tz-a.hg.rotation.z)*k; };
   const A_=H.anim, rest=(nm,a,ov)=>ov!=null?ov:nm==='relax'?a.side*1.3:0, nR=A_.handR||(held?'pgrip':tool||mdl==='nade'?'fist':S.editing?'flat':'relax'); // an emote says what its hands do; loose hands hang palm-in
-  set(r.armR,nR,held?Math.PI/2:rest(nR,r.armR,A_.turnR),0);
-  const sp=held?GUN_SUPPORT[mdl]:0; const und=sp===undefined||sp===3, rlp=held&&S.reload?S.reload.p:-1, busy=rlp>0.12&&rlp<0.9, nL=A_.handL||(held?(busy?'fist':sp===0?'relax':sp===3?'fist':sp?'wrap':'cradle'):two?'fist':S.editing?'flat':'relax'); set(r.armL,nL,held?(busy?0:und?0.6:sp?-0.97:0):rest(nL,r.armL,A_.turnL),held&&und&&!busy?1.35:0);
-  const gh=held&&GUN_HOLD[mdl]||[0,0,0], hp=r.armR.hand.position, mx=held?-.032+gh[0]:0, my=held?-.092+gh[1]:-.098, mz=held?-.06+gh[2]:-.032; hp.x+=(mx-hp.x)*k; hp.y+=(my-hp.y)*k; hp.z+=(mz-hp.z)*k; }
-const _pkY=new THREE.Vector3(0,1,0), _p2c=new THREE.Vector3();
+  const tg=tool&&!A_.handR&&!S.editing, hm=tg&&r.hammer&&r.hammer.visible, TA=hm?HAMMER_AT:TOOL_AT; set(r.armR,tg?'tool':nR,held||hm?Math.PI/2:tg?0:rest(nR,r.armR,A_.turnR),hm?-Math.PI/2:tg?TOOL_ROLL:0);
+  const sp=held?GUN_SUPPORT[mdl]:0; const und=sp===undefined||sp===3, rlp=held&&S.reload?S.reload.p:-1, busy=rlp>0.12&&rlp<0.9, nL=A_.handL||(held?(busy?'fist':sp===0?'relax':sp===3?'fist':sp?'wrap':'cradle'):two?'tool':S.editing?'flat':'relax'); set(r.armL,nL,held?(busy?0:und?0.6:sp?-0.97:0):two?Math.PI:rest(nL,r.armL,A_.turnL),held&&und&&!busy?1.35:two?-TOOL_ROLL:0);
+  const gh=held&&GUN_HOLD[mdl]||[0,0,0], hp=r.armR.hand.position, mx=held?-.032+gh[0]:tg?TA[0]:0, my=held?-.092+gh[1]:tg?TA[1]:-.098, mz=held?-.06+gh[2]:tg?TA[2]:-.032; hp.x+=(mx-hp.x)*k; hp.y+=(my-hp.y)*k; hp.z+=(mz-hp.z)*k; }
+const _pkY=new THREE.Vector3(0,1,0), _p2c=new THREE.Vector3(), _p2d=new THREE.Vector3();
 function pickTwoHands(H,S){ const r=H.rig; if(!r.pick) return;
   if(!r.pickQ0){ r.pickQ0=r.pick.quaternion.clone(); r.pickQ1=new THREE.Quaternion().setFromAxisAngle(_pkY,-Math.PI/2).multiply(r.pickQ0); }
   const grip=r.pick.visible&&!S.gun&&!S.building&&!S.editing&&!(S.emote&&EMOTES[S.emote.id])&&!S.sky&&!S.down&&!S.item;
   r.pick.quaternion.copy(grip?r.pickQ1:r.pickQ0); if(!grip) return;
   r.armR.wr.rotation.y=Math.PI/2; r.armR.fing.rotation.x=1.25;
-  H.group.updateMatrixWorld(true); const t=r.pick.localToWorld(_p2a.set(0,0.11,0)), pole=H.group.localToWorld(_p2b.set(-0.7,0.6,0.3));
-  if(S.bare) return; r.armR.wr.getWorldQuaternion(_p2q); t.sub(_p2c.set(0,-.098,-.032).applyQuaternion(_p2q)); ikArm(r.armL,t,pole,_p2q); r.armL.fing.rotation.x=1.25; } // the wrist sits back from the handle so the fist closes on it
+  H.group.updateMatrixWorld(true); if(S.bare) return; r.armR.wr.getWorldQuaternion(_p2q); const pole=H.group.localToWorld(_p2b.set(-0.7,0.6,0.3)), shW=r.armL.sh.getWorldPosition(_p2d), reach=(r.armL.a+r.armL.b)*0.985;
+  // the off hand takes the handle below the firing hand, or above it when that is the only place it can reach; out of reach altogether, it lets go
+  const at=sd=>r.pick.localToWorld(_p2a.set(0,sd>0?0.105:-0.125,0)).sub(_p2c.set(TOOL_AT[0],TOOL_AT[1],-TOOL_AT[2]).applyQuaternion(_p2q));
+  let sd=r.pickSd||1, t=at(sd); if(t.distanceTo(shW)>reach){ const o=at(-sd); if(o.distanceTo(shW)<=reach){ sd=-sd; t=o; } else { t=at(sd); if(t.distanceTo(shW)>reach+0.05) return; } } r.pickSd=sd;
+  ikArm(r.armL,t,pole,_p2q); r.armL.fing.rotation.x=1.25; } // the wrist sits back from the handle so the fist closes on it
 function handQuat(out,fwd,up){ _ikY.copy(fwd).negate(); _ikZ.copy(up).addScaledVector(fwd,-up.dot(fwd)).normalize().negate(); _ikX.crossVectors(_ikY,_ikZ).normalize(); _ikM.makeBasis(_ikX,_ikY,_ikZ); return out.setFromRotationMatrix(_ikM); }
 
 // pickaxe swing keyframes (t 0..1): wind-up, strike, recover
@@ -7632,52 +7656,53 @@ function buildLandmarks(){ if(_lmBuilt) return; _lmBuilt=true; const col=new THR
     const solid=(x0,z0,x1,z1,h)=>{ const nx=Math.max(1,Math.ceil((x1-x0)/2.4)), nz=Math.max(1,Math.ceil((z1-z0)/2.4));
       for(let a=0;a<nx;a++) for(let b=0;b<nz;b++){ const xa=L.x+x0+(x1-x0)*a/nx, xb=L.x+x0+(x1-x0)*(a+1)/nx, za=L.z+z0+(z1-z0)*b/nz, zb=L.z+z0+(z1-z0)*(b+1)/nz;
         STATICS.push({x:(xa+xb)/2,z:(za+zb)/2,solid:{boxes:[[xa,Y0-2.5,za,xb,Y0+h,zb]],key:'lm'+STATICS.length}}); } };
+    const disc=(x,z,r,h)=>{ const n=Math.max(2,Math.ceil(r*2/0.7)); for(let q=0;q<n;q++){ const xa=-r+2*r*q/n, xb=-r+2*r*(q+1)/n, xm=(xa+xb)/2, hd=Math.sqrt(Math.max(0.01,r*r-xm*xm)); solid(x+xa,z-hd,x+xb,z+hd,h); } }; // a round footprint, in strips
     const flush=(spin)=>{ if(!parts.length) return; const pos=[],nor=[],cc=[]; parts.forEach(g=>{ pos.push(...g.attributes.position.array); nor.push(...g.attributes.normal.array); cc.push(...g.attributes.color.array); }); parts=[];
       const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3)); g.setAttribute('normal',new THREE.Float32BufferAttribute(nor,3)); g.setAttribute('color',new THREE.Float32BufferAttribute(cc,3)); g.computeBoundingSphere();
       const m=new THREE.Mesh(g,new THREE.MeshLambertMaterial({vertexColors:true})); m.castShadow=m.receiveShadow=true; m.position.set(L.x,Y0,L.z);
       if(spin){ m.position.set(L.x+spin[0],Y0+spin[1],L.z+spin[2]); m.onBeforeRender=()=>{ m.rotation.z=performance.now()*0.00035; }; } else { m.updateMatrix(); m.matrixAutoUpdate=false; } scene.add(m); return m; };
-    if(L.shore){ cyl(5.7,6.6,2.6,0,-2.6,0,0x8f8a80,22); cyl(5.3,5.7,0.22,0,-0.02,0,0xb9b3a4,22); solid(-4.6,-4.6,4.6,4.6,0.2); } // a stone base out on the shore
+    if(L.shore){ cyl(5.7,6.6,2.6,0,-2.6,0,0x8f8a80,22); cyl(5.3,5.7,0.22,0,-0.02,0,0xb9b3a4,22); disc(0,0,5.5,0.2); } // a stone base out on the shore
     else { box(13.4,0.1,13.4,0,0,0,0xb9b3a4); box(12.6,0.14,12.6,0,0,0,0xcfc9ba); } // a paved lot
     const kind=k===0?1:k===1?0:k%10; // the coastal town gets the lighthouse
     if(kind===0||kind===99){ // water tower
-      for(const [sx,sz] of [[1,1],[-1,1],[1,-1],[-1,-1]]){ cyl(0.16,0.24,9.2,sx*2.3,0,sz*2.3,0x6e5a4c,8); solid(sx*2.3-0.3,sz*2.3-0.3,sx*2.3+0.3,sz*2.3+0.3,9.2); }
+      for(const [sx,sz] of [[1,1],[-1,1],[1,-1],[-1,-1]]){ cyl(0.16,0.24,9.2,sx*2.3,0,sz*2.3,0x6e5a4c,8); solid(sx*2.3-0.35,sz*2.3-0.35,sx*2.3+0.35,sz*2.3+0.35,9.2); } solid(-0.4,-0.4,0.4,0.4,9.2); solid(-0.35,3.2,0.35,3.6,9.3);
       for(const y of [3,6]){ box(4.6,0.14,0.14,0,y,2.3,0x6e5a4c); box(4.6,0.14,0.14,0,y,-2.3,0x6e5a4c); box(0.14,0.14,4.6,2.3,y,0,0x6e5a4c); box(0.14,0.14,4.6,-2.3,y,0,0x6e5a4c); }
       cyl(3.5,3.5,0.3,0,9.1,0,0x5d4b40); cyl(3.3,3.3,4.2,0,9.4,0,0xa8533a); cyl(3.36,3.36,0.35,0,10.3,0,0x7c3b2a); cyl(3.36,3.36,0.35,0,12.4,0,0x7c3b2a);
       cyl(0.25,3.5,1.7,0,13.6,0,0x8a4631); sph(0.3,0,15.4,0,0xd9d4c8); box(0.5,9.3,0.08,0,0,3.4,0x57483e); cyl(0.3,0.3,9.2,0,0,0,0x57483e,8);
     } else if(kind===1){ // lighthouse
       const R=y=>2.7-1.25*y/14; for(let s=0;s<4;s++) cyl(R((s+1)*3.5),R(s*3.5),3.5,0,s*3.5,0,s%2?0xc8443c:0xf2efe6,18);
       cyl(2.3,2.3,0.3,0,14,0,0x3a3f46); for(let a=0;a<12;a++) cyl(0.05,0.05,1,Math.cos(a*0.5236)*2.2,14.3,Math.sin(a*0.5236)*2.2,0x3a3f46,6); cyl(2.25,2.25,0.08,0,15.25,0,0x3a3f46);
-      cyl(1.25,1.25,2.1,0,14.3,0,0xfff0a8,12); cyl(0.15,1.75,1.5,0,16.4,0,0xc8443c,12); sph(0.28,0,18,0,0x3a3f46); box(1.1,2.1,0.2,0,0,2.62,0x4a3a30); solid(-2.6,-2.6,2.6,2.6,14);
+      cyl(1.25,1.25,2.1,0,14.3,0,0xfff0a8,12); cyl(0.15,1.75,1.5,0,16.4,0,0xc8443c,12); sph(0.28,0,18,0,0x3a3f46); box(1.1,2.1,0.2,0,0,2.62,0x4a3a30); disc(0,0,2.9,14);
     } else if(kind===2){ // the big kettle
       cyl(0.45,0.7,7,0,0,0,0x8f959c,12); cyl(1.6,0.5,0.6,0,6.9,0,0x8f959c,12); cyl(2.9,2.3,0.9,0,7.5,0,0xd8392f); cyl(3.1,2.9,1.6,0,8.4,0,0xe04436); cyl(2.2,3.1,1.3,0,10,0,0xd8392f);
-      cyl(0.9,2.2,0.5,0,11.3,0,0x2e3238); sph(0.4,0,12,0,0x2e3238); cyl(0.3,0.55,3,3.4,8.6,0,0xd8392f,10,[0,0,-0.75]); put(new THREE.TorusGeometry(1.7,0.17,8,18,Math.PI),0x2e3238,-0.2,11.3,0); solid(-0.7,-0.7,0.7,0.7,7);
+      cyl(0.9,2.2,0.5,0,11.3,0,0x2e3238); sph(0.4,0,12,0,0x2e3238); cyl(0.3,0.55,3,3.4,8.6,0,0xd8392f,10,[0,0,-0.75]); put(new THREE.TorusGeometry(1.7,0.17,8,18,Math.PI),0x2e3238,-0.2,11.3,0); disc(0,0,0.9,7);
     } else if(kind===3){ // clock tower with lanterns
       box(3.6,1.2,3.6,0,0,0,0x9a9388); box(3.1,11.5,3.1,0,1.2,0,0xd9cdb4); box(3.7,0.45,3.7,0,12.7,0,0x9a9388); box(2.6,2.2,2.6,0,13.15,0,0xd9cdb4); cyl(0.05,2.6,3.2,0,15.35,0,0x3e4a5a,4,[0,Math.PI/4,0]); sph(0.22,0,18.7,0,0xe3c04a);
       for(const [x,z,ry] of [[0,1.58,0],[0,-1.58,0],[1.58,0,1],[-1.58,0,1]]){ cyl(1.05,1.05,0.1,x,10,z,0xf6f2e6,20,ry?[0,0,Math.PI/2]:[Math.PI/2,0,0]); box(ry?0.14:0.09,0.8,ry?0.09:0.14,x*1.04,10.5,z*1.04,0x22262c); box(ry?0.14:0.5,0.09,ry?0.5:0.14,x*1.04+(ry?0:0.22),10.5,z*1.04+(ry?0.22:0),0x22262c); }
-      box(1,2.2,0.15,0,1.2,1.56,0x4a3a30); for(const [x,z] of [[5,5],[-5,5],[5,-5],[-5,-5]]){ cyl(0.07,0.1,3.2,x,0,z,0x22262c,8); box(0.42,0.5,0.42,x,3.2,z,0xffd98a); cyl(0.05,0.34,0.25,x,3.7,z,0x22262c,4,[0,Math.PI/4,0]); solid(x-0.15,z-0.15,x+0.15,z+0.15,3.6); }
-      solid(-1.8,-1.8,1.8,1.8,13);
+      box(1,2.2,0.15,0,1.2,1.56,0x4a3a30); for(const [x,z] of [[5,5],[-5,5],[5,-5],[-5,-5]]){ cyl(0.07,0.1,3.2,x,0,z,0x22262c,8); box(0.42,0.5,0.42,x,3.2,z,0xffd98a); cyl(0.05,0.34,0.25,x,3.7,z,0x22262c,4,[0,Math.PI/4,0]); solid(x-0.22,z-0.22,x+0.22,z+0.22,3.6); }
+      solid(-1.95,-1.95,1.95,1.95,13);
     } else if(kind===4){ // windmill
-      cyl(1.9,3.1,9.5,0,0,0,0xe9e1cc,8); cyl(0.2,2.3,2,0,9.5,0,0x6b4a32,8); box(1.1,2.1,0.2,0,0,2.9,0x5a3d28); box(0.9,0.9,0.15,0,5,2.35,0x9fc4d8); cyl(0.3,0.3,1.4,0,9.2,2,0x5a3d28,8,[Math.PI/2,0,0]); solid(-2.8,-2.8,2.8,2.8,9.5);
+      cyl(1.9,3.1,9.5,0,0,0,0xe9e1cc,8); cyl(0.2,2.3,2,0,9.5,0,0x6b4a32,8); box(1.1,2.1,0.2,0,0,2.9,0x5a3d28); box(0.9,0.9,0.15,0,5,2.35,0x9fc4d8); cyl(0.3,0.3,1.4,0,9.2,2,0x5a3d28,8,[Math.PI/2,0,0]); disc(0,0,3.3,9.5);
       flush(); for(let b=0;b<4;b++){ const a=b*Math.PI/2+0.3, g1=new THREE.BoxGeometry(0.16,7,0.12); g1.translate(0,3.6,0); g1.rotateZ(a); put(g1,0x5a3d28,0,0,0); const g2=new THREE.BoxGeometry(1.3,5,0.06); g2.translate(0.7,4.4,0); g2.rotateZ(a); put(g2,0xf3ecd8,0,0,0); }
       cyl(0.45,0.45,0.5,0,-0.25,0,0x5a3d28,10,[Math.PI/2,0,0]); flush([0,9.9,2.75]);
     } else if(kind===5){ // radio mast and its hut
       for(let s=0;s<6;s++){ const r0=1-0.13*s, r1=1-0.13*(s+1); cyl(r1,r0,4,0,s*4,0,s%2?0xf2efe6:0xd8392f,4,[0,Math.PI/4,0]); }
       cyl(0.04,0.06,3,0,24,0,0x8f959c,6); sph(0.28,0,27.1,0,0xff4a3a); for(const [y,ry] of [[17,0.4],[20,2.6]]) cyl(0.7,0.15,0.35,Math.sin(ry)*0.75,y,Math.cos(ry)*0.75,0xe8e6e0,12,[Math.PI/2,ry,0]);
-      box(3.4,2.6,3,4.2,0,-3,0x8c8f8a); box(3.7,0.25,3.3,4.2,2.6,-3,0x55585c); box(0.9,1.9,0.12,4.2,0,-1.47,0x3a4a5a); solid(-0.8,-0.8,0.8,0.8,24); solid(2.5,-4.5,5.9,-1.5,2.85);
+      box(3.4,2.6,3,4.2,0,-3,0x8c8f8a); box(3.7,0.25,3.3,4.2,2.6,-3,0x55585c); box(0.9,1.9,0.12,4.2,0,-1.47,0x3a4a5a); solid(-1.15,-1.15,1.15,1.15,24); solid(2.35,-4.65,6.05,-1.35,2.85);
     } else if(kind===6){ // smokestack and boiler house
       cyl(1.3,2.3,19,-2.5,0,0,0x8a4a3a,14); cyl(1.42,1.42,0.9,-2.5,19,0,0x2e2a28,14); cyl(1.62,1.72,0.7,-2.5,14,0,0xe9e4d8,14); cyl(1.9,2,0.7,-2.5,9,0,0xe9e4d8,14);
       box(6,4.2,5.4,3,0,0,0x6e4438); box(6.4,0.3,5.8,3,4.2,0,0x35302e); box(1.6,2.4,0.14,3,0,2.72,0x2e2a28); for(const x of [1.2,4.8]) box(1,1,0.12,x,2.2,2.72,0xffd98a); cyl(0.35,0.35,2.6,-0.6,2.5,0,0x55585c,8,[0,0,Math.PI/2]);
-      solid(-4.7,-2.2,-0.3,2.2,19); solid(0,-2.7,6,2.7,4.5);
+      disc(-2.5,0,2.5,19); solid(-0.15,-2.85,6.15,2.85,4.5); solid(-2,-0.45,0.2,0.45,3);
     } else if(kind===7){ // grain silos
-      for(const x of [-2.6,2.6]){ cyl(2.3,2.3,10,x,0,0,0xc3c9cf,18); for(const y of [2.5,5,7.5]) cyl(2.34,2.34,0.12,x,y,0,0x9aa1a8,18); sph(2.3,x,10,0,0xaeb5bc); cyl(0.2,0.2,0.6,x,12.2,0,0x8f959c,8); solid(x-2.3,-2.3,x+2.3,2.3,11); }
-      box(1.2,13.5,1.2,0,0,-2.6,0xb5483a); box(1.6,1.2,1.6,0,13.5,-2.6,0x8a3428); cyl(0.14,0.14,3.2,-1.3,13.2,-1.5,0x8f959c,8,[0.5,0,1.05]); cyl(0.14,0.14,3.2,1.3,13.2,-1.5,0x8f959c,8,[0.5,0,-1.05]); box(0.5,10,0.08,-2.6,0,2.33,0x6c7279); solid(-0.6,-3.2,0.6,-2,13.5);
+      for(const x of [-2.6,2.6]){ cyl(2.3,2.3,10,x,0,0,0xc3c9cf,18); for(const y of [2.5,5,7.5]) cyl(2.34,2.34,0.12,x,y,0,0x9aa1a8,18); sph(2.3,x,10,0,0xaeb5bc); cyl(0.2,0.2,0.6,x,12.2,0,0x8f959c,8); disc(x,0,2.5,11); }
+      box(1.2,13.5,1.2,0,0,-2.6,0xb5483a); box(1.6,1.2,1.6,0,13.5,-2.6,0x8a3428); cyl(0.14,0.14,3.2,-1.3,13.2,-1.5,0x8f959c,8,[0.5,0,1.05]); cyl(0.14,0.14,3.2,1.3,13.2,-1.5,0x8f959c,8,[0.5,0,-1.05]); box(0.5,10,0.08,-2.6,0,2.33,0x6c7279); solid(-0.75,-3.35,0.75,-1.85,13.5);
     } else if(kind===8){ // copper-domed rotunda
       cyl(4.4,4.6,0.35,0,0,0,0xbdb5a4,10); cyl(3.9,4.1,0.35,0,0.35,0,0xcac2b0,10); cyl(2.6,2.6,5.2,0,0.7,0,0xd9cdb4,10); for(let a=0;a<10;a++) cyl(0.24,0.28,5.2,Math.cos(a*0.6283)*3.3,0.7,Math.sin(a*0.6283)*3.3,0xefe8d8,10);
-      cyl(3.9,3.9,0.5,0,5.9,0,0xcac2b0,10); const dome=new THREE.SphereGeometry(3.5,18,10,0,Math.PI*2,0,Math.PI/2); put(dome,0x4fa58c,0,6.4,0); cyl(0.5,0.9,0.7,0,9.8,0,0x3f8a74,10); cyl(0.05,0.14,2.4,0,10.5,0,0xe3c04a,8); box(1.1,2.3,0.2,0,0.7,2.62,0x4a3a30); solid(-3.5,-3.5,3.5,3.5,6.4);
+      cyl(3.9,3.9,0.5,0,5.9,0,0xcac2b0,10); const dome=new THREE.SphereGeometry(3.5,18,10,0,Math.PI*2,0,Math.PI/2); put(dome,0x4fa58c,0,6.4,0); cyl(0.5,0.9,0.7,0,9.8,0,0x3f8a74,10); cyl(0.05,0.14,2.4,0,10.5,0,0xe3c04a,8); box(1.1,2.3,0.2,0,0.7,2.62,0x4a3a30); disc(0,0,4.6,0.35); disc(0,0,4.1,0.7); disc(0,0,3.7,6.4);
     } else { // bandstand
-      cyl(3.6,3.8,0.4,0,0,0,0xcac2b0,8); for(let a=0;a<8;a++){ const x=Math.cos(a*0.7854+0.3927)*3.25, z=Math.sin(a*0.7854+0.3927)*3.25; cyl(0.11,0.13,2.7,x,0.4,z,0xf4f1ea,8); solid(x-0.14,z-0.14,x+0.14,z+0.14,3.1); }
-      cyl(3.7,3.7,0.22,0,3.1,0,0xf4f1ea,8); cyl(0.25,4.2,1.9,0,3.32,0,0x4f7d5c,8); sph(0.3,0,5.4,0,0xe3c04a); for(const z of [5.3,-5.3]){ box(2.2,0.1,0.55,0,0.5,z,0x7a5536); box(2.2,0.6,0.1,0,0.6,z+Math.sign(z)*0.25,0x7a5536); for(const x of [-0.9,0.9]) box(0.1,0.5,0.5,x,0,z,0x2e3238); }
-      for(const [x,z] of [[5.2,0],[-5.2,0]]){ cyl(0.5,0.6,0.5,x,0,z,0x9a9388,10); sph(0.75,x,1,z,0x4f8a4a); }
+      cyl(3.6,3.8,0.4,0,0,0,0xcac2b0,8); for(let a=0;a<8;a++){ const x=Math.cos(a*0.7854+0.3927)*3.25, z=Math.sin(a*0.7854+0.3927)*3.25; cyl(0.11,0.13,2.7,x,0.4,z,0xf4f1ea,8); solid(x-0.2,z-0.2,x+0.2,z+0.2,3.1); } disc(0,0,3.75,0.4);
+      cyl(3.7,3.7,0.22,0,3.1,0,0xf4f1ea,8); cyl(0.25,4.2,1.9,0,3.32,0,0x4f7d5c,8); sph(0.3,0,5.4,0,0xe3c04a); for(const z of [5.3,-5.3]){ box(2.2,0.1,0.55,0,0.5,z,0x7a5536); box(2.2,0.6,0.1,0,0.6,z+Math.sign(z)*0.25,0x7a5536); for(const x of [-0.9,0.9]) box(0.1,0.5,0.5,x,0,z,0x2e3238); solid(-1.15,z-0.35,1.15,z+0.4,z>0?1.2:1.2); }
+      for(const [x,z] of [[5.2,0],[-5.2,0]]){ cyl(0.5,0.6,0.5,x,0,z,0x9a9388,10); sph(0.75,x,1,z,0x4f8a4a); disc(x,z,0.8,1.7); }
     }
     flush(); });
 }
