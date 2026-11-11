@@ -1427,6 +1427,10 @@ for(const t of TOWNS){ for(let dj=-5;dj<=5;dj++) for(let di=-5;di<=5;di++){ cons
   // ---- rivers: where they run, and which stretches of road cross them (those become bridges, humped up to clear the water)
   { const NN=WN*WN, RVD=WORLD.RVD=new Float32Array(NN).fill(1e4), RVY=WORLD.RVY=new Float32Array(NN), RVW=WORLD.RVW=new Float32Array(NN), RVB=WORLD.RVB=new Float32Array(NN), RVP=WORLD.RVP=new Float32Array(NN);
     const RV=WORLD.rivers=routeRivers(); WORLD.bridges=[];
+    { const S=WGEN.sea(); if(S) for(const rv of RV){ if(rv.into>=0) continue; const p=rv.pts, n=p.length; if(n<6) continue; const L=p[n-1], A=p[n-6];
+        let dx=L[0]-A[0], dz=L[1]-A[1]; const dl=Math.hypot(dx,dz)||1; dx/=dl; dz/=dl; let deep=0;
+        for(let k=1;k<=60&&deep<4;k++){ const u=L[0]+dx*2*k, v=L[1]+dz*2*k; if(Math.abs(u)>WHALF-4||Math.abs(v)>WHALF-4) break; p.push([u,v,S.Y,L[3],L[4],L[5]]); if(WORLD.at(WH,u,v)<S.Y-1.0) deep++; else deep=0; }
+        if(p.length>n) p.forEach((q,i)=>{ if(i>=n-12&&q[2]>S.Y) q[2]=S.Y+(q[2]-S.Y)*Math.max(0,(n-1-i)/12); }); } }
     for(const rv of RV){ const p=rv.pts, n=p.length; // every cell near a river remembers the nearest stretch of it
       for(let q=0;q<n-1;q++){ const [x0,z0,y0,w0,b0,d0]=p[q], [x1,z1,y1,w1,b1,d1]=p[q+1], ex=x1-x0, ez=z1-z0, el=ex*ex+ez*ez||1e-6, R2=Math.max(w0,w1)+Math.max(b0,b1)+0.5;
         const i0=Math.max(0,Math.floor((Math.min(x0,x1)-R2+WHALF)/WHS)), i1=Math.min(WN-1,Math.ceil((Math.max(x0,x1)+R2+WHALF)/WHS)), j0=Math.max(0,Math.floor((Math.min(z0,z1)-R2+WHALF)/WHS)), j1=Math.min(WN-1,Math.ceil((Math.max(z0,z1)+R2+WHALF)/WHS));
@@ -1668,7 +1672,7 @@ function shoreAt(x,z){ const c=worldCell(x,z); return c>=0&&(WORLD.WS[c]>-999||W
     const o=(y*NS+x)*4; d[o]=Math.max(0,Math.min(255,128+gx*26)); d[o+1]=Math.max(0,Math.min(255,128+gy*26)); d[o+2]=255; d[o+3]=255; }
   const nT=new THREE.DataTexture(d,NS,NS,THREE.RGBAFormat); nT.wrapS=nT.wrapT=THREE.RepeatWrapping; nT.magFilter=THREE.LinearFilter; nT.minFilter=THREE.LinearMipmapLinearFilter; nT.generateMipmaps=true; nT.needsUpdate=true;
   WATER.mat=new THREE.ShaderMaterial({ transparent:true, depthWrite:false, fog:false,
-    uniforms:{ nT:{value:nT}, reflT:{value:(()=>{ const t=new THREE.DataTexture(new Uint8Array([0,0,0,255]),1,1,THREE.RGBAFormat); t.needsUpdate=true; return t; })()}, reflM:{value:new THREE.Matrix4()}, reflK:{value:0}, reflY:{value:0}, hT:{value:null}, seaA:{value:new THREE.Vector4(1,0,0,1)}, seaB:{value:new THREE.Vector4(1,0,0,0)}, seaO:{value:new THREE.Vector2(SPAWN[0],SPAWN[2])}, time:{value:0}, lum:{value:1}, sunDir:{value:SUN_DIR.clone()}, sunCol:{value:new THREE.Color(1,0.95,0.86)}, zen:{value:new THREE.Color(0x3f86d4)}, hor:{value:new THREE.Color(HAZE)}, fogCol:{value:new THREE.Color(HAZE)} },
+    uniforms:{ nT:{value:nT}, reflT:{value:(()=>{ const t=new THREE.DataTexture(new Uint8Array([0,0,0,255]),1,1,THREE.RGBAFormat); t.needsUpdate=true; return t; })()}, reflM:{value:new THREE.Matrix4()}, reflK:{value:0}, reflY:{value:0}, reflT2:{value:null}, reflM2:{value:new THREE.Matrix4()}, reflK2:{value:0}, reflY2:{value:0}, hT:{value:null}, seaA:{value:new THREE.Vector4(1,0,0,1)}, seaB:{value:new THREE.Vector4(1,0,0,0)}, seaO:{value:new THREE.Vector2(SPAWN[0],SPAWN[2])}, time:{value:0}, lum:{value:1}, sunDir:{value:SUN_DIR.clone()}, sunCol:{value:new THREE.Color(1,0.95,0.86)}, zen:{value:new THREE.Color(0x3f86d4)}, hor:{value:new THREE.Color(HAZE)}, fogCol:{value:new THREE.Color(HAZE)} },
     vertexShader:`attribute float depth; attribute vec2 flow; uniform float time; uniform vec4 seaA, seaB; uniform vec2 seaO; varying vec3 vW; varying float vDepth, vWash; varying vec2 vFlow; varying vec3 vSea;
       void main(){ vec4 w=modelMatrix*vec4(position,1.0); vDepth=depth; vFlow=flow;
         // along the beach the sea knows the ground under it exactly (a small map of heights), and it washes up and back: the whole sheet rises and falls a little there
@@ -1676,7 +1680,7 @@ function shoreAt(x,z){ const c=worldCell(x,z); return c>=0&&(WORLD.WS[c]>-999||W
         vSea=vec3((vec2(al-seaA.z,lat+seaB.x)*0.5+0.5)/seaB.zw,inside);
         vWash=inside*0.15*(0.5+0.5*sin(time*0.9+lat*0.035+1.7*sin(lat*0.011))); w.y+=vWash;
         vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }`,
-    fragmentShader:`uniform sampler2D nT, reflT, hT; uniform mat4 reflM; uniform float time, lum, reflK, reflY; uniform vec3 sunDir, sunCol, zen, hor, fogCol; varying vec3 vW; varying float vDepth, vWash; varying vec2 vFlow; varying vec3 vSea;
+    fragmentShader:`uniform sampler2D nT, reflT, reflT2, hT; uniform mat4 reflM, reflM2; uniform float time, lum, reflK, reflY, reflK2, reflY2; uniform vec3 sunDir, sunCol, zen, hor, fogCol; varying vec3 vW; varying float vDepth, vWash; varying vec2 vFlow; varying vec3 vSea;
       #ifdef TONE_MAPPING
         #define TM(c) toneMapping(c)
       #else
@@ -1694,8 +1698,10 @@ function shoreAt(x,z){ const c=worldCell(x,z); return c>=0&&(WORLD.WS[c]>-999||W
         vec3 R=reflect(-V,N); R.y=abs(R.y);
         float fg=min(1.0-exp(-dist*0.0011),0.92);
         vec3 mir=TM(mix(mix(hor,zen,pow(R.y,0.55)),fogCol,fg));                                              // with no mirror image: the sky, by angle
-        if(reflK>0.0){ vec4 rc=reflM*vec4(vW,1.0); vec2 ruv=rc.xy/rc.w+a*vec2(0.022,0.05)/(1.0+dist*0.03);   // the mirror image, wobbled by the ripples
-          mir=mix(mir,texture2D(reflT,clamp(ruv,0.003,0.997)).rgb,reflK*(1.0-smoothstep(0.6,2.2,abs(vW.y-reflY)))); } // (only water at the mirror's own level shows it)
+        vec2 wob=a*vec2(0.022,0.05)/(1.0+dist*0.03); float d1=vW.y-reflY, d2=vW.y-reflY2;                  // the mirror images, wobbled by the ripples
+        float w1=reflK*(d1>0.0?1.0-smoothstep(0.6,2.2,d1):1.0-smoothstep(1.5,5.0,-d1)), w2=reflK2*(d2>0.0?1.0-smoothstep(0.6,2.2,d2):1.0-smoothstep(1.5,5.0,-d2)); // (water at a mirror's level, or a little below it)
+        if(w1>0.004&&w1>=w2){ vec4 rc=reflM*vec4(vW,1.0); mir=mix(mir,texture2D(reflT,clamp(rc.xy/rc.w+wob,0.003,0.997)).rgb,w1); }
+        else if(w2>0.004){ vec4 rc=reflM2*vec4(vW,1.0); mir=mix(mir,texture2D(reflT2,clamp(rc.xy/rc.w+wob,0.003,0.997)).rgb,w2); }
         vec3 body=TM(mix(mix(vec3(0.20,0.62,0.66),vec3(0.03,0.22,0.36),smoothstep(0.0,4.5,D))*lum,fogCol,fg));
         vec3 col=mix(body,mir,F);
         float sr=max(dot(R,sunDir),0.0); col+=sunCol*(pow(sr,220.0)*2.2+pow(sr,28.0)*0.1)*(1.0-fg);          // glitter
@@ -1705,7 +1711,7 @@ function shoreAt(x,z){ const c=worldCell(x,z); return c>=0&&(WORLD.WS[c]>-999||W
         foam=max(foam,vSea.z*0.55*smoothstep(0.8,1.0,sin(D*6.5+time*1.5+fn*2.0))*smoothstep(0.06,0.3,D)*(1.0-smoothstep(0.55,1.2,D))); // lines of surf rolling in through the shallows
         foam*=smoothstep(0.0,0.05,D);
         col=mix(col,TM(mix(vec3(0.96,0.98,1.0)*(0.35+0.65*lum),fogCol,fg)),foam*0.85);
-        float al=smoothstep(0.0,0.18,D)*mix(0.62,0.96,smoothstep(0.0,2.5,D)); al=max(al,F*smoothstep(0.0,0.1,D)); al=max(al,foam*0.8);
+        float al=smoothstep(0.0,0.18,D)*mix(0.62,0.96,smoothstep(0.0,2.5,D)); al=max(al,F*smoothstep(0.0,0.1,D)); al=max(al,foam*0.8); al*=mix(1.0,smoothstep(0.016,0.5,length(vFlow)),riv); // (a river thins out where it meets the sea)
         gl_FragColor=vec4(col,al);
       }` });
   for(let c=0;c<WN*WN;c++) if(WORLD.SAND[c]>64||WORLD.WS[c]>-999) WORLD.GRASS[c]=0; // no grass on the beach or under water
@@ -1725,8 +1731,8 @@ function shoreAt(x,z){ const c=worldCell(x,z); return c>=0&&(WORLD.WS[c]>-999||W
   // the rivers: a ribbon of water down each one, level across, carrying its current
   for(const rv of WORLD.rivers||[]){ const p=rv.pts, n=p.length, AC=[-1.2,-0.85,-0.45,0,0.45,0.85,1.2], NC=AC.length, rp=[], rd=[], rf=[], ri=[]; let endQ=n-1;
     if(rv.into>=0){ const J=p[n-1], iw=WORLD.rivers[rv.into].pts[rv.jq][3]; while(endQ>2&&Math.hypot(p[endQ-1][0]-J[0],p[endQ-1][1]-J[1])<iw*0.5) endQ--; } // it stops well inside the water it joins
-    else for(let q=0;q<n;q++) if(p[q][2]<=S.Y+0.02){ endQ=Math.min(n-1,q+6); break; }                                                              // or where it reaches the sea
-    for(let q=0;q<=endQ;q++){ const a=p[Math.max(0,q-1)], b=p[Math.min(n-1,q+1)]; let tx=b[0]-a[0], tz=b[1]-a[1]; const tl=Math.hypot(tx,tz)||1; tx/=tl; tz/=tl; const hw=p[q][3], fade=Math.min(1,q/3,rv.into>=0?1:(endQ-q)/3), sp=rv.main?0.8:1.1;
+    else for(let q=0;q<n;q++) if(p[q][2]<=S.Y+0.02){ endQ=Math.min(n-1,q+8); break; }                                                              // or where it reaches the sea
+    for(let q=0;q<=endQ;q++){ const a=p[Math.max(0,q-1)], b=p[Math.min(n-1,q+1)]; let tx=b[0]-a[0], tz=b[1]-a[1]; const tl=Math.hypot(tx,tz)||1; tx/=tl; tz/=tl; const hw=p[q][3], fade=Math.min(1,q/3), sp=(rv.main?0.8:1.1)*(rv.into>=0||endQ===n-1&&p[n-1][2]>S.Y+0.02?1:Math.max(0.02,Math.min(1,(endQ-q)/9)));
       for(const c of AC){ rp.push(SPAWN[0]+p[q][0]-tz*hw*c,p[q][2],SPAWN[2]+p[q][1]+tx*hw*c); rd.push(Math.max(0,p[q][5]*(1-c*c))*fade); rf.push(tx*sp,tz*sp); } }
     for(let q=0;q<endQ;q++) for(let c=0;c<NC-1;c++){ const k=q*NC+c; ri.push(k,k+1,k+NC, k+1,k+NC+1,k+NC); }
     const rg=new THREE.BufferGeometry(); rg.setAttribute('position',new THREE.Float32BufferAttribute(rp,3)); rg.setAttribute('depth',new THREE.Float32BufferAttribute(rd,1)); rg.setAttribute('flow',new THREE.Float32BufferAttribute(rf,2)); rg.setIndex(ri); rg.computeBoundingSphere();
@@ -1781,25 +1787,16 @@ function renderMain(){ if(!AO.ok||settings.ao===false||!PERF.ao||!scene.visible)
   AO.matA.uniforms.projInv.value.copy(camera.projectionMatrixInverse); AO.matA.uniforms.pscale.value=AO.ao.height*0.5*camera.projectionMatrix.elements[5];
   renderer.setRenderTarget(AO.ao); renderer.render(AO.sA,AO.cam); renderer.setRenderTarget(null); renderer.render(AO.sC,AO.cam);
   if(AO.n<3&&++AO.n===3){ const gl=renderer.getContext(); if(gl.getError()!==gl.NO_ERROR){ console.warn('ambient occlusion switched off: the graphics driver refused it'); AO.ok=false; } } } // (checked once, after the first few frames)
-const REFL={lvl:-1e4,skip:0,ok:false,K:0,rt:null,cam:new THREE.PerspectiveCamera(),m:new THREE.Matrix4(),plane:new THREE.Plane(),clip:new THREE.Vector4(),q:new THREE.Vector4(),sz:new THREE.Vector2(),t:new THREE.Vector3(),hid:[]};
-function renderReflection(){ if(!WATER.mat) return; const u=WATER.mat.uniforms; u.reflK.value=0;
-  if(settings.reflect===false||!PERF.reflect||!WATER.lv||!scene.visible) return;
-  const cp=camera.position, LN=WATER.LN, i=Math.max(0,Math.min(LN-1,Math.floor((cp.x-SPAWN[0]+WHALF)/WATER.LC))), j=Math.max(0,Math.min(LN-1,Math.floor((cp.z-SPAWN[2]+WHALF)/WATER.LC)));
-  let lvl=WATER.lv[j*LN+i], off=WATER.ld[j*LN+i];
-  { camera.getWorldDirection(_rfD); const hl=Math.hypot(_rfD.x,_rfD.z); if(hl>0.05){ const dx=_rfD.x/hl, dz=_rfD.z/hl; // the water ahead of you, if there is some
-      for(let s=1;s<=140;s+=s<20?1.5:4){ const x=cp.x+dx*s, z=cp.z+dz*s, w=waterAt(x,z); if(w>-999&&w<cp.y-0.1){ lvl=w; off=Math.min(off,s*0.5); break; } } } }
-  const hgt=cp.y-lvl;
-  if(Math.abs(lvl-REFL.lvl)>0.02) REFL.skip=0; REFL.lvl=lvl; if(REFL.skip>0&&REFL.ok){ REFL.skip--; u.reflM.value.copy(REFL.m); u.reflK.value=REFL.K; u.reflY.value=lvl; return; } // the last mirror image still serves
-  REFL.ok=false;
-  if(lvl<-999||off>300||hgt<0.12||hgt>180) return; // no water near, or too high up for it to matter
-  const K=(1-sstep(180,300,off))*(1-sstep(120,180,hgt)); if(K<0.01) return;
+const REFL={cam:new THREE.PerspectiveCamera(),plane:new THREE.Plane(),clip:new THREE.Vector4(),q:new THREE.Vector4(),sz:new THREE.Vector2(),t:new THREE.Vector3(),hid:[],
+  s:[0,1].map(()=>({rt:null,m:new THREE.Matrix4(),lvl:-1e4,rl:-1e4,K:0,k:0,ok:false,want:false,age:9})),t0:0,c:[],flip:0};
+function reflDraw(sl,lvl){ const u=WATER.mat.uniforms, cp=camera.position;
   renderer.getDrawingBufferSize(REFL.sz); const w=Math.max(64,Math.round(REFL.sz.x*0.5)), h=Math.max(64,Math.round(REFL.sz.y*0.5));
-  if(!REFL.rt){ REFL.rt=new THREE.WebGLRenderTarget(w,h,{minFilter:THREE.LinearFilter,magFilter:THREE.LinearFilter,format:THREE.RGBAFormat}); u.reflT.value=REFL.rt.texture; } else if(REFL.rt.width!==w||REFL.rt.height!==h) REFL.rt.setSize(w,h);
+  if(!sl.rt) sl.rt=new THREE.WebGLRenderTarget(w,h,{minFilter:THREE.LinearFilter,magFilter:THREE.LinearFilter,format:THREE.RGBAFormat}); else if(sl.rt.width!==w||sl.rt.height!==h) sl.rt.setSize(w,h);
   // the camera's mirror image below the surface
   const vc=REFL.cam; camera.updateMatrixWorld(); vc.position.set(cp.x,2*lvl-cp.y,cp.z);
   REFL.t.set(0,0,-1).applyQuaternion(camera.quaternion).add(cp); REFL.t.y=2*lvl-REFL.t.y;
   vc.up.set(0,1,0).applyQuaternion(camera.quaternion); vc.up.y=-vc.up.y; vc.lookAt(REFL.t); vc.updateMatrixWorld(); vc.projectionMatrix.copy(camera.projectionMatrix);
-  REFL.m.set(0.5,0,0,0.5, 0,0.5,0,0.5, 0,0,0.5,0.5, 0,0,0,1).multiply(vc.projectionMatrix).multiply(vc.matrixWorldInverse);
+  sl.m.set(0.5,0,0,0.5, 0,0.5,0,0.5, 0,0,0.5,0.5, 0,0,0,1).multiply(vc.projectionMatrix).multiply(vc.matrixWorldInverse);
   // its near plane is tilted onto the water surface, so nothing below the surface is drawn (Lengyel's oblique clipping)
   REFL.plane.normal.set(0,1,0); REFL.plane.constant=-lvl; REFL.plane.applyMatrix4(vc.matrixWorldInverse);
   const cl=REFL.clip.set(REFL.plane.normal.x,REFL.plane.normal.y,REFL.plane.normal.z,REFL.plane.constant), pe=vc.projectionMatrix.elements, q=REFL.q;
@@ -1808,9 +1805,35 @@ function renderReflection(){ if(!WATER.mat) return; const u=WATER.mat.uniforms; 
   const hid=REFL.hid; hid.length=0; for(const o of [...WATER.meshes,VCLOUD.sky,grassMesh,flowerMesh]) if(o&&o.visible){ o.visible=false; hid.push(o); }
   if(FOREST.far) for(const kind in FOREST.far) for(const o of FOREST.far[kind]) if(o.visible){ o.visible=false; hid.push(o); } // the far trees: too far off to matter in a rippled mirror
   const prev=renderer.getRenderTarget(), au=renderer.shadowMap.autoUpdate; renderer.shadowMap.autoUpdate=false; // the shadow maps from the last frame serve
-  renderer.setRenderTarget(REFL.rt); renderer.clear(); renderer.render(scene,vc); renderer.setRenderTarget(prev); renderer.shadowMap.autoUpdate=au;
+  renderer.setRenderTarget(sl.rt); renderer.clear(); renderer.render(scene,vc); renderer.setRenderTarget(prev); renderer.shadowMap.autoUpdate=au;
   for(const o of hid) o.visible=true;
-  u.reflM.value.copy(REFL.m); u.reflK.value=K; u.reflY.value=lvl; REFL.K=K; REFL.ok=true; REFL.skip=1;
+  sl.rl=lvl; sl.ok=true; sl.age=0; }
+function renderReflection(){ if(!WATER.mat) return; const u=WATER.mat.uniforms, now=performance.now(), dt=Math.min(0.1,Math.max(0,(now-(REFL.t0||now))/1000)); REFL.t0=now;
+  const off_=()=>{ u.reflK.value=0; u.reflK2.value=0; for(const sl of REFL.s){ sl.k=0; sl.ok=false; sl.lvl=-1e4; } };
+  if(settings.reflect===false||!PERF.reflect||!WATER.lv||!scene.visible){ off_(); return; }
+  const cp=camera.position, LN=WATER.LN, i=Math.max(0,Math.min(LN-1,Math.floor((cp.x-SPAWN[0]+WHALF)/WATER.LC))), j=Math.max(0,Math.min(LN-1,Math.floor((cp.z-SPAWN[2]+WHALF)/WATER.LC)));
+  // the water levels in view: under you, and the first water met straight ahead and a little to each side
+  const C=REFL.c; C.length=0; const add=(l,o)=>{ if(l<-999||l>cp.y-0.12) return; for(const c of C) if(Math.abs(c.l-l)<0.5){ if(o<c.o){ c.o=o; c.l=l; } return; } C.push({l,o}); };
+  add(WATER.lv[j*LN+i],WATER.ld[j*LN+i]);
+  camera.getWorldDirection(_rfD); const hl=Math.hypot(_rfD.x,_rfD.z);
+  if(hl>0.05){ const fx=_rfD.x/hl, fz=_rfD.z/hl;
+    for(const a of [0,-0.5,0.5]){ const ca=Math.cos(a), sa=Math.sin(a), dx=fx*ca-fz*sa, dz=fx*sa+fz*ca;
+      for(let s=1;s<=140;s+=s<20?1.5:4){ const x=cp.x+dx*s, z=cp.z+dz*s, w=waterAt(x,z); if(w>-999&&w<cp.y-0.1){ add(w,s*0.5*(a?1.6:1)); break; } } } }
+  C.sort((a,b)=>a.o-b.o); if(C.length>2) C.length=2;
+  for(const c of C){ const hgt=cp.y-c.l; c.K=(c.o>300||hgt<0.12||hgt>180)?0:(1-sstep(180,300,c.o))*(1-sstep(120,180,hgt)); }
+  // each wanted level keeps the mirror it already has; a new one takes over a mirror that is no longer wanted
+  const S2=REFL.s; for(const sl of S2) sl.want=false; const free=[];
+  for(const c of C){ if(c.K<0.01) continue; let best=null; for(const sl of S2) if(!sl.want&&Math.abs(sl.lvl-c.l)<0.6&&(!best||Math.abs(sl.lvl-c.l)<Math.abs(best.lvl-c.l))) best=sl;
+    if(best){ best.want=true; best.lvl=c.l; best.K=c.K; } else free.push(c); }
+  for(const c of free){ const sl=S2.filter(t=>!t.want).sort((a,b)=>a.k-b.k)[0]; if(!sl) break; sl.want=true; sl.lvl=c.l; sl.K=c.K; sl.k=0; sl.ok=false; }
+  for(const sl of S2){ sl.k=sl.want?Math.min(sl.K,sl.k+dt*3):Math.max(0,sl.k-dt*3); sl.age++; if(sl.k<=0&&!sl.want){ sl.ok=false; } }
+  // draw one mirror a frame: a new one at once, otherwise whichever is oldest; with just one in use, every other frame (as before)
+  const act=S2.filter(sl=>sl.want), fresh=act.find(sl=>!sl.ok||Math.abs(sl.rl-sl.lvl)>0.25);
+  let pick=fresh||null; if(!pick&&act.length){ const old=act.reduce((a,b)=>a.age>=b.age?a:b); if(act.length>1||old.age>=2) pick=old; }
+  if(pick) reflDraw(pick,pick.lvl);
+  const [A,B]=S2;
+  u.reflK.value=A.ok?A.k:0; if(A.ok){ u.reflT.value=A.rt.texture; u.reflM.value.copy(A.m); u.reflY.value=A.rl; }
+  u.reflK2.value=B.ok?B.k:0; if(B.ok){ u.reflT2.value=B.rt.texture; u.reflM2.value.copy(B.m); u.reflY2.value=B.rl; }
 }
 const _rfD=new THREE.Vector3();
 
@@ -3891,11 +3914,13 @@ function seatPlace(H,S){ const k=S.seat.k, G=H.group, r=H.rig; seatWorld(k,S.sea
       handQuat(_khq,_kf.copy(nz).negate().addScaledVector(ay,0.6).normalize(),ay); ikArm(arm,t,pole,_khq); } } }
 const _kc=new THREE.Vector3(), _kr=new THREE.Vector3(), _ku2=new THREE.Vector3(), _kn=new THREE.Vector3(), _kt=new THREE.Vector3(), _kp=new THREE.Vector3(), _kf=new THREE.Vector3(), _kq=new THREE.Quaternion(), _khq=new THREE.Quaternion();
 function animateRig(H,S,dt){
-  S.swimW=!S.seat&&!S.sky&&S.pos&&!H.anim.dead?swimSurface(S.pos):null;
+  { const A=H.anim, raw=!S.seat&&!S.sky&&S.pos&&!A.dead?swimSurface(S.pos):null;
+    if(raw!==null){ A.swIn=(A.swIn||0)+dt; A.swOut=0; A.swLast=raw; } else { A.swOut=(A.swOut||0)+dt; A.swIn=0; }
+    S.swimRaw=raw!==null; S.swimW=raw!==null&&((A.swimT||0)>0||A.swIn>0.12)?raw:(raw===null&&(A.swimT||0)>0&&!S.seat&&!S.sky&&!A.dead?A.swLast:null); }
   if(S.swimW!==null){ S.gun=false; S.building=false; S.editing=false; S.reload=null; S.emote=null; S.item=false; S.swingT=0; S.crouch=false; }
   if(S.seat){ const look=S.yaw, gunP=S.seat.s===1&&!!S.gun; S.seat.look=look; S.seat.gunP=gunP; if(!gunP){ S.gun=false; S.yaw=S.seat.k.yaw; S.reload=null; }
     S.vel=_ZV; S.onGround=true; S.crouch=false; S.emote=null; S.slope=0; S.building=false; S.editing=false; S.swingT=0; S.sky=null; S.item=false; }
-  footRestore(H); animateRig0(H,S,dt); if(S.seat) seatPlace(H,S); else if(S.showPick) showPickPose(H,S); else pickTwoHands(H,S); if(S.emote&&S.emote.id==='salute'&&EMOTES.salute) saluteHand(H,S); poseHands(H,S,dt); footPlant(H,S); }
+  footRestore(H); animateRig0(H,S,dt); if(S.seat) seatPlace(H,S); else if(S.showPick) showPickPose(H,S); else pickTwoHands(H,S,dt); if(S.emote&&S.emote.id==='salute'&&EMOTES.salute) saluteHand(H,S); poseHands(H,S,dt); footPlant(H,S); }
 const _slA=new THREE.Vector3(), _slB=new THREE.Vector3(), _slQ=new THREE.Quaternion(), _slQ2=new THREE.Quaternion(), _slQ3=new THREE.Quaternion(), _slF=new THREE.Vector3(), _slU=new THREE.Vector3(), _slS=new THREE.Quaternion(), _slW=new THREE.Quaternion(), _slM=new THREE.Matrix4();
 // a point in the body's own frame (x right, y up, z back), from its group
 const bodyPt=(H,x,y,z,out)=>out.set(x,y,z).applyQuaternion(H.group.quaternion).add(H.group.position);
@@ -5670,7 +5695,8 @@ function poseHands(H,S,dt){ const r=H.rig; if(!r.armR||!r.armR.fj) return; const
   const sp=held?GUN_SUPPORT[mdl]:0; const und=sp===undefined||sp===3, rlp=held&&S.reload?S.reload.p:-1, busy=rlp>0.12&&rlp<0.9, nL=A_.handL||(held?(busy?'fist':sp===0?'relax':sp===3?'fist':sp?'wrap':'cradle'):two?'tool':S.editing?'flat':'relax'); set(r.armL,nL,held?(busy?0:und?0.6:sp?-0.97:0):two?Math.PI:rest(nL,r.armL,A_.turnL),held&&und&&!busy?1.35:two?-TOOL_ROLL:0);
   const gh=held&&GUN_HOLD[mdl]||[0,0,0], hp=r.armR.hand.position, mx=held?-.032+gh[0]:tg?TA[0]:0, my=held?-.092+gh[1]:tg?TA[1]:-.098, mz=held?-.06+gh[2]:tg?TA[2]:-.032; hp.x+=(mx-hp.x)*k; hp.y+=(my-hp.y)*k; hp.z+=(mz-hp.z)*k; }
 const _pkY=new THREE.Vector3(0,1,0), _p2c=new THREE.Vector3(), _p2d=new THREE.Vector3();
-function pickTwoHands(H,S){ const r=H.rig; if(!r.pick) return;
+const _pgq=[new THREE.Quaternion(),new THREE.Quaternion(),new THREE.Quaternion()];
+function pickTwoHands(H,S,dt){ const r=H.rig, A=H.anim; if(!r.pick) return; const was=A.gripW||0; A.gripW=0;
   if(!r.pickQ0){ r.pickQ0=r.pick.quaternion.clone(); r.pickQ1=new THREE.Quaternion().setFromAxisAngle(_pkY,-Math.PI/2).multiply(r.pickQ0); }
   const grip=r.pick.visible&&!S.gun&&!S.building&&!S.editing&&!(S.emote&&EMOTES[S.emote.id])&&!S.sky&&!S.down&&!S.item;
   r.pick.quaternion.copy(grip?r.pickQ1:r.pickQ0); if(!grip) return;
@@ -5679,7 +5705,9 @@ function pickTwoHands(H,S){ const r=H.rig; if(!r.pick) return;
   // the off hand takes the handle below the firing hand, or above it when that is the only place it can reach; out of reach altogether, it lets go
   const at=sd=>r.pick.localToWorld(_p2a.set(0,sd>0?0.105:-0.125,0)).sub(_p2c.set(TOOL_AT[0],TOOL_AT[1],-TOOL_AT[2]).applyQuaternion(_p2q));
   let sd=r.pickSd||1, t=at(sd); if(t.distanceTo(shW)>reach){ const o=at(-sd); if(o.distanceTo(shW)<=reach){ sd=-sd; t=o; } else { t=at(sd); if(t.distanceTo(shW)>reach+0.05) return; } } r.pickSd=sd;
-  ikArm(r.armL,t,pole,_p2q); r.armL.fing.rotation.x=1.25; } // the wrist sits back from the handle so the fist closes on it
+  const L=r.armL, w=A.gripW=Math.min(1,was+(dt||0.016)*5.5); if(w<1){ _pgq[0].copy(L.sh.quaternion); _pgq[1].copy(L.el.quaternion); _pgq[2].copy(L.wr.quaternion); }
+  ikArm(L,t,pole,_p2q); L.fing.rotation.x=1.25; // the wrist sits back from the handle so the fist closes on it
+  if(w<1){ const e=w*w*(3-2*w); L.sh.quaternion.copy(_pgq[0].slerp(L.sh.quaternion,e)); L.el.quaternion.copy(_pgq[1].slerp(L.el.quaternion,e)); L.wr.quaternion.copy(_pgq[2].slerp(L.wr.quaternion,e)); } }
 function handQuat(out,fwd,up){ _ikY.copy(fwd).negate(); _ikZ.copy(up).addScaledVector(fwd,-up.dot(fwd)).normalize().negate(); _ikX.crossVectors(_ikY,_ikZ).normalize(); _ikM.makeBasis(_ikX,_ikY,_ikZ); return out.setFromRotationMatrix(_ikM); }
 
 // pickaxe swing keyframes (t 0..1): wind-up, strike, recover
@@ -5739,7 +5767,7 @@ function animateRig0(H,S,dt){
   const fx=-Math.sin(S.yaw), fz=-Math.cos(S.yaw), rx=Math.cos(S.yaw), rz=-Math.sin(S.yaw);
   const vf=S.vel.x*fx+S.vel.z*fz, vs=S.vel.x*rx+S.vel.z*rz, sp=Math.hypot(S.vel.x,S.vel.z), k=Math.min(1,sp/RUN);
   const mv=sp>0.2?Math.atan2(vs,vf):0, cm=Math.cos(mv), sm_=Math.sin(mv);
-  const sm=1-Math.exp(-dt*18), smF=1-Math.exp(-dt*30);
+  const sm=1-Math.exp(-dt*((A.swEx||0)>0?7:18)), smF=1-Math.exp(-dt*30);
   const emo=S.emote&&EMOTES[S.emote.id]?S.emote:null;
   const gun=!S.building&&S.gun&&!emo?S.gun:false, building=!!S.building&&!emo;
   // turn rate and acceleration, smoothed: the body banks into turns and leans with speed changes
@@ -5770,8 +5798,8 @@ function animateRig0(H,S,dt){
     return;
   }
   // ----- swimming: head out of the water; a breaststroke when moving, treading water when still -----
-  if(S.swimW!=null){ A.swimT=Math.min(1,(A.swimT||0)+dt*3); A.downT=0; const e=A.swimT*A.swimT*(3-2*A.swimT), set=(o,ax,v)=>{ o.rotation[ax]=lerp(o.rotation[ax],v,sm); }, W=S.swimW;
-    const mvK=A.swimMv=lerp(A.swimMv||0,Math.min(1,sp/(S.down?0.8:1.6)),Math.min(1,dt*4)), bob=Math.sin(A.t*2.1)*0.035*(1-0.5*mvK);
+  if(S.swimW!=null){ A.swimT=S.swimRaw?Math.min(1,(A.swimT||0)+dt*3):Math.max(0,(A.swimT||0)-dt*3); A.downT=0; const e=A.swimT*A.swimT*(3-2*A.swimT), smS=1-Math.exp(-dt*9), set=(o,ax,v)=>{ o.rotation[ax]=lerp(o.rotation[ax],v,smS); }, W=S.swimW;
+    if(!S.swimRaw) A.swEx=0.5; const mvK=A.swimMv=lerp(A.swimMv||0,S.swimRaw?Math.min(1,sp/(S.down?0.8:1.6)):0,Math.min(1,dt*(S.swimRaw?4:9))), bob=Math.sin(A.t*2.1)*0.035*(1-0.5*mvK);
     A.swC=((A.swC||0)+dt*(0.55+0.45*mvK)*(S.down?0.6:1))%1; const c=A.swC, TAU=Math.PI*2, reach=0.5+0.5*Math.cos(TAU*c), out=Math.max(0,Math.sin(TAU*c)), legB=Math.max(0,-Math.sin(TAU*c)), surge=0.06*out*mvK;
     // the body: upright treading water, nearly flat swimming; the hips just under the surface, so the head is always out
     A.swX=lerp(A.swX||0,-(0.1+1.05*mvK)*e,Math.min(1,dt*5)); const th=A.swX, hipW=lerp(W-0.44,W-0.2,mvK)+bob+surge, hY=0.94;
@@ -5782,8 +5810,8 @@ function animateRig0(H,S,dt){
     set(r.neck,'x',lerp(0.05,0.55,mvK)); set(r.neck,'y',lerp(0.15*Math.sin(A.t*0.7),0,mvK)); set(r.neck,'z',0);                                   // the chin up out of the water
     // arms: sculling out to the sides when treading; a breaststroke pull (out, round and in) then shooting forward when swimming
     const sc=Math.sin(A.t*3.2);
-    for(const [a,sx] of [[r.armL,-1],[r.armR,1]]){ set(a.sh,'x',lerp(0.45+0.08*sc,1.75+1.15*reach,mvK)); set(a.sh,'z',sx*lerp(1.05+0.18*sc,0.22+0.95*out,mvK)); set(a.sh,'y',sx*lerp(0.25*sc,-0.2*out,mvK));
-      set(a.el,'x',lerp(0.55,0.2+1.35*(1-reach),mvK)); set(a.wr,'x',lerp(0.1,0.25,mvK)); }
+    for(const [a,sx] of [[r.armL,-1],[r.armR,1]]){ set(a.sh,'x',lerp(0.78+0.06*sc,1.75+1.15*reach,mvK)); set(a.sh,'z',sx*lerp(0.42+0.16*sc,0.22+0.95*out,mvK)); set(a.sh,'y',sx*lerp(0.35*sc,-0.2*out,mvK));
+      set(a.el,'x',lerp(1.0-0.12*sc,0.2+1.35*(1-reach),mvK)); set(a.wr,'x',lerp(0.15,0.25,mvK)); set(a.wr,'z',sx*lerp(0.45*sc,0,mvK)); }
     // legs: an eggbeater kick treading water; the frog kick (knees up and out, then a snap back together) swimming
     let q=0; for(const [L,sx] of [[r.legL,-1],[r.legR,1]]){ const eg=Math.sin(A.t*4.2+q*Math.PI); q++;
       set(L.hp,'x',lerp(0.55+0.25*eg,0.12+0.55*legB,mvK)); set(L.hp,'z',sx*lerp(0.32+0.1*eg,0.12+0.5*legB,mvK)); set(L.hp,'y',sx*lerp(0.2,0.35*legB,mvK));
@@ -5794,7 +5822,7 @@ function animateRig0(H,S,dt){
     // ripples where you break the surface
     A.rip=(A.rip||0)-dt; if(A.rip<=0&&S.pos.distanceTo(camera.position)<45){ A.rip=mvK>0.3?0.22:0.7; burst(_swV.set(S.pos.x+fx*0.5*mvK,W+0.04,S.pos.z+fz*0.5*mvK),mvK>0.3?4:2,0.9+1.4*mvK,0.05,splashMat); }
     return; }
-  A.swimT=0;
+  A.swimT=0; if(A.swEx>0) A.swEx=Math.max(0,A.swEx-dt);
   // ----- knocked down: face down, dragging yourself along on your forearms -----
   if(S.down){ A.downT=Math.min(1,(A.downT||0)+dt*2.2); const e=A.downT*A.downT*(3-2*A.downT), set=(o,ax,v,f)=>{ o.rotation[ax]=lerp(o.rotation[ax],v,f||sm); };
     A.dnX=lerp(A.dnX||0,-1.5*e,Math.min(1,dt*10)); G.position.y=S.pos.y+0.3*e;

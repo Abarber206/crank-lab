@@ -37,3 +37,5 @@ Run with Node and Playwright (Chromium), from a folder that has `three` and `pee
 - `tvan.js` — pictures of a Reboot Van from each side, its terminal and its roof (VIEWS=side,roof).
 - `tprof.js` — Chrome's sampling profiler over standing, skydiving and gliding: ms per frame by function.
 - `tdraw.js` — drawing work per frame (calls, triangles, far-shadow redraws, terrain meshes built) standing, skydiving and gliding.
+- `twater.js` — pictures of every river mouth and stream join from the bank (NOREFL=1 without reflections).
+- `tswimt.js` — walk into deep water and back out: the swim pose switches once each way and no limb jumps between frames.
