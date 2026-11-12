@@ -69,3 +69,6 @@ Run with Node and Playwright (Chromium), from a folder that has `three` and `pee
 - tdances.js: every emote start to end: joints stay sane, feet stay on the floor, every song beat plays
 - tdancestrip.js: a dance as front and side frames (OFF= start, SPAN= seconds) for judging poses
 - tlkemotes.js: the Locker emote section with every emote owned
+- tpoiview.js: aerial and close pictures of a point of interest (node tpoiview.js factory|castle|labs|timber views)
+- tpoiwalk.js: every staircase at the points of interest is walkable and every loot spot sits on a floor with headroom
+- tpoistand.js: the points of interest stand (no piece falls in the first half minute)
