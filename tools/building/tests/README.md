@@ -64,3 +64,4 @@ Run with Node and Playwright (Chromium), from a folder that has `three` and `pee
 - tpickrow.js: every pickaxe head side by side
 - tback.js: back bling slot: off, swap, owned/locked, the hero rebuilds
 - tlockerbk.js: screenshots of the Locker back bling row and the Item Shop
+- tstageone.js: in a party the Locker stage shows only your hero and its pad fits the picture

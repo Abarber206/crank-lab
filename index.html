@@ -9903,14 +9903,14 @@ function stageLineup(){ // who stands on the stage: you in the middle, party to 
   const lk=window._stageLook||{}, me={me:true,name:(net.role?net.name:($('pname').value.trim()||net.name))||'Player',o:lk.o!=null?lk.o:outfitIdx(settings.outfit),pk:lk.pk||settings.pickaxe,bk:lk.bk||settings.back||'auto',ready:true};
   const out=[me]; if(net.role){ const list=net.role==='host'?partyMembers():party.list; list.forEach(x=>{ if(x.id!==net.id) out.push({id:x.id,name:x.name,o:x.o|0,pk:'steel',ready:x.ready,lead:x.lead}); }); }
   return out.slice(0,4); }
-function stageSync(){ const S=_stage, L=stageLineup(), key=L.map(x=>x.o+'/'+x.pk+'/'+(x.bk||'auto')+'/'+x.name+'/'+(x.ready?1:0)).join('|');
+function stageSync(){ const S=_stage, L=stageLineup().filter(x=>x.me), key=L.map(x=>x.o+'/'+x.pk+'/'+(x.bk||'auto')+'/'+x.name+'/'+(x.ready?1:0)).join('|');
   if(key===S.key) return; S.key=key;
   S.heroes.forEach(h=>S.sc.remove(h.h.group)); S.heroes=[]; S.extra.forEach(m=>S.sc.remove(m)); S.extra=[]; const plates=$('plates'); plates.innerHTML='';
   const spots=[[0,0],[-1.95,0.7],[1.95,0.7],[-3.7,1.5]];
   L.forEach((x,i)=>{ const h=heroFor(OUTFITS[x.o]||OUTFITS[0],x.pk,x.bk); h.group.traverse(o=>{ if(o.isMesh){ o.castShadow=true; o.receiveShadow=true; } }); S.sc.add(h.group);
     const pl=document.createElement('span'); pl.className=x.me?'me':''; pl.textContent=x.name; if(!x.me&&x.ready) pl.insertAdjacentHTML('beforeend','<i>'+(x.lead?'Leader':'Ready')+'</i>'); plates.appendChild(pl);
     const [sx,sz]=spots[i]; if(i){ const p2=S.pad.clone(), r2=S.ring.clone(); r2.material=S.ring.material; [p2,r2].forEach(m=>{ m.position.x=sx; m.position.z=sz; m.scale.setScalar(0.62); S.sc.add(m); S.extra.push(m); }); p2.scale.y=1; } S.heroes.push({h,pos:new THREE.Vector3(sx,0,sz),yaw:i?(sx<0?0.35:-0.35):0.3,plate:pl,ph:Math.random()*6}); });
-  S.ring.scale.setScalar(L.length>1?1:1); }
+  }
 const _stZ=new THREE.Vector3(), _stH=new THREE.Vector3();
 function stageFrame(now){ const S=_stage; if(!S||!S.on) return; if(!stageVisible()){ S.on=false; return; } requestAnimationFrame(stageFrame);
   const dt=Math.min(0.05,S.last?(now-S.last)/1000:1/60); S.last=now; stageSync();
@@ -9918,6 +9918,8 @@ function stageFrame(now){ const S=_stage; if(!S||!S.on) return; if(!stageVisible
   if(w!==S.w||h!==S.h){ S.w=w; S.h=h; S.r.setSize(w,h,false); S.cam.aspect=w/h; S.cam.updateProjectionMatrix(); }
   const n=S.heroes.length, wide=n>1?Math.min(1,0.55+n*0.15):0; // pull the camera back a little for a party
   S.cam.position.set(0.2,1.2+wide*0.3,-5.1-wide*3.6); S.cam.lookAt(0,0.78,wide*0.5);
+  { const d=S.cam.position.length(), half=d*Math.tan(S.cam.fov*Math.PI/360)*S.cam.aspect, k=Math.max(0.55,Math.min(1,half*0.86/1.25)); // the pad's whole width, with a margin, fits the picture
+    if(Math.abs(S.pad.scale.x-k)>1e-3){ S.pad.scale.set(k,1,k); S.ring.scale.setScalar(k); } }
   if(!S.drag){ S.spinV*=Math.exp(-3*dt); S.spin+=S.spinV*dt*0.2; S.spin*=Math.exp(-0.9*dt); }
   S.heroes.forEach((e,i)=>{ const st={showPick:i===0&&(window._stagePickT||0)>now,bare:!(i===0&&(window._stagePickT||0)>now),pos:e.pos,vel:_stZ,yaw:e.yaw+(i===0?S.spin:0),pitch:-0.05,onGround:true,crouch:false,building:false,editing:false,gun:false,ads:0,swingT:0,emote:i===0&&window._stagePrev&&EMOTES[_stagePrev.id]&&performance.now()-_stagePrev.t0<EMOTES[_stagePrev.id].dur*1000?{id:_stagePrev.id,t:(performance.now()-_stagePrev.t0)/1000}:null};
     animateRig(e.h,st,dt); e.h.rig.pick.visible=i===0&&(window._stagePickT||0)>now&&!st.emote;
