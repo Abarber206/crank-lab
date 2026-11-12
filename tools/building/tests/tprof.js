@@ -1,7 +1,7 @@
 // where the time goes: Chrome's sampling profiler over a few seconds of standing, then of skydiving, grouped by function
 // node tprof.js [seconds]
 const {sleep,page,launch,open}=require('./h.js');
-(async()=>{ const b=await launch(); const {pg,errs}=await open(b,page('/home/claude/crank-lab/index.html','scene,P,renderer,settings,TOWNS,terrainH,skyDrop,deployGlider,SPAWN'),{vp:{width:800,height:480}});
+(async()=>{ const b=await launch(); const {pg,errs}=await open(b,page('/home/claude/crank-lab/index.html','scene,P,renderer,settings,TOWNS,terrainH,skyDrop,deployGlider,SPAWN'),process.env.DRAW?{vp:{width:800,height:480}}:{fast:true,norender:true});
  await pg.waitForFunction(()=>window.T&&T.renderer&&T.TOWNS,null,{timeout:180000});
  await pg.evaluate(()=>{ T.settings.skyDrop=false; const s=document.querySelector('#botSel'); s.value='off'; s.dispatchEvent(new Event('change')); document.getElementById('play').click(); }); await sleep(4000);
  const cdp=await pg.context().newCDPSession(pg); await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval',{interval:500});

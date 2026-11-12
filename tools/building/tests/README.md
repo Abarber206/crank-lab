@@ -42,3 +42,4 @@ Run with Node and Playwright (Chromium), from a folder that has `three` and `pee
 - `tcbux.js` — Crank Bux: wallet shows Crank Bux, the Get Crank Bux window shows points and pack costs, converting, buying, and "Get Crank Bux" when short (VP=844x390 for a phone).
 - `tmouth.js` — river mouths: no shoals standing up in the channel out to sea; a boat drives from the sea up each river without running aground.
 - `trefl.js` — pictures of reflections from boat height beside sea cliffs, looking along the shore and turned.
+- `tpick.js` — the hero standing with the pickaxe out, from the side and from behind (FILE=... to compare builds).

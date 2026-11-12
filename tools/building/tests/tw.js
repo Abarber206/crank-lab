@@ -1,4 +1,4 @@
 const {sleep,page,launch,open}=require('./h.js');
-(async()=>{ const b=await launch(); const {pg,errs}=await open(b,page('/home/claude/crank-lab/index.html','scene,P,renderer,TOWNS,terrainH,WORLD,SPAWN,WGEN'),{fast:true,norender:true});
+(async()=>{ const b=await launch(); const {pg,errs}=await open(b,page('/home/claude/crank-lab/index.html','scene,P,renderer,TOWNS,terrainH,WORLD,SPAWN,WGEN,waterAt,get WORLD_EDGE(){return WORLD_EDGE},waterDepth,houseRooms,housePartition,houseStair,doorOf,props,pieces'),{fast:true,norender:true});
  await pg.waitForFunction(()=>window.T&&T.renderer&&T.TOWNS,null,{timeout:180000});
  const r=await pg.evaluate(process.argv[2]); console.log(JSON.stringify(r)); console.log(errs.join('\n')||'no errors'); await b.close(); })();
