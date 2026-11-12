@@ -33,3 +33,13 @@ rep("""    if(k<1) requestAnimationFrame(step); else { LOAD.on=false; setTimeout
 rep("""function hideLoading(){ LOAD.on=false; $('loadScr').hidden=true; }""","""function hideLoading(){ if(LOAD.on&&master) master.gain.setTargetAtTime(0.9,AC.currentTime,0.3); LOAD.on=false; $('loadScr').hidden=true; }""")
 # a slower storm: about 15 minutes from the first circle to the last
 rep("""const BR_N=19, BR_SHRINK=[[60,0.62,45],[50,0.4,40],[45,0.24,35],[40,0.13,30],[35,0.06,25],[30,0,25]]""","""const BR_N=19, BR_SHRINK=[[150,0.62,90],[120,0.4,75],[100,0.24,65],[90,0.13,55],[75,0.06,45],[60,0,40]]""")
+# emotes only on the ground: in the air (bus, skydiving, a jump) or in a car the wheel doesn't open and nothing is saved for later
+rep("""function emoKeyDown(){ if(!playing||isDead()||P.down) { startEmote(settings.emote); return; } emoOpen('key'); }""",
+"""const emoAir=()=>P.sky||P.bus||P.kart||!P.onGround;
+function emoKeyDown(){ if(playing&&emoAir()){ toast('Land first to emote'); return; } if(!playing||isDead()||P.down) { startEmote(settings.emote); return; } emoOpen('key'); }""")
+rep("""    else if(act==='emote'){ if(P.down) startEmote(settings.emote); else emoOpen('touch'); }""","""    else if(act==='emote'){ if(emoAir()) toast('Land first to emote'); else if(P.down) startEmote(settings.emote); else emoOpen('touch'); }""")
+rep("""P.emote=null; if(!P.onGround||P.sky||P.bus||P.kart){ P.emoteQ=id; toast('Emote when you land'); return; } startEmote(id); }""","""P.emote=null; if(emoAir()) return; startEmote(id); }""")
+rep("""    combatTick(dt); if(P.emoteQ&&P.onGround&&!P.sky&&!P.bus&&!P.kart){ const q=P.emoteQ; P.emoteQ=null; startEmote(q); }""","""    combatTick(dt);""")
+rep("""function startEmote(id){
+  if(!EMOTES[id]||isDead()||edit||!P.onGround) return;""","""function startEmote(id){
+  if(!EMOTES[id]||isDead()||edit||!P.onGround||P.sky||P.bus||P.kart) return;""")

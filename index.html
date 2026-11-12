@@ -3436,7 +3436,7 @@ function songBeat(id,b){ const S=SONGS[id]||SONGS.dance, bd=1/((EMOTES[id]||{}).
 let _gId='dance', _gB=0;
 function emoteBeat(id,b){ _gId=id; _gB=b; sfx('groove'); }
 function startEmote(id){
-  if(!EMOTES[id]||isDead()||edit||!P.onGround) return;
+  if(!EMOTES[id]||isDead()||edit||!P.onGround||P.sky||P.bus||P.kart) return;
   if(P.emote&&P.emote.id===id){ P.emote=null; return; } // pressing it again stops it
   P.emote={id,t:0,beat:-1}; adsHeld=false; fireHeld=false; P.useT=0;
 }
@@ -6524,7 +6524,7 @@ document.querySelectorAll('.tb').forEach(b=>{
     else if(act==='build') toggleBuild();
     else if(act==='inventory') toggleInv();
     else if(act==='fire') fireDown('touch');
-    else if(act==='emote'){ if(P.down) startEmote(settings.emote); else emoOpen('touch'); }
+    else if(act==='emote'){ if(emoAir()) toast('Land first to emote'); else if(P.down) startEmote(settings.emote); else emoOpen('touch'); }
     else if(act==='use') useDown();
   });
   const up=()=>{ b.classList.remove('down'); const act=b.dataset.act;
@@ -9642,10 +9642,11 @@ function emoSel(k){ EW.sel=k; $('emoRing').querySelectorAll('.sl').forEach(b=>b.
 function emoOpen(how){ if(EW.open) return; EW.how=how; emoBuild(); if(!EW.ids.length){ toast('No emotes yet'); return; } EW.open=true; EW.mx=EW.my=0; EW.t0=performance.now(); $('emoWheel').hidden=false; if(how!=='key') emoSel(-1); }
 function emoClose(){ EW.open=false; $('emoWheel').hidden=true; }
 function emoPick(k){ const id=EW.ids[k], how=EW.how; emoClose(); if(!id) return; emoPlay(id,how); }
-function emoPlay(id,how){ if(how==='lobby'){ LOBBY.emote={id,t:0,beat:-1,n:((LOBBY.emote&&LOBBY.emote.n)|0)+1}; audioInit(); return; } P.emote=null; if(!P.onGround||P.sky||P.bus||P.kart){ P.emoteQ=id; toast('Emote when you land'); return; } startEmote(id); }
+function emoPlay(id,how){ if(how==='lobby'){ LOBBY.emote={id,t:0,beat:-1,n:((LOBBY.emote&&LOBBY.emote.n)|0)+1}; audioInit(); return; } P.emote=null; if(emoAir()) return; startEmote(id); }
 $('emoWheel').addEventListener('click',e=>{ if(e.target.id==='emoWheel'||e.target.id==='emoRing') emoClose(); });
 // the computer in a match: hold the key, move the mouse toward an emote, let go; a quick tap plays your Locker emote
-function emoKeyDown(){ if(!playing||isDead()||P.down) { startEmote(settings.emote); return; } emoOpen('key'); }
+const emoAir=()=>P.sky||P.bus||P.kart||!P.onGround;
+function emoKeyDown(){ if(playing&&emoAir()){ toast('Land first to emote'); return; } if(!playing||isDead()||P.down) { startEmote(settings.emote); return; } emoOpen('key'); }
 function emoKeyUp(){ if(!EW.open||EW.how!=='key') return; const quick=performance.now()-EW.t0<300&&EW.sel<0; const k=EW.sel; emoClose(); if(quick) startEmote(settings.emote); else if(k>=0) emoPlay(EW.ids[k],'key'); }
 addEventListener('mousemove',e=>{ if(!EW.open||EW.how!=='key') return; EW.mx+=e.movementX||0; EW.my+=e.movementY||0; const r=Math.hypot(EW.mx,EW.my); if(r>220){ EW.mx*=220/r; EW.my*=220/r; }
   if(r<36) { if(EW.sel!==-1) emoSel(-1); return; } const n=EW.ids.length, a=Math.atan2(EW.my,EW.mx)+Math.PI/2, k=((Math.round(a/(2*Math.PI/n))%n)+n)%n; if(k!==EW.sel) emoSel(k); },true);
@@ -10465,7 +10466,7 @@ function frame(now){
     if(P.down){ fireHeld=false; heldPiece=null; adsHeld=false; P.crouch=false; P.useT=0; P.emote=null; if(edit) exitEdit(false); }
     if(B&&B.active) botUpdate(dt);
     const n=Math.max(1,Math.ceil(dt/0.008)); stepFall(); for(let k=0;k<n;k++){ physStep(dt/n,P); if(B&&B.active) physStep(dt/n,B); }
-    combatTick(dt); if(P.emoteQ&&P.onGround&&!P.sky&&!P.bus&&!P.kart){ const q=P.emoteQ; P.emoteQ=null; startEmote(q); }
+    combatTick(dt);
     if(P.pos.y<-20) respawn();
     if(edit){
       const hv=tileAtNDC(0,0); if(hv!==edit.hover){ edit.hover=hv; refreshTiles(); }
