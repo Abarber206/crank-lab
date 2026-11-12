@@ -1319,6 +1319,9 @@ function makeWorldGen(o){
 
 /* ---------- baking the playable area into a heightfield, with towns and roads ----------
    One 2 m grid over the whole island: the ground mesh, physics, grass and props all read the same numbers. */
+// the outline of a town: a lumpy, lopsided ring, never wider than t.R (points of interest stay round)
+function townRadAt(t,dx,dz){ const sh=t.sh; if(!sh) return t.R; const a=Math.atan2(dz,dx); let s=0;
+  for(let k=0;k<sh.length;k+=2) s+=sh[k]*Math.cos((k/2+1)*a+sh[k+1]); return t.R*(0.86+0.14*s); }
 function bakeWorld(o){
   const {genH,MASSIFS}=o.gen, HS=o.HS, HALF=o.HALF, N=Math.round(2*HALF/HS)+1, FLAT_R=o.FLAT_R, MAP_R=o.MAP_R;
   const H0=new Float32Array(N*N);
@@ -1337,12 +1340,12 @@ function bakeWorld(o){
     cands.sort((A,B)=>A.score-B.score||A.u-B.u);
     for(const c of cands){ if(towns.length>=o.towns) break; if(towns.some(t=>{ const dx=t.u-c.u, dz=t.v-c.v; return Math.sqrt(dx*dx+dz*dz)<o.townGap; })) continue; towns.push(c); } }
   // ---- level the towns
-  for(const t of towns){ if(o.snap){ const q=o.snap(t.u,t.v); t.u=q[0]; t.v=q[1]; } t.h=Math.max(o.LVL,Math.round(t.avg/o.LVL)*o.LVL); t.R=o.townR; }
+  for(const t of towns){ if(o.snap){ const q=o.snap(t.u,t.v); t.u=q[0]; t.v=q[1]; } t.h=Math.max(o.LVL,Math.round(t.avg/o.LVL)*o.LVL); const k_=towns.indexOf(t); t.R=typeof o.townR==='function'?o.townR(k_):o.townR; t.sh=o.townShape?o.townShape(k_):null; }
   if(o.gen.setSea&&towns.length){ const t=towns[0], d=Math.sqrt(t.u*t.u+t.v*t.v); o.gen.setSea({nx:t.u/d,nz:t.v/d,C0:d+115,Y:t.h-5.5}); // below any natural ground, so only the bay floods // the first town is the coastal one
     for(let j=0;j<N;j++){ const v=-HALF+j*HS; for(let i=0;i<N;i++){ const u=-HALF+i*HS; if(o.gen.seaW(u,v)>0) H0[j*N+i]=genH(u,v); } } }
   for(const t of towns){ const E=t.R+26, i0=Math.max(0,Math.floor((t.u-E+HALF)/HS)), i1=Math.min(N-1,Math.ceil((t.u+E+HALF)/HS)), j0=Math.max(0,Math.floor((t.v-E+HALF)/HS)), j1=Math.min(N-1,Math.ceil((t.v+E+HALF)/HS));
     for(let j=j0;j<=j1;j++) for(let i=i0;i<=i1;i++){ const du=-HALF+i*HS-t.u, dv=-HALF+j*HS-t.v, d=Math.sqrt(du*du+dv*dv); if(d>=E) continue;
-      const k=d<=t.R?1:1-(d-t.R)/26, s=k*k*(3-2*k), q=j*N+i; H0[q]+=(t.h-H0[q])*s; } }
+      const rr=townRadAt(t,du,dv), k=d<=rr?1:Math.max(0,1-(d-rr)/26), s=k*k*(3-2*k), q=j*N+i; H0[q]+=(t.h-H0[q])*s; } }
   // ---- roads: towns (and the build field in the middle) joined by a minimum spanning tree plus a couple of loops
   const nodes=towns.map((t,i)=>({u:t.u,v:t.v,town:t}));
   const dist=(a,b)=>{ const dx=a.u-b.u, dz=a.v-b.v; return Math.sqrt(dx*dx+dz*dz); };
@@ -1389,7 +1392,7 @@ function bakeWorld(o){
     // height profile: follow the ground, smoothed and graded; pinned flat in towns and where it meets an earlier road
     const n=rs.length, y=new Float32Array(n), pin=new Int8Array(n), pv=new Float32Array(n);
     for(let q=0;q<n;q++){ const [u,v]=rs[q]; y[q]=at(H0,u,v);
-      for(const t of towns){ const du=u-t.u, dv=v-t.v; if(du*du+dv*dv<(t.R-2)*(t.R-2)){ pin[q]=1; pv[q]=t.h; } }
+      for(const t of towns){ const du=u-t.u, dv=v-t.v; if(Math.sqrt(du*du+dv*dv)<townRadAt(t,du,dv)-2){ pin[q]=1; pv[q]=t.h; } }
       if(!pin[q]&&at(RD,u,v)<3){ pin[q]=1; pv[q]=at(RY,u,v); }
       if(Math.sqrt(u*u+v*v)<FLAT_R+1){ pin[q]=1; pv[q]=0; } }
     const repin=()=>{ for(let q=0;q<n;q++) if(pin[q]) y[q]=pv[q]; }; repin();
@@ -1425,9 +1428,9 @@ function bakeWorld(o){
 }
 const FLAT_R=42, MAP_R=800, WHALF=832, WHS=2; // you can walk up to the foot of the outer range, no further
 const WGEN=makeWorldGen({FLAT_R,MAP_R,massifs:4,rng:seeded}), genH=WGEN.genH;
-const WORLD=bakeWorld({gen:WGEN,HS:WHS,HALF:WHALF,FLAT_R,MAP_R,rng:seeded,towns:10,townGap:210,LVL,townR:46,loops:3,loopMax:520,maxGrade:0.1,roadW:6,blendMax:34,
+const WORLD=bakeWorld({gen:WGEN,HS:WHS,HALF:WHALF,FLAT_R,MAP_R,rng:seeded,towns:10,townGap:210,LVL,townR:k=>[3,4,6,8].includes(k)?46:82,townShape:k=>{ if([3,4,6,8].includes(k)) return null; const r=seeded(5150+k), a=[0.3+r()*0.25,0.35+r()*0.3,0.18+r()*0.2,0.08+r()*0.12], s=a.reduce((x,y)=>x+y), o=[]; a.forEach(v=>o.push(v/s,r()*6.2832)); return o; },loops:3,loopMax:520,maxGrade:0.1,roadW:6,blendMax:34,
   snap:(u,v)=>[Math.round((SPAWN[0]+u)/CELL)*CELL-SPAWN[0],Math.round((SPAWN[2]+v)/CELL)*CELL-SPAWN[2]]});
-const WN=WORLD.N, WH=WORLD.H, WRD=WORLD.RD, PLAZA_R=3.6;
+const WN=WORLD.N, WH=WORLD.H, WRD=WORLD.RD, PLAZA_R=3.6, ROAD_HW_=3.6;
 // height anywhere: the baked 2 m grid inside the island, the generator itself out beyond it
 function terrainH(x,z){ const fx=(x-SPAWN[0]+WHALF)/WHS, fz=(z-SPAWN[2]+WHALF)/WHS;
   if(!(fx>=0&&fz>=0&&fx<WN-1&&fz<WN-1)) return genH(x-SPAWN[0],z-SPAWN[2]);
@@ -1442,7 +1445,7 @@ function worldCell(x,z){ const i=Math.round((x-SPAWN[0]+WHALF)/WHS), j=Math.roun
    The generator picks the flattest lowland spots and levels each to a whole build level, so the houses (real build
    pieces: you can shoot, break and collapse them) sit flush on it. Same for every player. */
 const TOWN_NAMES=['Pebble Point','Rustwood','Kettle Creek','Lantern Row','Mossy Mill','Hollow Hill','Cinder Flats','Brambleford','Copper Ridge','Willow Bend'];
-var TOWNS=WORLD.towns.map((t,k)=>{ const r=seeded(9000+k); return {x:SPAWN[0]+t.u,z:SPAWN[2]+t.v,R:t.R,h:t.h,name:TOWN_NAMES[k]||('Town '+(k+1)),seed:1+Math.floor(r()*1e9),houses:[]}; });
+var TOWNS=WORLD.towns.map((t,k)=>{ const r=seeded(9000+k); return {x:SPAWN[0]+t.u,z:SPAWN[2]+t.v,R:t.R,sh:t.sh,h:t.h,name:TOWN_NAMES[k]||('Town '+(k+1)),seed:1+Math.floor(r()*1e9),houses:[]}; });
 // four sites are points of interest, not towns
 const POI_SITE={3:'castle',4:'timber',6:'factory',8:'labs'}, POI_NAME={castle:'Fort Granite',timber:'Timber Yard',factory:'Gearworks',labs:'Crater Labs'};
 const POI_ON={castle:1,factory:1,labs:1,timber:1};
@@ -1479,7 +1482,7 @@ for(const t of TOWNS){ for(let dj=-5;dj<=5;dj++) for(let di=-5;di<=5;di++){ cons
     for(let it=0;it<5;it++){ const nx=[pts[0]]; for(let q=0;q<pts.length-1;q++){ const a=pts[q], b=pts[q+1]; nx.push([a[0]*.75+b[0]*.25,a[1]*.75+b[1]*.25],[a[0]*.25+b[0]*.75,a[1]*.25+b[1]*.75]); } nx.push(pts[pts.length-1]); pts=nx; }
     const rs=[pts[0]]; for(let q=1;q<pts.length;q++){ let [x0,z0]=rs[rs.length-1]; const [x1,z1]=pts[q]; let dx=x1-x0, dz=z1-z0, L=Math.hypot(dx,dz); while(L>=2){ x0+=dx/L*2; z0+=dz/L*2; rs.push([x0,z0]); dx=x1-x0; dz=z1-z0; L=Math.hypot(dx,dz); } }
     const n=rs.length, y=new Float32Array(n), pin=new Int8Array(n), pv=new Float32Array(n);
-    for(let q=0;q<n;q++){ const [u,v]=rs[q]; y[q]=hAt(u,v); for(const t of [A.t,B.t]) if(t&&Math.hypot(u-t.u,v-t.v)<t.R-2){ pin[q]=1; pv[q]=t.h; } }
+    for(let q=0;q<n;q++){ const [u,v]=rs[q]; y[q]=hAt(u,v); for(const t of [A.t,B.t]) if(t&&Math.hypot(u-t.u,v-t.v)<townRadAt(t,u-t.u,v-t.v)-2){ pin[q]=1; pv[q]=t.h; } }
     const repin=()=>{ for(let q=0;q<n;q++) if(pin[q]) y[q]=pv[q]; }; repin(); const tmp=new Float32Array(n);
     for(let pass=0;pass<8;pass++){ for(let q=0;q<n;q++){ let a=0,c=0; for(let w=-10;w<=10;w++){ const z=q+w; if(z<0||z>=n) continue; a+=y[z]; c++; } tmp[q]=a/c; } y.set(tmp); repin(); }
     for(let pass=0;pass<4;pass++){ const g=0.2; for(let q=1;q<n;q++){ if(y[q]>y[q-1]+g) y[q]=y[q-1]+g; if(y[q]<y[q-1]-g) y[q]=y[q-1]-g; } for(let q=n-2;q>=0;q--){ if(y[q]>y[q+1]+g) y[q]=y[q+1]+g; if(y[q]<y[q+1]-g) y[q]=y[q+1]-g; } repin(); }
@@ -1487,13 +1490,76 @@ for(const t of TOWNS){ for(let dj=-5;dj<=5;dj++) for(let di=-5;di<=5;di++){ cons
   const T_=k=>({u:WORLD.towns[k].u,v:WORLD.towns[k].v,t:WORLD.towns[k]});
   const W_=(u,v)=>({u,v,t:null});
   for(const stops of [[2,8],[5,W_(-638,283),W_(-486,557),W_(-300,632),'bw',7]]){ const st=stops.map(x=>x==='bw'?Object.assign(W_(WORLD.towns[7].u-90,WORLD.towns[7].v),{straight:true}):typeof x==='number'?WORLD.towns[x]&&T_(x):x); if(st.some(x=>!x)) continue; const rd=route(st); if(rd){ if(stops.length>2) rd.prefEnd={7:0}; WORLD.roads.push(rd); } } } // the south road comes into Brambleford's west end
+/* ---------- town streets: a main street and side streets ----------
+   The main street runs through town along the first road in, out to the edge both ways. Side streets branch off it
+   here and there, to one side or both, staggered rather than a neat crossroads: some run out to the edge (where a
+   road can come in), some stop short with a turning circle. Now and then a back lane joins two side streets into a
+   loop. Every street runs along the build grid, so the houses still sit square to their street. The town's ground is
+   a lumpy outline, not a circle (townRadAt). */
+function townIn(t,x,z,pad){ const dx=x-t.x, dz=z-t.z; return Math.hypot(dx,dz)<townRadAt(t,dx,dz)-(pad||0); }
+function planStreets(t,arrivals){ const C=CELL, ci=Math.round(t.x/C), cj=Math.round(t.z/C);
+  if(t.kind){ const Ls=Math.floor((t.R-4)/C)*C; t.streetL=Ls; t.ends=[[t.x-Ls,t.z],[t.x+Ls,t.z],[t.x,t.z-Ls],[t.x,t.z+Ls]]; t.endDir=[[-1,0],[1,0],[0,-1],[0,1]]; t.endEdge=[1,1,1,1]; t.endKind=['edge','edge','edge','edge']; t.segs=[]; t.junc=[]; return; }
+  const r=seeded(t.seed+4242), X0=t.axis==='x', inC=(i,j,pad)=>townIn(t,i*C,j*C,pad);
+  const reach=(i,j,di,dj)=>{ let n=0; while(n<26&&inC(i+di*(n+1),j+dj*(n+1),5)) n++; return n; };
+  // cell space: a street runs along x (X) or along z, on grid line c across it, from grid line a to b along it
+  const P0=X0?ci:cj, Q0=X0?cj:ci, ij=(p,q)=>X0?[p,q]:[q,p]; // (along main, across main) -> (i,j)
+  const main={X:X0,c:Q0,a:P0-reach(ci,cj,X0?-1:0,X0?0:-1),b:P0+reach(ci,cj,X0?1:0,X0?0:1),edgeA:1,edgeB:1}, segs=[main], sides=[];
+  const side=(p,s,want)=>{ const [i,j]=ij(p,Q0), full=reach(i,j,X0?0:s,X0?s:0); if(full<5) return null;
+    const len=want==='edge'?full:Math.min(full,want), edge=len===full?1:0;
+    const S={X:!X0,c:p,a:s>0?Q0:Q0-len,b:s>0?Q0+len:Q0,side:s,edgeA:s<0?edge:0,edgeB:s>0?edge:0,len}; segs.push(S); sides.push(S); return S; };
+  const okAt=(p,s)=>p>=main.a+3&&p<=main.b-3&&sides.every(S=>S.side===s?Math.abs(S.c-p)>=6:(S.c===p||Math.abs(S.c-p)>=3));
+  // first a street out toward every road that comes in from the side (the main street's ends take the rest)
+  for(const [ax,az] of arrivals||[]){ const dx=ax-t.x, dz=az-t.z, dl=Math.hypot(dx,dz)||1, ua=(X0?dx:dz)/dl, ub=(X0?dz:dx)/dl; if(Math.abs(ua)>0.64) continue;
+    const s=ub>0?1:-1; if(sides.some(S=>S.side===s&&(S.edgeA||S.edgeB))) continue;
+    const p0=Math.max(main.a+3,Math.min(main.b-3,Math.round((X0?ax:az)/C)));
+    for(const dp of [0,1,-1,2,-2,3,-3,4,-4,5,-5]){ const p=p0+dp; if(okAt(p,s)&&side(p,s,'edge')) break; } }
+  // then a few more, out to the edge or a short way with a turning circle
+  const want=4+(r()<0.5?1:0);
+  for(let tr=0;tr<60&&sides.length<want;tr++){ const p=main.a+3+Math.floor(r()*Math.max(1,main.b-main.a-5)), s=r()<0.5?1:-1; if(!okAt(p,s)) continue;
+    side(p,s,r()<0.6?'edge':6+Math.floor(r()*4)); }
+  // back lanes: two neighbouring side streets on the same side joined into a loop (a short dead end is pulled in to meet it)
+  for(const s of [1,-1]){ const L=sides.filter(S=>S.side===s).sort((A,B)=>A.c-B.c), inLoop=new Set();
+    for(let q=0;q<L.length-1;q++){ const A=L[q], B=L[q+1]; if(inLoop.has(A)||r()>0.85||B.c-A.c<6||B.c-A.c>16) continue; const o=Math.min(10,A.len,B.len); if(o<7) continue;
+      let ok=true; for(let p=A.c;p<=B.c&&ok;p++){ const [i,j]=ij(p,Q0+s*o); if(!inC(i,j,3)) ok=false; } if(!ok) continue;
+      if([A,B].some(S=>S.len-o>0&&S.len-o<4&&(S.edgeA||S.edgeB))) continue; // (no stub just past the lane)
+      for(const S of [A,B]) if(S.len-o>0&&S.len-o<4){ S.len=o; if(s>0) S.b=Q0+o; else S.a=Q0-o; }
+      segs.push({X:X0,c:Q0+s*o,a:A.c,b:B.c,lane:1}); inLoop.add(A); inLoop.add(B); } }
+  // the ends left inside town: one turning circle at most (on the longest), the rest a hammerhead where it fits, or a fence
+  const onSeg=(S,i,j)=>S.X?(j===S.c&&i>=S.a&&i<=S.b):(i===S.c&&j>=S.a&&j<=S.b);
+  { const dead=[]; segs.forEach((S,k)=>{ for(const E of ['A','B']){ if(S['edge'+E]) continue; const g=E==='B'?S.b:S.a, [i,j]=S.X?[g,S.c]:[S.c,g]; if(!segs.some((O,m)=>m!==k&&onSeg(O,i,j))) dead.push([S,E,g]); } });
+    dead.sort((x,y)=>(y[0].b-y[0].a)-(x[0].b-x[0].a)); let circle=r()<0.75;
+    for(const [S,E,g] of dead){ if(circle){ S['kind'+E]='circle'; circle=false; continue; }
+      const H={X:!S.X,c:g,a:S.c-2,b:S.c+2,hammer:1}; let fits=true;
+      for(let p=H.a;p<=H.b&&fits;p++){ const [i,j]=H.X?[p,H.c]:[H.c,p]; if(!inC(i,j,3)) fits=false; }
+      if(fits&&segs.some(O=>O!==S&&(O.X===H.X?Math.abs(O.c-H.c)<5&&O.a<H.b+3&&O.b>H.a-3:O.c>=H.a-3&&O.c<=H.b+3&&H.c>=O.a-3&&H.c<=O.b+3))) fits=false;
+      if(fits&&r()<0.7){ segs.push(H); S['kind'+E]='hammer'; } else S['kind'+E]='fence'; } }
+  // in world space, with the open ends (a road comes in, a turning circle, a stub or a fence) and the junctions
+  t.segs=segs.map(S=>({X:S.X,ci:S.c,ai:S.a,bi:S.b,c:S.c*C,a:S.a*C,b:S.b*C,main:S===main,lane:!!S.lane,hammer:!!S.hammer}));
+  t.ends=[]; t.endDir=[]; t.endEdge=[]; t.endKind=[]; t.junc=[]; const jk=new Set();
+  segs.forEach((S,k)=>{ for(const e of [0,1]){ const g=e?S.b:S.a, [i,j]=S.X?[g,S.c]:[S.c,g], d=e?1:-1, E=e?'B':'A';
+    const m=segs.findIndex((O,mm)=>mm!==k&&onSeg(O,i,j));
+    if(m>=0){ t.segs[k]['j'+E]=m; const key=i+','+j; if(!jk.has(key)){ jk.add(key); t.junc.push([i*C,j*C]); } }
+    else { t.segs[k]['end'+E]=t.ends.length; t.ends.push([i*C,j*C]); t.endDir.push(S.X?[d,0]:[0,d]); t.endEdge.push(S['edge'+E]?1:0); t.endKind.push(S['edge'+E]?'edge':S.hammer?'stub':S['kind'+E]||'fence'); } } });
+  t.streetL=Math.max(...t.segs.map(S=>S.b-S.a))/2; }
+// which open end a road coming in joins: the nearest one at the edge of town (or the one facing a preferred way)
+function pickEnd(t,at,pref){ let ids=t.ends.map((e,k)=>k).filter(k=>t.endEdge[k]); if(!ids.length) ids=t.ends.map((e,k)=>k);
+  if(pref!=null){ const D=[[-1,0],[1,0],[0,-1],[0,1]][pref]; ids.sort((a,b)=>(t.endDir[b][0]*D[0]+t.endDir[b][1]*D[1])-(t.endDir[a][0]*D[0]+t.endDir[a][1]*D[1])); return t.ends[ids[0]]; }
+  return t.ends[ids.reduce((a,b)=>Math.hypot(t.ends[b][0]-at[0],t.ends[b][1]-at[1])<Math.hypot(t.ends[a][0]-at[0],t.ends[a][1]-at[1])?b:a)]; }
+// how far (x,z) is from the nearest street centreline of a town; and is it on a street, its sidewalk or a turning circle
+function streetDist(t,x,z){ let best=1e9; for(const S of t.segs||[]){ const al=S.X?x:z, ac=S.X?z:x, f=al<S.a?S.a:al>S.b?S.b:al, d=Math.hypot(al-f,ac-S.c); if(d<best) best=d; } return best; }
+function streetNear(t,x,z,d){ if(streetDist(t,x,z)<d) return true; for(const b of townBulbs(t)) if(Math.hypot(x-b[0],z-b[1])<BULB_R+d-ROAD_HW) return true; return false; }
+// a stretch of street well away from its ends and any junction (for parking)
+function streetMid(t,S,x,z,m){ if(!S) return false; const al=S.X?x:z; if(al<S.a+m||al>S.b-m) return false; return !(t.junc||[]).some(J=>Math.hypot(J[0]-x,J[1]-z)<m); }
 { const rdPts=[];
   for(const t of TOWNS){
     let ax='x', best=1e9;
     for(const rd of WORLD.roads) for(const end of [0,1]){ const p=end?rd.pts[rd.pts.length-1]:rd.pts[0], q=end?rd.pts[Math.max(0,rd.pts.length-12)]:rd.pts[Math.min(rd.pts.length-1,11)];
       const d=Math.hypot(SPAWN[0]+p[0]-t.x,SPAWN[2]+p[1]-t.z); if(d<best&&d<4){ best=d; ax=Math.abs(q[0]-p[0])>=Math.abs(q[1]-p[1])?'x':'z'; } }
-    t.axis=ax; t.streetL=Math.floor((t.R-4)/CELL)*CELL; const Ls=t.streetL;
-    t.ends=[[t.x-Ls,t.z],[t.x+Ls,t.z],[t.x,t.z-Ls],[t.x,t.z+Ls]];
+    t.axis=ax; const tOut=q=>{ const dx=SPAWN[0]+q[0]-t.x, dz=SPAWN[2]+q[1]-t.z; return Math.hypot(dx,dz)>=townRadAt(t,dx,dz)+12; };
+    { const arr=[]; for(const rd of WORLD.roads){ if(rd.street) continue; for(const end of [0,1]){ const P=end?rd.pts.slice().reverse():rd.pts; if(Math.hypot(SPAWN[0]+P[0][0]-t.x,SPAWN[2]+P[0][1]-t.z)>4) continue;
+        let k=0; while(k<P.length-8&&!tOut(P[k])) k++; arr.push([SPAWN[0]+P[k][0],SPAWN[2]+P[k][1]]); } }
+      planStreets(t,arr); }
+    const Ls=t.streetL;
     // reroute: each road coming in is cut some way outside town and joined to the nearest street end by a smooth curve.
     // The curve leaves the street end straight along the street and meets the road along its own direction, and its
     // height eases from the town's level to the road's, so the road keeps its hills and still meets the street cleanly.
@@ -1501,25 +1567,25 @@ for(const t of TOWNS){ for(let dj=-5;dj<=5;dj++) for(let di=-5;di<=5;di++){ cons
     for(const rd of WORLD.roads){ if(rd.street) continue;
       for(const end of [0,1]){ const P=end?rd.pts.slice().reverse():rd.pts.slice();
         if(Math.hypot(SPAWN[0]+P[0][0]-t.x,SPAWN[2]+P[0][1]-t.z)>4) continue; // this end isn't at this town
-        let k=0; while(k<P.length-8&&Math.hypot(SPAWN[0]+P[k][0]-t.x,SPAWN[2]+P[k][1]-t.z)<cut) k++;
-        const at=[SPAWN[0]+P[k][0],SPAWN[2]+P[k][1]], e=rd.prefEnd&&rd.prefEnd[TOWNS.indexOf(t)]!=null?t.ends[rd.prefEnd[TOWNS.indexOf(t)]]:t.ends.reduce((a,b)=>Math.hypot(b[0]-at[0],b[1]-at[1])<Math.hypot(a[0]-at[0],a[1]-at[1])?b:a);
-        const L=Math.hypot(at[0]-e[0],at[1]-e[1]), ax_=[(e[0]-t.x)/Ls,(e[1]-t.z)/Ls];
+        let k=0; while(k<P.length-8&&!tOut(P[k])) k++;
+        const at=[SPAWN[0]+P[k][0],SPAWN[2]+P[k][1]], e=pickEnd(t,at,rd.prefEnd?rd.prefEnd[TOWNS.indexOf(t)]:null);
+        const L=Math.hypot(at[0]-e[0],at[1]-e[1]), ax_=t.endDir[t.ends.indexOf(e)];
         const q2=P[Math.min(P.length-1,k+3)], dx=SPAWN[0]+q2[0]-at[0], dz=SPAWN[2]+q2[1]-at[1], dl=Math.hypot(dx,dz)||1, dout=[dx/dl,dz/dl];
         const C1=[e[0]+ax_[0]*L*0.42,e[1]+ax_[1]*L*0.42], C2=[at[0]-dout[0]*L*0.42,at[1]-dout[1]*L*0.42], y0=t.h, y1=P[k][2];
         const n=Math.max(3,Math.round(L/1.8)), conn=[];
         for(let q=0;q<n;q++){ const f=q/n, g=1-f, w0=g*g*g, w1=3*g*g*f, w2=3*g*f*f, w3=f*f*f;
-          const cx=w0*e[0]+w1*C1[0]+w2*C2[0]+w3*at[0], cz=w0*e[1]+w1*C1[1]+w2*C2[1]+w3*at[1], rr=Math.hypot(cx-t.x,cz-t.z), fr=Math.max(0,Math.min(1,(rr-t.R-1)/Math.max(1,cut-t.R-1))), ey=fr*fr*(3-2*fr);
+          const cx=w0*e[0]+w1*C1[0]+w2*C2[0]+w3*at[0], cz=w0*e[1]+w1*C1[1]+w2*C2[1]+w3*at[1], rr=Math.hypot(cx-t.x,cz-t.z), RL=townRadAt(t,cx-t.x,cz-t.z), fr=Math.max(0,Math.min(1,(rr-RL-1)/11)), ey=fr*fr*(3-2*fr);
           conn.push([cx-SPAWN[0],cz-SPAWN[2],y0+(y1-y0)*ey]); } // level through town, easing to the road's height outside it
         let NP=conn.concat(P.slice(k)); if(end) NP=NP.reverse();
         rd.pts=NP; rd.skip=new Uint8Array(NP.length); } }
     // clear the old road traces inside town: no dirt, grass back
     const r2=(t.R-1)*(t.R-1);
     for(let j=-Math.ceil(t.R/WHS);j<=Math.ceil(t.R/WHS);j++) for(let i=-Math.ceil(t.R/WHS);i<=Math.ceil(t.R/WHS);i++){
-      const x=t.x+i*WHS, z=t.z+j*WHS; if((x-t.x)*(x-t.x)+(z-t.z)*(z-t.z)>r2) continue; const c=worldCell(x,z); if(c>=0){ WRD[c]=1e4; WORLD.GRASS[c]=255; } }
+      const x=t.x+i*WHS, z=t.z+j*WHS; if(!townIn(t,x,z,1)) continue; const c=worldCell(x,z); if(c>=0){ WRD[c]=1e4; WORLD.GRASS[c]=255; } }
     // the two streets (none through a point of interest: its roads stop at its edge)
-    if(!t.kind) for(const X of [true,false]){ const pts=[];
-      for(let s=-Ls;s<=Ls+0.01;s+=2) pts.push(X?[t.x+s-SPAWN[0],t.z-SPAWN[2],t.h]:[t.x-SPAWN[0],t.z+s-SPAWN[2],t.h]);
-      WORLD.roads.push({pts,skip:new Uint8Array(pts.length),street:true,town:t}); }
+    if(!t.kind) for(const S of t.segs){ const pts=[], a=S.a-(S.jA!=null?ROAD_HW_:0), b=S.b+(S.jB!=null?ROAD_HW_:0), n=Math.max(2,Math.ceil((b-a)/2)); // (past a junction by half a road, so corners are closed)
+      for(let q=0;q<=n;q++){ const s=a+(b-a)*q/n; pts.push(S.X?[s-SPAWN[0],S.c-SPAWN[2],t.h]:[S.c-SPAWN[0],s-SPAWN[2],t.h]); }
+      WORLD.roads.push({pts,skip:new Uint8Array(pts.length),street:true,town:t,seg:S}); }
   }
   // ---- rivers: where they run, and which stretches of road cross them (those become bridges, humped up to clear the water)
   { const NN=WN*WN, RVD=WORLD.RVD=new Float32Array(NN).fill(1e4), RVY=WORLD.RVY=new Float32Array(NN), RVW=WORLD.RVW=new Float32Array(NN), RVB=WORLD.RVB=new Float32Array(NN), RVP=WORLD.RVP=new Float32Array(NN);
@@ -1556,17 +1622,25 @@ for(const t of TOWNS){ for(let dj=-5;dj<=5;dj++) for(let di=-5;di<=5;di++){ cons
         for(let j=j0;j<=j1;j++){ const pz=SPAWN[2]-WHALF+j*WHS; for(let i=i0;i<=i1;i++){ const px=SPAWN[0]-WHALF+i*WHS; let f=((px-x0)*ex+(pz-z0)*ez)/el; f=f<0?0:f>1?1:f;
           const qx=px-(x0+ex*f), qz=pz-(z0+ez*f), d=Math.sqrt(qx*qx+qz*qz); if(d>=R2) continue; const c=j*N+i; if(dk[c]>=1e4) touched.push(c); if(d<dk[c]){ dk[c]=d; yk[c]=y0+(y1-y0)*f; } } } }
       for(const c of touched){ const d=dk[c], u=d/2.5, w=1/(1+u*u*u*u); sumW[c]+=w; sumY[c]+=w*yk[c]; if(d<minD[c]){ minD2[c]=minD[c]; minD[c]=d; } else if(d<minD2[c]) minD2[c]=d; dk[c]=1e4; } }
-    const {ROCK,SNOW,GRASS}=WORLD, DIRT=WORLD.DIRT=new Uint8Array(N*N);
+    const {ROCK,SNOW,GRASS}=WORLD, DIRT=WORLD.DIRT=new Uint8Array(N*N), TRACK=WORLD.TRACK=new Uint8Array(N*N);
     for(let c=0;c<N*N;c++){ const dd=minD[c], h0=H0[c]; let h=h0;
       if(dd<R2){ const y=sumY[c]/sumW[c], diff=Math.abs(h0-y);
         if(dd<=RW) h=y; else { const B=Math.max(6,Math.min(BM,diff*1.6)); if(dd<RW+B){ let t=(dd-RW)/B; t=t*t*(3-2*t); h=y+(h0-y)*t; } } }
       WH[c]=h; const was=WRD[c]; WRD[c]=dd;
       // a worn dirt edge beside the asphalt, but not in the strip between two roads at a fork: that stays grass
-      const gore=minD2[c]<dd+6, edge=gore?(dd<3.9?0:1e4):dd; DIRT[c]=gore&&dd>=3.9?0:dd<5?Math.round(255*(1-sstep(3.8,5.0,dd))):0;
-      if(edge<4.8) GRASS[c]=0; else if(was<4.8||gore) GRASS[c]=Math.round((1-ROCK[c]/255)*(1-SNOW[c]/255)*255); } } // grass back where a road used to run
+      let eo=5.0; if(dd<7.5){ const i_=c%N, u=-WHALF+i_*WHS, v=-WHALF+(c-i_)/N*WHS, nz=gnoise(u/9,v/9,71)+0.5*gnoise(u/3.2,v/3.2,72); eo=Math.max(4.1,Math.min(6.9,5.2+1.6*nz)); }
+      const gore=minD2[c]<dd+6, edge=gore?(dd<3.9?0:1e4):dd; DIRT[c]=gore&&dd>=3.9?0:dd<eo?Math.round(255*(1-sstep(3.7,eo,dd))):0;
+      TRACK[c]=gore||dd<3.2||dd>=eo+0.8?0:Math.round(170*(1-sstep(eo-1.0,eo+0.8,dd)));
+      if(edge<eo-0.3) GRASS[c]=0; else if(was<4.8||gore) GRASS[c]=Math.round((1-ROCK[c]/255)*(1-SNOW[c]/255)*255); } } // grass back where a road used to run
   for(const t of TOWNS){ const r2=(t.R-1)*(t.R-1); // the town ground stays level; no road shoulders inside town (the streets have sidewalks)
-    for(let j=-Math.ceil(t.R/WHS);j<=Math.ceil(t.R/WHS);j++) for(let i=-Math.ceil(t.R/WHS);i<=Math.ceil(t.R/WHS);i++){ const x=t.x+i*WHS, z=t.z+j*WHS; if((x-t.x)*(x-t.x)+(z-t.z)*(z-t.z)>r2) continue; const c=worldCell(x,z); if(c<0) continue; WH[c]=WORLD.H0[c]; if(WRD[c]>3.6){ WRD[c]=1e4; WORLD.DIRT[c]=0; } } }
-  for(const t of TOWNS) if(!t.kind) for(const X of [true,false]) for(let s=-t.streetL;s<=t.streetL;s+=1) for(let c=-6;c<=6;c+=1){ const cc=worldCell(X?t.x+s:t.x+c,X?t.z+c:t.z+s); if(cc>=0) WORLD.GRASS[cc]=0; } // sidewalks too
+    for(let j=-Math.ceil(t.R/WHS);j<=Math.ceil(t.R/WHS);j++) for(let i=-Math.ceil(t.R/WHS);i<=Math.ceil(t.R/WHS);i++){ const x=t.x+i*WHS, z=t.z+j*WHS; if(!townIn(t,x,z,1)) continue; const c=worldCell(x,z); if(c<0) continue; WH[c]=WORLD.H0[c]; WORLD.TRACK[c]=0; if(WRD[c]>3.6){ WRD[c]=1e4; WORLD.DIRT[c]=0; } } }
+  for(const t of TOWNS) if(!t.kind) for(const S of t.segs) for(let s=S.a-6;s<=S.b+6;s+=1) for(let c=-6;c<=6;c+=1){ if((s<S.a&&S.jA==null)||(s>S.b&&S.jB==null)) continue; const cc=worldCell(S.X?s:S.c+c,S.X?S.c+c:s); if(cc>=0) WORLD.GRASS[cc]=0; } // sidewalks too
+  // a street end at the edge of town that no road comes in to runs on as a dirt track, wandering a little and fading into the grass
+  for(const t of TOWNS) if(!t.kind) t.ends.forEach((e,k)=>{ if(!t.endEdge[k]||WORLD.roads.some(r=>!r.street&&[r.pts[0],r.pts[r.pts.length-1]].some(p=>Math.hypot(SPAWN[0]+p[0]-e[0],SPAWN[2]+p[1]-e[1])<3))) return;
+    const r=seeded(t.seed+k*31+7), L=30+r()*34; let x=e[0], z=e[1], a=Math.atan2(t.endDir[k][1],t.endDir[k][0]), da=(r()-0.5)*0.05; (t.tracks=t.tracks||[]).push([[x,z]]);
+    for(let s=0;s<L;s+=0.8){ a+=da; da+=(r()-0.5)*0.016; da*=0.97; x+=Math.cos(a)*0.8; z+=Math.sin(a)*0.8; if(s%4<0.8) t.tracks[t.tracks.length-1].push([x,z]); const f=s<L*0.5?1:1-(s-L*0.5)/(L*0.5);
+      for(let w=-2.6;w<=2.6;w+=0.65){ const px=x-Math.sin(a)*w, pz=z+Math.cos(a)*w, c=worldCell(px,pz); if(c<0) continue; const aw=Math.abs(w), rut=Math.abs(aw-0.95)<0.45?1:0.7, v=Math.round(255*f*Math.min(1,(2.7-aw)/1.2)*rut);
+        if(v>WORLD.TRACK[c]) WORLD.TRACK[c]=v; const gv=Math.round(255*(1-0.85*f*Math.min(1,(2.7-aw)/1.4))); if(gv<WORLD.GRASS[c]) WORLD.GRASS[c]=gv; } } });
 }
 /* ---------- rivers ----------
    The main river starts at the rim across the map from the bay and follows the lowest passes down to the beach beside
@@ -1650,7 +1724,7 @@ function routeRivers(){
     if(h0<_rvSeaY+0.6||dd<=hw) h=Math.min(h,h0); // (never raised: not under the river, and not on the sea floor)
     WH[c]=h; if(dd<hw-0.15&&h<ys-0.04&&WS[c]<-999) WS[c]=ys;
     if(dd<hw+1.5) GRASS[c]=0; const sd=Math.round(215*(1-sstep(hw*0.55,hw+1.8,dd))); if(sd>SAND[c]) SAND[c]=sd; if(dd<hw) ROCK[c]=Math.round(ROCK[c]*0.3); } }
-function townAt(x,z,pad){ for(const t of TOWNS) if(Math.hypot(x-t.x,z-t.z)<t.R+(pad||0)) return t; return null; }
+function townAt(x,z,pad){ for(const t of TOWNS){ const dx=x-t.x, dz=z-t.z; if(Math.abs(dx)<t.R+(pad||0)+1&&Math.abs(dz)<t.R+(pad||0)+1&&Math.hypot(dx,dz)<townRadAt(t,dx,dz)+(pad||0)) return t; } return null; }
 // highest ground under a body (centre and the four corners), so you never sink into a slope
 function terrainUnder(x,z){ let m=terrainH(x,z); for(const s of SAMP){ const t=terrainH(x+s[0],z+s[1]); if(t>m) m=t; } const w=waterAt(x,z)-1.3; if(w>m) m=w; return m; } // deep water holds you up, chest deep
 
@@ -1681,6 +1755,7 @@ terrainMat.onBeforeCompile=sh=>{ sh.uniforms.rockMap={value:rockTex}; sh.uniform
     diffuseColor.rgb=mix(diffuseColor.rgb,texture2D(roadMap,vWP.xz*vec2(0.1389,0.04167)).rgb,smoothstep(0.5,0.9,vCover.z)); // (no brown shoulder: it showed as wedges where roads meet sidewalks)
     diffuseColor.rgb=mix(diffuseColor.rgb,rk*vec3(0.93,0.92,0.9),clamp(vCover.x,0.0,1.0));
     diffuseColor.rgb=mix(diffuseColor.rgb,vec3(0.66,0.58,0.41)*(0.84+0.3*rk.g),clamp(-vCover.z,0.0,1.0)*smoothstep(0.5,0.78,normalize(vWN).y)); // sand (a negative third cover value; not on cliff faces)
+    diffuseColor.rgb=mix(diffuseColor.rgb,vec3(0.5,0.42,0.3)*(0.78+0.4*rk.g),clamp(-vCover.y,0.0,1.0)*0.9); // worn earth: road shoulders, dirt tracks (a negative second cover value)
     diffuseColor.rgb=mix(diffuseColor.rgb,vec3(0.9,0.93,0.97)*(0.9+0.12*rk.r),clamp(vCover.y,0.0,1.0)); }`); };
 const T_LUSH=new THREE.Color(0.8,0.94,0.8), T_DRY=new THREE.Color(1.06,1.0,0.74), T_DIRT=new THREE.Color(0.94,0.82,0.66), _tc=new THREE.Color();
 // grass tint: lush in the valleys, sun-dried higher up, a little earthy on steep slopes, and gentle random patches
@@ -1714,7 +1789,7 @@ function terrainPatch(i0,j0,na,nb,st){
     pos[k*3]=x; pos[k*3+1]=h-dy; pos[k*3+2]=z; nor[k*3]=-gx*ny; nor[k*3+1]=ny; nor[k*3+2]=-gz*ny;
     uv[k*2]=(i-i0)*WHS/16; uv[k*2+1]=(j-j0)*WHS/16; // the grass texture tiles every 16 m, seamlessly across chunks
     const t=terrainTint(x,z,h,ny); col[k*3]=t.r; col[k*3+1]=t.g; col[k*3+2]=t.b;
-    cov[k*3]=ROCK[q]/255; cov[k*3+1]=SNOW[q]/255; cov[k*3+2]=WORLD.SAND[q]?-WORLD.SAND[q]/255:st===1?WORLD.DIRT[q]/255:0; },4*st+2); // a narrow worn edge beside the asphalt, up close only
+    cov[k*3]=ROCK[q]/255; cov[k*3+1]=SNOW[q]?SNOW[q]/255:-WORLD.TRACK[q]/255; cov[k*3+2]=WORLD.SAND[q]?-WORLD.SAND[q]/255:st===1?WORLD.DIRT[q]/255:0; },4*st+2); // a narrow worn edge beside the asphalt, up close only
   m.receiveShadow=true; return m; }
 const chunkMesh=(c,lod)=>terrainPatch(c.ci*TCH,c.cj*TCH,TCH,TCH,1<<lod);
 for(let cj=0;cj<TNC;cj++) for(let ci=0;ci<TNC;ci++){ const x0=SPAWN[0]-WHALF+ci*TCH*WHS, z0=SPAWN[2]-WHALF+cj*TCH*WHS;
@@ -1946,14 +2021,32 @@ const _rfD=new THREE.Vector3();
 
 /* ---------- roads: asphalt with white edge lines and a dashed yellow centre, plus a paved square in each town ---------- */
 let roadPlainTex=null;
-const roadTex=(()=>{ const W=256, Hh=1024, c=document.createElement('canvas'); c.width=W; c.height=Hh; const g=c.getContext('2d');
+const roadTex=(()=>{ const W=256, Hh=2048, c=document.createElement('canvas'); c.width=W; c.height=Hh; const g=c.getContext('2d'), R=seeded(4401);
   g.fillStyle='#4b4e53'; g.fillRect(0,0,W,Hh);
-  for(let i=0;i<60000;i++){ const v=Math.random(); g.fillStyle=v<.5?'rgba(22,24,28,.26)':v<.9?'rgba(140,140,138,.16)':'rgba(200,196,186,.22)'; g.fillRect(Math.random()*W,Math.random()*Hh,1+Math.random(),1+Math.random()); }
-  for(let i=0;i<22;i++){ const x=Math.random()*W, y=Math.random()*Hh, r=20+Math.random()*50, gr=g.createRadialGradient(x,y,0,x,y,r); gr.addColorStop(0,'rgba(30,30,32,.18)'); gr.addColorStop(1,'rgba(0,0,0,0)'); g.fillStyle=gr; g.fillRect(x-r,y-r,r*2,r*2); }
-  const pc=document.createElement('canvas'); pc.width=W; pc.height=Hh; pc.getContext('2d').drawImage(c,0,0); // the same asphalt without markings, for junctions
+  for(let i=0;i<120000;i++){ const v=R(); g.fillStyle=v<.5?'rgba(22,24,28,.26)':v<.9?'rgba(140,140,138,.16)':'rgba(200,196,186,.22)'; g.fillRect(R()*W,R()*Hh,1+R(),1+R()); }
+  const blot=(x,y,r,col)=>{ const gr=g.createRadialGradient(x,y,0,x,y,r); gr.addColorStop(0,col); gr.addColorStop(1,'rgba(0,0,0,0)'); g.fillStyle=gr; g.fillRect(x-r,y-r,r*2,r*2); };
+  for(let i=0;i<44;i++){ const x=R()*W, y=R()*Hh; for(const o of [-Hh,0,Hh]) blot(x,y+o,20+R()*50,'rgba(30,30,32,.18)'); }
+  const pc=document.createElement('canvas'); pc.width=W; pc.height=1024; pc.getContext('2d').drawImage(c,0,0); // the same asphalt without markings or wear, for junctions
   roadPlainTex=new THREE.CanvasTexture(pc); roadPlainTex.wrapS=roadPlainTex.wrapT=THREE.RepeatWrapping; roadPlainTex.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());
-  g.fillStyle='rgba(236,236,230,.92)'; g.fillRect(12,0,6,Hh); g.fillRect(W-18,0,6,Hh);   // edge lines
-  g.fillStyle='#e6c23c'; g.fillRect(W/2-4,0,8,Hh*0.5);                                // centre dash: half of every 12 m
+  // wheel tracks: two smoother, darker bands down each lane, and a lighter oil-stained strip between them
+  for(const x0 of [64,192]){ for(const o of [-31,31]){ const gr=g.createLinearGradient(x0+o-15,0,x0+o+15,0); gr.addColorStop(0,'rgba(24,24,27,0)'); gr.addColorStop(0.5,'rgba(24,24,27,.2)'); gr.addColorStop(1,'rgba(24,24,27,0)'); g.fillStyle=gr; g.fillRect(x0+o-15,0,30,Hh); }
+    for(let i=0;i<14;i++){ const y=R()*Hh; for(const k of [-Hh,0,Hh]) blot(x0+(R()-.5)*16,y+k,8+R()*16,'rgba(16,16,18,.22)'); } }
+  // patched repairs: rectangles of newer, darker asphalt with a sealed seam
+  for(let i=0;i<6;i++){ const lane=R()<0.5?0:128, w=36+R()*84, x=lane+6+R()*(122-w), h=70+R()*240, y=R()*(Hh-h);
+    g.fillStyle=R()<0.7?'rgba(34,35,39,.55)':'rgba(96,96,94,.28)'; g.fillRect(x,y,w,h); for(let k=0;k<900;k++){ g.fillStyle='rgba(120,120,118,.12)'; g.fillRect(x+R()*w,y+R()*h,1,1); }
+    g.strokeStyle='rgba(14,14,16,.55)'; g.lineWidth=1.6; g.strokeRect(x,y,w,h); }
+  // cracks: thin wandering lines, mostly lengthways, more of them toward the edges where the road breaks up
+  const crack=(x,y,a,len)=>{ g.beginPath(); g.moveTo(x,y); for(let l=0;l<len;l+=3){ a+=(R()-.5)*0.7; x+=Math.cos(a)*3; y+=Math.sin(a)*3; g.lineTo(x,y); if(R()<0.04) crack(x,y,a+(R()<.5?1:-1)*(0.8+R()*0.6),len*0.4); } g.stroke(); };
+  g.strokeStyle='rgba(16,16,18,.6)'; g.lineCap='round';
+  for(let i=0;i<70;i++){ const edge=R()<0.55, x=edge?(R()<.5?4+R()*26:W-30+R()*26):20+R()*(W-40), y=R()*(Hh-120)+60; g.lineWidth=0.8+R()*0.9;
+    crack(x,y,R()<0.75?Math.PI/2+(R()-.5)*0.6:(R()-.5)*0.8,edge?30+R()*90:20+R()*70); }
+  // a dusty, crumbly margin outside the edge lines
+  for(const [x0,x1] of [[0,13],[W-13,W]]){ const gr=g.createLinearGradient(x0===0?0:W,0,x0===0?13:W-13,0); gr.addColorStop(0,'rgba(118,104,80,.42)'); gr.addColorStop(1,'rgba(118,104,80,0)'); g.fillStyle=gr; g.fillRect(x0,0,x1-x0,Hh);
+    for(let k=0;k<700;k++){ g.fillStyle=R()<.5?'rgba(150,136,108,.35)':'rgba(20,20,22,.3)'; g.fillRect(x0+R()*(x1-x0),R()*Hh,1+R()*2,1+R()*2); } }
+  // markings, faded and chipped: edge lines in short runs of varying strength, the centre dashes worn through in places
+  for(const x of [13,W-19]) for(let y=0;y<Hh;y+=16){ if(R()<0.03) continue; g.fillStyle='rgba(236,236,230,'+(0.55+R()*0.35).toFixed(2)+')'; g.fillRect(x+(R()-.5)*0.6,y,6,16); }
+  for(const y0 of [0,Hh/2]){ g.fillStyle='rgba(230,194,60,.92)'; g.fillRect(W/2-4,y0,8,Hh/4); }
+  for(const [x,w] of [[13,6],[W-19,6],[W/2-4,8]]) for(let k=0;k<1400;k++){ g.fillStyle=R()<.7?'rgba(72,74,78,.75)':'rgba(40,42,46,.6)'; g.fillRect(x+R()*w,R()*Hh,1+R()*1.5,1+R()*2); }
   const t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy()); return t; })();
 const ROAD_HW=3.6, roadMeshes=[];
 // how close a point is to any other road's centreline (for leaving markings out of junctions)
@@ -1974,8 +2067,8 @@ WORLD.roads.forEach((rd,k)=>{ const p=rd.pts, n=p.length, pos=[], nor=[], uv=[],
     // every point across the road sits on the ground under it, so the road follows the cut ground exactly: no
     // floating, no sinking, and where two roads at different heights meet the asphalt runs smoothly from one to the other
     const dk=rd.deck&&rd.deck[q];
-    for(const c of AC){ const px=x+sx*ROAD_HW*c, pz=z+sz*ROAD_HW*c, h=dk?p[q][2]:terrainH(px,pz), e=0.6, gx=dk?0:(terrainH(px+e,pz)-terrainH(px-e,pz))/(2*e), gz=dk?0:(terrainH(px,pz+e)-terrainH(px,pz-e))/(2*e), nl=Math.hypot(gx,1,gz);
-      pos.push(px,h+0.07,pz); nor.push(-gx/nl,1/nl,-gz/nl); uv.push((c+1)/2,s/12); lines.push(ln); }
+    for(const c0 of AC){ const c=(c0===-1||c0===1)&&!rd.street&&!dk?c0*(1-0.06*(0.5+0.5*gnoise(s/2.4,k*13.1+c0*3.7,93))):c0, px=x+sx*ROAD_HW*c, pz=z+sz*ROAD_HW*c, h=dk?p[q][2]:terrainH(px,pz), e=0.6, gx=dk?0:(terrainH(px+e,pz)-terrainH(px-e,pz))/(2*e), gz=dk?0:(terrainH(px,pz+e)-terrainH(px,pz-e))/(2*e), nl=Math.hypot(gx,1,gz);
+      pos.push(px,h+0.07,pz); nor.push(-gx/nl,1/nl,-gz/nl); uv.push((c+1)/2,s/24); lines.push(ln); }
     bx0=Math.min(bx0,x); bx1=Math.max(bx1,x); bz0=Math.min(bz0,z); bz1=Math.max(bz1,z); }
   const up=(A,B,C)=>{ const ax=pos[B*3]-pos[A*3], az=pos[B*3+2]-pos[A*3+2], cx=pos[C*3]-pos[A*3], cz=pos[C*3+2]-pos[A*3+2]; return az*cx-ax*cz>0; };
   for(let q=0;q<n-1;q++) for(let c=0;c<NC-1;c++){ if(rd.deck&&rd.deck[q]&&rd.deck[q+1]) continue; // (a bridge deck takes over here)
@@ -3064,9 +3157,10 @@ function doorOf(h){ const C=CELL, a=Math.floor(h.w/2), b=Math.floor(h.d/2);
   if(h.side==='w') return {x:h.i0*C,z:(h.j0+b+0.5)*C,nx:-1,nz:0}; if(h.side==='e') return {x:(h.i0+h.w)*C,z:(h.j0+b+0.5)*C,nx:1,nz:0};
   if(h.side==='n') return {x:(h.i0+a+0.5)*C,z:h.j0*C,nx:0,nz:-1}; return {x:(h.i0+a+0.5)*C,z:(h.j0+h.d)*C,nx:0,nz:1}; }
 const BULB_R=6.8, BULB_IN=3;
-function townBulbs(t){ if(t.bulbs) return t.bulbs; const Ls=t.streetL;
+function townBulbs(t){ if(t.bulbs) return t.bulbs;
   t.dead=t.ends.map(e=>!WORLD.roads.some(r=>!r.street&&[r.pts[0],r.pts[r.pts.length-1]].some(p=>Math.hypot(SPAWN[0]+p[0]-e[0],SPAWN[2]+p[1]-e[1])<3)));
-  return t.bulbs=t.ends.map((e,k)=>{ const ox=(e[0]-t.x)/Ls, oz=(e[1]-t.z)/Ls; return t.dead[k]?[e[0]-ox*BULB_IN,e[1]-oz*BULB_IN,ox,oz]:null; }).filter(Boolean); }
+  if(t.kind) return t.bulbs=[]; // (a point of interest has no streets: its roads just stop)
+  return t.bulbs=t.ends.map((e,k)=>{ const [ox,oz]=t.endDir[k]; return t.dead[k]&&t.endKind[k]==='circle'?[e[0]-ox*BULB_IN,e[1]-oz*BULB_IN,ox,oz]:null; }).filter(Boolean); }
 function buildSidewalks(){
   if(sidewalkMesh) return; const pos=[], nor=[], uv=[], idx=[], {GRASS:GR}=WORLD;
   const inHouse=(t,x,z)=>t.houses.some(h=>x>h.i0*CELL-0.9&&x<(h.i0+h.w)*CELL+0.9&&z>h.j0*CELL-0.9&&z<(h.j0+h.d)*CELL+0.9);
@@ -3077,20 +3171,28 @@ function buildSidewalks(){
     const t1=[o,o+2,o+1], t2=[o+1,o+2,o+3]; [t1,t2].forEach(tr=>{ if(!up(...tr)) tr.reverse(); idx.push(...tr); });
     for(let s=0;s<=L;s+=1) for(const off of ww>2?[-1.6,-0.8,0,0.8,1.6]:[-0.8,0,0.8]){ const c=worldCell(a[0]+dx*s/L-dz/L*off,a[1]+dz*s/L+dx/L*off); if(c>=0) GR[c]=0; } // no grass on the path
     return v1; };
-  for(const t of TOWNS){ if(t.kind) continue; const Ls=t.streetL, y=t.h+0.045;
-    // a sidewalk down each side of both streets
+  for(const t of TOWNS){ if(t.kind) continue; const y=t.h+0.045, H=ROAD_HW, Wk=WALK_W;
+    // a sidewalk down each side of every street, stopping at the streets it meets (the earlier street keeps the corner)
     const bulbs=townBulbs(t), dd=t.dead, cutB=Math.sqrt(BULB_R*BULB_R-ROAD_HW*ROAD_HW)+BULB_IN-0.25; // the sidewalks stop where the turnaround's ring takes over
-    for(const X of [true,false]) for(const sd of [-1,1]){ const off=sd*(ROAD_HW+WALK_W/2), c0=dd[X?0:2]?cutB:0, c1=dd[X?1:3]?cutB:0, a=X?[t.x-Ls+c0,t.z+off]:[t.x+off,t.z-Ls+c0], b=X?[t.x+Ls-c1,t.z+off]:[t.x+off,t.z+Ls-c1]; quad(a,b,y,0); SIDEWALKS.push([a,b]); }
+    const roadR=S=>{ const a=S.a-(S.jA!=null?H:0), b=S.b+(S.jB!=null?H:0); return S.X?[a,S.c-H,b,S.c+H]:[S.c-H,a,S.c+H,b]; }, got=[];
+    t.segs.forEach((S,k)=>{ for(const sd of [-1,1]){
+      const ext=E=>S['j'+E]!=null?H+Wk:(S['end'+E]!=null&&t.endKind[S['end'+E]]==='circle')?-cutB:0, c0=S.c+sd*H, c1=S.c+sd*(H+Wk), lo=Math.min(c0,c1), hi=Math.max(c0,c1);
+      let iv=[[S.a-ext('A'),S.b+ext('B')]];
+      const cutBy=R=>{ const al0=S.X?R[0]:R[1], al1=S.X?R[2]:R[3], ac0=S.X?R[1]:R[0], ac1=S.X?R[3]:R[2]; if(Math.min(hi,ac1)-Math.max(lo,ac0)<0.05) return;
+        const nx=[]; for(const [u0,u1] of iv){ if(al1<=u0||al0>=u1){ nx.push([u0,u1]); continue; } if(al0>u0) nx.push([u0,al0]); if(al1<u1) nx.push([al1,u1]); } iv=nx; };
+      t.segs.forEach((O,m)=>{ if(m!==k) cutBy(roadR(O)); }); got.forEach(cutBy);
+      for(const [u0,u1] of iv){ if(u1-u0<0.4) continue; const m=(c0+c1)/2, a=S.X?[u0,m]:[m,u0], b=S.X?[u1,m]:[m,u1]; quad(a,b,y,0); SIDEWALKS.push([a,b]); got.push(S.X?[u0,lo,u1,hi]:[lo,u0,hi,u1]); } } });
+    t.ends.forEach((e,k)=>{ if(t.endKind[k]!=='stub'&&t.endKind[k]!=='fence') return; const [ox,oz]=t.endDir[k], m=[e[0]+ox*Wk/2,e[1]+oz*Wk/2], h=H+Wk, a=[m[0]-oz*h,m[1]-ox*h], b=[m[0]+oz*h,m[1]+ox*h]; quad(a,b,y,0); SIDEWALKS.push([a,b]); }); // the kerb across the end
     for(const [cx,cz,ox,oz] of bulbs){ const th=Math.PI-Math.asin(ROAD_HW/BULB_R), n=36, rr=BULB_R+WALK_W/2, pt=k=>{ const a=-th+2*th*k/n, ca=Math.cos(a), sa=Math.sin(a); return [cx+(ox*ca-oz*sa)*rr,cz+(oz*ca+ox*sa)*rr]; };
       let v=0; for(let k=0;k<n;k++){ const a=pt(k-0.04), b=pt(k+1.04); v=quad(a,b,y+0.001,v); SIDEWALKS.push([pt(k),pt(k+1)]); }
       const R2=BULB_R+WALK_W+0.6; for(let u=-R2;u<=R2;u+=0.8) for(let w=-R2;w<=R2;w+=0.8) if(u*u+w*w<R2*R2){ const c=worldCell(cx+u,cz+w); if(c>=0) GR[c]=0; }
       const cg=new THREE.CircleGeometry(BULB_R+0.12,44); cg.rotateX(-Math.PI/2); const P_=cg.attributes.position, U_=cg.attributes.uv; for(let q=0;q<P_.count;q++) U_.setXY(q,(cx+P_.getX(q))/7.2,(cz+P_.getZ(q))/24);
       const cm=new THREE.Mesh(cg,new THREE.MeshLambertMaterial({map:roadPlainTex,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-4*(8+WORLD.roads.length)})); cm.position.set(cx,t.h+0.03,cz); cm.receiveShadow=true; cm.updateMatrix(); cm.matrixAutoUpdate=false; scene.add(cm); }
     // and a front path from every door straight out to the sidewalk of the street it faces
-    for(const h of t.houses){ const D=doorOf(h), a=[D.x+D.nx*0.14,D.z+D.nz*0.14], X=h.side==='n'||h.side==='s', across=X?a[1]-t.z:a[0]-t.x, edge=Math.sign(across)*(ROAD_HW+WALK_W-0.1);
-      const b=X?[a[0],t.z+edge]:[t.x+edge,a[1]]; quad(a,b,y+0.002,0); SIDEWALKS.push([a,b]); }
-    for(const h of t.houses){ if(!h.garage) continue; const f=garageFrame(h), m=f.p(2.5,0.02), X=f.X, across=X?m[1]-t.z:m[0]-t.x, edge=Math.sign(across)*(ROAD_HW+0.05);
-      const a=[m[0],m[1]], b=X?[m[0],t.z+edge]:[t.x+edge,m[1]]; quad(a,b,y+0.004,0,3.4); SIDEWALKS.push([a,b]); } }
+    for(const h of t.houses){ const D=doorOf(h), a=[D.x+D.nx*0.14,D.z+D.nz*0.14], X=h.side==='n'||h.side==='s', across=a[X?1:0]-h.sc, edge=Math.sign(across)*(ROAD_HW+WALK_W-0.1);
+      const b=X?[a[0],h.sc+edge]:[h.sc+edge,a[1]]; quad(a,b,y+0.002,0); SIDEWALKS.push([a,b]); }
+    for(const h of t.houses){ if(!h.garage) continue; const f=garageFrame(h), m=f.p(2.5,0.02), X=f.X, across=m[X?1:0]-h.sc, edge=Math.sign(across)*(ROAD_HW+0.05);
+      const a=[m[0],m[1]], b=X?[m[0],h.sc+edge]:[h.sc+edge,m[1]]; quad(a,b,y+0.004,0,3.4); SIDEWALKS.push([a,b]); } }
   const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3)); g.setAttribute('normal',new THREE.Float32BufferAttribute(nor,3)); g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2)); g.setIndex(idx); g.computeBoundingSphere();
   sidewalkMesh=new THREE.Mesh(g,new THREE.MeshLambertMaterial({map:walkTex,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-7})); sidewalkMesh.receiveShadow=true; sidewalkMesh.matrixAutoUpdate=false; scene.add(sidewalkMesh);
 }
@@ -3117,12 +3219,12 @@ function planHouses(t){ if(t.kind){ t.poi=null; t.houses=[]; return t.houses; } 
      Lots in the way of a road coming into town are skipped. */
   const r=seeded(t.seed), L=Math.round(t.h/LVL), ci=Math.round(t.x/CELL), cj=Math.round(t.z/CELL), used=new Set(), out=[];
   const key=(i,j)=>i+','+j;
-  for(let a=-12;a<=12;a++) for(let b=-12;b<=12;b++) if(a===-1||a===0||b===-1||b===0) used.add(key(ci+a,cj+b)); // the two streets
+  for(const S of t.segs) for(let a=S.ai-1;a<=S.bi;a++) for(const b of [S.ci-1,S.ci]) used.add(S.X?key(a,b):key(b,a)); // the streets
   for(const rd of WORLD.roads){ if(rd.street) continue; // roads coming in
     for(const p of rd.pts){ const x=SPAWN[0]+p[0], z=SPAWN[2]+p[1]; if(Math.hypot(x-t.x,z-t.z)>t.R+12) continue;
       for(let a=-2;a<=2;a++) for(let b=-2;b<=2;b++){ const i=Math.floor(x/CELL)+a, j=Math.floor(z/CELL)+b; if(Math.hypot((i+.5)*CELL-x,(j+.5)*CELL-z)<7.5) used.add(key(i,j)); } } }
   const free=(i0,j0,w,d)=>{ for(let a=-1;a<=w;a++) for(let b=-1;b<=d;b++) if(used.has(key(i0+a,j0+b))) return false; return true; };
-  const inTown=(i0,j0,w,d)=>[[i0,j0],[i0+w,j0],[i0,j0+d],[i0+w,j0+d]].every(([i,j])=>Math.hypot(i*CELL-t.x,j*CELL-t.z)<t.R-1);
+  const inTown=(i0,j0,w,d)=>[[i0,j0],[i0+w,j0],[i0,j0+d],[i0+w,j0+d]].every(([i,j])=>townIn(t,i*CELL,j*CELL,1));
   const TH=TOWN_THEME[TOWNS.indexOf(t)%TOWN_THEME.length];
   { const pr=seeded(t.seed+31337), quads=[[1,1],[-1,1],[1,-1],[-1,-1]]; for(let q=3;q>0;q--){ const j=Math.floor(pr()*(q+1)); [quads[q],quads[j]]=[quads[j],quads[q]]; }
     t.poi=null; const SEA_=WGEN.sea();
@@ -3131,22 +3233,21 @@ function planHouses(t){ if(t.kind){ t.poi=null; t.houses=[]; return t.houses; } 
       for(let p=0;p<3;p++) for(let q=0;q<3;q++) used.add(key(i0+p,j0+q)); t.poi={x:(i0+1.5)*CELL,z:(j0+1.5)*CELL};
       for(let u=-7.4;u<=7.4;u+=0.8) for(let w=-7.4;w<=7.4;w+=0.8){ const c=worldCell(t.poi.x+u,t.poi.z+w); if(c>=0) WORLD.GRASS[c]=0; } break; } }
   const shapes=[[2,2],[3,2],[2,3]]; let k=0;
-  const order=t.axis==='z'?[false,true]:[true,false];
-  for(const X of order) for(const sd of [1,-1]){ let s=-11;
-    while(s<11){ const [along,deep]=shapes[Math.floor(r()*shapes.length)], front=sd>0?TH.set:-TH.set-deep; // a front-yard row between the street and the house
-      const i0=X?ci+s:ci+front, j0=X?cj+front:cj+s, w=X?along:deep, d=X?deep:along;
-      if(!free(i0,j0,w,d)||!inTown(i0,j0,w,d)){ s++; continue; }
+  for(const S of t.segs) if(!S.hammer) for(const sd of (r()<0.5?[1,-1]:[-1,1])){ let s=S.ai+1; const X=S.X;
+    while(s<S.bi){ const [along,deep]=shapes[Math.floor(r()*shapes.length)], set=TH.set+(r()<0.22?1:0), front=sd>0?set:-set-deep; // a front-yard row between the street and the house (some set further back)
+      const i0=X?s:S.ci+front, j0=X?S.ci+front:s, w=X?along:deep, d=X?deep:along;
+      if(s+along>S.bi||!free(i0,j0,w,d)||!inTown(i0,j0,w,d)){ s++; continue; }
       for(let p=0;p<w;p++) for(let q=0;q<d;q++) used.add(key(i0+p,j0+q));
       const side=X?(sd>0?'n':'s'):(sd>0?'w':'e'); // the door faces its street
       const m=r(), mat=m<TH.w?'wood':m<TH.b?'brick':'metal', roof=r()<0.6?'brick':'wood', floors=r()<TH.two?2:1;
       const rs=seeded(t.seed+977*(k+1)), style=HOUSE_STYLE[mat]; k++;
-      out.push({i0,j0,w,d,L,side,mat,roof,floors,id:t.houses.length+out.length,skin:{style,paint:TH.paint&&TH.paint[style]?TH.paint[style][Math.floor(rs()*TH.paint[style].length)]:Math.floor(rs()*HOUSE_PAINT[style].length),roof:Math.floor(rs()*4)}});
+      out.push({i0,j0,w,d,L,side,mat,roof,floors,sc:S.c,id:t.houses.length+out.length,skin:{style,paint:TH.paint&&TH.paint[style]?TH.paint[style][Math.floor(rs()*TH.paint[style].length)]:Math.floor(rs()*HOUSE_PAINT[style].length),roof:Math.floor(rs()*4)}});
       { // a garage on the far side of some houses, its door facing the same street; now and then a dune buggy inside
         const H=out[out.length-1], gr=seeded(t.seed+7919*(k+3));
         if(gr()<TH.gar){ const X_=side==='n'||side==='s', gi=X_?i0+w:(side==='w'?i0:i0+w-1), gj=X_?(side==='n'?j0:j0+d-1):j0+d;
           let ok=inTown(gi,gj,1,1); for(let a=-1;a<=1&&ok;a++) for(let b=-1;b<=1&&ok;b++){ const ii=gi+a, jj=gj+b; if(ii>=i0&&ii<i0+w&&jj>=j0&&jj<j0+d) continue; if(used.has(key(ii,jj))) ok=false; }
           if(ok){ used.add(key(gi,gj)); H.garage={i:gi,j:gj,kart:gr()<0.45,paint:Math.floor(gr()*8)}; s+=1; } } }
-      s+=along+TH.gap; } }
+      s+=along+TH.gap+(r()<0.25?1:0); } }
   t.houses=out; return out;
 }
 // the piece list for one house: [{type,i,j,l,axis,dir,mask,mat}]
@@ -8916,7 +9017,7 @@ function initProps(){
     for(let t=0;t<1500&&(lane<9||kerb<16)&&roads.length;t++){ const rd=roads[Math.floor(r2()*roads.length)], n=rd.pts.length; if(n<9) continue;
       const q=4+Math.floor(r2()*(n-8)), a=rd.pts[q-3], b=rd.pts[q+3], side=r2()<0.5?-1:1, flip=r2()<0.5?Math.PI:0; let tx=b[0]-a[0], tz=b[1]-a[1]; const tl=Math.hypot(tx,tz)||1; tx/=tl; tz/=tl;
       const off=rd.street?2.45:1.9, x=SPAWN[0]+rd.pts[q][0]-tz*off*side, z=SPAWN[2]+rd.pts[q][1]+tx*off*side;
-      if(rd.street){ const tw=rd.town, dc=Math.hypot(x-tw.x,z-tw.z); if(kerb>=16||(perTown.get(tw)||0)>=2||dc<11||dc>tw.streetL-12||!roomy(x,z,'car')) continue;
+      if(rd.street){ const tw=rd.town; if(kerb>=16||(perTown.get(tw)||0)>=2||!streetMid(tw,rd.seg,x,z,12)||!roomy(x,z,'car')) continue;
         const p=add('car',x,z,1,Math.atan2(-tz,tx)+(side>0?Math.PI:0)); p.yard=true; perTown.set(tw,(perTown.get(tw)||0)+1); kerb++; }
       else { if(lane>=9||rd.skip[q]||townAt(x,z,14)||Math.abs(terrainH(x,z)-rd.pts[q][2])>0.5||!roomy(x,z,'car')) continue; if(typeof nearOther==='function'&&nearOther(roads.indexOf(rd),x,z)<30) continue;
         add('car',x,z,1,Math.atan2(-tz,tx)+flip+(r2()-0.5)*0.5); lane++; } } }
@@ -9004,7 +9105,7 @@ function buildSigns(){ const grey=[], dark=[], pale=[], faces=new Map(), placed=
     for(const end of [0,1]){ const e=p[end?n-1:0], ex=SPAWN[0]+e[0], ez=SPAWN[2]+e[1], t=TOWNS.find(t=>t.ends.some(a=>Math.hypot(a[0]-ex,a[1]-ez)<3)); if(!t) continue;
       let arc=0, q=end?n-1:0; const st=end?-1:1, want=Math.min(82,n*0.6); while(q+st>=0&&q+st<n&&arc<want){ arc+=Math.hypot(p[q+st][0]-p[q][0],p[q+st][1]-p[q][1]); q+=st; }
       for(let tr=0;tr<10;tr++,q+=st*3,arc+=6){ const s=spot(k,q,-st,ROAD_HW+2.7,20); if(!s) continue;
-        const dist=Math.round((arc+t.streetL)/10)*10, f=face('town'+t.name+dist,720,260,(g,w,h)=>{ g.fillStyle='#f4f4f0'; g.fillRect(0,0,w,h); g.fillStyle='#1d6a44'; rrect(g,10,10,w-20,h-20,24); g.fill();
+        const dist=Math.round((arc+Math.hypot(ex-t.x,ez-t.z))/10)*10, f=face('town'+t.name+dist,720,260,(g,w,h)=>{ g.fillStyle='#f4f4f0'; g.fillRect(0,0,w,h); g.fillStyle='#1d6a44'; rrect(g,10,10,w-20,h-20,24); g.fill();
           g.fillStyle='#f4f4f0'; g.textAlign='center'; g.textBaseline='middle'; let fs=104; g.font='800 '+fs+'px '+F; while(g.measureText(t.name).width>w-90&&fs>40){ fs-=4; g.font='800 '+fs+'px '+F; } g.fillText(t.name,w/2,94);
           g.font='700 58px '+F; g.fillText(dist+' m',w/2+36,190); g.lineWidth=13; g.strokeStyle='#f4f4f0'; g.lineCap='round'; g.lineJoin='round'; const ax=w/2-g.measureText(dist+' m').width/2-26; g.beginPath(); g.moveTo(ax,214); g.lineTo(ax,166); g.moveTo(ax-22,186); g.lineTo(ax,162); g.lineTo(ax+22,186); g.stroke(); });
         board(f,new THREE.PlaneGeometry(3.5,1.26),s.x,s.y+2.85,s.z,s.yaw); const cx=Math.cos(s.yaw), cz=-Math.sin(s.yaw); for(const u of [-1.25,1.25]) post(grey,s.x+cx*u,Math.min(s.y,terrainH(s.x+cx*u,s.z+cz*u)),s.z+cz*u,3.55,s.yaw,0.1); break; } } });
@@ -9024,17 +9125,29 @@ function buildSigns(){ const grey=[], dark=[], pale=[], faces=new Map(), placed=
   // ---- towns: a stop sign on each way into the crossroads, and street lamps
   const stopF=face('stop',256,256,(g)=>{ g.fillStyle='#c4262b'; g.fillRect(0,0,256,256); g.strokeStyle='#f6f6f2'; g.lineWidth=10; g.beginPath(); for(let a=0;a<8;a++){ const x=128+Math.cos(a*Math.PI/4)*108, y=128+Math.sin(a*Math.PI/4)*108; a?g.lineTo(x,y):g.moveTo(x,y); } g.closePath(); g.stroke();
     g.translate(128,128); g.rotate(Math.PI/8); g.fillStyle='#f6f6f2'; g.textAlign='center'; g.textBaseline='middle'; g.font='800 74px '+F; g.fillText('STOP',0,4); });
+  const fenceW=[];
   for(const t of TOWNS){ townBulbs(t); if(t.kind) continue;
-    for(const [ox,oz] of [[1,0],[-1,0],[0,1],[0,-1]]){ const hx=-ox, hz=-oz, x=t.x+ox*(ROAD_HW+2.3)-hz*(ROAD_HW+0.6), z=t.z+oz*(ROAD_HW+2.3)+hx*(ROAD_HW+0.6), yaw=Math.atan2(ox,oz);
+    t.ends.forEach((e,k)=>{ if(t.endKind[k]!=='fence') return; const [ox,oz]=t.endDir[k], px=-oz, pz=ox, L=ROAD_HW+WALK_W+0.3, fx=e[0]+ox*(WALK_W+0.7), fz=e[1]+oz*(WALK_W+0.7), yaw=Math.atan2(ox,oz), y=t.h;
+      const n=Math.ceil(2*L/1.5); for(let q=0;q<=n;q++){ const u=-L+2*L*q/n; post(fenceW,fx+px*u,y,fz+pz*u,1.25,yaw,0.15); }
+      for(const h of [0.55,1.05]){ const g=new THREE.BoxGeometry(2*L+0.2,0.13,0.06); g.rotateY(yaw+Math.PI/2); g.translate(fx,y+h,fz); fenceW.push(g); }
+      for(let u=-L;u<L-0.01;u+=2*L/Math.ceil(2*L/2.2)){ const u1=Math.min(L,u+2*L/Math.ceil(2*L/2.2)), ax=fx+px*u, az=fz+pz*u, bx=fx+px*u1, bz=fz+pz*u1;
+        STATICS.push({x:(ax+bx)/2,z:(az+bz)/2,solid:{boxes:[[Math.min(ax,bx)-0.12,y,Math.min(az,bz)-0.12,Math.max(ax,bx)+0.12,y+1.25,Math.max(az,bz)+0.12]],key:'fence'+STATICS.length}}); }
+      const f=face('roadend',512,128,(g,w,h)=>{ g.fillStyle='#f2c418'; g.fillRect(0,0,w,h); g.fillStyle='#17181b'; for(let x=-h;x<w+h;x+=64){ g.beginPath(); g.moveTo(x,h); g.lineTo(x+32,h); g.lineTo(x+32+h,0); g.lineTo(x+h,0); g.closePath(); g.fill(); } });
+      board(f,new THREE.PlaneGeometry(2.4,0.6),fx-ox*0.06,y+0.8,fz-oz*0.06,Math.atan2(-ox,-oz)); });
+    const arms=[]; t.segs.forEach(S=>{ for(const E of ['A','B']){ const m=S['j'+E]; if(m==null) continue; const O=t.segs[m]; if(O.hammer||!(S.c>O.a+0.1&&S.c<O.b-0.1)) continue; // a through street: the side street stops
+        const g=E==='A'?S.a:S.b, d=E==='A'?1:-1; arms.push([S.X?g:S.c,S.X?S.c:g,S.X?d:0,S.X?0:d]); } });
+    for(const [jx,jz,ox,oz] of arms){ const hx=-ox, hz=-oz, x=jx+ox*(ROAD_HW+2.3)-hz*(ROAD_HW+0.6), z=jz+oz*(ROAD_HW+2.3)+hx*(ROAD_HW+0.6), yaw=Math.atan2(ox,oz);
       const g=new THREE.CircleGeometry(0.42,8); g.rotateZ(Math.PI/8); board(stopF,g,x,t.h+2.35,z,yaw); post(grey,x,t.h,z,2.5,yaw); }
-    for(const X of [true,false]) for(const s0 of [-29,-15,15,29]){ const sd=(s0>0)!==(Math.abs(s0)>20)?1:-1, ac=sd*(ROAD_HW+WALK_W+0.4); let s=s0, ok=false;
-      for(let tr=0;tr<5&&!ok;tr++,s+=Math.sign(s0)*-2.3){ const x=X?t.x+s:t.x+ac, z=X?t.z+ac:t.z+s; ok=!SIDEWALKS.some(([a,b])=>X?(Math.abs(a[0]-b[0])<0.2&&Math.abs(a[0]-x)<2.2&&z>Math.min(a[1],b[1])-0.6&&z<Math.max(a[1],b[1])+0.6):(Math.abs(a[1]-b[1])<0.2&&Math.abs(a[1]-z)<2.2&&x>Math.min(a[0],b[0])-0.6&&x<Math.max(a[0],b[0])+0.6));
+    for(const S of t.segs){ if(S.hammer) continue; const X=S.X, n0=Math.floor((S.b-S.a-14)/14); if(n0<1) continue; const step=(S.b-S.a-14)/n0;
+     for(let q=0;q<=n0;q++){ const s0=S.a+7+q*step, sd=q%2?1:-1, ac=S.c+sd*(ROAD_HW+WALK_W+0.4); let s=s0, ok=false;
+      for(let tr=0;tr<5&&!ok;tr++,s+=(tr%2?1:-1)*tr*2.3){ const x=X?s:ac, z=X?ac:s; if((t.junc||[]).some(J=>Math.hypot(J[0]-x,J[1]-z)<9)||townBulbs(t).some(b=>Math.hypot(b[0]-x,b[1]-z)<BULB_R+WALK_W+1.2)) continue; ok=!SIDEWALKS.some(([a,b])=>X?(Math.abs(a[0]-b[0])<0.2&&Math.abs(a[0]-x)<2.2&&z>Math.min(a[1],b[1])-0.6&&z<Math.max(a[1],b[1])+0.6):(Math.abs(a[1]-b[1])<0.2&&Math.abs(a[1]-z)<2.2&&x>Math.min(a[0],b[0])-0.6&&x<Math.max(a[0],b[0])+0.6));
         if(!ok) continue; const ix=X?0:-sd, iz=X?-sd:0; // toward the street
         post(dark,x,t.h,z,4.9,0,0.13); const b0=new THREE.BoxGeometry(0.3,0.5,0.3); b0.translate(x,t.h+0.25,z); dark.push(b0);
         const arm=new THREE.BoxGeometry(X?0.08:1.5,0.08,X?1.5:0.08); arm.translate(x+ix*0.7,t.h+4.85,z+iz*0.7); dark.push(arm);
-        const hd=new THREE.BoxGeometry(X?0.3:0.62,0.13,X?0.62:0.3); hd.translate(x+ix*1.5,t.h+4.8,z+iz*1.5); dark.push(hd); const gl=new THREE.BoxGeometry(X?0.22:0.5,0.05,X?0.5:0.22); gl.translate(x+ix*1.5,t.h+4.715,z+iz*1.5); pale.push(gl); } } }
+        const hd=new THREE.BoxGeometry(X?0.3:0.62,0.13,X?0.62:0.3); hd.translate(x+ix*1.5,t.h+4.8,z+iz*1.5); dark.push(hd); const gl=new THREE.BoxGeometry(X?0.22:0.5,0.05,X?0.5:0.22); gl.translate(x+ix*1.5,t.h+4.715,z+iz*1.5); pale.push(gl);
+        STATICS.push({x,z,solid:{boxes:[[x-0.15,t.h,z-0.15,x+0.15,t.h+4.9,z+0.15]],key:'lamp'+STATICS.length}}); } } } }
   const add=(list,mat)=>{ if(!list.length) return; const g=mergeGeos(list); g.computeBoundingSphere(); const m=new THREE.Mesh(g,mat); m.castShadow=true; m.receiveShadow=true; m.matrixAutoUpdate=false; scene.add(m); };
-  add(grey,new THREE.MeshLambertMaterial({color:0x8d939a})); add(dark,new THREE.MeshLambertMaterial({color:0x2b3036})); add(pale,new THREE.MeshBasicMaterial({color:0xfff3cf}));
+  add(fenceW,new THREE.MeshLambertMaterial({color:0x7a5a3c})); add(grey,new THREE.MeshLambertMaterial({color:0x8d939a})); add(dark,new THREE.MeshLambertMaterial({color:0x2b3036})); add(pale,new THREE.MeshBasicMaterial({color:0xfff3cf}));
   faces.forEach(f=>add(f.geos,new THREE.MeshLambertMaterial({map:f.tex})));
 }
 /* Bridges: where a road crosses a river the land under it is cut away and the road runs on a concrete deck with a
@@ -9269,22 +9382,29 @@ function buildImpostors(){ if(IMP.rt) return; const T=IMP.tile, W=T*IMP.cols, H=
     IMP.size[kind]={S,y0};
     for(let v=0;v<8;v++){ const m=new THREE.Mesh(geos[v],mat); sc.add(m);
       for(const view of ['side','top']){ const k=tile++, cx=k%IMP.cols, cy=Math.floor(k/IMP.cols);
-        if(view==='side'){ cam.left=-S/2; cam.right=S/2; cam.bottom=y0-0.2; cam.top=y0-0.2+S; cam.position.set(0,0,40); cam.lookAt(0,0,0); cam.up.set(0,1,0); }
+        if(view==='side'){ cam.left=-S/2; cam.right=S/2; cam.bottom=y0-0.2; cam.top=y0-0.2+S; cam.up.set(0,1,0); cam.position.set(0,0,40); cam.lookAt(0,0,0); } // (up before aiming: after a top view it was still pointing along z)
         else { cam.left=-S/2; cam.right=S/2; cam.top=S/2; cam.bottom=-S/2; cam.position.set(0,60,0); cam.up.set(0,0,-1); cam.lookAt(0,0,0); }
         cam.updateProjectionMatrix(); rt.viewport.set(cx*T,cy*T,T,T); rt.scissor.set(cx*T,cy*T,T,T); rt.scissorTest=true; renderer.setRenderTarget(rt); renderer.render(sc,cam); }
       sc.remove(m); } }
   rt.scissorTest=false; rt.viewport.set(0,0,W,H); rt.scissor.set(0,0,W,H); renderer.setRenderTarget(prevRT); renderer.setClearColor(prevClr,prevA); renderer.autoClear=prevAuto; renderer.shadowMap.enabled=prevSh;
-  IMP.rt=rt; IMP.mat=new THREE.MeshLambertMaterial({map:rt.texture,alphaTest:0.3,side:THREE.DoubleSide,emissive:0x1a1a10}); IMP.mat.onBeforeCompile=sh=>{ sh.fragmentShader=sh.fragmentShader.replace('reflectedLight.indirectDiffuse += ( gl_FrontFacing ) ? vIndirectFront : vIndirectBack;','reflectedLight.indirectDiffuse += vIndirectFront;').replace('reflectedLight.directDiffuse = ( gl_FrontFacing ) ? vLightFront : vLightBack;','reflectedLight.directDiffuse = vLightFront;'); };
+  IMP.rt=rt; IMP.mat=new THREE.MeshLambertMaterial({map:rt.texture,alphaTest:0.3,side:THREE.DoubleSide,emissive:0x1a1a10}); IMP.mat.onBeforeCompile=sh=>{ impTopFade(sh); sh.fragmentShader=sh.fragmentShader.replace('reflectedLight.indirectDiffuse += ( gl_FrontFacing ) ? vIndirectFront : vIndirectBack;','reflectedLight.indirectDiffuse += vIndirectFront;').replace('reflectedLight.directDiffuse = ( gl_FrontFacing ) ? vLightFront : vLightBack;','reflectedLight.directDiffuse = vLightFront;'); };
   IMP.depth=new THREE.MeshDepthMaterial({depthPacking:THREE.RGBADepthPacking,map:rt.texture,alphaTest:0.38,side:THREE.DoubleSide}); }
 // the far model of one variant: n crossed cards with its side picture and a level card with its top picture
+// the crown-from-above card only shows when you look down on the tree; from the side (or below) it folds away, so it
+// never reads as a floating disc
+function impTopFade(sh){ sh.vertexShader='attribute float topc;\n'+sh.vertexShader.replace('#include <project_vertex>',`#ifdef USE_INSTANCING
+  if(topc>0.5){ vec4 wq=modelMatrix*instanceMatrix*vec4(transformed,1.0); float up=cameraPosition.y-wq.y, dh=length(cameraPosition.xz-wq.xz); if(up<dh*0.14) transformed=vec3(0.0,-1000.0,0.0); }
+#endif
+#include <project_vertex>`); }
 function impostorGeo(kind,v,n){ const {S,y0}=IMP.size[kind], k0=(kind==='tree'?0:16)+v*2, T=IMP.tile, Wd=T*IMP.cols, Hd=T*IMP.rows, P=[],N=[],U=[],I=[];
   const reg=k=>{ const cx=k%IMP.cols, cy=Math.floor(k/IMP.cols), e=1.5; return [(cx*T+e)/Wd,(cy*T+e)/Hd,((cx+1)*T-e)/Wd,((cy+1)*T-e)/Hd]; };
   const cy=y0-0.2+S*0.55, put=(x,y,z,u,w)=>{ P.push(x,y,z); const nx=x, ny=(y-cy)*0.8+0.3, nz=z, l=Math.hypot(nx,ny,nz)||1; N.push(nx/l,ny/l,nz/l); U.push(u,w); return P.length/3-1; };
   const side=reg(k0), top=reg(k0+1);
   for(let k=0;k<n;k++){ const a=k/n*Math.PI, dx=Math.cos(a)*S/2, dz=Math.sin(a)*S/2, b=y0-0.2, t=b+S;
     const i0=put(-dx,b,-dz,side[0],side[1]), i1=put(dx,b,dz,side[2],side[1]), i2=put(dx,t,dz,side[2],side[3]), i3=put(-dx,t,-dz,side[0],side[3]); I.push(i0,i1,i2,i0,i2,i3); }
+  const nSide=P.length/3;
   { const h=kind==='tree'?y0+S*0.62:y0+S*0.42, s=S/2, i0=put(-s,h,s,top[0],top[1]), i1=put(s,h,s,top[2],top[1]), i2=put(s,h,-s,top[2],top[3]), i3=put(-s,h,-s,top[0],top[3]); I.push(i0,i1,i2,i0,i2,i3); }
-  const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(P,3)); g.setAttribute('normal',new THREE.Float32BufferAttribute(N,3)); g.setAttribute('uv',new THREE.Float32BufferAttribute(U,2)); g.setIndex(I); g.computeBoundingSphere(); return g; }
+  const g=new THREE.BufferGeometry(); g.setAttribute('topc',new THREE.Float32BufferAttribute(P.map((v,i)=>i).filter(i=>i%3===0).map(i=>i/3>=nSide?1:0),1)); g.setAttribute('position',new THREE.Float32BufferAttribute(P,3)); g.setAttribute('normal',new THREE.Float32BufferAttribute(N,3)); g.setAttribute('uv',new THREE.Float32BufferAttribute(U,2)); g.setIndex(I); g.computeBoundingSphere(); return g; }
 
 /* ---------- the forest ----------
    Thousands of trees can't each be their own object, so they're drawn as instanced meshes: within 130 m every tree
@@ -9333,10 +9453,10 @@ function treeAnim(p){ const moving=p.wob>0||p.dying>0||(p.alive&&p.grow<1);
    per town, just for looks. */
 // is (x,z) on (or within pad of) a front path or driveway of this town? (sidewalks along the streets are kept clear separately)
 function onWalk(t,x,z,pad){ const seg=(ax,az,bx,bz,w)=>{ const dx=bx-ax, dz=bz-az, L2=dx*dx+dz*dz||1e-6; let f=((x-ax)*dx+(z-az)*dz)/L2; f=f<0?0:f>1?1:f; return Math.hypot(x-ax-dx*f,z-az-dz*f)<w/2+pad; };
-  for(const h of t.houses){ const D=doorOf(h), X=h.side==='n'||h.side==='s', across=X?D.z-t.z:D.x-t.x, edge=Math.sign(across)*(ROAD_HW+WALK_W-0.1);
-    if(seg(D.x,D.z,X?D.x:t.x+edge,X?t.z+edge:D.z,WALK_W)) return true;
-    if(h.garage){ const f=garageFrame(h), m=f.p(2.5,0.02), a2=f.X?m[1]-t.z:m[0]-t.x, e2=Math.sign(a2)*(ROAD_HW+0.05); if(seg(m[0],m[1],f.X?m[0]:t.x+e2,f.X?t.z+e2:m[1],3.4)) return true; } }
-  return Math.abs(x-t.x)<ROAD_HW+WALK_W+pad||Math.abs(z-t.z)<ROAD_HW+WALK_W+pad; }
+  for(const h of t.houses){ const D=doorOf(h), X=h.side==='n'||h.side==='s', across=(X?D.z:D.x)-h.sc, edge=Math.sign(across)*(ROAD_HW+WALK_W-0.1);
+    if(seg(D.x,D.z,X?D.x:h.sc+edge,X?h.sc+edge:D.z,WALK_W)) return true;
+    if(h.garage){ const f=garageFrame(h), m=f.p(2.5,0.02), a2=(f.X?m[1]:m[0])-h.sc, e2=Math.sign(a2)*(ROAD_HW+0.05); if(seg(m[0],m[1],f.X?m[0]:h.sc+e2,f.X?h.sc+e2:m[1],3.4)) return true; } }
+  return streetNear(t,x,z,ROAD_HW+WALK_W+pad); }
 function yardFrame(t,h){ const C=CELL, X=h.side==='n'||h.side==='s';
   const fN=h.side==='n'||h.side==='w', x0=h.i0*C, x1=(h.i0+h.w)*C, z0=h.j0*C, z1=(h.j0+h.d)*C;
   // u along the front, w out from the front wall (toward the street, negative w goes behind the house)
@@ -9445,7 +9565,7 @@ function houseFurniture(add){ const BESIDE={8:4,10:3}, SZ=FURN_SZ, ENDS={2:1,7:1
             if(!fits(f,tight?0.02:0.3)) continue;
             put(ft,x,z,yaw); placed.push(f); made++; if(!got[ft]) got[ft]={sd,f}; break; } } } } } } }
 function yardTrees(add,r){
-  const free=(t,x,z,pad)=>{ if(Math.hypot(x-t.x,z-t.z)>t.R+6) return false; if(Math.abs(x-t.x)<ROAD_HW+WALK_W+1.4||Math.abs(z-t.z)<ROAD_HW+WALK_W+1.4) return false;
+  const free=(t,x,z,pad)=>{ if(!townIn(t,x,z,-6)) return false; if(streetNear(t,x,z,ROAD_HW+WALK_W+1.4)) return false;
     for(const h of t.houses){ if(x>h.i0*CELL-pad&&x<(h.i0+h.w)*CELL+pad&&z>h.j0*CELL-pad&&z<(h.j0+h.d)*CELL+pad) return false; const G=h.garage; if(G&&x>G.i*CELL-pad&&x<(G.i+1)*CELL+pad&&z>G.j*CELL-pad&&z<(G.j+1)*CELL+pad) return false; }
     for(const rd of WORLD.roads){ if(rd.street) continue; if(roadDistAt(x,z)<ROAD_HW+2) return false; } return true; };
   for(const t of TOWNS){ if(!t.houses.length) planHouses(t);
@@ -9470,7 +9590,7 @@ function buildGardens(){ const flowers=[0xe8456b,0xf2c014,0xffffff,0xa45ee5,0xff
       // round shrubs at the front corners
       for(const fu of [0.25,f.len-0.25]){ if(h.garage&&fu>mid) continue; const [x,z]=f.p(fu,0.4); const rr=0.45+q()*0.2; put(new THREE.IcosahedronGeometry(rr,1).scale(1,0.85,1),0x3d7a32,x,y0+rr*0.7,z); }
       // a mailbox by the sidewalk, beside the front path
-      { const [x,z]=f.p(mid+1.25,(X?Math.abs((h.side==='n'?h.j0*CELL:(h.j0+h.d)*CELL)-t.z):Math.abs((h.side==='w'?h.i0*CELL:(h.i0+h.w)*CELL)-t.x))-(ROAD_HW+WALK_W)-0.45);
+      { const [x,z]=f.p(mid+1.25,(X?Math.abs((h.side==='n'?h.j0*CELL:(h.j0+h.d)*CELL)-h.sc):Math.abs((h.side==='w'?h.i0*CELL:(h.i0+h.w)*CELL)-h.sc))-(ROAD_HW+WALK_W)-0.45);
         STATICS.push({x,z,solid:{boxes:[[x-0.16,y0,z-0.16,x+0.16,y0+1.26,z+0.16]],key:'mail'+STATICS.length}});
         put(new THREE.BoxGeometry(0.09,1.05,0.09),0x5a4030,x,y0+0.52,z,ry); put(new THREE.BoxGeometry(0.24,0.24,0.46),[0x2a2d33,0x8a2a2a,0x2f5d8a,0xe0ddd5][Math.floor(q()*4)],x,y0+1.12,z,ry+Math.PI/2);
         put(new THREE.BoxGeometry(0.03,0.16,0.07),0xd23a2a,...[x+(X?0.14:0),y0+1.2,z+(X?0:0.14)],ry); } }
@@ -10224,7 +10344,7 @@ function drawMini(){
     for(const rd of WORLD.roads){ const bx=rd.box; if(bx[2]<ox-R||bx[0]>ox+R||bx[3]<oz-R||bx[1]>oz+R) continue; g.beginPath(); let on=false;
       for(const p of rd.pts){ const x=SPAWN[0]+p[0], z=SPAWN[2]+p[1]; if(Math.abs(x-ox)<R+10&&Math.abs(z-oz)<R+10){ if(on) g.lineTo(tx(x),tz(z)); else { g.moveTo(tx(x),tz(z)); on=true; } } else on=false; }
       g.stroke(); }
-    g.fillStyle=col; TOWNS.forEach(t=>{ if(Math.abs(t.x-ox)<R+60&&Math.abs(t.z-oz)<R+60){ g.beginPath(); g.arc(tx(t.x),tz(t.z),(PLAZA_R+(w-ROAD_HW*2)/2)*sc,0,7); g.fill(); for(const b of townBulbs(t)){ g.beginPath(); g.arc(tx(b[0]),tz(b[1]),(BULB_R+(w-ROAD_HW*2)/2)*sc,0,7); g.fill(); } } }); }
+    g.fillStyle=col; TOWNS.forEach(t=>{ if(Math.abs(t.x-ox)<R+60&&Math.abs(t.z-oz)<R+60){ for(const J of t.junc||[]){ g.beginPath(); g.arc(tx(J[0]),tz(J[1]),(ROAD_HW+(w-ROAD_HW*2)/2)*sc,0,7); g.fill(); } for(const b of townBulbs(t)){ g.beginPath(); g.arc(tx(b[0]),tz(b[1]),(BULB_R+(w-ROAD_HW*2)/2)*sc,0,7); g.fill(); } } }); }
   g.strokeStyle='#c9c6be'; g.lineWidth=WALK_W*sc; // sidewalks
   for(const w of SIDEWALKS){ if(Math.abs(w[0][0]-ox)>R+30||Math.abs(w[0][1]-oz)>R+30) continue; g.beginPath(); w.forEach((p,k)=>k?g.lineTo(tx(p[0]),tz(p[1])):g.moveTo(tx(p[0]),tz(p[1]))); g.stroke(); }
   g.lineCap='butt';
@@ -10295,7 +10415,7 @@ function renderBigMapImage(){
   g.lineCap='round'; g.lineJoin='round';
   for(const [w,col] of [[14,'#26282c'],[7.2,'#9a9ea4']]){ g.strokeStyle=col; g.lineWidth=w;
     for(const rd of WORLD.roads){ g.beginPath(); rd.pts.forEach((p,k)=>k?g.lineTo(X(p[0]),X(p[1])):g.moveTo(X(p[0]),X(p[1]))); g.stroke(); }
-    g.fillStyle=col; WORLD.towns.forEach(t=>{ g.beginPath(); g.arc(X(t.u),X(t.v),(PLAZA_R/mpp)+w/2+1,0,7); g.fill(); });
+    g.fillStyle=col; TOWNS.forEach(t=>(t.junc||[]).forEach(J=>{ g.beginPath(); g.arc(X(J[0]-SPAWN[0]),X(J[1]-SPAWN[2]),w/2,0,7); g.fill(); }));
     TOWNS.forEach(t=>{ for(const b of townBulbs(t)){ g.beginPath(); g.arc(X(b[0]-SPAWN[0]),X(b[1]-SPAWN[2]),BULB_R/mpp+(w-7.2)/2,0,7); g.fill(); } }); }
   g.setLineDash([]);
   TOWNS.forEach(t=>{ if(!t.poi) return; const x=X(t.poi.x-SPAWN[0]), y=X(t.poi.z-SPAWN[2]), q=Math.max(4,7/mpp); g.fillStyle='#ffd24a'; g.strokeStyle='#3a2c10'; g.lineWidth=1.5; g.beginPath(); g.moveTo(x,y-q); g.lineTo(x+q,y); g.lineTo(x,y+q); g.lineTo(x-q,y); g.closePath(); g.fill(); g.stroke(); }); // landmarks
@@ -10382,7 +10502,7 @@ function warmBuildShaders(){ try{ const g=new THREE.Group(), geo=new THREE.BoxGe
   const gw=makeGlider(0xff6a3d); gw.visible=true; gw.scale.setScalar(0.003); g.add(gw);
   g.position.copy(camera.position); scene.add(g); renderer.compile(scene,camera); scene.remove(g); }catch(e){ console.warn('shader warm-up skipped',e); } }
 setTimeout(warmBuildShaders,1500);
-initProps(); props.forEach(p=>{ if((!p.yard&&townAt(p.x,p.z,6))||shoreAt(p.x,p.z)){ p.gone=true; p.alive=false; p.g.visible=false; } }); syncMats(); buildBridges(); buildRails(); buildLandmarks(); buildSigns();
+initProps(); props.forEach(p=>{ const tc=worldCell(p.x,p.z); if((!p.yard&&townAt(p.x,p.z,6))||shoreAt(p.x,p.z)||(!p.yard&&tc>=0&&WORLD.TRACK[tc]>110)){ p.gone=true; p.alive=false; p.g.visible=false; } }); syncMats(); buildBridges(); buildRails(); buildLandmarks(); buildSigns();
 buildWorld(); initChests(); spawnFloorLoot(); initKarts(); initVans(); initForest(); { const hb=$('hordeBot'); hb.checked=!!settings.hordeBot; hb.addEventListener('change',()=>{ settings.hordeBot=hb.checked; saveSettings(); }); syncModeCards(); } buildGardens();
 syncBot();
 // locker: render a portrait of every outfit once, then build the cards

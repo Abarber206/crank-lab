@@ -4,7 +4,7 @@ const {sleep,page,launch,open}=require('./h.js'); const tag=process.argv[2]||'a'
  await pg.evaluate(()=>{ const s=document.querySelector('#botSel'); s.value='off'; s.dispatchEvent(new Event('change')); T.settings.skyDrop=false; });
  await pg.evaluate(()=>document.getElementById('play').click()); await pg.waitForFunction(()=>T.renderer.info.render.frame>3,null,{timeout:120000});
  await pg.evaluate(()=>{ window.cam=new THREE.PerspectiveCamera(70,900/520,0.05,2000); const R=T.renderer.render.bind(T.renderer); T.renderer.render=(s,c)=>R(s,c===T.camera?cam:c);
-   const t=T.TOWNS[6]; window.H=t.houses.find(h=>h.floors>1&&h.w*h.d>=6)||t.houses.find(h=>h.floors>1); window.S=T.houseStair(H); });
+   const t=T.TOWNS.find(t=>!t.kind&&t.houses.some(h=>h.floors>1)); window.H=t.houses.find(h=>h.floors>1&&h.w*h.d>=6)||t.houses.find(h=>h.floors>1); window.S=T.houseStair(H); });
  const shot=async(name,fn)=>{ for(let i=0;i<6;i++) await pg.evaluate(fn); await sleep(300); await pg.screenshot({path:`hs_${tag}_${name}.png`}); };
  const info=await pg.evaluate(()=>JSON.stringify({i0:H.i0,j0:H.j0,w:H.w,d:H.d,L:H.L,side:H.side,cells:S.cells,top:S.top}));
  console.log(info);

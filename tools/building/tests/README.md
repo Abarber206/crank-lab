@@ -74,3 +74,7 @@ Run with Node and Playwright (Chromium), from a folder that has `three` and `pee
 - tpoistand.js: the points of interest stand (no piece falls in the first half minute)
 - ttrees.js: the forest close up, middle distance, far, from the sky and from under a tree
 - ttreefall.js: a chopped tree tips over, lands and sinks away without shrinking, then grows back upright
+- tstreets.js: town streets, ends, houses off the streets, sidewalks off the roads, roads join edge ends
+- ttownview.js / tendview.js: aerial town pictures; ground views of street ends and an open road
+- timpostor.js: the far-tree picture atlas and a row of far trees (must stand upright)
+- ttreelook.js / tgfxtrees.js: trees as players see them in the lobby (every graphics preset) and in the world

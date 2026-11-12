@@ -123,19 +123,26 @@ function buildImpostors(){ if(IMP.rt) return; const T=IMP.tile, W=T*IMP.cols, H=
     IMP.size[kind]={S,y0};
     for(let v=0;v<8;v++){ const m=new THREE.Mesh(geos[v],mat); sc.add(m);
       for(const view of ['side','top']){ const k=tile++, cx=k%IMP.cols, cy=Math.floor(k/IMP.cols);
-        if(view==='side'){ cam.left=-S/2; cam.right=S/2; cam.bottom=y0-0.2; cam.top=y0-0.2+S; cam.position.set(0,0,40); cam.lookAt(0,0,0); cam.up.set(0,1,0); }
+        if(view==='side'){ cam.left=-S/2; cam.right=S/2; cam.bottom=y0-0.2; cam.top=y0-0.2+S; cam.up.set(0,1,0); cam.position.set(0,0,40); cam.lookAt(0,0,0); } // (up before aiming: after a top view it was still pointing along z)
         else { cam.left=-S/2; cam.right=S/2; cam.top=S/2; cam.bottom=-S/2; cam.position.set(0,60,0); cam.up.set(0,0,-1); cam.lookAt(0,0,0); }
         cam.updateProjectionMatrix(); rt.viewport.set(cx*T,cy*T,T,T); rt.scissor.set(cx*T,cy*T,T,T); rt.scissorTest=true; renderer.setRenderTarget(rt); renderer.render(sc,cam); }
       sc.remove(m); } }
   rt.scissorTest=false; rt.viewport.set(0,0,W,H); rt.scissor.set(0,0,W,H); renderer.setRenderTarget(prevRT); renderer.setClearColor(prevClr,prevA); renderer.autoClear=prevAuto; renderer.shadowMap.enabled=prevSh;
-  IMP.rt=rt; IMP.mat=new THREE.MeshLambertMaterial({map:rt.texture,alphaTest:0.3,side:THREE.DoubleSide,emissive:0x1a1a10}); IMP.mat.onBeforeCompile=sh=>{ sh.fragmentShader=sh.fragmentShader.replace('reflectedLight.indirectDiffuse += ( gl_FrontFacing ) ? vIndirectFront : vIndirectBack;','reflectedLight.indirectDiffuse += vIndirectFront;').replace('reflectedLight.directDiffuse = ( gl_FrontFacing ) ? vLightFront : vLightBack;','reflectedLight.directDiffuse = vLightFront;'); };
+  IMP.rt=rt; IMP.mat=new THREE.MeshLambertMaterial({map:rt.texture,alphaTest:0.3,side:THREE.DoubleSide,emissive:0x1a1a10}); IMP.mat.onBeforeCompile=sh=>{ impTopFade(sh); sh.fragmentShader=sh.fragmentShader.replace('reflectedLight.indirectDiffuse += ( gl_FrontFacing ) ? vIndirectFront : vIndirectBack;','reflectedLight.indirectDiffuse += vIndirectFront;').replace('reflectedLight.directDiffuse = ( gl_FrontFacing ) ? vLightFront : vLightBack;','reflectedLight.directDiffuse = vLightFront;'); };
   IMP.depth=new THREE.MeshDepthMaterial({depthPacking:THREE.RGBADepthPacking,map:rt.texture,alphaTest:0.38,side:THREE.DoubleSide}); }
 // the far model of one variant: n crossed cards with its side picture and a level card with its top picture
+// the crown-from-above card only shows when you look down on the tree; from the side (or below) it folds away, so it
+// never reads as a floating disc
+function impTopFade(sh){ sh.vertexShader='attribute float topc;\n'+sh.vertexShader.replace('#include <project_vertex>',`#ifdef USE_INSTANCING
+  if(topc>0.5){ vec4 wq=modelMatrix*instanceMatrix*vec4(transformed,1.0); float up=cameraPosition.y-wq.y, dh=length(cameraPosition.xz-wq.xz); if(up<dh*0.14) transformed=vec3(0.0,-1000.0,0.0); }
+#endif
+#include <project_vertex>`); }
 function impostorGeo(kind,v,n){ const {S,y0}=IMP.size[kind], k0=(kind==='tree'?0:16)+v*2, T=IMP.tile, Wd=T*IMP.cols, Hd=T*IMP.rows, P=[],N=[],U=[],I=[];
   const reg=k=>{ const cx=k%IMP.cols, cy=Math.floor(k/IMP.cols), e=1.5; return [(cx*T+e)/Wd,(cy*T+e)/Hd,((cx+1)*T-e)/Wd,((cy+1)*T-e)/Hd]; };
   const cy=y0-0.2+S*0.55, put=(x,y,z,u,w)=>{ P.push(x,y,z); const nx=x, ny=(y-cy)*0.8+0.3, nz=z, l=Math.hypot(nx,ny,nz)||1; N.push(nx/l,ny/l,nz/l); U.push(u,w); return P.length/3-1; };
   const side=reg(k0), top=reg(k0+1);
   for(let k=0;k<n;k++){ const a=k/n*Math.PI, dx=Math.cos(a)*S/2, dz=Math.sin(a)*S/2, b=y0-0.2, t=b+S;
     const i0=put(-dx,b,-dz,side[0],side[1]), i1=put(dx,b,dz,side[2],side[1]), i2=put(dx,t,dz,side[2],side[3]), i3=put(-dx,t,-dz,side[0],side[3]); I.push(i0,i1,i2,i0,i2,i3); }
+  const nSide=P.length/3;
   { const h=kind==='tree'?y0+S*0.62:y0+S*0.42, s=S/2, i0=put(-s,h,s,top[0],top[1]), i1=put(s,h,s,top[2],top[1]), i2=put(s,h,-s,top[2],top[3]), i3=put(-s,h,-s,top[0],top[3]); I.push(i0,i1,i2,i0,i2,i3); }
-  const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(P,3)); g.setAttribute('normal',new THREE.Float32BufferAttribute(N,3)); g.setAttribute('uv',new THREE.Float32BufferAttribute(U,2)); g.setIndex(I); g.computeBoundingSphere(); return g; }
+  const g=new THREE.BufferGeometry(); g.setAttribute('topc',new THREE.Float32BufferAttribute(P.map((v,i)=>i).filter(i=>i%3===0).map(i=>i/3>=nSide?1:0),1)); g.setAttribute('position',new THREE.Float32BufferAttribute(P,3)); g.setAttribute('normal',new THREE.Float32BufferAttribute(N,3)); g.setAttribute('uv',new THREE.Float32BufferAttribute(U,2)); g.setIndex(I); g.computeBoundingSphere(); return g; }
