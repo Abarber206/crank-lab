@@ -57,3 +57,6 @@ Run with Node and Playwright (Chromium), from a folder that has `three` and `pee
 - `tbus.js` — the battle bus: everyone aboard high over the island, you jump when you press Jump, teammates follow, nobody left aboard at the end.
 - `tbrend.js` — Battle royale: a 10 s loading screen before the match; eliminated, you are back in the lobby.
 - `tbremote.js` — the emote wheel opens in Battle royale.
+- tcalls.js: draw calls in one frame by pass and by object (node tcalls.js town|river|br)
+- tbench.js: CPU ms per frame by subsystem (CDP profiler)
+- tperfview.js: town screenshot with the Performance preset, alternate-frame shadows and the FPS counter
