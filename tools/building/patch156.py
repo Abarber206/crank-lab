@@ -20,3 +20,6 @@ rep("""  put('deck',new THREE.BoxGeometry(1.5,0.05,3.7),0,0.06,0.45);""","""  { 
 # the dark boot-top line stops where the bow's keel rises above it (forward of that it hung below the hull as a loose black rod)
 rep("""      const a=p(t0,y0), b=p(t1,y0), c=p(t0,y1), d=p(t1,y1); if(s>0) pos.push(a,c,b, b,c,d); else pos.push(a,b,c, b,d,c); }""",
 """      if(h.keel(t0)>y0-0.015) continue; const a=p(t0,y0), b=p(t1,y0), c=p(t0,y1), d=p(t1,y1); if(s>0) pos.push(a,c,b, b,c,d); else pos.push(a,b,c, b,d,c); }""")
+# the bow: from inside the boat the tip of the hull (forward of where the inner lining starts) was see-through; the hull
+# shell now draws on both sides
+rep("""hull:kMat('hull',()=>new THREE.MeshPhongMaterial({color:0xf3f1ec,shininess:80,specular:0x6a6a6a})),""","""hull:kMat('hull',()=>new THREE.MeshPhongMaterial({color:0xf3f1ec,shininess:80,specular:0x6a6a6a,side:THREE.DoubleSide})),""")

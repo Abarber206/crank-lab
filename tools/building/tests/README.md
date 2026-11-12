@@ -50,3 +50,7 @@ Run with Node and Playwright (Chromium), from a folder that has `three` and `pee
 - `tpickgal.js` — every pickaxe in the Locker preview, one picture each (IDS=..., D=camera distance).
 - `tboatview.js` — a moored boat close up from the front, side, back, three-quarter and above.
 - `tzfar.js` — Zombie horde: a zombie left 300 m away comes back to 30-70 m from you, on dry ground.
+- `tbr.js` — Battle royale: 19 bots drop in, land, loot guns; your shots hit them; the storm closes and hurts anyone outside.
+- `tbrfight.js` — Battle royale bots: two armed bots fight each other; a bot notices you standing in the open sooner than crouched, and shoots.
+- `tbrteam.js` — Battle royale squads: your three teammates drop with you, are marked, and never count as foes; other teams of four.
+- `tbrshot.js` — pictures of the storm wall with the HUD and the big map with the circles.
