@@ -10148,7 +10148,7 @@ function brUpdate(dt){
   BR.tick-=dt; if(BR.tick<=0){ BR.tick=1; const d=BR_DPS[Math.min(S.ph,BR_DPS.length-1)];
     if(!BR.out&&!P.sky&&!P.bus&&brOut(P,S)){ P.hp-=d; const f=$('hurtfx'); f.classList.add('on'); void f.offsetWidth; f.classList.remove('on'); if(P.hp<=0) brPlayerOut('the storm'); }
     for(const b of BR.bots) if(b.alive&&!b.sky&&brOut(b,S)){ b.hp-=d; if(b.hp<=0) brBotOut(b,null,'the storm'); } }
-  $('stormFx').hidden=!(playing&&!BR.out&&brOut(P,S));
+  $('stormFx').hidden=!(playing&&!BR.out&&!P.bus&&brOut(P,S)); // (the bus sets off from outside the storm)
   // the bots
   for(const b of BR.bots) if(b.alive) brStepBot(b,dt,now);
   // end of the match

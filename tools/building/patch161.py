@@ -70,3 +70,4 @@ rep("""#stormFx{position:fixed;""","""#busTip{bottom:calc(env(safe-area-inset-bo
 rep("""  for(const b of BR.bots) if(b.alive&&b.team===0){ g.fillStyle='#3f8fff';""","""  if(BRBUS.on){ g.strokeStyle='rgba(255,255,255,.8)'; g.setLineDash([3*dpr,3*dpr]); g.lineWidth=2*dpr; g.beginPath(); g.moveTo(tx(BRBUS.ax),tz(BRBUS.az)); g.lineTo(tx(BRBUS.bx),tz(BRBUS.bz)); g.stroke(); g.setLineDash([]);
     const q=brBusPos(BRBUS.t,_brBP); g.fillStyle='#2f6fe0'; g.strokeStyle='#fff'; g.lineWidth=1.5*dpr; g.beginPath(); g.arc(tx(q.x),tz(q.z),5*dpr,0,7); g.fill(); g.stroke(); }
   for(const b of BR.bots) if(b.alive&&b.team===0){ g.fillStyle='#3f8fff';""")
+rep("""  $('stormFx').hidden=!(playing&&!BR.out&&brOut(P,S));""","""  $('stormFx').hidden=!(playing&&!BR.out&&!P.bus&&brOut(P,S)); // (the bus sets off from outside the storm)""")
