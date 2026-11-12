@@ -65,3 +65,4 @@ Run with Node and Playwright (Chromium), from a folder that has `three` and `pee
 - tback.js: back bling slot: off, swap, owned/locked, the hero rebuilds
 - tlockerbk.js: screenshots of the Locker back bling row and the Item Shop
 - tstageone.js: in a party the Locker stage shows only your hero and its pad fits the picture
+- twheel5.js: the 5-slot emote wheel: pick a slot then an emote, swap, remove, buying fills an empty slot
