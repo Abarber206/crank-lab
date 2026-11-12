@@ -45,3 +45,4 @@ Run with Node and Playwright (Chromium), from a folder that has `three` and `pee
 - `tpick.js` — the hero standing with the pickaxe out, from the side and from behind (FILE=... to compare builds).
 - `tstagepick.js` — the Locker pickaxe preview: the hero rests the pickaxe over the shoulder.
 - `tpickclip.js` — every outfit with two pickaxes in the shoulder-rest preview: no point of the pick inside the body (SEARCH=1 searches poses).
+- `thero.js` — close-ups of the Locker stage hero (front, side, back, three-quarter, face) to judge the body, clothes and lighting (VIEWS=..., OUTFIT=...).
