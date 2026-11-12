@@ -4485,17 +4485,18 @@ function sfxAt(k,pos){ const L=typeof camera!=='undefined'?camera.position:P.pos
   if(sfxOccluded(pos,d)){ sfxGain*=0.55; sfxLP=Math.min(sfxLP,1100); }
   sfxPos=pos; sfxEcho=far&&d>40?Math.min(0.55,0.15+d/550):0; if(sfxEcho&&AUDIO.echo) AUDIO.echo.delayTime.setTargetAtTime(Math.min(0.7,0.14+d/650),AC.currentTime,0.02);
   sfx(k); sfxPos=null; sfxEcho=0; sfxGain=1; sfxLP=20000; }
-function panAt(p,pos){ if(p.positionX){ const t=AC.currentTime; p.positionX.setValueAtTime(pos.x,t); p.positionY.setValueAtTime(pos.y,t); p.positionZ.setValueAtTime(pos.z,t); } else p.setPosition(pos.x,pos.y,pos.z); }
+function panAt(p,pos){ if(!pos||!isFinite(pos.x)||!isFinite(pos.y)||!isFinite(pos.z)) return; if(p.positionX){ const t=AC.currentTime; p.positionX.setValueAtTime(pos.x,t); p.positionY.setValueAtTime(pos.y,t); p.positionZ.setValueAtTime(pos.z,t); } else p.setPosition(pos.x,pos.y,pos.z); }
 function mkPanner(){ const p=AC.createPanner(); p.panningModel=isTouch?'equalpower':'HRTF'; p.distanceModel='linear'; p.refDistance=1; p.maxDistance=1e5; p.rolloffFactor=0; return p; } // direction only: the distance falloff is ours
 // the listener: the camera, each frame; inside a house or not
-function audioListen(){ if(!AC) return; const L=AC.listener, c=camera.position, t=AC.currentTime; camera.getWorldDirection(_alF);
+function audioListen(){ try{ audioListen0(); }catch(e){} }
+function audioListen0(){ if(!AC) return; const L=AC.listener, c=camera.position, t=AC.currentTime; camera.getWorldDirection(_alF);
   if(L.positionX){ L.positionX.setValueAtTime(c.x,t); L.positionY.setValueAtTime(c.y,t); L.positionZ.setValueAtTime(c.z,t); L.forwardX.setValueAtTime(_alF.x,t); L.forwardY.setValueAtTime(_alF.y,t); L.forwardZ.setValueAtTime(_alF.z,t); L.upX.setValueAtTime(0,t); L.upY.setValueAtTime(1,t); L.upZ.setValueAtTime(0,t); }
   else { L.setPosition(c.x,c.y,c.z); L.setOrientation(_alF.x,_alF.y,_alF.z,0,1,0); }
   const ins=typeof brHouseAt==='function'&&!!brHouseAt(c.x,c.z)&&c.y<terrainH(c.x,c.z)+12; if(ins!==AUDIO.inside&&AUDIO.og){ AUDIO.inside=ins; AUDIO.og.gain.setTargetAtTime(ins?0.25:1,t,0.3); AUDIO.rg.gain.setTargetAtTime(ins?1.2:0,t,0.3); } }
 const _alF=new THREE.Vector3();
 // a sound that keeps playing at a place: make(out) wires its sources into out; set(volume, position)
 function loopSound(make){ if(!AC) return null; const g=AC.createGain(); g.gain.value=0; const p=mkPanner(); g.connect(p).connect(master); const stops=make(g)||[];
-  return {g,p,set(v,pos){ g.gain.setTargetAtTime(v,AC.currentTime,0.15); if(pos) panAt(p,pos); },stop(){ try{ stops.forEach(s=>s.stop()); }catch(e){} g.disconnect(); }}; }
+  return {g,p,set(v,pos){ try{ g.gain.setTargetAtTime(v,AC.currentTime,0.15); if(pos) panAt(p,pos); }catch(e){} },stop(){ try{ stops.forEach(s=>s.stop()); }catch(e){} g.disconnect(); }}; }
 function audioUpgrade(comp){ AUDIO.comp=comp; const out=verb, len=Math.floor(AC.sampleRate*0.42), ir=AC.createBuffer(2,len,AC.sampleRate); // a room: dense early reflections, quick decay
   for(let c=0;c<2;c++){ const ch=ir.getChannelData(c); for(let i=0;i<len;i++) ch[i]=(Math.random()*2-1)*Math.pow(1-i/len,2.2)*(i<AC.sampleRate*0.004?0:1)*(1+0.8*Math.sin(i*0.004+c)); }
   const room=AC.createConvolver(); room.buffer=ir; const rg=AC.createGain(); rg.gain.value=0; room.connect(rg).connect(comp);
@@ -4517,7 +4518,7 @@ function audioInit(){
 }
 function bus(){ const g=AC.createGain(); g.gain.value=sfxGain; let n=g;
   if(sfxLP<19000){ const f=AC.createBiquadFilter(); f.type='lowpass'; f.frequency.value=sfxLP; g.connect(f); n=f; }
-  if(sfxPos){ const p=mkPanner(); panAt(p,sfxPos); n.connect(p).connect(master); } else n.connect(master);
+  let panned=false; if(sfxPos) try{ const p=mkPanner(); panAt(p,sfxPos); n.connect(p).connect(master); panned=true; }catch(e){} if(!panned) n.connect(master);
   const v=sfxVerb*(AUDIO.inside?1.3:1); if(v>0){ const sg=AC.createGain(); sg.gain.value=v; n.connect(sg); sg.connect(verb); }
   if(sfxEcho>0&&AUDIO.echo){ const eg=AC.createGain(); eg.gain.value=sfxEcho; n.connect(eg); eg.connect(AUDIO.echo); } return g; }
 function tone(type,f0,f1,dur,vol,delay=0){
@@ -6247,7 +6248,7 @@ function updateCamera(){
   camera.rotation.set(P.pitch,P.yaw,0);
   if(shake>0){ camera.position.x+=(Math.random()-.5)*shake; camera.position.y+=(Math.random()-.5)*shake; shake=Math.max(0,shake-lastDt*1.6); }
   camDist=dist; hero.visible=dist>0.85&&!scopeOn&&!P.bus; // through a scope you see what the scope sees
-  { let nr=0.08; if(P.sky){ const clr=camera.position.y-Math.max(skyGround(P),terrainH(camera.position.x,camera.position.z)); nr=Math.max(0.08,Math.min(camDist*0.4,clr*0.15,2.5)); }
+  { let nr=0.08; if(P.bus){ const clr=camera.position.y-terrainH(camera.position.x,camera.position.z); nr=Math.max(0.08,Math.min(camDist*0.45,clr*0.15,6)); } else if(P.sky){ const clr=camera.position.y-Math.max(skyGround(P),terrainH(camera.position.x,camera.position.z)); nr=Math.max(0.08,Math.min(camDist*0.4,clr*0.15,2.5)); }
     if(Math.abs(nr-camera.near)>0.004){ camera.near=nr; camera.updateProjectionMatrix(); } } // high up, the near plane moves out for depth precision far away
   // the shadow box follows you in whole shadow-map texels, so shadow edges don't crawl as you move
   { const st=(sc.right-sc.left)/sun.shadow.mapSize.x, a=Math.round(P.pos.dot(_lX)/st)*st, b=Math.round(P.pos.dot(_lY)/st)*st, c=P.pos.dot(SUN_DIR);
@@ -6523,7 +6524,7 @@ document.querySelectorAll('.tb').forEach(b=>{
     else if(act==='build') toggleBuild();
     else if(act==='inventory') toggleInv();
     else if(act==='fire') fireDown('touch');
-    else if(act==='emote'){ if(P.kart||P.sky||P.down) startEmote(settings.emote); else emoOpen('touch'); }
+    else if(act==='emote'){ if(P.down) startEmote(settings.emote); else emoOpen('touch'); }
     else if(act==='use') useDown();
   });
   const up=()=>{ b.classList.remove('down'); const act=b.dataset.act;
@@ -6728,7 +6729,7 @@ function onHit(m){
   if(from&&sameTeam(from)) return; // no team damage
   const f=$('hurtfx'); f.classList.add('on'); void f.offsetWidth; f.classList.remove('on'); sfx('hurt'); animEvent(localHero,'hurt');
   if(from) dmgDirFrom(from.pos);
-  if(P.down){ P.hp-=Math.max(1,m.dmg*0.25); if(P.hp<=0) rbBleedOut(); return; }
+  if(P.down){ if(m.id==='zombie') return; P.hp-=Math.max(1,m.dmg*0.25); if(P.hp<=0) rbBleedOut(); return; }
   if(hurt(P,m.dmg)){ if(rbCanKnock()){ rbKnock(m.id,m.w); return; } net.dead=true; net.deaths++; animEvent(localHero,'die'); const e={type:'elim',id:net.id,by:m.id,w:m.w}; onElim(e); netSend(e);
     afterDeath(); }
 }
@@ -7538,6 +7539,7 @@ function zombieCanHit(z,who){
 }
 function zombieAttack(z,who){ z.atk=ZATK; z.swipe={who,t:0.44}; zsfx('claw',z.pos); }
 function zombieDamage(who,dmg,from){ // the host hands out creature damage
+  if((who===P&&P.down)||(who===AB&&AB&&AB.down)||(who.flags&256)) return; // knocked: left alone
   if(who===P) hordeHurtMe(dmg,from);
   else if(who===AB) allyHurt(dmg);
   else if(net.role==='host'){ const c=net.conns.get(who.id); if(c&&c.open) try{ c.send({type:'hit',id:'zombie',to:who.id,dmg,w:'zombie'}); }catch(e){} } }
@@ -9386,12 +9388,12 @@ function showLoading(mode,sub,secs,who,done){ const el=$('loadScr'); if(!bigMapI
   if(bigMapImg){ const c=$('loadMap'); c.width=c.height=Math.min(1024,bigMapImg.width); c.getContext('2d').drawImage(bigMapImg,0,0,c.width,c.height); c.style.animation='none'; void c.offsetWidth; c.style.animation=''; }
   $('lsMode').textContent=mode; $('lsTitle').textContent='Loading in'; $('lsSub').textContent=sub||''; $('lsWho').innerHTML=(who||[]).map(n=>'<li><b>✓</b> '+esc(n)+'</li>').join('');
   let tip=Math.floor(Math.random()*LS_TIPS.length); $('lsTip').textContent=LS_TIPS[tip];
-  el.hidden=false; LOAD.on=true; const t0=performance.now(), T=secs*1000; let lastN=-1, tipT=t0;
-  const step=now=>{ if(!LOAD.on) return; const k=Math.min(1,(now-t0)/T), n=Math.ceil(secs*(1-k)); $('lsFill').style.width=(k*100).toFixed(1)+'%'; if(n!==lastN){ lastN=n; $('lsNum').textContent=n>0?n:'GO'; if(n<=3&&n>0) sfx('equip'); }
+  el.hidden=false; LOAD.on=true; if(master) master.gain.setTargetAtTime(0,AC.currentTime,0.05); const t0=performance.now(), T=secs*1000; let lastN=-1, tipT=t0;
+  const step=now=>{ if(!LOAD.on) return; const k=Math.min(1,(now-t0)/T), n=Math.ceil(secs*(1-k)); $('lsFill').style.width=(k*100).toFixed(1)+'%'; if(n!==lastN){ lastN=n; $('lsNum').textContent=n>0?n:'GO'; }
     if(now-tipT>4200){ tipT=now; tip=(tip+1)%LS_TIPS.length; $('lsTip').textContent=LS_TIPS[tip]; }
-    if(k<1) requestAnimationFrame(step); else { LOAD.on=false; setTimeout(()=>{ el.hidden=true; },250); if(done) done(); } };
+    if(k<1) requestAnimationFrame(step); else { LOAD.on=false; if(master) master.gain.setTargetAtTime(0.9,AC.currentTime,0.3); setTimeout(()=>{ el.hidden=true; },250); if(done) done(); } };
   requestAnimationFrame(step); }
-function hideLoading(){ LOAD.on=false; $('loadScr').hidden=true; }
+function hideLoading(){ if(LOAD.on&&master) master.gain.setTargetAtTime(0.9,AC.currentTime,0.3); LOAD.on=false; $('loadScr').hidden=true; }
 function renderBigMapImage(){
   const S=2048, c=document.createElement('canvas'); c.width=c.height=S; const g=c.getContext('2d'), img=g.createImageData(S,S), d=img.data, {ROCK,SNOW}=WORLD;
   const mpp=2*WHALF/S, LX=-0.5, LY=0.75, LZ=-0.43; // lit from the north-west
@@ -9640,10 +9642,10 @@ function emoSel(k){ EW.sel=k; $('emoRing').querySelectorAll('.sl').forEach(b=>b.
 function emoOpen(how){ if(EW.open) return; EW.how=how; emoBuild(); if(!EW.ids.length){ toast('No emotes yet'); return; } EW.open=true; EW.mx=EW.my=0; EW.t0=performance.now(); $('emoWheel').hidden=false; if(how!=='key') emoSel(-1); }
 function emoClose(){ EW.open=false; $('emoWheel').hidden=true; }
 function emoPick(k){ const id=EW.ids[k], how=EW.how; emoClose(); if(!id) return; emoPlay(id,how); }
-function emoPlay(id,how){ if(how==='lobby'){ LOBBY.emote={id,t:0,beat:-1,n:((LOBBY.emote&&LOBBY.emote.n)|0)+1}; audioInit(); return; } P.emote=null; startEmote(id); }
+function emoPlay(id,how){ if(how==='lobby'){ LOBBY.emote={id,t:0,beat:-1,n:((LOBBY.emote&&LOBBY.emote.n)|0)+1}; audioInit(); return; } P.emote=null; if(!P.onGround||P.sky||P.bus||P.kart){ P.emoteQ=id; toast('Emote when you land'); return; } startEmote(id); }
 $('emoWheel').addEventListener('click',e=>{ if(e.target.id==='emoWheel'||e.target.id==='emoRing') emoClose(); });
 // the computer in a match: hold the key, move the mouse toward an emote, let go; a quick tap plays your Locker emote
-function emoKeyDown(){ if(!playing||isDead()||P.down||P.sky||P.kart) { startEmote(settings.emote); return; } emoOpen('key'); }
+function emoKeyDown(){ if(!playing||isDead()||P.down) { startEmote(settings.emote); return; } emoOpen('key'); }
 function emoKeyUp(){ if(!EW.open||EW.how!=='key') return; const quick=performance.now()-EW.t0<300&&EW.sel<0; const k=EW.sel; emoClose(); if(quick) startEmote(settings.emote); else if(k>=0) emoPlay(EW.ids[k],'key'); }
 addEventListener('mousemove',e=>{ if(!EW.open||EW.how!=='key') return; EW.mx+=e.movementX||0; EW.my+=e.movementY||0; const r=Math.hypot(EW.mx,EW.my); if(r>220){ EW.mx*=220/r; EW.my*=220/r; }
   if(r<36) { if(EW.sel!==-1) emoSel(-1); return; } const n=EW.ids.length, a=Math.atan2(EW.my,EW.mx)+Math.PI/2, k=((Math.round(a/(2*Math.PI/n))%n)+n)%n; if(k!==EW.sel) emoSel(k); },true);
@@ -9709,7 +9711,7 @@ function lobbyView(dt){ const on=lobbyActive(); document.body.classList.toggle('
   $('toLobby').addEventListener('click',()=>{ if(net.role) return; if(horde.on) hordeStop(); P.everPlayed=false; respawn(); syncLobby(); showTab('play'); lobbyLabels(); });
   $('pdFs').addEventListener('click',()=>$('fs').click());
   setInterval(lobbyLabels,500); })();
-function lobbyLabels(){ const lob=menu.classList.contains('lobby'), m=net.role==='client'?(party.mode||settings.mode):settings.mode; $('modeName').textContent=m==='horde'?'Zombie horde':'Build fight';
+function lobbyLabels(){ const lob=menu.classList.contains('lobby'), m=net.role==='client'?(party.mode||settings.mode):settings.mode; $('modeName').textContent=m==='horde'?'Zombie horde':m==='br'?'Battle royale':'Build fight';
   $('tabPlay').textContent=lob?'Lobby':'Game';
   if(LOBBY.on&&!menu.classList.contains('l3d')&&EW.open) emoClose();
   if(lob){ $('play').textContent=net.role&&!party.live?(net.role==='host'?'Play':(party.readyMe?'Ready ✓':'Ready')):'Play'; }
@@ -10083,7 +10085,7 @@ function brJumpOut(E){ if(!E.bus) return; E.bus=false; const p=brBusPos(BRBUS.t,
   if(E===P){ sfx('bus_jump'); $('busTip').hidden=true; for(const b of BR.bots) if(b.bus&&b.team===0) b.jumpAt=BRBUS.t+0.3+Math.random()*0.9; }
   else { E.h.group.visible=true; } }
 var BR={on:false,bots:[],out:false,over:false,overT:0,kills:0,storm:null,wall:null,tick:0,hudT:0,place:0,frame:0};
-const BR_N=19, BR_SHRINK=[[60,0.62,45],[50,0.4,40],[45,0.24,35],[40,0.13,30],[35,0.06,25],[30,0,25]], BR_DPS=[1,2,4,6,8,10]; // [wait, radius after (of the island), shrink time]
+const BR_N=19, BR_SHRINK=[[150,0.62,90],[120,0.4,75],[100,0.24,65],[90,0.13,55],[75,0.06,45],[60,0,40]], BR_DPS=[1,2,4,6,8,10]; // [wait, radius after (of the island), shrink time]
 const BR_NAMES=['Rook2','Pixel','Nova','Talon','Bramble','Vex','Juno','Moss','Static','Kestrel','Cinder','Wisp','Dune','Echo','Sable','Quill','Rift','Ember','Glint','Hollow','Fable','Brick'];
 function brMine(){ return settings.mode==='br'&&!net.role; }
 function brSpot(){ const T0=Math.random()<0.75&&TOWNS.length?TOWNS[Math.floor(Math.random()*TOWNS.length)]:null; // most drop near a town, some out in the wild
@@ -10143,12 +10145,12 @@ function brUpdate(dt){
   if(S.state==='wait'){ if(S.t<=0){ S.state='shrink'; S.t=ph[2]; S.T=ph[2]; if(S.ph<BR_SHRINK.length) toast('The storm is closing in'); } }
   else { const k=1-Math.max(0,S.t)/S.T, e=k*k*(3-2*k); S.cx=S.fx+(S.tx-S.fx)*e; S.cz=S.fz+(S.tz-S.fz)*e; S.r=S.fr+(S.tr-S.fr)*e;
     if(S.t<=0){ S.ph++; if(S.ph<BR_SHRINK.length){ S.state='wait'; S.t=BR_SHRINK[S.ph][0]; brNextCircle(); } else { S.state='done'; S.t=1e9; } } }
-  const W=BR.wall; W.position.set(S.cx,-60,S.cz); W.scale.set(Math.max(1,S.r),700,Math.max(1,S.r)); W.material.uniforms.time.value=now/1000;
+  const W=BR.wall; W.visible=!lobbyActive(); W.position.set(S.cx,-60,S.cz); W.scale.set(Math.max(1,S.r),700,Math.max(1,S.r)); W.material.uniforms.time.value=now/1000;
   // storm damage, once a second
   BR.tick-=dt; if(BR.tick<=0){ BR.tick=1; const d=BR_DPS[Math.min(S.ph,BR_DPS.length-1)];
     if(!BR.out&&!P.sky&&!P.bus&&brOut(P,S)){ P.hp-=d; const f=$('hurtfx'); f.classList.add('on'); void f.offsetWidth; f.classList.remove('on'); if(P.hp<=0) brPlayerOut('the storm'); }
     for(const b of BR.bots) if(b.alive&&!b.sky&&brOut(b,S)){ b.hp-=d; if(b.hp<=0) brBotOut(b,null,'the storm'); } }
-  $('stormFx').hidden=!(playing&&!BR.out&&!P.bus&&brOut(P,S)); // (the bus sets off from outside the storm)
+  $('stormFx').hidden=!(playing&&!BR.out&&!P.bus&&!lobbyActive()&&brOut(P,S)); // (the bus sets off from outside the storm)
   // the bots
   for(const b of BR.bots) if(b.alive) brStepBot(b,dt,now);
   // end of the match
@@ -10463,7 +10465,7 @@ function frame(now){
     if(P.down){ fireHeld=false; heldPiece=null; adsHeld=false; P.crouch=false; P.useT=0; P.emote=null; if(edit) exitEdit(false); }
     if(B&&B.active) botUpdate(dt);
     const n=Math.max(1,Math.ceil(dt/0.008)); stepFall(); for(let k=0;k<n;k++){ physStep(dt/n,P); if(B&&B.active) physStep(dt/n,B); }
-    combatTick(dt);
+    combatTick(dt); if(P.emoteQ&&P.onGround&&!P.sky&&!P.bus&&!P.kart){ const q=P.emoteQ; P.emoteQ=null; startEmote(q); }
     if(P.pos.y<-20) respawn();
     if(edit){
       const hv=tileAtNDC(0,0); if(hv!==edit.hover){ edit.hover=hv; refreshTiles(); }
