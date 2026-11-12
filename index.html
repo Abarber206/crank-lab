@@ -364,7 +364,7 @@ body.touch #stickHint{width:100px;height:100px;opacity:.6}
 #menu.lobby .mtab[data-tab=play]>.stage{display:block;grid-column:1;grid-row:1 / span 30;position:relative;height:min(74vh,700px);min-height:340px}
 #menu.lobby .stage canvas{position:absolute;inset:0;width:100%;height:100%;cursor:grab;touch-action:none}
 #menu.lobby .stage canvas:active{cursor:grabbing}
-.plates{position:absolute;inset:0;pointer-events:none}
+.plates{position:absolute;inset:0;pointer-events:none;display:none}
 .plates span{position:absolute;transform:translate(-50%,-100%);white-space:nowrap;font:800 italic 15px/1 var(--font-hud);letter-spacing:.06em;text-transform:uppercase;color:#fff;background:rgba(5,18,64,.7);border:1px solid rgba(255,255,255,.25);border-radius:4px;padding:5px 9px 4px}
 .plates span.me{background:#ffe14d;color:#15123a;border-color:#fff3a8}
 .plates span i{font-style:normal;color:#9ff59a;margin-left:6px}
@@ -6421,7 +6421,7 @@ function updateHUD(){
 
 /* ---------- menu / settings ---------- */
 const menu=$('menu'); let _lobbySkip=0;
-function openMenu(){ if(typeof EW!=='undefined'&&EW.open&&EW.how!=='lobby') emoClose(); if(mapOpen) toggleMap(false); menu.hidden=false; setTimeout(syncLobby,0); playing=false; releaseAll(); touchJump=false; stick.x=stick.y=0; $('play').textContent='Resume'; }
+function openMenu(){ $('hudRoom').hidden=true; if(typeof EW!=='undefined'&&EW.open&&EW.how!=='lobby') emoClose(); if(mapOpen) toggleMap(false); menu.hidden=false; setTimeout(syncLobby,0); playing=false; releaseAll(); touchJump=false; stick.x=stick.y=0; $('play').textContent='Resume'; }
 function startPlay(){
   audioInit();
   if(menu.classList.contains('lobby')&&net.role&&!party.live){ if(net.role==='host') startMatch(); else $('readyBtn').click(); setTimeout(lobbyLabels,50); return; }
@@ -6962,7 +6962,7 @@ function updateRoomUI(){
   else { party.live=false; party.pendingStart=false; party.list=[]; party.ready.clear(); $('play').classList.remove('pulse'); }
   if(typeof syncModeCards==='function') syncModeCards();
   if(typeof syncBot==='function'&&document.getElementById('vitals')) syncBot();
-  $('hudRoom').hidden=!inRoom; if(inRoom) $('hudRoomV').textContent=net.code+' · '+count;
+  $('hudRoom').hidden=!inRoom||!menu.hidden; if(inRoom) $('hudRoomV').textContent=net.code+' · '+count;
 }
 try{ $('pname').value=localStorage.getItem('cranklab.name')||''; }catch(e){}
 $('hostBtn').addEventListener('click',hostGame);
@@ -9876,7 +9876,7 @@ function lobbyLabels(){ const lob=menu.classList.contains('lobby'), m=net.role==
   if(LOBBY.on&&!menu.classList.contains('l3d')&&EW.open) emoClose();
   if(lob){ $('play').textContent=net.role&&!party.live?(net.role==='host'?'Play':(party.readyMe?'Ready ✓':'Ready')):'Play'; }
   const L=stageLineup(); $('pdList').innerHTML=''; if(net.role) L.forEach(x=>{ const s=document.createElement('span'); s.textContent=x.name+(x.me?' (you)':''); if(!x.me) s.insertAdjacentHTML('beforeend','<em>'+(x.lead?'Leader':x.ready?'Ready':'Not ready')+'</em>'); $('pdList').appendChild(s); });
-  $('pdLeave').hidden=!net.role; }
+  $('pdLeave').hidden=!net.role; $('hudRoom').hidden=!net.role||!menu.hidden; }
 
 /* ---------- lobby stage: your hero (and party) on a lit pad, rendered on its own small canvas while the lobby shows ---------- */
 var _stage=null;
