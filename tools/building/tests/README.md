@@ -78,3 +78,6 @@ Run with Node and Playwright (Chromium), from a folder that has `three` and `pee
 - ttownview.js / tendview.js: aerial town pictures; ground views of street ends and an open road
 - timpostor.js: the far-tree picture atlas and a row of far trees (must stand upright)
 - ttreelook.js / tgfxtrees.js: trees as players see them in the lobby (every graphics preset) and in the world
+- tmapphoto.js: the island photographed for the map; the minimap and full map using it
+- tdecor.js: decoration counts and pictures (campsite, power line, hay field, dock, bench, river boat, POIs)
+- tfloat.js: nothing floating (decorations and outdoor chests), loot odds follow each item's rarity, no landmark strongbox, boat count

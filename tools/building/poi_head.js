@@ -126,9 +126,9 @@ function poiDecor(){ const patches=new Map(), glows=new Map(), col=new THREE.Col
     sph:(r,x,y,z,c,sc,glow)=>{ const g=new THREE.SphereGeometry(r,16,10); if(sc) g.scale(sc[0],sc[1],sc[2]); return put(g,c,x,y,z,null,glow); },
     geo:(g,c,x,y,z,rot,glow)=>put(g,c,x,y,z,rot,glow),
     // a solid box in world metres (split into patches no wider than 2.4 m so the collision lookup always finds it)
-    solid(x0,y0,z0,x1,y1,z1){ const nx=Math.max(1,Math.ceil((x1-x0)/2.4)), nz=Math.max(1,Math.ceil((z1-z0)/2.4));
+    solid(x0,y0,z0,x1,y1,z1,kp){ const nx=Math.max(1,Math.ceil((x1-x0)/2.4)), nz=Math.max(1,Math.ceil((z1-z0)/2.4));
       for(let a=0;a<nx;a++) for(let b=0;b<nz;b++){ const xa=x0+(x1-x0)*a/nx, xb=x0+(x1-x0)*(a+1)/nx, za=z0+(z1-z0)*b/nz, zb=z0+(z1-z0)*(b+1)/nz;
-        STATICS.push({x:(xa+xb)/2,z:(za+zb)/2,solid:{boxes:[[xa,y0,za,xb,y1,zb]],key:'poi'+STATICS.length,mat:'metal',deco:1}}); } },
+        STATICS.push({x:(xa+xb)/2,z:(za+zb)/2,solid:{boxes:[[xa,y0,za,xb,y1,zb]],key:(kp||'poi')+STATICS.length,mat:'metal',deco:1}}); } },
     sbox(w,h,d,x,y,z,c,glow){ D.box(w,h,d,x,y,z,c,null,glow); D.solid(x-w/2,y,z-d/2,x+w/2,y+h,z+d/2); },          // drawn and solid
     scyl(r,h,x,y,z,c,seg){ D.cyl(r,r,h,x,y,z,c,seg); const n=Math.max(2,Math.ceil(r*2/1.2)); for(let q=0;q<n;q++){ const xa=-r+2*r*q/n, xb=-r+2*r*(q+1)/n, xm=(xa+xb)/2, hd=Math.sqrt(Math.max(0.01,r*r-xm*xm)); D.solid(x+xa,y,z-hd,x+xb,y+h,z+hd); } },
     flush(){ const out=[]; const merge=list=>{ let n=0; for(const g of list) n+=g.attributes.position.count; const P=new Float32Array(n*3), N=new Float32Array(n*3), Cc=new Float32Array(n*3); let o=0;

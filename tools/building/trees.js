@@ -134,7 +134,7 @@ function buildImpostors(){ if(IMP.rt) return; const T=IMP.tile, W=T*IMP.cols, H=
 // the crown-from-above card only shows when you look down on the tree; from the side (or below) it folds away, so it
 // never reads as a floating disc
 function impTopFade(sh){ sh.vertexShader='attribute float topc;\n'+sh.vertexShader.replace('#include <project_vertex>',`#ifdef USE_INSTANCING
-  if(topc>0.5){ vec4 wq=modelMatrix*instanceMatrix*vec4(transformed,1.0); float up=cameraPosition.y-wq.y, dh=length(cameraPosition.xz-wq.xz); if(up<dh*0.14) transformed=vec3(0.0,-1000.0,0.0); }
+  if(topc>0.5){ vec4 wq=modelMatrix*instanceMatrix*vec4(transformed,1.0); vec3 vt=viewMatrix[3].xyz, cp=-vec3(dot(viewMatrix[0].xyz,vt),dot(viewMatrix[1].xyz,vt),dot(viewMatrix[2].xyz,vt)); float up=cp.y-wq.y, dh=length(cp.xz-wq.xz); if(up<dh*0.14) transformed=vec3(0.0,-1000.0,0.0); }
 #endif
 #include <project_vertex>`); }
 function impostorGeo(kind,v,n){ const {S,y0}=IMP.size[kind], k0=(kind==='tree'?0:16)+v*2, T=IMP.tile, Wd=T*IMP.cols, Hd=T*IMP.rows, P=[],N=[],U=[],I=[];
