@@ -81,3 +81,7 @@ Run with Node and Playwright (Chromium), from a folder that has `three` and `pee
 - tmapphoto.js: the island photographed for the map; the minimap and full map using it
 - tdecor.js: decoration counts and pictures (campsite, power line, hay field, dock, bench, river boat, POIs)
 - tfloat.js: nothing floating (decorations and outdoor chests), loot odds follow each item's rarity, no landmark strongbox, boat count
+- tstartloot.js: no mats/shield at match start, Shield Potion +50, spilled loot on elimination stays
+- tmapzoom.js: smooth map zoom, pins on map/minimap/compass/world
+- tcarclip.js: parked cars solid at their real angle, buggies stop against people and push you out
+- ticons.js: 3D material icons with count badges, gun stats card
