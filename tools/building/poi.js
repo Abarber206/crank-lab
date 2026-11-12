@@ -144,8 +144,8 @@ let poiGroundN=0;
 function poiGround(t,kind,shape,margin,clip){ let tex=poiGroundTex.get(kind); if(!tex){ const N=256, c=document.createElement('canvas'); c.width=c.height=N; const g=c.getContext('2d');
     if(kind==='cobble'){ g.fillStyle='#8f897d'; g.fillRect(0,0,N,N); for(let y=0;y<N;y+=16) for(let x=-(y/16%2)*10;x<N;x+=20){ const v=120+Math.random()*60; g.fillStyle=`rgb(${v},${v-4},${v-12})`; g.beginPath(); g.ellipse(x+10,y+8,9,7,0,0,7); g.fill(); } }
     else if(kind==='asphalt'){ g.fillStyle='#55575a'; g.fillRect(0,0,N,N); speckle(g,0,0,N,N,2400,'20,20,20','190,190,190'); for(let k=0;k<6;k++){ g.strokeStyle='rgba(20,20,20,.35)'; g.lineWidth=1.5; g.beginPath(); let x=Math.random()*N, y=Math.random()*N; g.moveTo(x,y); for(let s=0;s<6;s++){ x+=(Math.random()-.5)*40; y+=(Math.random()-.5)*40; g.lineTo(x,y); } g.stroke(); } }
-    else if(kind==='concrete'){ g.fillStyle='#b9b7b1'; g.fillRect(0,0,N,N); speckle(g,0,0,N,N,1600,'60,60,60','255,255,255'); g.fillStyle='rgba(60,60,60,.4)'; g.fillRect(0,0,N,2); g.fillRect(0,0,2,N); }
-    else { g.fillStyle='#8a6e4e'; g.fillRect(0,0,N,N); speckle(g,0,0,N,N,2600,'60,40,20','220,190,140'); for(let k=0;k<40;k++){ g.fillStyle='rgba(230,200,140,.25)'; g.fillRect(Math.random()*N,Math.random()*N,3+Math.random()*10,1.5); } } // dirt and sawdust
+    else if(kind==='concrete'){ g.fillStyle='#8f8e8a'; g.fillRect(0,0,N,N); speckle(g,0,0,N,N,1600,'60,60,60','255,255,255'); g.fillStyle='rgba(60,60,60,.4)'; g.fillRect(0,0,N,2); g.fillRect(0,0,2,N); }
+    else { g.fillStyle='#6e5a43'; g.fillRect(0,0,N,N); speckle(g,0,0,N,N,2600,'50,36,20','170,150,115'); for(let k=0;k<40;k++){ g.fillStyle='rgba(230,200,140,.25)'; g.fillRect(Math.random()*N,Math.random()*N,3+Math.random()*10,1.5); } } // dirt and sawdust
     tex=new THREE.CanvasTexture(c); tex.wrapS=tex.wrapT=THREE.RepeatWrapping; tex.anisotropy=MAXANI; poiGroundTex.set(kind,tex); }
   const rep=kind==='cobble'?3:kind==='concrete'?5:8, ox=Math.round(t.x/CELL)*CELL, oz=Math.round(t.z/CELL)*CELL;
   // the outline: rays out from the middle of the shape until they leave it, plus a margin that wanders, so the edge is ragged and lopsided
@@ -353,6 +353,132 @@ POI_BUILD.castle=(t,D)=>{ const K=poiKit(t), L=K.L, X_=poiCtx(t), {i,j,X,Z,y0,C,
   { const out=[rectIn(-34,-34,29,29,0)]; if(gW) out.push(rectIn(-42,-6,-30,6,0)); if(gE) out.push(rectIn(25,-6,41,6,0)); if(gN) out.push(rectIn(-6,-42,6,-30,0)); if(gS) out.push(rectIn(-6,25,6,41,0)); out.push(discIn(-27,22,9));
     poiGround(t,'dirt',anyIn(out),2.2); }
   poiGround(t,'cobble',rectIn(-30,-30,25,25,-1.5),1.2,rectIn(-30,-30,25,25,-0.2));
+  return blds; };
+
+/* Crater Labs: a two-storey research centre, an observatory dome, a hangar with a rover, a rocket on its pad beside a
+   climbable service gantry (stairs all the way to the top and a bridge to the capsule), satellite dishes, solar
+   panels, glowing tanks and a helipad. Concrete. */
+POI_BUILD.labs=(t,D)=>{ const K=poiKit(t), L=K.L, X_=poiCtx(t), {i,j,X,Z,y0,C,jit,r}=X_, blds=[], pad=[];
+  const lab=poiSkin('lab',0,'brick',{s:{floor:'tile',tread:'plate',beam:0x3e454c}}), lab2=poiSkin('lab',1,'metal',{s:{floor:'concrete',tread:'plate',beam:0x3e454c}});
+  const roofS=poiSkin('lab',0,'brick',{s:{floor:'tar',beam:0x3e454c}}), steel=poiSkin('corr',1,'metal',{s:{floor:'plate',tread:'plate',beam:0xc0392b}});
+  // --- the research centre: cells -6..-2 by -5..-3, two floors, flat roof
+  { const n0=K.P.length, sp={chest:[],floor:[]}, i0=i(-6), j0=j(-5);
+    K.slab(i0,j0,5,3,L,lab); K.slab(i0,j0,5,3,L+1,lab,(a,b)=>a===i0+2&&b===j0+1); K.slab(i0,j0,5,3,L+2,roofS);
+    K.shell(i0,j0,5,3,L,2,lab,(f,k,s)=>{ if(s===0){ if(f==='s'&&k===2) return POI_DOOR; if(f==='e'&&k===1) return POI_DOOR; } return k===0&&f==='w'?511:POI_WIN; });
+    K.shell(i0,j0,5,3,L+2,1,lab,()=>POI_LOW); K.ramp(i0+2,j0+1,L,3,lab);
+    for(const b of [j0,j0+2]) K.wallX(i0+3,b,L,POI_DOOR,lab,{inner:1});                // a partition with two doorways
+    const bench=[[3.6,0.95,0.9,2.5,0,2.5,0xd5dade],[3.6,0.06,0.9,2.5,0.95,2.5,0x2c3e50],[0.25,0.5,0.25,1.4,1.0,2.4,0x9ae6ff,false,true],[0.25,0.35,0.25,2.4,1.0,2.6,0x7cff9a,false,true],[0.2,0.6,0.2,3.4,1.0,2.4,0xff9ae6,false,true]];
+    for(const [a,b,l] of [[0,0,L],[4,2,L],[1,2,L+1],[4,0,L+1]]){ const fl=poiFind(K,i0+a,j0+b,l); if(fl) poiFix(fl,bench); }
+    const desk=poiFind(K,i0+3,j0+2,L); if(desk) poiFix(desk,[[3.2,1.05,0.9,2.5,0,1.3,0xe9edf0],[3.2,0.08,1.0,2.5,1.05,1.3,0x22b3c4],[0.7,0.45,0.05,2.0,1.13,1.0,0x1d2329,false],[0.6,0.36,0.04,2.0,1.17,0.97,0x5ec8ff,false,true]]);
+    const ant=poiFind(K,i0+1,j0+1,L+2); if(ant) poiFix(ant,[[0.15,7,0.15,2.5,0,2.5,0xc9d2dc],[0.3,0.3,0.3,2.5,7,2.5,0xff3b3b,false,true],[1.6,0.12,0.12,2.5,4.5,2.5,0xc9d2dc,false],[1.1,0.12,0.12,2.5,5.6,2.5,0xc9d2dc,false]]);
+    sp.chest.push(poiSpot(i0,j0+2,L),poiSpot(i0+4,j0+1,L+1),poiSpot(i0+3,j0,L+2)); sp.floor.push(poiSpot(i0+1,j0+1,L),poiSpot(i0+3,j0+1,L+1),poiSpot(i0+1,j0,L));
+    blds.push({pieces:K.P.slice(n0),spots:sp,kind:'research'}); pad.push(rectIn(-30,-25,-5,-10,4));
+    // tanks of something glowing, in a row outside the east door
+    for(const [x,z,c] of [[-1.6,-21.6,0x58ff8a],[-1.6,-18.4,0x58e8ff],[0.6,-23.2,0x58ff8a]]){ D.scyl(0.9,0.4,X(x),y0,Z(z),0x55606a,14); D.cyl(0.8,0.8,2.4,X(x),y0+0.4,Z(z),c,14,null,true); D.cyl(0.95,0.95,0.3,X(x),y0+2.8,Z(z),0x55606a,14); D.solid(X(x)-0.8,y0,Z(z)-0.8,X(x)+0.8,y0+3.1,Z(z)+0.8); } }
+  // --- the observatory: a drum with a dome and the telescope out of its slit
+  { const ox=-15, oz=17, R=6.5; D.scyl(R,6,X(ox),y0,Z(oz),0xe9edf0,28); D.cyl(R+0.2,R+0.2,0.4,X(ox),y0+6,Z(oz),0x9aa3ab,28);
+    const dome=new THREE.SphereGeometry(R,28,14,0,Math.PI*2,0,Math.PI/2); D.geo(dome,0xdfe4e8,X(ox),y0+6.4,Z(oz));
+    for(let h=0;h<R-0.5;h+=1.1){ const rr=Math.sqrt(R*R-h*h); D.solid(X(ox)-rr*0.7,y0+6.4+h,Z(oz)-rr*0.7,X(ox)+rr*0.7,y0+6.4+h+1.1,Z(oz)+rr*0.7); }
+    { const g=new THREE.BoxGeometry(1.4,R*1.05,0.3); g.translate(0,R*0.5,R*0.62); D.geo(g,0x2c3036,X(ox),y0+6.4,Z(oz),[-0.6,0.7,0]); const tl=new THREE.CylinderGeometry(0.55,0.75,5.4,14); tl.rotateX(-0.9); D.geo(tl,0x3e454c,X(ox)+2.1,y0+10.5,Z(oz)+2.6,[0,0.7,0]); }
+    D.box(1.8,2.4,0.3,X(ox),y0,Z(oz)-R+0.05,0x2c3036); D.box(2.6,0.12,1.2,X(ox),y0+2.4,Z(oz)-R-0.3,0x9aa3ab); pad.push(discIn(ox,oz,R+3)); }
+  // --- the hangar: cells 2..4 by -7..-4, two storeys tall, its whole south end open
+  { const n0=K.P.length, sp={chest:[],floor:[]}, i0=i(2), j0=j(-7);
+    K.slab(i0,j0,3,4,L,lab2); K.slab(i0,j0,3,4,L+2,roofS);
+    K.shell(i0,j0,3,4,L,2,lab2,(f,k,s)=>{ if(f==='s'&&k<=1) return null; if(f==='s') return 511; if(s===1) return k%2?POI_WIN:511; return f==='w'&&k===2?POI_DOOR:511; });
+    K.shell(i0,j0,3,4,L+2,1,roofS,()=>POI_LOW);
+    // the rover: six wheels, a cab, a mast
+    { const rx=X(16), rz=Z(-24); D.sbox(2.6,1.0,4.6,rx,y0+0.7,rz,0xe9edf0); D.sbox(2.2,1.0,1.8,rx,y0+1.7,rz-1.1,0xd5dade); D.box(2.0,0.6,0.05,rx,y0+2.0,rz-2.02,0x5ec8ff,null,true);
+      for(const dz of [-1.7,0,1.7]) for(const dx of [-1.45,1.45]){ const w=new THREE.CylinderGeometry(0.62,0.62,0.45,14); w.rotateZ(Math.PI/2); D.geo(w,0x2c3036,rx+dx,y0+0.62,rz+dz); }
+      D.box(0.12,1.8,0.12,rx+0.8,y0+2.7,rz+1.4,0x9aa3ab); D.sph(0.45,rx+0.8,y0+4.6,rz+1.4,0xf2f2f2,[1,0.3,1]); }
+    for(const [x,z,h] of [[12.2,-33.4,0],[13.5,-33,0],[12.8,-33.2,1.2],[23.6,-29.6,0]]) D.sbox(1.2,1.2,1.2,X(x),y0+h,Z(z),0x8a9aa8);
+    sp.chest.push(poiSpot(i0+2,j0,L),poiSpot(i0,j0+1,L)); sp.floor.push(poiSpot(i0+1,j0+3,L)); blds.push({pieces:K.P.slice(n0),spots:sp,kind:'hangar'}); pad.push(rectIn(10,-35,25,-15,4),rectIn(12,-15,23,-6,2)); }
+  // --- the rocket on its pad, and its service gantry: a stair tower of map pieces climbing six storeys
+  { const n0=K.P.length, sp={chest:[],floor:[]}, P=i(1), Q=i(2), r0=j(1), r1=j(2), r2=j(3);
+    K.ramp(P,r1,L,3,steel);
+    for(let s=1;s<=5;s++){ const l=L+s, north=s%2===1, row=north?r0:r2;
+      if(s<5){ K.floor(P,row,l,steel); K.floor(Q,row,l,steel); K.ramp(north?Q:P,r1,l,north?1:3,steel); }
+      else { for(const c of [P,Q]) for(const rr of [r0,r1,r2]) if(!(c===P&&rr===r1)) K.floor(c,rr,l,steel); } }
+    for(let s=1;s<=4;s++){ const l=L+s, row=s%2===1?r0:r2; K.wallZ(P,s%2===1?r0:r2+1,l,POI_LOW,steel); K.wallZ(Q,s%2===1?r0:r2+1,l,POI_LOW,steel); K.wallX(P,row,l,POI_LOW,steel); }
+    K.wallZ(P,r0,L+5,POI_LOW,steel); K.wallZ(Q,r0,L+5,POI_LOW,steel); K.wallZ(P,r2+1,L+5,POI_LOW,steel); K.wallZ(Q,r2+1,L+5,POI_LOW,steel); for(const rr of [r0,r1,r2]) K.wallX(P,rr,L+5,POI_LOW,steel); K.wallX(Q+1,r0,L+5,POI_LOW,steel); K.wallX(Q+1,r2,L+5,POI_LOW,steel);
+    const top=poiFind(K,Q,r0,L+5); if(top) poiFix(top,[[0.9,0.5,0.9,1.2,0,1.2,0x2c3036],[0.6,0.4,0.05,1.2,0.5,0.8,0x5ec8ff,false,true]]);
+    sp.chest.push(poiSpot(Q,r2,L+5),poiSpot(P,r0,L+3)); sp.floor.push(poiSpot(Q,r0,L+1),poiSpot(P,r2,L+4)); blds.push({pieces:K.P.slice(n0),spots:sp,kind:'gantry'});
+    // the steelwork round the tower, in red and white
+    for(const [x,z] of [[5,5],[15,5],[5,20],[15,20]]){ for(let s=0;s<6;s++) D.box(0.35,LVL,0.35,X(x),y0+s*LVL,Z(z),s%2?0xf2f2f2:0xc0392b); D.solid(X(x)-0.18,y0,Z(z)-0.18,X(x)+0.18,y0+6*LVL,Z(z)+0.18); }
+    for(let s=0;s<6;s++) for(const [x0,z0,x1,z1] of [[5,5,15,5],[5,20,15,20]]){ const g=new THREE.BoxGeometry(0.14,0.14,Math.hypot(x1-x0,LVL)); D.geo(g,0x9aa3ab,X((x0+x1)/2),y0+s*LVL+LVL/2,Z(z0),[0,Math.PI/2,s%2?0.68:-0.68]); }
+    // the rocket
+    const rx=X(21.5), rz=Z(12.5); D.sbox(11,0.6,11,rx,y0,rz,0x9aa3ab); D.box(4,0.62,4,rx,y0,rz,0x2c3036);
+    D.scyl(1.9,22,rx,y0+2.2,rz,0xf2f2f2,20); for(const h of [6,13,20]) D.cyl(1.94,1.94,0.5,rx,y0+2.2+h,rz,0x2c3036,20);
+    D.cyl(1.2,1.9,4,rx,y0+24.2,rz,0xf2f2f2,20); D.cyl(0.05,1.2,2.6,rx,y0+28.2,rz,0xc0392b,20); D.box(1.0,1.2,0.1,rx-1.92,y0+22.4,rz,0x2c3036);
+    for(let k=0;k<4;k++){ const a=k*Math.PI/2+Math.PI/4, g=new THREE.BoxGeometry(0.2,4.2,2.2); g.translate(0,0,2.3); D.geo(g,0xc0392b,rx,y0+2.1+2.1,rz,[0,a,0]); D.cyl(0.55,0.75,1.2,rx+Math.sin(a)*1.1,y0+1.0,rz+Math.cos(a)*1.1,0x3e454c,12); }
+    D.solid(rx-3,y0,rz-3,rx+3,y0+2.2,rz+3);
+    D.sbox(4.4,0.2,1.4,X(17.4),y0+5*LVL-0.2,rz,0x9aa3ab); for(const dz of [-0.7,0.7]) D.box(4.4,1.0,0.06,X(17.4),y0+5*LVL,rz+dz,0xc0392b); // the bridge to the capsule hatch
+    pad.push(rectIn(4,4,28,21,3)); }
+  // --- satellite dishes, solar panels, a helipad with a helicopter, a guard hut
+  { for(const [x,z,yw] of [[-35,14,0.6],[-26,25,1.3]]){ D.scyl(0.7,5,X(x),y0,Z(z),0xd5dade,12); D.box(2.2,0.8,2.2,X(x),y0,Z(z),0x9aa3ab); D.solid(X(x)-1.1,y0,Z(z)-1.1,X(x)+1.1,y0+0.8,Z(z)+1.1);
+      const dish=new THREE.SphereGeometry(4.6,24,10,0,Math.PI*2,0,0.75); dish.scale(1,0.55,1); dish.rotateX(Math.PI); D.geo(dish,0xf2f2f2,X(x),y0+7.6,Z(z),[0.9,yw,0]);
+      const back=dish.clone(); D.geo(back,0xb9c2c9,X(x),y0+7.55,Z(z),[0.9,yw,0]); const ft=new THREE.CylinderGeometry(0.06,0.06,3.6,6); ft.translate(0,1.8,0); D.geo(ft,0x55606a,X(x),y0+6.8,Z(z),[0.9,yw,0]); D.sph(0.35,X(x)+Math.sin(yw)*2.6,y0+9.2,Z(z)+Math.cos(yw)*2.6,0x2c3036); }
+    for(let row=0;row<4;row++) for(let k=0;k<3;k++){ const x=-38.5+row*3.2, z=-6+k*6.2+jit(0.3); if(!X_.inR(x,z,2)) continue; const g=new THREE.BoxGeometry(2.4,0.08,5); D.geo(g,0x1f3a5f,X(x),y0+1.2,Z(z),[0,0,-0.5]); D.box(0.12,1.0,0.12,X(x),y0,Z(z),0x9aa3ab); D.solid(X(x)-1.1,y0,Z(z)-2.5,X(x)+1.1,y0+1.6,Z(z)+2.5); }
+    { const hx=X(-3), hz=Z(29); const pd=new THREE.CylinderGeometry(6,6,0.25,32); D.geo(pd,0x6b737a,hx,y0+0.13,hz); D.solid(hx-4.2,y0,hz-4.2,hx+4.2,y0+0.25,hz+4.2);
+      const ring=new THREE.TorusGeometry(5.2,0.18,6,40); ring.rotateX(Math.PI/2); D.geo(ring,0xf2f2f2,hx,y0+0.27,hz); for(const [w,d,dx] of [[0.6,4,-1.3],[0.6,4,1.3],[2,0.6,0]]) D.box(w,0.04,d,hx+dx,y0+0.26,hz,0xf2f2f2);
+      const yw=0.8; D.geo(new THREE.SphereGeometry(1.5,16,10).scale(1,0.85,1.6),0xd35400,hx,y0+1.7,hz,[0,yw,0]); D.solid(hx-1.4,y0+0.25,hz-1.4,hx+1.4,y0+3,hz+1.4);
+      { const tb=new THREE.CylinderGeometry(0.2,0.35,4.6,10); tb.rotateX(Math.PI/2); tb.translate(0,0,3.6); D.geo(tb,0xd35400,hx,y0+2.0,hz,[0,yw,0]); }
+      for(const a of [0.3,2.4]){ const bl=new THREE.BoxGeometry(9,0.06,0.4); D.geo(bl,0x2c3036,hx,y0+3.25,hz,[0,a,0]); } D.cyl(0.12,0.12,0.6,hx,y0+2.7,hz,0x2c3036,8);
+      for(const dx of [-1,1]){ const sk=new THREE.BoxGeometry(0.12,0.12,3.2); sk.translate(dx,0,0); D.geo(sk,0x2c3036,hx,y0+0.4,hz,[0,yw,0]); } pad.push(discIn(-3,29,7)); }
+    D.sbox(2.6,2.6,2.6,X(32),y0,Z(5.5),0xe9edf0); D.box(2.8,0.2,2.8,X(32),y0+2.6,Z(5.5),0x22b3c4); D.box(1.2,0.8,0.05,X(32),y0+1.4,Z(4.18),0x5ec8ff,null,true); // the guard hut by the east gate
+    D.box(5,0.12,0.12,X(35),y0+1.0,Z(3.2),0xc0392b,[0,0,0.35]); D.box(0.25,1.1,0.25,X(32.6),y0,Z(3.2),0x55606a);
+    for(const [x,z] of [[-8,-4],[8,-8],[-20,4],[30,-4],[6,26],[-34,-14]]){ if(!X_.inR(x,z,1)) continue; D.box(0.2,7,0.2,X(x),y0,Z(z),0xc9d2dc); D.box(1.2,0.3,0.4,X(x),y0+7,Z(z),0x3e454c); D.box(1.0,0.06,0.3,X(x),y0+6.96,Z(z),0xfff3cf,null,true); D.solid(X(x)-0.1,y0,Z(z)-0.1,X(x)+0.1,y0+7,Z(z)+0.1); }
+    pad.push(rectIn(-40,-12,-26,12,2),rectIn(-14,-10,40,8,3),rectIn(-4,26,4,40,2),rectIn(30,-5,40,5,2),discIn(-30,15,8)); }
+  poiGround(t,'concrete',anyIn(pad),2.4);
+  return blds; };
+
+/* Timber Yard: an open-sided sawmill with a big blade, log cabins (one with an upstairs), log piles and stacks of
+   cut planks, a log loader, a flatbed loaded with logs, a wooden water tower, a campfire, stumps. Dirt and sawdust. */
+POI_BUILD.timber=(t,D)=>{ const K=poiKit(t), L=K.L, X_=poiCtx(t), {i,j,X,Z,y0,C,jit,r}=X_, blds=[], pad=[];
+  const logS=poiSkin('log',0,'wood',{roof:'wood',roofCol:1,s:{floor:'plank',tread:'plank',beam:0x5a3a1e}}), logS2=poiSkin('log',1,'wood',{roof:'wood',roofCol:3,s:{floor:'plank',tread:'plank',beam:0x4a2e16}});
+  const shed=poiSkin('log',1,'wood',{roof:'wood',roofCol:0,s:{floor:'plank',tread:'plank',beam:0x4a2e16}});
+  // --- the sawmill: cells -3..0 by -6..-4, open on three sides
+  { const n0=K.P.length, sp={chest:[],floor:[]}, i0=i(-3), j0=j(-6); K.slab(i0,j0,4,3,L,shed); K.shell(i0,j0,4,3,L,1,shed,f=>f==='n'?511:POI_OPEN); K.roof(i0,j0,4,3,L+1,shed);
+    const bx=X(-6), bz=Z(-22.5); D.sbox(12,0.9,1.6,X(-6),y0,bz,0x6b4a2e); for(let x=-11.5;x<-0.5;x+=1.2) D.box(0.15,0.08,1.7,X(x),y0+0.9,bz,0x9aa3ab); // the carriage bed
+    D.cyl(1.4,1.4,0.06,bx,y0+1.1,bz,0xc9d2dc,28,[0,0,Math.PI/2]); D.box(0.4,1.2,1.2,bx,y0+0.9,bz+0.9,0x3a3d42); // the blade
+    D.scyl(0.45,9,X(-10.5),y0+0.9,bz,0x8a5a32,10); const lg=new THREE.CylinderGeometry(0.45,0.5,9,12); lg.rotateZ(Math.PI/2); D.geo(lg,0x8a5a32,X(-10.5),y0+1.35,bz); D.solid(X(-15),y0+0.9,bz-0.5,X(-6.5),y0+1.8,bz+0.5);
+    for(const [x,z,s] of [[4,-21,1.6],[1,-16.8,1.4],[-9,-16.4,1.2]]){ const g=new THREE.ConeGeometry(s,s*0.7,12); D.geo(g,0xd9b77a,X(x),y0+s*0.35,Z(z)); }
+    for(let k=0;k<4;k++) D.sbox(1.2,0.6,4.8,X(-13.5+k*0.0),y0+k*0.6,Z(-27.4),0xc89a62);
+    sp.chest.push(poiSpot(i0+3,j0,L,0,0.8),poiSpot(i0,j0+2,L)); sp.floor.push(poiSpot(i0+2,j0+2,L)); blds.push({pieces:K.P.slice(n0),spots:sp,kind:'sawmill'}); pad.push(rectIn(-15,-30,5,-15,5)); }
+  // --- a log cabin, north-east, one room with a porch
+  { const n0=K.P.length, sp={chest:[],floor:[]}, i0=i(3), j0=j(-5); K.slab(i0,j0,2,2,L,logS); K.shell(i0,j0,2,2,L,1,logS,(f,k)=>f==='s'&&k===0?POI_DOOR:f==='n'?511:POI_WIN); K.roof(i0,j0,2,2,L+1,logS);
+    D.sbox(10,0.3,2.4,X(20),y0,Z(-13.8),0x8a5a32); for(const x of [15.4,24.6]) D.box(0.2,2.6,0.2,X(x),y0+0.3,Z(-12.8),0x6b4a2e); D.box(10.2,0.15,2.8,X(20),y0+2.9,Z(-13.8),0x4a2e16,[0.12,0,0]);
+    D.sbox(1.2,0.5,0.5,X(22),y0+0.3,Z(-13.4),0x6b4a2e); D.box(0.6,2.2,0.6,X(23.4),y0,Z(-21.6),0x6e6458); D.box(0.9,6.6,0.9,X(24.6),y0,Z(-20),0x8f877a); D.solid(X(24.15),y0,Z(-20.45),X(25.05),y0+6.6,Z(-19.55)); // bench, stove, chimney
+    sp.chest.push(poiSpot(i0+1,j0,L)); sp.floor.push(poiSpot(i0,j0,L)); blds.push({pieces:K.P.slice(n0),spots:sp,kind:'cabin'}); pad.push(rectIn(15,-25,25,-12,3)); }
+  // --- the foreman's house, south-west: 2x3 with an upstairs
+  { const n0=K.P.length, sp={chest:[],floor:[]}, i0=i(-7), j0=j(1); K.slab(i0,j0,2,3,L,logS2); K.slab(i0,j0,2,3,L+1,logS2,(a,b)=>a===i0+1&&b===j0+1);
+    K.shell(i0,j0,2,3,L,2,logS2,(f,k,s)=>s===0&&f==='e'&&k===2?POI_DOOR:k===1?POI_WIN:511); K.roof(i0,j0,2,3,L+2,logS2); K.ramp(i0+1,j0+1,L,3,logS2);
+    const bed=poiFind(K,i0,j0,L+1); if(bed) poiFix(bed,[[2,0.5,1.2,2.5,0,1.2,0x6b4a2e],[2,0.15,1.2,2.5,0.5,1.2,0xb3262e,false]]);
+    const tb=poiFind(K,i0,j0+2,L); if(tb) poiFix(tb,[[1.6,0.8,1.0,2.5,0,2.5,0x6b4a2e],[0.5,0.5,0.5,1.2,0,2.5,0x5a3d26],[0.5,0.5,0.5,3.8,0,2.5,0x5a3d26]]);
+    sp.chest.push(poiSpot(i0,j0+2,L+1),poiSpot(i0,j0+1,L)); sp.floor.push(poiSpot(i0+1,j0+2,L+1)); blds.push({pieces:K.P.slice(n0),spots:sp,kind:'house'}); pad.push(rectIn(-35,5,-25,20,4));
+    // a campfire with log seats in front
+    const fx=X(-19), fz=Z(15); for(let k=0;k<7;k++){ const a=k/7*Math.PI*2; D.box(0.35,0.25,0.25,fx+Math.cos(a)*0.7,y0,fz+Math.sin(a)*0.7,0x6e6458,[0,a,0]); }
+    D.cyl(0.08,0.55,0.9,fx,y0+0.1,fz,0xff8a1f,8,null,true); D.cyl(0.05,0.3,0.6,fx+0.15,y0+0.1,fz-0.1,0xffd24a,8,null,true);
+    for(const a of [0.4,2.2,4.1]){ const g=new THREE.CylinderGeometry(0.3,0.3,2.2,10); g.rotateZ(Math.PI/2); D.geo(g,0x8a5a32,fx+Math.cos(a)*2.4,y0+0.3,fz+Math.sin(a)*2.4,[0,-a+Math.PI/2,0]); D.solid(fx+Math.cos(a)*2.4-0.8,y0,fz+Math.sin(a)*2.4-0.8,fx+Math.cos(a)*2.4+0.8,y0+0.55,fz+Math.sin(a)*2.4+0.8); } pad.push(discIn(-19,15,5)); }
+  // --- log piles, plank stacks, the log loader, a loaded flatbed, the water tower, stumps
+  { const pile=(x,z,yw,n)=>{ const s=Math.sin(yw), co=Math.cos(yw); let h=0; for(let row=n;row>0;row--){ for(let k=0;k<row;k++){ const off=(k-(row-1)/2)*0.95, rr=0.44+r()*0.06, g=new THREE.CylinderGeometry(rr,rr*1.05,7+r()*0.8,12); g.rotateX(Math.PI/2);
+          D.geo(g,[0x8a5a32,0x7a4e2c,0x94643a][Math.floor(r()*3)],X(x+co*off),y0+0.45+h,Z(z-s*off),[0,yw,0]); } h+=0.8; }
+        const ex=Math.abs(co)*n*0.48+Math.abs(s)*3.6, ez=Math.abs(s)*n*0.48+Math.abs(co)*3.6; D.solid(X(x)-ex*0.85,y0,Z(z)-ez*0.85,X(x)+ex*0.85,y0+h*0.75,Z(z)+ez*0.85); };
+    pile(-25,-12,0.3,5); pile(12,9,1.3,4); pile(24,22,-0.4,5); pile(-8,24,2.0,3); pile(-27,-25,0.9,3);
+    for(const [x,z,yw,n] of [[10,-6,0.1,4],[16,-4,0.2,3],[6,16,-0.5,5]]){ for(let q=0;q<n;q++){ const g=new THREE.BoxGeometry(2.4,0.38,4.8); D.geo(g,q%2?0xd9b077:0xc89a62,X(x),y0+0.12+q*0.4+0.19,Z(z),[0,yw+(q%2?0.03:0),0]); }
+      D.solid(X(x)-1.6,y0,Z(z)-2.6,X(x)+1.6,y0+0.12+n*0.4,Z(z)+2.6); D.box(2.6,0.12,5,X(x),y0,Z(z),0x8c6a3f,[0,yw,0]); }
+    { const lx=X(-18), lz=Z(-3); D.sbox(2.6,1.4,4.4,lx,y0+0.5,lz,0xe0a326); D.sbox(2.0,1.4,1.8,lx,y0+1.9,lz+1.1,0xe0a326); D.box(1.8,1.0,0.05,lx,y0+2.2,lz+0.18,0x5ec8ff); for(const dz of [-1.4,1.4]) for(const dx of [-1.4,1.4]){ const w=new THREE.CylinderGeometry(0.55,0.55,0.4,12); w.rotateZ(Math.PI/2); D.geo(w,0x1d1f22,lx+dx,y0+0.55,lz+dz); }
+      const arm=new THREE.BoxGeometry(0.4,0.4,7); arm.translate(0,0,-3.2); D.geo(arm,0xd4991c,lx,y0+3.2,lz-1,[-0.5,0,0]); const cl=new THREE.TorusGeometry(0.7,0.12,6,12,Math.PI); D.geo(cl,0x3a3d42,lx,y0+3.6,lz-7.4,[Math.PI/2,0,0]); }
+    { const tx=X(-3), tz=Z(9), yw=0.6, g=new THREE.BoxGeometry(2.4,0.5,9); D.geo(g,0x3a3d42,tx,y0+1.05,tz,[0,yw,0]); const cab=new THREE.BoxGeometry(2.4,1.9,2.2); cab.translate(0,0,5.4); D.geo(cab,0x2e86c1,tx,y0+2.15,tz,[0,yw,0]);
+      for(const s of [-3.2,-1.8,4.6]){ const w=new THREE.CylinderGeometry(0.55,0.55,2.5,12); w.rotateZ(Math.PI/2); w.translate(0,0,s); D.geo(w,0x1d1f22,tx,y0+0.55,tz,[0,yw,0]); }
+      for(let k=0;k<5;k++){ const lg=new THREE.CylinderGeometry(0.38,0.4,8.4,10); lg.rotateX(Math.PI/2); lg.translate((k%3-1)*0.75,k<3?0:0.7,-0.2); D.geo(lg,0x8a5a32,tx,y0+1.7,tz,[0,yw,0]); }
+      D.solid(tx-3.5,y0+0.6,tz-3.5,tx+3.5,y0+2.7,tz+3.5); }
+    { const wx=X(22), wz=Z(12); for(const [dx,dz] of [[-2,-2],[2,-2],[-2,2],[2,2]]){ D.box(0.35,8,0.35,wx+dx,y0,wz+dz,0x6b4a2e); D.solid(wx+dx-0.18,y0,wz+dz-0.18,wx+dx+0.18,y0+8,wz+dz+0.18); }
+      for(const h of [2.6,5.2]){ D.box(4.4,0.15,0.15,wx,y0+h,wz-2,0x5a3d26); D.box(4.4,0.15,0.15,wx,y0+h,wz+2,0x5a3d26); D.box(0.15,0.15,4.4,wx-2,y0+h,wz,0x5a3d26); D.box(0.15,0.15,4.4,wx+2,y0+h,wz,0x5a3d26); }
+      D.sbox(5.4,0.3,5.4,wx,y0+8,wz,0x5a3d26); D.scyl(2.5,3.6,wx,y0+8.3,wz,0x9a6a3d,18); for(const h of [0.6,1.8,3]) D.cyl(2.55,2.55,0.12,wx,y0+8.3+h,wz,0x2a2a2e,18); D.cyl(0.2,2.8,1.4,wx,y0+11.9,wz,0x4a2e16,18); }
+    for(let k=0;k<14;k++){ const x=-38+r()*76, z=-38+r()*76; if(!X_.inR(x,z,1)) continue; if(Math.abs(x+6)<14&&z<-12&&z>-32) continue; if(Math.hypot(x-22,z-12)<5||Math.hypot(x+19,z-15)<4||Math.hypot(x+3,z-9)<6) continue;
+      const rr=0.35+r()*0.3; D.cyl(rr,rr*1.15,0.5+r()*0.4,X(x),y0,Z(z),0x8a5a32,10); D.cyl(rr*0.95,rr*0.95,0.03,X(x),y0+0.52,Z(z),0xd9b077,10); if(k%4===0){ D.box(0.06,0.7,0.06,X(x)+0.1,y0+0.6,Z(z),0x6b4a2e,[0,0,0.3]); D.box(0.04,0.2,0.32,X(x)+0.28,y0+0.95,Z(z),0x9aa3ab,[0,0,0.3]); } }
+    pad.push(rectIn(-30,-15,30,26,1),rectIn(-40,-5,-28,5,2),rectIn(28,-5,40,5,2),rectIn(-4,26,4,40,2)); }
+  poiGround(t,'dirt',anyIn(pad),2.8);
   return blds; };
 // build a site once: its pieces (put up by buildWorld like the houses) and its decoration
 function planPOI(t){ if(t.blds) return t.blds; const D=poiDecor(); t.blds=POI_BUILD[t.kind](t,D); t.decor=D.flush(); return t.blds; }

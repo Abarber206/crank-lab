@@ -144,8 +144,8 @@ let poiGroundN=0;
 function poiGround(t,kind,shape,margin,clip){ let tex=poiGroundTex.get(kind); if(!tex){ const N=256, c=document.createElement('canvas'); c.width=c.height=N; const g=c.getContext('2d');
     if(kind==='cobble'){ g.fillStyle='#8f897d'; g.fillRect(0,0,N,N); for(let y=0;y<N;y+=16) for(let x=-(y/16%2)*10;x<N;x+=20){ const v=120+Math.random()*60; g.fillStyle=`rgb(${v},${v-4},${v-12})`; g.beginPath(); g.ellipse(x+10,y+8,9,7,0,0,7); g.fill(); } }
     else if(kind==='asphalt'){ g.fillStyle='#55575a'; g.fillRect(0,0,N,N); speckle(g,0,0,N,N,2400,'20,20,20','190,190,190'); for(let k=0;k<6;k++){ g.strokeStyle='rgba(20,20,20,.35)'; g.lineWidth=1.5; g.beginPath(); let x=Math.random()*N, y=Math.random()*N; g.moveTo(x,y); for(let s=0;s<6;s++){ x+=(Math.random()-.5)*40; y+=(Math.random()-.5)*40; g.lineTo(x,y); } g.stroke(); } }
-    else if(kind==='concrete'){ g.fillStyle='#b9b7b1'; g.fillRect(0,0,N,N); speckle(g,0,0,N,N,1600,'60,60,60','255,255,255'); g.fillStyle='rgba(60,60,60,.4)'; g.fillRect(0,0,N,2); g.fillRect(0,0,2,N); }
-    else { g.fillStyle='#8a6e4e'; g.fillRect(0,0,N,N); speckle(g,0,0,N,N,2600,'60,40,20','220,190,140'); for(let k=0;k<40;k++){ g.fillStyle='rgba(230,200,140,.25)'; g.fillRect(Math.random()*N,Math.random()*N,3+Math.random()*10,1.5); } } // dirt and sawdust
+    else if(kind==='concrete'){ g.fillStyle='#8f8e8a'; g.fillRect(0,0,N,N); speckle(g,0,0,N,N,1600,'60,60,60','255,255,255'); g.fillStyle='rgba(60,60,60,.4)'; g.fillRect(0,0,N,2); g.fillRect(0,0,2,N); }
+    else { g.fillStyle='#6e5a43'; g.fillRect(0,0,N,N); speckle(g,0,0,N,N,2600,'50,36,20','170,150,115'); for(let k=0;k<40;k++){ g.fillStyle='rgba(230,200,140,.25)'; g.fillRect(Math.random()*N,Math.random()*N,3+Math.random()*10,1.5); } } // dirt and sawdust
     tex=new THREE.CanvasTexture(c); tex.wrapS=tex.wrapT=THREE.RepeatWrapping; tex.anisotropy=MAXANI; poiGroundTex.set(kind,tex); }
   const rep=kind==='cobble'?3:kind==='concrete'?5:8, ox=Math.round(t.x/CELL)*CELL, oz=Math.round(t.z/CELL)*CELL;
   // the outline: rays out from the middle of the shape until they leave it, plus a margin that wanders, so the edge is ragged and lopsided
