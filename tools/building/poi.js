@@ -115,11 +115,23 @@ function poiFix(p,list){ const o=new THREE.Vector3((p.i+.5)*CELL,p.l*LVL-FT/2,(p
   p.fix={boxes,parts}; }
 
 /* decoration: merged meshes in vertex colours (one per 64 m patch, so they cull), with solid boxes for standing on */
-function poiDecor(){ const patches=new Map(), glows=new Map(), col=new THREE.Color();
+/* Every piece of decoration belongs to an object (a crate, a tent, a pole, a machine...). Objects are marked where it
+   matters (D.obj), and anything left unmarked is grouped by what touches what. An object has health from its size and
+   a material from its colour; shot, hit with the pickaxe or caught in a blast it chips, and at zero it breaks: it
+   vanishes in a burst of debris, stops being solid and gives materials. A reset of the world puts everything back. */
+const DECO={objs:[],byId:new Map(),meshes:[]};
+function decoNewObj(mat,hp){ const o={id:DECO.objs.length,mat:mat||null,hp:hp||0,hp0:hp||0,ranges:[],statics:[],boxes0:[],geos:[],gone:false,c:new THREE.Vector3()}; o.piece={key:'deco'+o.id,mat:'metal',type:'wall',deco:1,dobj:o,group:{position:o.c}}; DECO.objs.push(o); DECO.byId.set(o.id,o); return o; }
+function poiDecor(){ const patches=new Map(), glows=new Map(), col=new THREE.Color(), loose=[], looseS=[]; let cur=null;
   const bucket=(map,x,z)=>{ const k=Math.floor(x/64)+','+Math.floor(z/64); let a=map.get(k); if(!a){ a=[]; map.set(k,a); } return a; };
   const put=(g,c,x,y,z,rot,glow)=>{ if(rot){ if(rot[0]) g.rotateX(rot[0]); if(rot[2]) g.rotateZ(rot[2]); if(rot[1]) g.rotateY(rot[1]); } g.translate(x,y,z); if(g.index) g=g.toNonIndexed(); g.computeVertexNormals(); col.setHex(c);
-    const n=g.attributes.position.count, ca=new Float32Array(n*3); for(let q=0;q<n;q++){ ca[q*3]=col.r; ca[q*3+1]=col.g; ca[q*3+2]=col.b; } g.setAttribute('color',new THREE.BufferAttribute(ca,3)); if(g.attributes.uv) g.deleteAttribute('uv'); bucket(glow?glows:patches,x,z).push(g); return g; };
+    const n=g.attributes.position.count, ca=new Float32Array(n*3); for(let q=0;q<n;q++){ ca[q*3]=col.r; ca[q*3+1]=col.g; ca[q*3+2]=col.b; } g.setAttribute('color',new THREE.BufferAttribute(ca,3)); if(g.attributes.uv) g.deleteAttribute('uv');
+    g.userData.objs=cur?cur.slice():null; g.userData.col=c; if(cur) cur.forEach(o=>o.geos.push(g)); else loose.push(g); bucket(glow?glows:patches,x,z).push(g); return g; };
+  const claim=st=>{ if(cur&&cur[0]){ st.solid.dobj=cur[0]; cur[0].statics.push(st); } else looseS.push(st); };
   const D={
+    obj(mat,hp){ const o=decoNewObj(mat,hp); cur=[o]; return o; },    // what follows belongs to a new object...
+    with(...os){ cur=os.filter(Boolean); },                               // ...or to these (a wire hangs from two poles)
+    end(){ cur=null; },
+    claim,
     box:(w,h,d,x,y,z,c,rot,glow)=>put(new THREE.BoxGeometry(w,h,d),c,x,y+h/2,z,rot,glow),            // y is the bottom
     cyl:(rt,rb,h,x,y,z,c,seg,rot,glow)=>put(new THREE.CylinderGeometry(rt,rb,h,seg||14),c,x,y+h/2,z,rot,glow),
     tube:(r,h,x,y,z,c,rot,seg)=>put(new THREE.CylinderGeometry(r,r,h,seg||10),c,x,y,z,rot),             // centred
@@ -128,16 +140,56 @@ function poiDecor(){ const patches=new Map(), glows=new Map(), col=new THREE.Col
     // a solid box in world metres (split into patches no wider than 2.4 m so the collision lookup always finds it)
     solid(x0,y0,z0,x1,y1,z1,kp){ const nx=Math.max(1,Math.ceil((x1-x0)/2.4)), nz=Math.max(1,Math.ceil((z1-z0)/2.4));
       for(let a=0;a<nx;a++) for(let b=0;b<nz;b++){ const xa=x0+(x1-x0)*a/nx, xb=x0+(x1-x0)*(a+1)/nx, za=z0+(z1-z0)*b/nz, zb=z0+(z1-z0)*(b+1)/nz;
-        STATICS.push({x:(xa+xb)/2,z:(za+zb)/2,solid:{boxes:[[xa,y0,za,xb,y1,zb]],key:(kp||'poi')+STATICS.length,mat:'metal',deco:1}}); } },
+        const st={x:(xa+xb)/2,z:(za+zb)/2,solid:{boxes:[[xa,y0,za,xb,y1,zb]],key:(kp||'poi')+STATICS.length,mat:'metal',deco:1}}; STATICS.push(st); claim(st); } },
     sbox(w,h,d,x,y,z,c,glow){ D.box(w,h,d,x,y,z,c,null,glow); D.solid(x-w/2,y,z-d/2,x+w/2,y+h,z+d/2); },          // drawn and solid
     scyl(r,h,x,y,z,c,seg){ D.cyl(r,r,h,x,y,z,c,seg); const n=Math.max(2,Math.ceil(r*2/1.2)); for(let q=0;q<n;q++){ const xa=-r+2*r*q/n, xb=-r+2*r*(q+1)/n, xm=(xa+xb)/2, hd=Math.sqrt(Math.max(0.01,r*r-xm*xm)); D.solid(x+xa,y,z-hd,x+xb,y+h,z+hd); } },
-    flush(){ const out=[]; const merge=list=>{ let n=0; for(const g of list) n+=g.attributes.position.count; const P=new Float32Array(n*3), N=new Float32Array(n*3), Cc=new Float32Array(n*3); let o=0;
-        for(const g of list){ P.set(g.attributes.position.array,o*3); N.set(g.attributes.normal.array,o*3); Cc.set(g.attributes.color.array,o*3); o+=g.attributes.position.count; }
-        const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.BufferAttribute(P,3)); g.setAttribute('normal',new THREE.BufferAttribute(N,3)); g.setAttribute('color',new THREE.BufferAttribute(Cc,3)); return g; };
+    flush(){ cur=null;
+      decoGroup(loose,looseS);
+      const out=[]; const merge=list=>{ let n=0; for(const g of list) n+=g.attributes.position.count; const P=new Float32Array(n*3), N=new Float32Array(n*3), Cc=new Float32Array(n*3); let o=0;
+        const geo=new THREE.BufferGeometry();
+        for(const g of list){ const c=g.attributes.position.count; P.set(g.attributes.position.array,o*3); N.set(g.attributes.normal.array,o*3); Cc.set(g.attributes.color.array,o*3); if(g.userData.objs) for(const ob of g.userData.objs) ob.ranges.push([geo,o,c]); o+=c; }
+        geo.setAttribute('position',new THREE.BufferAttribute(P,3)); geo.setAttribute('normal',new THREE.BufferAttribute(N,3)); geo.setAttribute('color',new THREE.BufferAttribute(Cc,3)); geo.userData.orig=P.slice(); return geo; };
       const mk=(map,glow)=>map.forEach(list=>{ if(!list.length) return; const g=merge(list); g.computeBoundingSphere();
-        const m=new THREE.Mesh(g,glow?new THREE.MeshBasicMaterial({vertexColors:true}):new THREE.MeshLambertMaterial({vertexColors:true})); m.castShadow=!glow; m.receiveShadow=!glow; m.userData.kind='poiDecor'; m.matrixAutoUpdate=false; m.updateMatrix(); scene.add(m); out.push(m); });
-      mk(patches,false); mk(glows,true); patches.clear(); glows.clear(); return out; } };
+        const m=new THREE.Mesh(g,glow?new THREE.MeshBasicMaterial({vertexColors:true}):new THREE.MeshLambertMaterial({vertexColors:true})); m.castShadow=!glow; m.receiveShadow=!glow; m.userData.kind='poiDecor'; m.matrixAutoUpdate=false; m.updateMatrix(); scene.add(m); out.push(m); DECO.meshes.push(g); });
+      mk(patches,false); mk(glows,true); patches.clear(); glows.clear();
+      decoReady();
+      loose.length=0; looseS.length=0; return out; } };
   return D; }
+// group geometry and solid boxes that touch into objects (a geometry's userData.mat, if set, decides the material)
+function decoGroup(geos,stats){ const items=[]; for(const g of geos){ g.computeBoundingBox(); const b=g.boundingBox; items.push({g,b:[b.min.x,b.min.y,b.min.z,b.max.x,b.max.y,b.max.z]}); }
+  for(const st of stats) if(st.solid.boxes.length) items.push({st,b:st.solid.boxes[0].slice()});
+  const n=items.length, par=items.map((_,i)=>i), f=i=>{ while(par[i]!==i){ par[i]=par[par[i]]; i=par[i]; } return i; }, E=0.12;
+  const ord=items.map((_,i)=>i).sort((a,b)=>items[a].b[0]-items[b].b[0]);
+  for(let a=0;a<n;a++){ const A=items[ord[a]].b; for(let c=a+1;c<n;c++){ const B=items[ord[c]].b; if(B[0]>A[3]+E) break;
+      if(B[1]<=A[4]+E&&B[4]>=A[1]-E&&B[2]<=A[5]+E&&B[5]>=A[2]-E){ const x=f(ord[a]), y=f(ord[c]); if(x!==y) par[x]=y; } } }
+  const groups=new Map(); items.forEach((it,i)=>{ const r=f(i); let G=groups.get(r); if(!G){ G=[]; groups.set(r,G); } G.push(it); });
+  groups.forEach(G=>{ if(!G.some(it=>it.st)) return; const gm=G.find(it=>it.g&&it.g.userData.mat), o=decoNewObj(gm?gm.g.userData.mat:null,0); o.geos=[];
+    for(const it of G){ if(it.g){ it.g.userData.objs=[o]; o.geos.push(it.g); } else { it.st.solid.dobj=o; it.st.solid.deco=1; o.statics.push(it.st); } } }); }
+// after merging a list of geometries into one: where each object's part sits in it (and a copy to put it back from)
+function decoRegister(list,merged){ let off=0; for(const g of list){ const c=g.index?g.index.count:g.attributes.position.count; if(g.userData.objs) for(const o of g.userData.objs) o.ranges.push([merged,off,c]); off+=c; }
+  merged.userData.orig=merged.attributes.position.array.slice(); DECO.meshes.push(merged); }
+// each new object: its size, material (from its colours unless given), health, centre; the boxes kept to put back
+function decoReady(){ for(const o of DECO.objs){ if(o.ready) continue; o.ready=true; const bb=new THREE.Box3(); let wsum=0, cr=0, cg=0, cb=0;
+    for(const g of (o.geos||[])){ g.computeBoundingBox(); bb.union(g.boundingBox); const n=g.attributes.position.count, c=new THREE.Color(g.userData.col||0x888888); cr+=c.r*n; cg+=c.g*n; cb+=c.b*n; wsum+=n; }
+    for(const st of o.statics){ const b=st.solid.boxes[0]; if(!b) continue; bb.expandByPoint(new THREE.Vector3(b[0],b[1],b[2])); bb.expandByPoint(new THREE.Vector3(b[3],b[4],b[5])); } o.boxes0=o.statics.map(st=>st.solid.boxes.map(x=>x.slice()));
+    if(bb.isEmpty()){ o.geos=null; continue; } bb.getCenter(o.c); const sz=bb.getSize(new THREE.Vector3()), vol=Math.max(0.05,sz.x*sz.y*sz.z);
+    if(!o.mat){ cr/=wsum||1; cg/=wsum||1; cb/=wsum||1; const mx=Math.max(cr,cg,cb), mn=Math.min(cr,cg,cb); o.mat=(cr>cb+0.08&&cr>=cg)?'wood':(mx-mn<0.08&&mx<0.62)?'brick':'metal'; }
+    if(!o.hp0){ o.hp0=Math.round(Math.min(1500,70+110*Math.cbrt(vol)*Math.cbrt(vol))); } o.hp=o.hp0; o.piece.mat=o.mat; o.geos=null; } }
+// damage to an object of decoration (pickaxe: give materials for each hit, like a house)
+function decoDamage(o,dmg,point,byPick){ if(!o||o.gone) return; o.hp-=dmg*(o.mat==='metal'?0.8:1);
+  if(point) burst(point,4,3,0.07,o.mat==='metal'&&Math.random()<0.6?hotSparkMat:matFor[o.mat].chip);
+  if(byPick&&typeof HOUSE_FARM!=='undefined'){ const F=HOUSE_FARM[o.mat]; giveMats(o.mat,Math.round(F[0]+Math.random()*(F[1]-F[0])),point); }
+  if(o.hp<=0){ decoBreak(o,point); netOp({op:'dbreak',id:o.id}); } }
+// break it: the triangles fold away to nothing, the solid boxes empty, a burst of debris where it stood
+function decoBreak(o,point){ if(!o||o.gone) return; o.gone=true; o.hp=0;
+  const touched=new Set(); for(const [g,off,cnt] of o.ranges){ const A=g.attributes.position.array, x=A[off*3], y=A[off*3+1], z=A[off*3+2]; for(let i=off;i<off+cnt;i++){ A[i*3]=x; A[i*3+1]=y; A[i*3+2]=z; } touched.add(g); }
+  touched.forEach(g=>{ g.attributes.position.needsUpdate=true; });
+  for(const st of o.statics) st.solid.boxes.length=0; if(o.meshes) o.meshes.forEach(m=>{ m.visible=false; });
+  const c=o.c, d=c.distanceTo(P.pos); if(d<70){ dustAt(c,o.mat,o.mat==='brick'?3:2,1); burst(point||c,10,6,0.1,matFor[o.mat].chip); if(o.mat==='metal') burst(point||c,8,7,0.04,hotSparkMat); if(d<8) shake=Math.max(shake,0.05); }
+  sfxAt('break_'+o.mat,c); }
+// a new round: everything back as it was
+function decoReset(){ for(const g of DECO.meshes){ g.attributes.position.array.set(g.userData.orig); g.attributes.position.needsUpdate=true; }
+  for(const o of DECO.objs){ o.gone=false; o.hp=o.hp0; if(o.meshes) o.meshes.forEach(m=>{ m.visible=true; }); o.statics.forEach((st,i)=>{ st.solid.boxes.length=0; (o.boxes0[i]||[]).forEach(b=>st.solid.boxes.push(b.slice())); }); } }
 // ground for a whole site: a flat textured pad over the levelled ground (streets stay on top of it)
 const poiGroundTex=new Map();
 let poiGroundN=0;
@@ -484,5 +536,5 @@ POI_BUILD.timber=(t,D)=>{ const K=poiKit(t), L=K.L, X_=poiCtx(t), {i,j,X,Z,y0,C,
 function planPOI(t){ if(t.blds) return t.blds; const D=poiDecor(); t.blds=POI_BUILD[t.kind](t,D); t.decor=D.flush(); return t.blds; }
 // shots stop on solid decoration (containers, machines, the rocket...): a stand-in piece takes the hit
 const POI_SOLID={key:'_deco',mat:'metal',type:'wall',deco:1,group:{position:new THREE.Vector3()}};
-function decoShot(o,d,range,nearT){ let best=null; const ps=new Set(), n=Math.min(90,Math.ceil(range/4)); for(let k=0;k<=n;k++){ const t=k*4; staticsInto(ps,o.x+d.x*t,o.z+d.z*t,2.5); }
-  ps.forEach(s=>{ if(!s.deco) return; for(const b of s.boxes){ const tb=rayBox(o,d,b); if(tb>=nearT&&tb<=range&&(!best||tb<best)) best=tb; } }); return best; }
+function decoShot(o,d,range,nearT){ let best=null, bs=null; const ps=new Set(), n=Math.min(90,Math.ceil(range/4)); for(let k=0;k<=n;k++){ const t=k*4; staticsInto(ps,o.x+d.x*t,o.z+d.z*t,2.5); }
+  ps.forEach(s=>{ if(!s.deco) return; for(const b of s.boxes){ const tb=rayBox(o,d,b); if(tb>=nearT&&tb<=range&&(best==null||tb<best)){ best=tb; bs=s; } } }); return best==null?null:{t:best,s:bs}; } // (where, and what it hit)

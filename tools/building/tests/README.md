@@ -85,3 +85,5 @@ Run with Node and Playwright (Chromium), from a folder that has `three` and `pee
 - tmapzoom.js: smooth map zoom, pins on map/minimap/compass/world
 - tcarclip.js: parked cars solid at their real angle, buggies stop against people and push you out
 - ticons.js: 3D material icons with count badges, gun stats card
+- tdecobreak.js: decorations are objects that shots find, break (fold away, stop being solid) and come back on reset
+- tdecoshot.js: before/after picture of breaking everything near a town street

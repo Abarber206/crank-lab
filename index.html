@@ -3481,11 +3481,23 @@ function poiFix(p,list){ const o=new THREE.Vector3((p.i+.5)*CELL,p.l*LVL-FT/2,(p
   p.fix={boxes,parts}; }
 
 /* decoration: merged meshes in vertex colours (one per 64 m patch, so they cull), with solid boxes for standing on */
-function poiDecor(){ const patches=new Map(), glows=new Map(), col=new THREE.Color();
+/* Every piece of decoration belongs to an object (a crate, a tent, a pole, a machine...). Objects are marked where it
+   matters (D.obj), and anything left unmarked is grouped by what touches what. An object has health from its size and
+   a material from its colour; shot, hit with the pickaxe or caught in a blast it chips, and at zero it breaks: it
+   vanishes in a burst of debris, stops being solid and gives materials. A reset of the world puts everything back. */
+const DECO={objs:[],byId:new Map(),meshes:[]};
+function decoNewObj(mat,hp){ const o={id:DECO.objs.length,mat:mat||null,hp:hp||0,hp0:hp||0,ranges:[],statics:[],boxes0:[],geos:[],gone:false,c:new THREE.Vector3()}; o.piece={key:'deco'+o.id,mat:'metal',type:'wall',deco:1,dobj:o,group:{position:o.c}}; DECO.objs.push(o); DECO.byId.set(o.id,o); return o; }
+function poiDecor(){ const patches=new Map(), glows=new Map(), col=new THREE.Color(), loose=[], looseS=[]; let cur=null;
   const bucket=(map,x,z)=>{ const k=Math.floor(x/64)+','+Math.floor(z/64); let a=map.get(k); if(!a){ a=[]; map.set(k,a); } return a; };
   const put=(g,c,x,y,z,rot,glow)=>{ if(rot){ if(rot[0]) g.rotateX(rot[0]); if(rot[2]) g.rotateZ(rot[2]); if(rot[1]) g.rotateY(rot[1]); } g.translate(x,y,z); if(g.index) g=g.toNonIndexed(); g.computeVertexNormals(); col.setHex(c);
-    const n=g.attributes.position.count, ca=new Float32Array(n*3); for(let q=0;q<n;q++){ ca[q*3]=col.r; ca[q*3+1]=col.g; ca[q*3+2]=col.b; } g.setAttribute('color',new THREE.BufferAttribute(ca,3)); if(g.attributes.uv) g.deleteAttribute('uv'); bucket(glow?glows:patches,x,z).push(g); return g; };
+    const n=g.attributes.position.count, ca=new Float32Array(n*3); for(let q=0;q<n;q++){ ca[q*3]=col.r; ca[q*3+1]=col.g; ca[q*3+2]=col.b; } g.setAttribute('color',new THREE.BufferAttribute(ca,3)); if(g.attributes.uv) g.deleteAttribute('uv');
+    g.userData.objs=cur?cur.slice():null; g.userData.col=c; if(cur) cur.forEach(o=>o.geos.push(g)); else loose.push(g); bucket(glow?glows:patches,x,z).push(g); return g; };
+  const claim=st=>{ if(cur&&cur[0]){ st.solid.dobj=cur[0]; cur[0].statics.push(st); } else looseS.push(st); };
   const D={
+    obj(mat,hp){ const o=decoNewObj(mat,hp); cur=[o]; return o; },    // what follows belongs to a new object...
+    with(...os){ cur=os.filter(Boolean); },                               // ...or to these (a wire hangs from two poles)
+    end(){ cur=null; },
+    claim,
     box:(w,h,d,x,y,z,c,rot,glow)=>put(new THREE.BoxGeometry(w,h,d),c,x,y+h/2,z,rot,glow),            // y is the bottom
     cyl:(rt,rb,h,x,y,z,c,seg,rot,glow)=>put(new THREE.CylinderGeometry(rt,rb,h,seg||14),c,x,y+h/2,z,rot,glow),
     tube:(r,h,x,y,z,c,rot,seg)=>put(new THREE.CylinderGeometry(r,r,h,seg||10),c,x,y,z,rot),             // centred
@@ -3494,16 +3506,56 @@ function poiDecor(){ const patches=new Map(), glows=new Map(), col=new THREE.Col
     // a solid box in world metres (split into patches no wider than 2.4 m so the collision lookup always finds it)
     solid(x0,y0,z0,x1,y1,z1,kp){ const nx=Math.max(1,Math.ceil((x1-x0)/2.4)), nz=Math.max(1,Math.ceil((z1-z0)/2.4));
       for(let a=0;a<nx;a++) for(let b=0;b<nz;b++){ const xa=x0+(x1-x0)*a/nx, xb=x0+(x1-x0)*(a+1)/nx, za=z0+(z1-z0)*b/nz, zb=z0+(z1-z0)*(b+1)/nz;
-        STATICS.push({x:(xa+xb)/2,z:(za+zb)/2,solid:{boxes:[[xa,y0,za,xb,y1,zb]],key:(kp||'poi')+STATICS.length,mat:'metal',deco:1}}); } },
+        const st={x:(xa+xb)/2,z:(za+zb)/2,solid:{boxes:[[xa,y0,za,xb,y1,zb]],key:(kp||'poi')+STATICS.length,mat:'metal',deco:1}}; STATICS.push(st); claim(st); } },
     sbox(w,h,d,x,y,z,c,glow){ D.box(w,h,d,x,y,z,c,null,glow); D.solid(x-w/2,y,z-d/2,x+w/2,y+h,z+d/2); },          // drawn and solid
     scyl(r,h,x,y,z,c,seg){ D.cyl(r,r,h,x,y,z,c,seg); const n=Math.max(2,Math.ceil(r*2/1.2)); for(let q=0;q<n;q++){ const xa=-r+2*r*q/n, xb=-r+2*r*(q+1)/n, xm=(xa+xb)/2, hd=Math.sqrt(Math.max(0.01,r*r-xm*xm)); D.solid(x+xa,y,z-hd,x+xb,y+h,z+hd); } },
-    flush(){ const out=[]; const merge=list=>{ let n=0; for(const g of list) n+=g.attributes.position.count; const P=new Float32Array(n*3), N=new Float32Array(n*3), Cc=new Float32Array(n*3); let o=0;
-        for(const g of list){ P.set(g.attributes.position.array,o*3); N.set(g.attributes.normal.array,o*3); Cc.set(g.attributes.color.array,o*3); o+=g.attributes.position.count; }
-        const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.BufferAttribute(P,3)); g.setAttribute('normal',new THREE.BufferAttribute(N,3)); g.setAttribute('color',new THREE.BufferAttribute(Cc,3)); return g; };
+    flush(){ cur=null;
+      decoGroup(loose,looseS);
+      const out=[]; const merge=list=>{ let n=0; for(const g of list) n+=g.attributes.position.count; const P=new Float32Array(n*3), N=new Float32Array(n*3), Cc=new Float32Array(n*3); let o=0;
+        const geo=new THREE.BufferGeometry();
+        for(const g of list){ const c=g.attributes.position.count; P.set(g.attributes.position.array,o*3); N.set(g.attributes.normal.array,o*3); Cc.set(g.attributes.color.array,o*3); if(g.userData.objs) for(const ob of g.userData.objs) ob.ranges.push([geo,o,c]); o+=c; }
+        geo.setAttribute('position',new THREE.BufferAttribute(P,3)); geo.setAttribute('normal',new THREE.BufferAttribute(N,3)); geo.setAttribute('color',new THREE.BufferAttribute(Cc,3)); geo.userData.orig=P.slice(); return geo; };
       const mk=(map,glow)=>map.forEach(list=>{ if(!list.length) return; const g=merge(list); g.computeBoundingSphere();
-        const m=new THREE.Mesh(g,glow?new THREE.MeshBasicMaterial({vertexColors:true}):new THREE.MeshLambertMaterial({vertexColors:true})); m.castShadow=!glow; m.receiveShadow=!glow; m.userData.kind='poiDecor'; m.matrixAutoUpdate=false; m.updateMatrix(); scene.add(m); out.push(m); });
-      mk(patches,false); mk(glows,true); patches.clear(); glows.clear(); return out; } };
+        const m=new THREE.Mesh(g,glow?new THREE.MeshBasicMaterial({vertexColors:true}):new THREE.MeshLambertMaterial({vertexColors:true})); m.castShadow=!glow; m.receiveShadow=!glow; m.userData.kind='poiDecor'; m.matrixAutoUpdate=false; m.updateMatrix(); scene.add(m); out.push(m); DECO.meshes.push(g); });
+      mk(patches,false); mk(glows,true); patches.clear(); glows.clear();
+      decoReady();
+      loose.length=0; looseS.length=0; return out; } };
   return D; }
+// group geometry and solid boxes that touch into objects (a geometry's userData.mat, if set, decides the material)
+function decoGroup(geos,stats){ const items=[]; for(const g of geos){ g.computeBoundingBox(); const b=g.boundingBox; items.push({g,b:[b.min.x,b.min.y,b.min.z,b.max.x,b.max.y,b.max.z]}); }
+  for(const st of stats) if(st.solid.boxes.length) items.push({st,b:st.solid.boxes[0].slice()});
+  const n=items.length, par=items.map((_,i)=>i), f=i=>{ while(par[i]!==i){ par[i]=par[par[i]]; i=par[i]; } return i; }, E=0.12;
+  const ord=items.map((_,i)=>i).sort((a,b)=>items[a].b[0]-items[b].b[0]);
+  for(let a=0;a<n;a++){ const A=items[ord[a]].b; for(let c=a+1;c<n;c++){ const B=items[ord[c]].b; if(B[0]>A[3]+E) break;
+      if(B[1]<=A[4]+E&&B[4]>=A[1]-E&&B[2]<=A[5]+E&&B[5]>=A[2]-E){ const x=f(ord[a]), y=f(ord[c]); if(x!==y) par[x]=y; } } }
+  const groups=new Map(); items.forEach((it,i)=>{ const r=f(i); let G=groups.get(r); if(!G){ G=[]; groups.set(r,G); } G.push(it); });
+  groups.forEach(G=>{ if(!G.some(it=>it.st)) return; const gm=G.find(it=>it.g&&it.g.userData.mat), o=decoNewObj(gm?gm.g.userData.mat:null,0); o.geos=[];
+    for(const it of G){ if(it.g){ it.g.userData.objs=[o]; o.geos.push(it.g); } else { it.st.solid.dobj=o; it.st.solid.deco=1; o.statics.push(it.st); } } }); }
+// after merging a list of geometries into one: where each object's part sits in it (and a copy to put it back from)
+function decoRegister(list,merged){ let off=0; for(const g of list){ const c=g.index?g.index.count:g.attributes.position.count; if(g.userData.objs) for(const o of g.userData.objs) o.ranges.push([merged,off,c]); off+=c; }
+  merged.userData.orig=merged.attributes.position.array.slice(); DECO.meshes.push(merged); }
+// each new object: its size, material (from its colours unless given), health, centre; the boxes kept to put back
+function decoReady(){ for(const o of DECO.objs){ if(o.ready) continue; o.ready=true; const bb=new THREE.Box3(); let wsum=0, cr=0, cg=0, cb=0;
+    for(const g of (o.geos||[])){ g.computeBoundingBox(); bb.union(g.boundingBox); const n=g.attributes.position.count, c=new THREE.Color(g.userData.col||0x888888); cr+=c.r*n; cg+=c.g*n; cb+=c.b*n; wsum+=n; }
+    for(const st of o.statics){ const b=st.solid.boxes[0]; if(!b) continue; bb.expandByPoint(new THREE.Vector3(b[0],b[1],b[2])); bb.expandByPoint(new THREE.Vector3(b[3],b[4],b[5])); } o.boxes0=o.statics.map(st=>st.solid.boxes.map(x=>x.slice()));
+    if(bb.isEmpty()){ o.geos=null; continue; } bb.getCenter(o.c); const sz=bb.getSize(new THREE.Vector3()), vol=Math.max(0.05,sz.x*sz.y*sz.z);
+    if(!o.mat){ cr/=wsum||1; cg/=wsum||1; cb/=wsum||1; const mx=Math.max(cr,cg,cb), mn=Math.min(cr,cg,cb); o.mat=(cr>cb+0.08&&cr>=cg)?'wood':(mx-mn<0.08&&mx<0.62)?'brick':'metal'; }
+    if(!o.hp0){ o.hp0=Math.round(Math.min(1500,70+110*Math.cbrt(vol)*Math.cbrt(vol))); } o.hp=o.hp0; o.piece.mat=o.mat; o.geos=null; } }
+// damage to an object of decoration (pickaxe: give materials for each hit, like a house)
+function decoDamage(o,dmg,point,byPick){ if(!o||o.gone) return; o.hp-=dmg*(o.mat==='metal'?0.8:1);
+  if(point) burst(point,4,3,0.07,o.mat==='metal'&&Math.random()<0.6?hotSparkMat:matFor[o.mat].chip);
+  if(byPick&&typeof HOUSE_FARM!=='undefined'){ const F=HOUSE_FARM[o.mat]; giveMats(o.mat,Math.round(F[0]+Math.random()*(F[1]-F[0])),point); }
+  if(o.hp<=0){ decoBreak(o,point); netOp({op:'dbreak',id:o.id}); } }
+// break it: the triangles fold away to nothing, the solid boxes empty, a burst of debris where it stood
+function decoBreak(o,point){ if(!o||o.gone) return; o.gone=true; o.hp=0;
+  const touched=new Set(); for(const [g,off,cnt] of o.ranges){ const A=g.attributes.position.array, x=A[off*3], y=A[off*3+1], z=A[off*3+2]; for(let i=off;i<off+cnt;i++){ A[i*3]=x; A[i*3+1]=y; A[i*3+2]=z; } touched.add(g); }
+  touched.forEach(g=>{ g.attributes.position.needsUpdate=true; });
+  for(const st of o.statics) st.solid.boxes.length=0; if(o.meshes) o.meshes.forEach(m=>{ m.visible=false; });
+  const c=o.c, d=c.distanceTo(P.pos); if(d<70){ dustAt(c,o.mat,o.mat==='brick'?3:2,1); burst(point||c,10,6,0.1,matFor[o.mat].chip); if(o.mat==='metal') burst(point||c,8,7,0.04,hotSparkMat); if(d<8) shake=Math.max(shake,0.05); }
+  sfxAt('break_'+o.mat,c); }
+// a new round: everything back as it was
+function decoReset(){ for(const g of DECO.meshes){ g.attributes.position.array.set(g.userData.orig); g.attributes.position.needsUpdate=true; }
+  for(const o of DECO.objs){ o.gone=false; o.hp=o.hp0; if(o.meshes) o.meshes.forEach(m=>{ m.visible=true; }); o.statics.forEach((st,i)=>{ st.solid.boxes.length=0; (o.boxes0[i]||[]).forEach(b=>st.solid.boxes.push(b.slice())); }); } }
 // ground for a whole site: a flat textured pad over the levelled ground (streets stay on top of it)
 const poiGroundTex=new Map();
 let poiGroundN=0;
@@ -3850,8 +3902,8 @@ POI_BUILD.timber=(t,D)=>{ const K=poiKit(t), L=K.L, X_=poiCtx(t), {i,j,X,Z,y0,C,
 function planPOI(t){ if(t.blds) return t.blds; const D=poiDecor(); t.blds=POI_BUILD[t.kind](t,D); t.decor=D.flush(); return t.blds; }
 // shots stop on solid decoration (containers, machines, the rocket...): a stand-in piece takes the hit
 const POI_SOLID={key:'_deco',mat:'metal',type:'wall',deco:1,group:{position:new THREE.Vector3()}};
-function decoShot(o,d,range,nearT){ let best=null; const ps=new Set(), n=Math.min(90,Math.ceil(range/4)); for(let k=0;k<=n;k++){ const t=k*4; staticsInto(ps,o.x+d.x*t,o.z+d.z*t,2.5); }
-  ps.forEach(s=>{ if(!s.deco) return; for(const b of s.boxes){ const tb=rayBox(o,d,b); if(tb>=nearT&&tb<=range&&(!best||tb<best)) best=tb; } }); return best; }
+function decoShot(o,d,range,nearT){ let best=null, bs=null; const ps=new Set(), n=Math.min(90,Math.ceil(range/4)); for(let k=0;k<=n;k++){ const t=k*4; staticsInto(ps,o.x+d.x*t,o.z+d.z*t,2.5); }
+  ps.forEach(s=>{ if(!s.deco) return; for(const b of s.boxes){ const tb=rayBox(o,d,b); if(tb>=nearT&&tb<=range&&(best==null||tb<best)){ best=tb; bs=s; } } }); return best==null?null:{t:best,s:bs}; } // (where, and what it hit)
 
 function buildWorld(){
   for(const t of TOWNS){ if(!t.houses.length) planHouses(t);
@@ -3861,7 +3913,7 @@ function buildWorld(){
   buildSidewalks();
 }
 
-function clearBuilds(){ resetKarts(); if(typeof chests!=='undefined') chests.forEach(closeChest); if(edit) exitEdit(false); [...order].forEach(p=>removePiece(p)); buildWorld(); } // the map's houses come back fresh
+function clearBuilds(){ resetKarts(); if(typeof decoReset==='function') decoReset(); if(typeof chests!=='undefined') chests.forEach(closeChest); if(edit) exitEdit(false); [...order].forEach(p=>removePiece(p)); buildWorld(); } // the map's houses come back fresh
 /* Who may edit a build. Owner = whoever placed it. The rule is the host's setting in a room (sent on join and when it
    changes) and the host re-checks every edit, so a client can't edit around it. A player who leaves hands their
    builds over to everyone ('public'). */
@@ -5148,6 +5200,8 @@ function swing(fromImpact){
   if(zb){ const dmg=40, pt=zb.pos.clone().setY(zb.pos.y+1.3*zb.sc); dmgNum(pt,dmg,'hp'); sfx('pick_hit'); hitMarker(dmg,false); burst(pt,4,2.5,0.06,goreMat);
     if(net.role==='client') netSend({type:'zhit',id:net.id,z:zb.id,dmg}); else zombieHurt(zb,dmg,net.id); return; }
   const hit=aimHit(3.4);
+  { const o=camera.position.clone(), d=aimDir(), dh=decoShot(o,d,camDist+3.4,Math.max(0,camDist*0.9)); // decoration in front of the pickaxe (and nearer than anything else)
+    if(dh&&dh.s.dobj&&!dh.s.dobj.gone&&(!hit||dh.t<hit.distance)){ const pt=o.addScaledVector(d,dh.t); dmgNum(pt,PICK_DMG,'build'); sfx('pick_hit'); decoDamage(dh.s.dobj,PICK_DMG,pt,true); return; } }
   // the pickaxe chips builds (50 a hit) instead of deleting them
   if(hit&&hit.object.userData.piece&&hit.object.userData.piece.isProp){ propHit(hit.object.userData.piece,PICK_DMG,hit.point,true); return; }
   if(hit){ const hp_=hit.object.userData.piece; dmgNum(hit.point,PICK_DMG,'build'); sfx('pick_hit'); damagePiece(hp_,PICK_DMG,hit.point);
@@ -7497,6 +7551,7 @@ function applyOp(o,quiet){
   else if(o.op==='replace'){ const old=pieces.get(o.t.key); if(old){ if(edit&&edit.piece===old) exitEdit(false); removePiece(old); } addPiece(o.t); }
   else if(o.op==='hp'){ const p=pieces.get(o.key); if(p){ const d=o.d!=null?o.d:Math.max(0,p.hp-o.hp); p.dmgTaken=(p.dmgTaken||0)+d; p.hp=Math.min(p.hp,o.hp); if(d>0) hitLook(p); } }
   else if(o.op==='break'){ const p=pieces.get(o.key); if(p) destroyPiece(p,o.pt?new THREE.Vector3(o.pt[0],o.pt[1],o.pt[2]):null); }
+  else if(o.op==='dbreak'){ decoBreak(DECO.byId.get(o.id)); }
   else if(o.op==='collapse'){ const list=(o.keys||[]).map(k=>pieces.get(k)).filter(Boolean); if(list.length) collapsePieces(list,o.c?new THREE.Vector3(o.c[0],o.c[1],o.c[2]):null); }
   else if(o.op==='door'){ const p=pieces.get(o.key); if(p) toggleDoor(p,o.c,true,!!o.open,o.side||1); }
   else if(o.op==='shape'){ const p=pieces.get(o.key); if(p){ if(edit&&edit.piece===p) exitEdit(false); const nb0=[...(conn.get(p)||[])]; p.mask=o.mask; p.dir=o.dir; p.half=o.half; p.path=o.path||null; buildPiece(p); startAnim(p,140); popPlayerOut(); reshaped(p,nb0); } }
@@ -7924,13 +7979,13 @@ function castShot(o,d,range,nearT,target){
   for(const tg of (Array.isArray(target)?target:target?[target]:[])){ const h=rayBody(o,d,tg); if(h&&h.t>=nearT&&(!bh||h.t<bh.t)){ bh=h; who=tg; } }
   const bx=boxShot(o,d,range,nearT); let pt=ph?ph.distance:Infinity, pp=ph?ph.object.userData.piece:null;
   if(bx&&bx.t<pt-0.02){ pt=bx.t; pp=bx.p; }
-  { const dt=decoShot(o,d,Math.min(range,pt),nearT); if(dt!=null&&dt<pt-0.02){ pt=dt; pp=POI_SOLID; } }
+  { const dh=decoShot(o,d,Math.min(range,pt),nearT); if(dh&&dh.t<pt-0.02){ pt=dh.t; pp=dh.s.dobj&&!dh.s.dobj.gone?dh.s.dobj.piece:POI_SOLID; } }
   if(bh&&bh.t<=range&&bh.t<pt) return {kind:'body',t:bh.t,head:bh.head,who,point:o.clone().addScaledVector(d,bh.t)};
   if(pp) return {kind:'piece',t:pt,piece:pp,point:o.clone().addScaledVector(d,pt)};
   return {kind:'none',t:range,point:o.clone().addScaledVector(d,range)};
 }
 function damagePiece(p,dmg,point){
-  if(!pieces.has(p.key)){ if(p.deco&&point) burst(point,3,3,0.07,hotSparkMat); return; }
+  if(!pieces.has(p.key)){ if(p.dobj){ decoDamage(p.dobj,dmg,point); return; } if(p.deco&&point) burst(point,3,3,0.07,hotSparkMat); return; }
   dmg*=BUILD_CFG.resist[p.mat]||1;
   p.hp-=dmg; p.dmgTaken=(p.dmgTaken||0)+dmg; p.dmgUnsent=(p.dmgUnsent||0)+dmg;
   burst(point,3,3,0.07,p.mat==='metal'&&Math.random()<0.6?hotSparkMat:matFor[p.mat].chip);
@@ -9049,7 +9104,12 @@ function initProps(){
 /* Guard rails: posts and a steel beam along the side of a road where the ground drops away, and a few more at random. */
 /* Landmarks: one per town, built from plain shapes in one mesh, solid where you'd expect. */
 let _lmBuilt=false;
-function buildLandmarks(){ if(_lmBuilt) return; _lmBuilt=true; const col=new THREE.Color();
+function buildLandmarks(){ if(_lmBuilt) return; const c0=scene.children.length, s0=STATICS.length; buildLandmarks0();
+  const meshes=scene.children.slice(c0), stats=STATICS.slice(s0).filter(st=>/^lm/.test(st.solid.key));
+  for(const t of TOWNS){ const L=t.poi; if(!L) continue; const o=decoNewObj('brick',1500); o.meshes=meshes.filter(m=>{ if(!m.geometry) return false; m.updateMatrixWorld(true); if(!m.geometry.boundingSphere) m.geometry.computeBoundingSphere(); const p=m.geometry.boundingSphere.center.clone().applyMatrix4(m.matrixWorld); return Math.hypot(p.x-L.x,p.z-L.z)<30; });
+    for(const st of stats) if(Math.hypot(st.x-L.x,st.z-L.z)<30){ st.solid.dobj=o; st.solid.deco=1; o.statics.push(st); }
+    o.boxes0=o.statics.map(st=>st.solid.boxes.map(b=>b.slice())); o.c.set(L.x,(L.y!=null?L.y:t.h)+4,L.z); o.ready=true; o.piece.mat=o.mat; } }
+function buildLandmarks0(){ if(_lmBuilt) return; _lmBuilt=true; const col=new THREE.Color();
   TOWNS.forEach((t,k)=>{ const L=t.poi; if(!L) return; let parts=[]; const Y0=L.y!=null?L.y:t.h;
     const put=(g,c,x,y,z,rot)=>{ if(rot){ if(rot[0]) g.rotateX(rot[0]); if(rot[2]) g.rotateZ(rot[2]); if(rot[1]) g.rotateY(rot[1]); } g.translate(x,y,z); if(g.index) g=g.toNonIndexed(); g.computeVertexNormals(); col.setHex(c);
       const n=g.attributes.position.count, ca=new Float32Array(n*3); for(let q=0;q<n;q++){ ca[q*3]=col.r; ca[q*3+1]=col.g; ca[q*3+2]=col.b; } g.setAttribute('color',new THREE.BufferAttribute(ca,3)); parts.push(g); };
@@ -9112,7 +9172,7 @@ function buildLandmarks(){ if(_lmBuilt) return; _lmBuilt=true; const col=new THR
 /* Roadside furniture: a direction sign a little way out on each road into a town, speed limits along the open road,
    warnings before sharp bends, stop signs at the town crossroads and street lamps. A handful of merged meshes. */
 var SIGNS=[];
-function buildSigns(){ const grey=[], dark=[], pale=[], faces=new Map(), placed=[], roads=WORLD.roads;
+function buildSigns(){ const grey=[], dark=[], pale=[], faces=new Map(), placed=[], roads=WORLD.roads, sigS0=STATICS.length;
   const face=(key,w,h,draw)=>{ let f=faces.get(key); if(!f){ const c=document.createElement('canvas'); c.width=w; c.height=h; draw(c.getContext('2d'),w,h); const tex=new THREE.CanvasTexture(c); tex.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy()); f={tex,geos:[],key}; faces.set(key,f); } return f; };
   const solid=(x,y,z,h)=>STATICS.push({x,z,solid:{boxes:[[x-0.1,y-0.3,z-0.1,x+0.1,y+h,z+0.1]],key:'sign'+STATICS.length}});
   const post=(list,x,y,z,h,yaw,w)=>{ const g=new THREE.BoxGeometry(w||0.09,h,w||0.09); g.rotateY(yaw); g.translate(x,y+h/2,z); list.push(g); solid(x,y,z,h); };
@@ -9170,7 +9230,9 @@ function buildSigns(){ const grey=[], dark=[], pale=[], faces=new Map(), placed=
         const arm=new THREE.BoxGeometry(X?0.08:1.5,0.08,X?1.5:0.08); arm.translate(x+ix*0.7,t.h+4.85,z+iz*0.7); dark.push(arm);
         const hd=new THREE.BoxGeometry(X?0.3:0.62,0.13,X?0.62:0.3); hd.translate(x+ix*1.5,t.h+4.8,z+iz*1.5); dark.push(hd); const gl=new THREE.BoxGeometry(X?0.22:0.5,0.05,X?0.5:0.22); gl.translate(x+ix*1.5,t.h+4.715,z+iz*1.5); pale.push(gl);
         STATICS.push({x,z,solid:{boxes:[[x-0.15,t.h,z-0.15,x+0.15,t.h+4.9,z+0.15]],key:'lamp'+STATICS.length}}); } } } }
-  const add=(list,mat)=>{ if(!list.length) return; const g=mergeGeos(list); g.computeBoundingSphere(); const m=new THREE.Mesh(g,mat); m.castShadow=true; m.receiveShadow=true; m.matrixAutoUpdate=false; scene.add(m); };
+  let grouped=false; const add=(list,mat)=>{ if(!grouped){ grouped=true; const all=[]; for(const [Lq,mq] of [[fenceW,'wood'],[grey,'metal'],[dark,'metal'],[pale,'metal']]) for(const q of Lq){ q.userData.mat=mq; all.push(q); } faces.forEach(f=>f.geos.forEach(q=>{ q.userData.mat='metal'; all.push(q); }));
+      decoGroup(all,STATICS.slice(sigS0).filter(st=>/^(sign|lamp|fence)/.test(st.solid.key))); decoReady(); } // (each sign, light and fence panel its own object)
+    if(!list.length) return; const g=mergeGeos(list); decoRegister(list,g); g.computeBoundingSphere(); const m=new THREE.Mesh(g,mat); m.castShadow=true; m.receiveShadow=true; m.matrixAutoUpdate=false; scene.add(m); };
   add(fenceW,new THREE.MeshLambertMaterial({color:0x7a5a3c})); add(grey,new THREE.MeshLambertMaterial({color:0x8d939a})); add(dark,new THREE.MeshLambertMaterial({color:0x2b3036})); add(pale,new THREE.MeshBasicMaterial({color:0xfff3cf}));
   faces.forEach(f=>add(f.geos,new THREE.MeshLambertMaterial({map:f.tex})));
 }
@@ -9198,41 +9260,41 @@ function buildWorldDecor(){ const D=poiDecor(), r=seeded(60613), S=SPAWN, PI=Mat
   const H=(x,z)=>terrainH(x,z), Hm=(x,z,r)=>Math.min(H(x,z),H(x+r,z),H(x-r,z),H(x,z+r),H(x,z-r),H(x+r*0.7,z+r*0.7),H(x-r*0.7,z+r*0.7),H(x+r*0.7,z-r*0.7),H(x-r*0.7,z-r*0.7))-0.03; // the lowest ground under a footprint: set things there and nothing hangs in the air on a slope
   const WOOD=0x7a5a3c, DARKWOOD=0x5a4030, BARK=0x6b4e34, STONE=0x8d8a84;
   // a lying log: length along local z (turned by a)
-  const log=(x,y,z,a,len,rad,c,solid,pitch)=>{ const p=pitch||0, rise=Math.sin(p)*len/2; D.geo(new THREE.CylinderGeometry(rad,rad*1.05,len,10),c||BARK,x,y+rad,z,[PI/2-p,a,0]); D.geo(new THREE.CircleGeometry(rad*0.92,10),0xc8a878,...at(x,z,a,0,len/2+0.005).reduce((o,v,i)=>(o[i*2]=v,o),[0,y+rad+rise,0]),[-p,a,0]);
-    if(solid){ const [ex,ez]=rot(0,len/2,a), hx=Math.abs(ex)+rad, hz=Math.abs(ez)+rad; D.solid(x-hx,y-Math.abs(rise),z-hz,x+hx,y+rad*2*0.9+Math.abs(rise),z+hz,'log'); } };
+  const log=(x,y,z,a,len,rad,c,solid,pitch)=>{ if(solid) D.obj('wood',Math.round(60+len*rad*90)); const p=pitch||0, rise=Math.sin(p)*len/2; D.geo(new THREE.CylinderGeometry(rad,rad*1.05,len,10),c||BARK,x,y+rad,z,[PI/2-p,a,0]); D.geo(new THREE.CircleGeometry(rad*0.92,10),0xc8a878,...at(x,z,a,0,len/2+0.005).reduce((o,v,i)=>(o[i*2]=v,o),[0,y+rad+rise,0]),[-p,a,0]);
+    if(solid){ const [ex,ez]=rot(0,len/2,a), hx=Math.abs(ex)+rad, hz=Math.abs(ez)+rad; D.solid(x-hx,y-Math.abs(rise),z-hz,x+hx,y+rad*2*0.9+Math.abs(rise),z+hz,'log'); D.end(); } };
   // an A-frame tent, ridge along local z: w wide, h high, L long
   const tentGeo=(w,h,L)=>{ const g=new THREE.BufferGeometry(), a=w/2, b=L/2, P=[ -a,0,-b, 0,h,-b, 0,h,b,  -a,0,-b, 0,h,b, -a,0,b,   a,0,-b, a,0,b, 0,h,b,  a,0,-b, 0,h,b, 0,h,-b,   -a,0,-b, a,0,-b, 0,h,-b ];
     for(let i=P.length-9;i>=0;i-=9) P.push(P[i+6],P[i+7],P[i+8],P[i+3],P[i+4],P[i+5],P[i],P[i+1],P[i+2]); // both sides (the faces are one-sided)
     g.setAttribute('position',new THREE.Float32BufferAttribute(P,3)); return g; };
-  const tent=(x,z,a,col)=>{ const y=Hm(x,z,1.5), w=2.3, h=1.55, L=2.8; D.geo(tentGeo(w,h,L),col,x,y,z,[0,a,0]);
+  const tent=(x,z,a,col)=>{ const y=Hm(x,z,1.5), w=2.3, h=1.55, L=2.8; D.obj('wood',160); D.geo(tentGeo(w,h,L),col,x,y,z,[0,a,0]);
     { const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute([-0.42,0,0, 0.42,0,0, 0,1.1,0, 0.42,0,0, -0.42,0,0, 0,1.1,0],3)); const [dx,dz]=at(x,z,a,0,L/2+0.02); D.geo(g,0x2a2620,dx,y+0.01,dz,[0,a,0]); } // the door
     for(const s of [-1,1]){ const [px,pz]=at(x,z,a,0,s*(L/2+0.05)); D.cyl(0.03,0.03,h+0.12,px,y,pz,0x9a9a9a,6); }
     for(const [sx,sz] of [[-1,-1],[1,-1],[-1,1],[1,1]]){ const [px,pz]=at(x,z,a,sx*(w/2+0.35),sz*(L/2-0.3)); D.cyl(0.02,0.02,0.25,px,H(px,pz)-0.05,pz,0xd0d0c8,4); } // pegs
-    const [hx,hz]=[Math.abs(Math.sin(a))*L/2+Math.abs(Math.cos(a))*w/2,Math.abs(Math.cos(a))*L/2+Math.abs(Math.sin(a))*w/2]; D.solid(x-hx*0.8,y,z-hz*0.8,x+hx*0.8,y+h*0.85,z+hz*0.8); };
-  const crate=(x,y,z,s,a,c)=>{ D.box(s,s,s,x,y,z,c||0x9c7a4c,[0,a,0]); D.box(s*1.02,s*0.12,s*1.02,x,y+s*0.44,z,0x6e5233,[0,a,0]); D.solid(x-s*0.6,y,z-s*0.6,x+s*0.6,y+s,z+s*0.6); };
-  const drum=(x,y,z,c)=>{ D.scyl(0.32,0.92,x,y,z,c,14); D.cyl(0.33,0.33,0.04,x,y+0.3,z,0x3a3a3a,14); D.cyl(0.33,0.33,0.04,x,y+0.62,z,0x3a3a3a,14); };
-  const bale=(x,z,a,up)=>{ const y=Hm(x,z,0.8); if(up){ D.scyl(0.78,1.15,x,y,z,0xd6b45a,16); D.cyl(0.7,0.7,0.02,x,y+1.15,z,0xc49a3e,16); return; }
+    const [hx,hz]=[Math.abs(Math.sin(a))*L/2+Math.abs(Math.cos(a))*w/2,Math.abs(Math.cos(a))*L/2+Math.abs(Math.sin(a))*w/2]; D.solid(x-hx*0.8,y,z-hz*0.8,x+hx*0.8,y+h*0.85,z+hz*0.8); D.end(); };
+  const crate=(x,y,z,s,a,c)=>{ D.obj('wood',110); D.box(s,s,s,x,y,z,c||0x9c7a4c,[0,a,0]); D.box(s*1.02,s*0.12,s*1.02,x,y+s*0.44,z,0x6e5233,[0,a,0]); D.solid(x-s*0.6,y,z-s*0.6,x+s*0.6,y+s,z+s*0.6); D.end(); };
+  const drum=(x,y,z,c)=>{ D.obj('metal',130); D.scyl(0.32,0.92,x,y,z,c,14); D.cyl(0.33,0.33,0.04,x,y+0.3,z,0x3a3a3a,14); D.cyl(0.33,0.33,0.04,x,y+0.62,z,0x3a3a3a,14); D.end(); };
+  const bale=(x,z,a,up)=>{ const y=Hm(x,z,0.8); D.obj('wood',120); if(up){ D.scyl(0.78,1.15,x,y,z,0xd6b45a,16); D.cyl(0.7,0.7,0.02,x,y+1.15,z,0xc49a3e,16); D.end(); return; }
     D.geo(new THREE.CylinderGeometry(0.78,0.78,1.2,16),0xd6b45a,x,y+0.74,z,[PI/2,a,0]); for(const s of [-1,1]){ const [ex,ez]=at(x,z,a,0,s*0.61); D.geo(new THREE.CircleGeometry(0.74,16),0xc49a3e,ex,y+0.74,ez,[0,a+(s>0?0:PI),0]); }
-    const [hx,hz]=[Math.abs(Math.sin(a))*0.6+Math.abs(Math.cos(a))*0.78,Math.abs(Math.cos(a))*0.6+Math.abs(Math.sin(a))*0.78]; D.solid(x-hx,y,z-hz,x+hx,y+1.5,z+hz); };
-  const fenceRun=(ax,az,bx,bz,gap)=>{ const L=Math.hypot(bx-ax,bz-az), n=Math.max(1,Math.round(L/2.5)), a=Math.atan2(bx-ax,bz-az);
-    for(let q=0;q<=n;q++){ const f=q/n, x=ax+(bx-ax)*f, z=az+(bz-az)*f; if(gap&&gap(f)) continue; D.box(0.14,1.25,0.14,x,H(x,z)-0.1,z,DARKWOOD,[0,a,0]); }
-    for(let q=0;q<n;q++){ const f0=q/n, f1=(q+1)/n; if(gap&&(gap(f0)||gap(f1)||gap((f0+f1)/2))) continue; const x0=ax+(bx-ax)*f0, z0=az+(bz-az)*f0, x1=ax+(bx-ax)*f1, z1=az+(bz-az)*f1, y0=H(x0,z0), y1=H(x1,z1), l=Math.hypot(x1-x0,z1-z0), tilt=Math.atan2(y1-y0,l);
+    const [hx,hz]=[Math.abs(Math.sin(a))*0.6+Math.abs(Math.cos(a))*0.78,Math.abs(Math.cos(a))*0.6+Math.abs(Math.sin(a))*0.78]; D.solid(x-hx,y,z-hz,x+hx,y+1.5,z+hz); D.end(); };
+  const fenceRun=(ax,az,bx,bz,gap)=>{ const L=Math.hypot(bx-ax,bz-az), n=Math.max(1,Math.round(L/2.5)), a=Math.atan2(bx-ax,bz-az), G=f=>!!(gap&&gap(f)); // each panel (rails and its posts) breaks on its own
+    for(let q=0;q<n;q++){ const f0=q/n, f1=(q+1)/n; if(G(f0)||G(f1)||G((f0+f1)/2)) continue; const x0=ax+(bx-ax)*f0, z0=az+(bz-az)*f0, x1=ax+(bx-ax)*f1, z1=az+(bz-az)*f1, y0=H(x0,z0), y1=H(x1,z1), l=Math.hypot(x1-x0,z1-z0), tilt=Math.atan2(y1-y0,l);
+      D.obj('wood',90); D.box(0.14,1.25,0.14,x0,y0-0.1,z0,DARKWOOD,[0,a,0]); if(q===n-1||G((q+1.5)/n)) D.box(0.14,1.25,0.14,x1,y1-0.1,z1,DARKWOOD,[0,a,0]);
       for(const h of [0.5,1.0]) D.geo(new THREE.BoxGeometry(0.06,0.12,l+0.14),WOOD,(x0+x1)/2,(y0+y1)/2+h,(z0+z1)/2,[-tilt,a,0]);
-      STATICS.push({x:(x0+x1)/2,z:(z0+z1)/2,solid:{boxes:[[Math.min(x0,x1)-0.1,Math.min(y0,y1),Math.min(z0,z1)-0.1,Math.max(x0,x1)+0.1,Math.max(y0,y1)+1.15,Math.max(z0,z1)+0.1]],key:'fencerail'+STATICS.length,mat:'wood',deco:1}}); } };
+      const st={x:(x0+x1)/2,z:(z0+z1)/2,solid:{boxes:[[Math.min(x0,x1)-0.1,Math.min(y0,y1),Math.min(z0,z1)-0.1,Math.max(x0,x1)+0.1,Math.max(y0,y1)+1.15,Math.max(z0,z1)+0.1]],key:'fencerail'+STATICS.length,mat:'wood',deco:1}}; STATICS.push(st); D.claim(st); D.end(); } };
 
   // ---- campsites: a clearing in the trees with two tents round a fire
   { let made=0; for(let tr=0;tr<900&&made<7;tr++){ const x=S[0]+(r()*2-1)*(MAP_R-80), z=S[2]+(r()*2-1)*(MAP_R-80); if(!open(x,z,11)) continue; if(treesNear(x,z,22)<6) continue; // (only out in the woods)
       let ok=true; for(let k=0;k<12&&ok;k++){ const a=k/12*2*PI, px=x+Math.cos(a)*7, pz=z+Math.sin(a)*7; if(Math.abs(H(px,pz)-H(x,z))>1.1||wet(px,pz,1)) ok=false; } if(!ok) continue;
       clearProps(x,z,9.5); placed.push([x,z,14]); made++; DECOR.camps.push([x,z]); const y=Hm(x,z,0.7), a0=r()*2*PI;
       // the fire ring: stones, crossed logs, embers
-      for(let k=0;k<10;k++){ const a=k/10*2*PI, sx=x+Math.cos(a)*0.78, sz=z+Math.sin(a)*0.78; D.sph(0.16+r()*0.05,sx,H(sx,sz)+0.08,sz,STONE,[1.2,0.75,1]); }
+      D.obj('brick',220); for(let k=0;k<10;k++){ const a=k/10*2*PI, sx=x+Math.cos(a)*0.78, sz=z+Math.sin(a)*0.78; D.sph(0.16+r()*0.05,sx,H(sx,sz)+0.08,sz,STONE,[1.2,0.75,1]); }
       D.cyl(0.62,0.66,0.03,x,y,z,0x2c2622,16); for(let k=0;k<3;k++) D.geo(new THREE.CylinderGeometry(0.06,0.07,1.0,6),0x3a2a1c,x,y+0.14+k*0.03,z,[PI/2-0.25,a0+k*1.05,0]);
-      D.sph(0.2,x,y+0.08,z,0xff7a2a,[1.4,0.45,1.4],true); D.sph(0.09,x+0.12,y+0.12,z-0.08,0xffc24a,null,true); D.solid(x-0.9,y,z-0.9,x+0.9,y+0.3,z+0.9);
+      D.sph(0.2,x,y+0.08,z,0xff7a2a,[1.4,0.45,1.4],true); D.sph(0.09,x+0.12,y+0.12,z-0.08,0xffc24a,null,true); D.solid(x-0.9,y,z-0.9,x+0.9,y+0.3,z+0.9); D.end();
       // two tents facing the fire, log seats between them
       const cols=[0xd8732e,0x3f7d4f,0x3b6aa8,0xc4b14a,0xa8443a], c1=cols[Math.floor(r()*cols.length)], c2=cols[Math.floor(r()*cols.length)];
       for(const [da,R,c] of [[0,4.4,c1],[2.2+r()*0.6,4.6,c2]]){ const a=a0+da, tx=x+Math.sin(a)*R, tz=z+Math.cos(a)*R; tent(tx,tz,a+PI,c); }
       for(const da of [1.1,4.0]){ const a=a0+da, lx=x+Math.sin(a)*2.3, lz=z+Math.cos(a)*2.3; log(lx,H(lx,lz)-0.06,lz,a+PI/2,1.9,0.2,BARK,true); }
-      { const a=a0+5.1, cx=x+Math.sin(a)*2.6, cz=z+Math.cos(a)*2.6, cy=Hm(cx,cz,0.4); D.box(0.7,0.42,0.42,cx,cy,cz,0x2f6fb3,[0,a,0]); D.box(0.72,0.07,0.44,cx,cy+0.42,cz,0xf2f2ee,[0,a,0]); D.solid(cx-0.4,cy,cz-0.4,cx+0.4,cy+0.5,cz+0.4); } // a cooler
+      { const a=a0+5.1, cx=x+Math.sin(a)*2.6, cz=z+Math.cos(a)*2.6, cy=Hm(cx,cz,0.4); D.obj('metal',70); D.box(0.7,0.42,0.42,cx,cy,cz,0x2f6fb3,[0,a,0]); D.box(0.72,0.07,0.44,cx,cy+0.42,cz,0xf2f2ee,[0,a,0]); D.solid(cx-0.4,cy,cz-0.4,cx+0.4,cy+0.5,cz+0.4); D.end(); } // a cooler
       { const a=a0+3.2, px=x+Math.sin(a)*3.2, pz=z+Math.cos(a)*3.2, py=H(px,pz)-0.15; D.cyl(0.04,0.05,1.5,px,py,pz,DARKWOOD,6); D.box(0.16,0.22,0.16,px,py+1.5,pz,0x3a3a3a); D.box(0.1,0.12,0.1,px,py+1.55,pz,0xffe08a,null,true); } // a lantern on a stick
       { const a=a0+0.9+PI, cx=x+Math.sin(a)*5.6, cz=z+Math.cos(a)*5.6; DECOR.chests.push([cx,Hm(cx,cz,0.6)+0.02,cz,a+PI]); } } }
 
@@ -9244,13 +9306,13 @@ function buildWorldDecor(){ const D=poiDecor(), r=seeded(60613), S=SPAWN, PI=Mat
         const x=S[0]+p[q][0]-tz*7.6*side, z=S[2]+p[q][1]+tx*7.6*side, y=H(x,z);
         const bad=(rd.deck&&rd.deck[q])||townAt(x,z,22)||wet(x,z,2)||roadDistAt(x,z)<6||slope(x,z)>0.55||staticNear(x,z,1.2);
         if(bad){ prev=null; continue; }
-        clearProps(x,z,2.6,['tree','pine','rock']); const a=Math.atan2(tx,tz); const yb=Hm(x,z,0.2); D.cyl(0.13,0.16,9.2,x,yb-0.3,z,0x6b5a46,8); D.solid(x-0.18,yb-0.3,z-0.18,x+0.18,yb+8.9,z+0.18); DECOR.poles++; if(DECOR.poles===12) DECOR.pole=[x,z,a];
+        clearProps(x,z,2.6,['tree','pine','rock']); const a=Math.atan2(tx,tz); const yb=Hm(x,z,0.2), po=D.obj('wood',240); D.cyl(0.13,0.16,9.2,x,yb-0.3,z,0x6b5a46,8); D.solid(x-0.18,yb-0.3,z-0.18,x+0.18,yb+8.9,z+0.18); DECOR.poles++; if(DECOR.poles===12) DECOR.pole=[x,z,a];
         D.box(2.5,0.14,0.14,x,y+8.3,z,0x5e4c3a,[0,a,0]); D.geo(new THREE.BoxGeometry(0.08,0.08,1.1),0x5e4c3a,...at(x,z,a+PI/2,0,0.45).reduce((o,v,i)=>(o[i*2]=v,o),[0,y+7.95,0]),[0.75,a+PI/2,0]); // the cross-arm and its brace
         const ends=[-1.1,0,1.1].map(u=>{ const [ex,ez]=at(x,z,a+PI/2,0,u); const ey=y+(u===0?8.95:8.44); D.cyl(0.05,0.06,0.16,ex,ey,ez,0xd8dcd4,6); return [ex,ey+0.14,ez]; });
-        if(prev&&Math.hypot(prev.x-x,prev.z-z)<52){ for(let w=0;w<3;w++){ const A=prev.ends[w], B=ends[w], L=Math.hypot(B[0]-A[0],B[2]-A[2]), sag=0.012*L*L/10+0.6; let lp=A;
+        if(prev&&Math.hypot(prev.x-x,prev.z-z)<52){ D.with(prev.po,po); for(let w=0;w<3;w++){ const A=prev.ends[w], B=ends[w], L=Math.hypot(B[0]-A[0],B[2]-A[2]), sag=0.012*L*L/10+0.6; let lp=A;
             for(let k=1;k<=10;k++){ const f=k/10, P=[A[0]+(B[0]-A[0])*f,A[1]+(B[1]-A[1])*f-sag*4*f*(1-f),A[2]+(B[2]-A[2])*f], dx=P[0]-lp[0], dy=P[1]-lp[1], dz=P[2]-lp[2], l=Math.hypot(dx,dy,dz);
               const g=new THREE.CylinderGeometry(0.022,0.022,l,4); g.translate(0,l/2,0); const qn=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),new THREE.Vector3(dx/l,dy/l,dz/l)); g.applyMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(qn)); D.geo(g,0x222326,lp[0],lp[1],lp[2]); lp=P; } } }
-        prev={x,z,ends}; } }); }
+        D.end(); prev={x,z,ends,po}; } }); }
 
   // ---- hay fields outside two farm towns: a rail fence round a mown field, round bales lying about
   { const farms=TOWNS.filter(t=>!t.kind&&/Bramble|Hollow|Willow/.test(t.name)).slice(0,2);
@@ -9263,10 +9325,10 @@ function buildWorldDecor(){ const D=poiDecor(), r=seeded(60613), S=SPAWN, PI=Mat
         for(let s=0;s<4;s++){ const A=corners[s], B=corners[(s+1)%4]; fenceRun(A[0],A[1],B[0],B[1],s===gateSide?(f=>f>0.42&&f<0.58):null); }
         const nb=8+Math.floor(r()*6); for(let k=0;k<nb;k++){ const [bx,bz]=at(cx,cz,ya,(r()-0.5)*(W-6),(r()-0.5)*(L-6)); if(!free(bx,bz,1.2)) continue; placed.push([bx,bz,1.2]); bale(bx,bz,r()*PI,r()<0.3); }
         // a hay cart by the gate
-        { const A=corners[gateSide], B=corners[(gateSide+1)%4], gx=(A[0]+B[0])/2, gz=(A[1]+B[1])/2, ox=(gx-cx), oz=(gz-cz), ol=Math.hypot(ox,oz), kx=gx-ox/ol*5+(B[0]-A[0])/Math.hypot(B[0]-A[0],B[1]-A[1])*4, kz=gz-oz/ol*5+(B[1]-A[1])/Math.hypot(B[0]-A[0],B[1]-A[1])*4, ky=Hm(kx,kz,1.4), ka=Math.atan2(B[0]-A[0],B[1]-A[1]);
+        { const A=corners[gateSide], B=corners[(gateSide+1)%4], gx=(A[0]+B[0])/2, gz=(A[1]+B[1])/2, ox=(gx-cx), oz=(gz-cz), ol=Math.hypot(ox,oz), kx=gx-ox/ol*5+(B[0]-A[0])/Math.hypot(B[0]-A[0],B[1]-A[1])*4, kz=gz-oz/ol*5+(B[1]-A[1])/Math.hypot(B[0]-A[0],B[1]-A[1])*4, ky=Hm(kx,kz,1.4), ka=Math.atan2(B[0]-A[0],B[1]-A[1]); D.obj('wood',220);
           D.box(1.6,0.12,2.8,kx,ky+0.7,kz,WOOD,[0,ka,0]); for(const s of [-1,1]){ D.box(0.08,0.5,2.8,...at(kx,kz,ka,s*0.78,0).reduce((o,v,i)=>(o[i*2]=v,o),[0,ky+0.82,0]),WOOD,[0,ka,0]); const [wx,wz]=at(kx,kz,ka,s*0.9,0); D.geo(new THREE.CylinderGeometry(0.55,0.55,0.1,14),DARKWOOD,wx,ky+0.55,wz,[0,ka,PI/2]); }
           D.geo(new THREE.BoxGeometry(0.08,0.08,1.6),WOOD,...at(kx,kz,ka,0,2.1).reduce((o,v,i)=>(o[i*2]=v,o),[0,ky+0.5,0]),[0.3,ka,0]); for(let k=0;k<3;k++){ const [hx,hz]=at(kx,kz,ka,(k-1)*0.5,0.2*(k%2)); D.sph(0.5,hx,ky+1.05,hz,0xdcbc66,[1,0.6,1.3]); }
-          D.solid(kx-1.3,ky,kz-1.3,kx+1.3,ky+1.4,kz+1.3); placed.push([kx,kz,2]); } } } }
+          D.solid(kx-1.3,ky,kz-1.3,kx+1.3,ky+1.4,kz+1.3); D.end(); placed.push([kx,kz,2]); } } } }
 
   // ---- town streets: benches looking onto the street, a bin beside each, fire hydrants at the kerb
   const segD=(x,z,ax,az,bx,bz)=>{ const dx=bx-ax, dz=bz-az, L2=dx*dx+dz*dz||1e-6; let f=((x-ax)*dx+(z-az)*dz)/L2; f=f<0?0:f>1?1:f; return Math.hypot(x-ax-dx*f,z-az-dz*f); };
@@ -9275,30 +9337,30 @@ function buildWorldDecor(){ const D=poiDecor(), r=seeded(60613), S=SPAWN, PI=Mat
   for(const t of TOWNS){ if(t.kind||!t.segs) continue; const tr=seeded(t.seed+881); let benches=0, hyd=0;
     for(const Sg of t.segs){ if(Sg.hammer) continue; const L=Sg.b-Sg.a; for(let s=Sg.a+9;s<Sg.b-9;s+=7+tr()*9){
         const sd=tr()<0.5?-1:1, X=Sg.X;
-        if(hyd<5&&tr()<0.35){ const ac=Sg.c+sd*(ROAD_HW+0.45), x=X?s:ac, z=X?ac:s; if(!(t.junc||[]).some(J=>Math.hypot(J[0]-x,J[1]-z)<6)&&!staticNear(x,z,1.2)&&!pathHit(t,x,z,0.5)){ const y=t.h+0.05; D.cyl(0.13,0.15,0.62,x,y,z,0xc4262b,10); D.sph(0.14,x,y+0.62,z,0xc4262b,[1,0.8,1]); D.tube(0.06,0.42,x,y+0.42,z,0xc4262b,[0,0,PI/2],8); D.tube(0.06,0.42,x,y+0.42,z,0xc4262b,[PI/2,0,0],8); D.solid(x-0.22,y,z-0.22,x+0.22,y+0.8,z+0.22); hyd++; } continue; }
+        if(hyd<5&&tr()<0.35){ const ac=Sg.c+sd*(ROAD_HW+0.45), x=X?s:ac, z=X?ac:s; if(!(t.junc||[]).some(J=>Math.hypot(J[0]-x,J[1]-z)<6)&&!staticNear(x,z,1.2)&&!pathHit(t,x,z,0.5)){ const y=t.h+0.05; D.obj('metal',160); D.cyl(0.13,0.15,0.62,x,y,z,0xc4262b,10); D.sph(0.14,x,y+0.62,z,0xc4262b,[1,0.8,1]); D.tube(0.06,0.42,x,y+0.42,z,0xc4262b,[0,0,PI/2],8); D.tube(0.06,0.42,x,y+0.42,z,0xc4262b,[PI/2,0,0],8); D.solid(x-0.22,y,z-0.22,x+0.22,y+0.8,z+0.22); D.end(); hyd++; } continue; }
         if(benches>=6||tr()<0.45) continue;
         const ac=Sg.c+sd*(ROAD_HW+WALK_W+0.75), x=X?s:ac, z=X?ac:s; if((t.junc||[]).some(J=>Math.hypot(J[0]-x,J[1]-z)<9)||staticNear(x,z,1.6)||pathHit(t,x,z,1.3)||propsNear(x,z,[],1).some(p=>!p.gone&&Math.hypot(p.x-x,p.z-z)<2.4)) continue;
-        const y=t.h+0.02, a=X?(sd>0?PI:0):(sd>0?-PI/2:PI/2); // facing the street
+        const y=t.h+0.02, a=X?(sd>0?PI:0):(sd>0?-PI/2:PI/2); D.obj('wood',110); // facing the street
         D.box(1.8,0.07,0.45,x,y+0.45,z,WOOD,[0,a,0]); D.box(1.8,0.38,0.06,...at(x,z,a,0,-0.24).reduce((o,v,i)=>(o[i*2]=v,o),[0,y+0.55,0]),WOOD,[0,a+0.0,0]);
         for(const u of [-0.75,0.75]){ const [lx,lz]=at(x,z,a,u,0); D.box(0.07,0.45,0.42,lx,y,lz,0x2b3036,[0,a,0]); }
-        { const hx=Math.abs(Math.cos(a))*0.95+Math.abs(Math.sin(a))*0.32, hz=Math.abs(Math.sin(a))*0.95+Math.abs(Math.cos(a))*0.32; D.solid(x-hx,y,z-hz,x+hx,y+0.6,z+hz); } benches++; if(!DECOR.bench) DECOR.bench=[x,z,a];
-        { const [bx,bz]=at(x,z,a,1.45,0); D.cyl(0.26,0.22,0.8,bx,y,bz,0x3f5a46,12); D.cyl(0.28,0.28,0.06,bx,y+0.8,bz,0x2e4234,12); D.solid(bx-0.3,y,bz-0.3,bx+0.3,y+0.86,bz+0.3); } } } }
+        { const hx=Math.abs(Math.cos(a))*0.95+Math.abs(Math.sin(a))*0.32, hz=Math.abs(Math.sin(a))*0.95+Math.abs(Math.cos(a))*0.32; D.solid(x-hx,y,z-hz,x+hx,y+0.6,z+hz); } D.end(); benches++; if(!DECOR.bench) DECOR.bench=[x,z,a];
+        { const [bx,bz]=at(x,z,a,1.45,0); D.obj('metal',80); D.cyl(0.26,0.22,0.8,bx,y,bz,0x3f5a46,12); D.cyl(0.28,0.28,0.06,bx,y+0.8,bz,0x2e4234,12); D.solid(bx-0.3,y,bz-0.3,bx+0.3,y+0.86,bz+0.3); D.end(); } } } }
 
   // ---- the beach at Pebble Point: a wooden dock out into the sea, a rowboat tied at the end, two pulled up on the sand
-  const boat=(x,y,z,a,c,tilt,kp)=>{ const hull=new THREE.SphereGeometry(1,14,8,0,2*PI,PI/2,PI/2); hull.scale(0.78,0.5,1.95); D.geo(hull,c,x,y+0.5,z,[tilt||0,a,0]);
+  const boat=(x,y,z,a,c,tilt,kp)=>{ D.obj('wood',200); const hull=new THREE.SphereGeometry(1,14,8,0,2*PI,PI/2,PI/2); hull.scale(0.78,0.5,1.95); D.geo(hull,c,x,y+0.5,z,[tilt||0,a,0]);
     const inner=new THREE.SphereGeometry(1,14,8,0,2*PI,PI/2,PI/2); inner.scale(-0.7,0.44,1.86); D.geo(inner,0x8a6440,x,y+0.52,z,[tilt||0,a,0]);
     for(const v of [-0.55,0.45]){ const [sx,sz]=at(x,z,a,0,v); D.box(1.3,0.06,0.28,sx,y+0.3,sz,0x9a7650,[tilt||0,a,0]); }
     for(const s of [-1,1]){ const [ox,oz]=at(x,z,a,s*0.35,0.1); D.geo(new THREE.CylinderGeometry(0.03,0.03,2.2,5),0xb08a5a,ox,y+0.42,oz,[PI/2-0.08,a+s*0.12,0]); }
-    D.solid(x-1,y,z-1,x+1,y+0.75,z+1,kp); };
+    D.solid(x-1,y,z-1,x+1,y+0.75,z+1,kp); D.end(); };
   { const sea=WGEN.sea&&WGEN.sea(), t=TOWNS[0]; if(sea&&t) for(const off of [32,-32,48,-48,64,-64]){ const bx0=t.x-sea.nz*off, bz0=t.z+sea.nx*off; let s=20; while(s<300&&H(bx0+sea.nx*s,bz0+sea.nz*s)>sea.Y+0.35) s+=1;
       if(s<300){ const a=Math.atan2(sea.nx,sea.nz), x0=bx0+sea.nx*(s-7), z0=bz0+sea.nz*(s-7), len=24, dy=sea.Y+1.05; let ok=!staticNear(x0,z0,3)&&!staticNear(x0+sea.nx*12,z0+sea.nz*12,3)&&!townAt(x0,z0,-30)&&roadDistAt(x0,z0)>6;
         if(ok){ clearProps(x0,z0,5); for(let k=0;k<=len;k+=0.5){ const [px,pz]=at(x0,z0,a,0,k); clearProps(px,pz,2.4,['rock','tree','pine']); }
-          const deckY=k=>{ const [px,pz]=at(x0,z0,a,0,k); return Math.max(dy,H(px,pz)+0.25); };
+          const deckY=k=>{ const [px,pz]=at(x0,z0,a,0,k); return Math.max(dy,H(px,pz)+0.25); }; D.obj('wood',700);
           for(let k=0;k<len;k+=0.42){ const [px,pz]=at(x0,z0,a,0,k+0.21), y=deckY(k+0.21); D.box(2.6,0.09,0.36,px,y-0.09,pz,(Math.floor(k/0.42)%3?0x9a7650:0x8d6c48),[0,a,0]); }
           for(let k=1;k<len;k+=3){ for(const u of [-1.2,1.2]){ const [px,pz]=at(x0,z0,a,u,k), gy=H(px,pz), y=deckY(k); if(y-gy>0.3) D.cyl(0.12,0.12,y-gy+0.6,px,gy-0.5,pz,0x6b5038,8); } }
           for(const u of [-1.25,1.25]) for(let k=6;k<len;k+=2.5){ const [px,pz]=at(x0,z0,a,u,k), y=deckY(k); D.cyl(0.05,0.05,0.9,px,y,pz,0x6b5038,6); }
           for(const u of [-1.25,1.25]){ const [mx,mz]=at(x0,z0,a,u,(6+len)/2); D.geo(new THREE.BoxGeometry(0.07,0.07,len-6),0x7a5a3c,mx,deckY(len*0.6)+0.88,mz,[0,a,0]); }
-          for(let k=0;k<len;k+=2){ const [px,pz]=at(x0,z0,a,0,k+1), y=deckY(k+1); const hx=Math.abs(Math.sin(a))*1+Math.abs(Math.cos(a))*1.3, hz=Math.abs(Math.cos(a))*1+Math.abs(Math.sin(a))*1.3; STATICS.push({x:px,z:pz,solid:{boxes:[[px-hx,y-0.3,pz-hz,px+hx,y,pz+hz]],key:'dock'+STATICS.length,mat:'wood',deco:1}}); }
+          for(let k=0;k<len;k+=2){ const [px,pz]=at(x0,z0,a,0,k+1), y=deckY(k+1); const hx=Math.abs(Math.sin(a))*1+Math.abs(Math.cos(a))*1.3, hz=Math.abs(Math.cos(a))*1+Math.abs(Math.sin(a))*1.3; const st={x:px,z:pz,solid:{boxes:[[px-hx,y-0.3,pz-hz,px+hx,y,pz+hz]],key:'dock'+STATICS.length,mat:'wood',deco:1}}; STATICS.push(st); D.claim(st); } D.end();
           { const [bx,bz]=at(x0,z0,a,2.6,len-3); boat(bx,sea.Y-0.38,bz,a+0.1,0xe8e4da,0,'moored'); } // (afloat, tied up)
           for(const [u,v,c] of [[-6,-3,0xc0473a]]){ const [bx,bz]=at(x0,z0,a,u,v); if(!wet(bx,bz,0)||H(bx,bz)>sea.Y){ boat(bx,Hm(bx,bz,1.1)-0.06,bz,a+PI+(r()-0.5)*0.8,c,0.06); placed.push([bx,bz,3]); } }
           placed.push([x0,z0,8]); DECOR.dock=[x0,z0,a]; break; } } } }
@@ -9314,14 +9376,14 @@ function buildWorldDecor(){ const D=poiDecor(), r=seeded(60613), S=SPAWN, PI=Mat
         clearProps(x,z,len/2+1,['rock']); { const [e1x,e1z]=at(x,z,a,0,len/2), [e2x,e2z]=at(x,z,a,0,-len/2), h1=H(e1x,e1z), h2=H(e2x,e2z), pt=Math.atan2(h1-h2,len); let dip=0; // tilted to follow the ground end to end, and let down onto its lowest point
           for(let k=-4;k<=4;k++){ const f=k/8, [sx,sz]=at(x,z,a,0,f*len); for(const w of [-rad*0.7,0,rad*0.7]){ const [qx,qz]=at(sx,sz,a,w,0); dip=Math.min(dip,H(qx,qz)-((h1+h2)/2+(h1-h2)*f)); } }
           log(x,(h1+h2)/2+dip-rad*0.22,z,a,len,rad,0x5e4630,true,pt); } { const [bx,bz]=at(x,z,a,0,len*0.15); D.geo(new THREE.CylinderGeometry(0.06,0.09,0.9,5),0x5e4630,bx,H(x,z)+rad*1.2,bz,[0.9,a+1.2,0]); } placed.push([x,z,len/2]); logs++; }
-      else if(stumps<60){ const rad=0.3+r()*0.2, y=Hm(x,z,rad); D.cyl(rad*0.9,rad*1.15,0.45+r()*0.3,x,y-0.05,z,0x5e4630,9); D.solid(x-rad,y,z-rad,x+rad,y+0.5,z+rad); placed.push([x,z,1]); stumps++; } } }
+      else if(stumps<60){ const rad=0.3+r()*0.2, y=Hm(x,z,rad); D.obj('wood',90); D.cyl(rad*0.9,rad*1.15,0.45+r()*0.3,x,y-0.05,z,0x5e4630,9); D.solid(x-rad,y,z-rad,x+rad,y+0.5,z+rad); D.end(); placed.push([x,z,1]); stumps++; } } }
 
   // ---- picnic tables by the road, at the nicer stretches
   { let n=0; for(let tr=0;tr<600&&n<6;tr++){ const rd=WORLD.roads[Math.floor(r()*WORLD.roads.length)]; if(rd.street) continue; const q=6+Math.floor(r()*(rd.pts.length-12)), p=rd.pts[q], p2=rd.pts[q+2]; if(!p2) continue;
       const tx=p2[0]-p[0], tz=p2[1]-p[1], tl=Math.hypot(tx,tz)||1, sd=r()<0.5?-1:1, x=S[0]+p[0]-tz/tl*11*sd, z=S[2]+p[1]+tx/tl*11*sd; if(!open(x,z,3)) continue; clearProps(x,z,4);
-      const y=Hm(x,z,1.2), a=Math.atan2(tx,tz); D.box(0.9,0.06,1.9,x,y+0.74,z,WOOD,[0,a,0]); for(const s of [-1,1]){ const [bx,bz]=at(x,z,a,s*0.78,0); D.box(0.3,0.05,1.9,bx,y+0.44,bz,WOOD,[0,a,0]); }
+      const y=Hm(x,z,1.2), a=Math.atan2(tx,tz); D.obj('wood',130); D.box(0.9,0.06,1.9,x,y+0.74,z,WOOD,[0,a,0]); for(const s of [-1,1]){ const [bx,bz]=at(x,z,a,s*0.78,0); D.box(0.3,0.05,1.9,bx,y+0.44,bz,WOOD,[0,a,0]); }
       for(const s of [-1,1]){ const [lx,lz]=at(x,z,a,0,s*0.7); D.box(1.9,0.06,0.08,lx,y+0.4,lz,DARKWOOD,[0,a,0]); D.geo(new THREE.BoxGeometry(0.07,0.95,0.07),DARKWOOD,...at(lx,lz,a,0.3,0).reduce((o,v,i)=>(o[i*2]=v,o),[0,y+0.38,0]),[0,a,0.55]); D.geo(new THREE.BoxGeometry(0.07,0.95,0.07),DARKWOOD,...at(lx,lz,a,-0.3,0).reduce((o,v,i)=>(o[i*2]=v,o),[0,y+0.38,0]),[0,a,-0.55]); }
-      D.solid(x-1.2,y,z-1.2,x+1.2,y+0.8,z+1.2); { const [bx,bz]=at(x,z,a,1.8,1.2); { const by=Hm(bx,bz,0.3); D.cyl(0.26,0.22,0.8,bx,by,bz,0x3f5a46,12); D.solid(bx-0.3,by,bz-0.3,bx+0.3,by+0.85,bz+0.3); } } placed.push([x,z,4]); n++; } }
+      D.solid(x-1.2,y,z-1.2,x+1.2,y+0.8,z+1.2); D.end(); { const [bx,bz]=at(x,z,a,1.8,1.2); D.obj('metal',80); { const by=Hm(bx,bz,0.3); D.cyl(0.26,0.22,0.8,bx,by,bz,0x3f5a46,12); D.solid(bx-0.3,by,bz-0.3,bx+0.3,by+0.85,bz+0.3); D.end(); } } placed.push([x,z,4]); n++; } }
 
   // ---- round the points of interest: odds and ends to suit each one, out at the edges where nothing else stands
   for(const t of TOWNS){ if(!t.kind) continue; const pr=seeded(t.seed+3131); let n=0; const occ=new Set(); for(const bl of planPOI(t)) for(const p of bl.pieces) occ.add(p.i+','+p.j); // (the buildings aren't up yet: go by their plan)
@@ -9765,7 +9827,7 @@ function yardTrees(add,r){
         if(propsNear(x,z,[],1).some(q=>Math.hypot(q.x-x,q.z-z)<4.5)) continue; const p=add(r()<0.6?'tree':'pine',x,z,0.8+r()*0.8); p.hs=0.85+r()*0.4; p.g.scale.set(p.s,p.s*p.hs,p.s); p.tint=0.88+r()*0.2; p.yard=true; p.boxes=propBoxes(p); } } } }
 let gardenMeshes=[];
 function buildGardens(){ const flowers=[0xe8456b,0xf2c014,0xffffff,0xa45ee5,0xff8a3d,0xe23a3a], q=seeded(77123);
-  for(const t of TOWNS){ const parts=[], put=(g,col,x,y,z,ry=0)=>{ if(col!==0x5a4030&&col!==0xd23a2a&&!(g.parameters&&g.parameters.height===0.24)&&onWalk(t,x,z,0.15)) return; g=g.index?g.toNonIndexed():g.clone(); g.rotateY(ry); g.translate(x,y,z); const n=g.attributes.position.count, c=new Float32Array(n*3), cc=new THREE.Color(col); for(let i=0;i<n;i++){ c[i*3]=cc.r; c[i*3+1]=cc.g; c[i*3+2]=cc.b; } g.setAttribute('color',new THREE.BufferAttribute(c,3)); parts.push(g); };
+  for(const t of TOWNS){ const gS0=STATICS.length, parts=[], put=(g,col,x,y,z,ry=0)=>{ if(col!==0x5a4030&&col!==0xd23a2a&&!(g.parameters&&g.parameters.height===0.24)&&onWalk(t,x,z,0.15)) return; g=g.index?g.toNonIndexed():g.clone(); g.rotateY(ry); g.translate(x,y,z); g.userData.col=col; const n=g.attributes.position.count, c=new Float32Array(n*3), cc=new THREE.Color(col); for(let i=0;i<n;i++){ c[i*3]=cc.r; c[i*3+1]=cc.g; c[i*3+2]=cc.b; } g.setAttribute('color',new THREE.BufferAttribute(c,3)); parts.push(g); };
     const y0=t.h;
     for(const h of t.houses){ const f=yardFrame(t,h), X=h.side==='n'||h.side==='s', ry=X?0:Math.PI/2, mid=f.len/2;
       // flower beds along the front wall, either side of the door: dark soil, a brick edge, rows of flowers
@@ -9781,8 +9843,10 @@ function buildGardens(){ const flowers=[0xe8456b,0xf2c014,0xffffff,0xa45ee5,0xff
         put(new THREE.BoxGeometry(0.09,1.05,0.09),0x5a4030,x,y0+0.52,z,ry); put(new THREE.BoxGeometry(0.24,0.24,0.46),[0x2a2d33,0x8a2a2a,0x2f5d8a,0xe0ddd5][Math.floor(q()*4)],x,y0+1.12,z,ry+Math.PI/2);
         put(new THREE.BoxGeometry(0.03,0.16,0.07),0xd23a2a,...[x+(X?0.14:0),y0+1.2,z+(X?0:0.14)],ry); } }
     if(!parts.length) continue;
+    { const ms=STATICS.slice(gS0).filter(st=>/^mail/.test(st.solid.key)); if(ms.length){ parts.forEach(g=>{ if(g.userData.col===0x5a4030||g.userData.col===0xd23a2a||[0x2a2d33,0x8a2a2a,0x2f5d8a,0xe0ddd5].includes(g.userData.col)) g.userData.mat='metal'; });
+        decoGroup(parts.filter(g=>g.userData.mat),ms); decoReady(); } }
     const out=new THREE.BufferGeometry(); for(const k of ['position','normal','color']){ let len=0; parts.forEach(g=>len+=g.attributes[k].array.length); const A=new Float32Array(len); let o=0; parts.forEach(g=>{ A.set(g.attributes[k].array,o); o+=g.attributes[k].array.length; }); out.setAttribute(k,new THREE.BufferAttribute(A,3)); }
-    out.computeBoundingSphere(); const m=new THREE.Mesh(out,new THREE.MeshLambertMaterial({vertexColors:true})); m.castShadow=true; m.receiveShadow=true; m.matrixAutoUpdate=false; m.userData.town=t; scene.add(m); gardenMeshes.push(m); } }
+    decoRegister(parts,out); out.computeBoundingSphere(); const m=new THREE.Mesh(out,new THREE.MeshLambertMaterial({vertexColors:true})); m.castShadow=true; m.receiveShadow=true; m.matrixAutoUpdate=false; m.userData.town=t; scene.add(m); gardenMeshes.push(m); } }
 /* materials: infinite by default; switch it off in Settings to farm for your builds */
 const MAT_MAX=999, BUILD_COST=10;
 function giveMats(mat,n,point){ if(infMats()||n<=0) return; P.mats[mat]=Math.min(MAT_MAX,(P.mats[mat]|0)+n); if(point) dmgNum(point,'+'+n+' '+MATERIALS[mat].name.toUpperCase(),'mat'); syncMats(); }
@@ -9994,6 +10058,7 @@ function explode(pos,p){
   if(!p.mine) return; // only the thrower's game deals the damage (everyone sees the blast)
   near(pos.x,pos.z,1).forEach(pc=>{ const c=pieceCenter(pc), dd=c.distanceTo(pos); if(dd<X.r+1.5) damagePiece(pc,X.bld*(1-0.55*Math.min(1,dd/(X.r+1.5))),c); });
   propsNear(pos.x,pos.z,[]).forEach(pr=>{ const dd=Math.hypot(pr.x-pos.x,pr.z-pos.z); if(dd<X.r) propHit(pr,X.bld*0.5*(1-dd/X.r),new THREE.Vector3(pr.x,pr.base+1,pr.z),false); });
+  { const ss=new Set(), seen=new Set(); staticsInto(ss,pos.x,pos.z,X.r+3); ss.forEach(s=>{ const o=s.dobj; if(!o||o.gone||seen.has(o)) return; seen.add(o); const dd=o.c.distanceTo(pos); if(dd<X.r+1.5) decoDamage(o,X.bld*(1-0.55*Math.min(1,dd/(X.r+1.5))),o.c.clone()); }); } // decoration in the blast
   const hurtBy=(e,yOff)=>{ const dd=_pd.set(e.pos.x,e.pos.y+(yOff||1),e.pos.z).distanceTo(pos); return dd<X.r?Math.round(X.dmg*(1-0.7*dd/X.r)):0; };
   horde.zs.forEach(z=>{ if(!z.alive) return; const dmg=hurtBy(z,1); if(!dmg) return; dmgNum(z.pos.clone().setY(z.pos.y+1.6),dmg,'hp'); hitMarker(dmg,false);
     if(net.role==='client') netSend({type:'zhit',id:net.id,z:z.id,dmg}); else zombieHurt(z,dmg,net.id); });
