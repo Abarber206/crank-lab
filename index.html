@@ -3956,7 +3956,7 @@ function animateRig(H,S,dt){
   if(S.swimW!==null){ S.gun=false; S.building=false; S.editing=false; S.reload=null; S.emote=null; S.item=false; S.swingT=0; S.crouch=false; }
   if(S.seat){ const look=S.yaw, gunP=S.seat.s===1&&!!S.gun; S.seat.look=look; S.seat.gunP=gunP; if(!gunP){ S.gun=false; S.yaw=S.seat.k.yaw; S.reload=null; }
     S.vel=_ZV; S.onGround=true; S.crouch=false; S.emote=null; S.slope=0; S.building=false; S.editing=false; S.swingT=0; S.sky=null; S.item=false; }
-  footRestore(H); animateRig0(H,S,dt); if(S.seat) seatPlace(H,S); else if(S.showPick) showPickPose(H,S); else pickTwoHands(H,S,dt); if(S.emote&&S.emote.id==='salute'&&EMOTES.salute) saluteHand(H,S); poseHands(H,S,dt); footPlant(H,S); }
+  footRestore(H); animateRig0(H,S,dt); if(S.seat) seatPlace(H,S); else if(S.showPick) showPickPose(H,S); else pickTwoHands(H,S,dt); if(!S.showPick&&H.rig.pick&&H.rig.pick.position.lengthSq()>0) H.rig.pick.position.set(0,0,0); if(S.emote&&S.emote.id==='salute'&&EMOTES.salute) saluteHand(H,S); poseHands(H,S,dt); footPlant(H,S); }
 const _slA=new THREE.Vector3(), _slB=new THREE.Vector3(), _slQ=new THREE.Quaternion(), _slQ2=new THREE.Quaternion(), _slQ3=new THREE.Quaternion(), _slF=new THREE.Vector3(), _slU=new THREE.Vector3(), _slS=new THREE.Quaternion(), _slW=new THREE.Quaternion(), _slM=new THREE.Matrix4();
 // a point in the body's own frame (x right, y up, z back), from its group
 const bodyPt=(H,x,y,z,out)=>out.set(x,y,z).applyQuaternion(H.group.quaternion).add(H.group.position);
@@ -3969,13 +3969,15 @@ function saluteHand(H,S){ const r=H.rig, E=EMOTES.salute, t=S.emote.t, cl=x=>Mat
   handQuat(_slW,fwd,upv); const s0=r.armR.sh.quaternion.clone(), e0=r.armR.el.quaternion.clone(), w0=r.armR.wr.quaternion.clone();
   ikArm(r.armR,tgt,pole,_slW); if(up<0.999){ r.armR.sh.quaternion.copy(s0.slerp(r.armR.sh.quaternion,up)); r.armR.el.quaternion.copy(e0.slerp(r.armR.el.quaternion,up)); r.armR.wr.quaternion.copy(w0.slerp(r.armR.wr.quaternion,up)); } }
 // the Locker's pickaxe preview: held low at the side, the head forward by the shins
+const PICK_GRIP=0.36; // how far up the handle (towards its end) the hand holds it on the shoulder
 function showPickPose(H,S){ const r=H.rig; if(!r.pick) return; r.pick.visible=true; H.group.updateMatrixWorld(true);
-  const tgt=bodyPt(H,0.27,0.9,-0.12,_slB), pole=bodyPt(H,0.6,0.7,0.2,_slF);
-  const hf=bodyDir(H,0,-1,-0.3,_slU), hu=bodyDir(H,0,0,-1,_slA);
+  const tgt=bodyPt(H,0.17,1.13,-0.2,_slB), pole=bodyPt(H,0.65,0.85,0.3,_slF);
+  const hf=bodyDir(H,-0.35,-0.25,-1,_slU), hu=bodyDir(H,0,1,-0.2,_slA);
   handQuat(_slW,hf,hu); ikArm(r.armR,tgt,pole,_slW); r.armR.fing.rotation.x=1.25;
-  // the pick itself: the handle angled down and forward from the hand
-  r.armR.hand.updateMatrixWorld(true); const hy=bodyDir(H,-0.12,0.62,0.78,_slA), hx=bodyDir(H,1,0,0,_slU.clone()); hx.addScaledVector(hy,-hx.dot(hy)).normalize(); const hz=_slF.crossVectors(hx,hy).normalize();
+  // the pick itself: the handle runs up from the fist and back over the shoulder, the head resting behind it
+  r.armR.hand.updateMatrixWorld(true); const hy=bodyDir(H,-0.05,-0.6,-0.8,_slA), hx=bodyDir(H,1,0,0,_slU.clone()); hx.addScaledVector(hy,-hx.dot(hy)).normalize(); const hz=_slF.crossVectors(hx,hy).normalize();
   _slM.makeBasis(hx,hy,hz); _slQ.setFromRotationMatrix(_slM); r.armR.hand.getWorldQuaternion(_slQ2); r.pick.quaternion.copy(_slQ2.invert().multiply(_slQ));
+  r.pick.position.set(0,-PICK_GRIP,0).applyQuaternion(r.pick.quaternion);
   r.armL.sh.rotation.set(0.05,0,-0.12); r.armL.el.rotation.set(0.15,0,0); }
 const _fpM0=new THREE.Matrix4(), _fpMi=new THREE.Matrix4(), _fpG=[new THREE.Vector3(),new THREE.Vector3()], _fpT=new THREE.Vector3(), _fpJ=new THREE.Vector3(), _fpQ=[new THREE.Quaternion(),new THREE.Quaternion()], _fpQa=new THREE.Quaternion(), _fpQb=new THREE.Quaternion(), _fpW=[0,0];
 // the solved legs are put back to their animated angles before the next frame, so the animation's own smoothing never sees them
