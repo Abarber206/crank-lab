@@ -66,3 +66,6 @@ Run with Node and Playwright (Chromium), from a folder that has `three` and `pee
 - tlockerbk.js: screenshots of the Locker back bling row and the Item Shop
 - tstageone.js: in a party the Locker stage shows only your hero and its pad fits the picture
 - twheel5.js: the 5-slot emote wheel: pick a slot then an emote, swap, remove, buying fills an empty slot
+- tdances.js: every emote start to end: joints stay sane, feet stay on the floor, every song beat plays
+- tdancestrip.js: a dance as front and side frames (OFF= start, SPAN= seconds) for judging poses
+- tlkemotes.js: the Locker emote section with every emote owned
