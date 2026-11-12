@@ -60,3 +60,7 @@ Run with Node and Playwright (Chromium), from a folder that has `three` and `pee
 - tcalls.js: draw calls in one frame by pass and by object (node tcalls.js town|river|br)
 - tbench.js: CPU ms per frame by subsystem (CDP profiler)
 - tperfview.js: town screenshot with the Performance preset, alternate-frame shadows and the FPS counter
+- tskins.js: every outfit in a row, front (BACK=1 back, SIDE=1 side profile), for judging the skins
+- tpickrow.js: every pickaxe head side by side
+- tback.js: back bling slot: off, swap, owned/locked, the hero rebuilds
+- tlockerbk.js: screenshots of the Locker back bling row and the Item Shop
