@@ -44,3 +44,4 @@ Run with Node and Playwright (Chromium), from a folder that has `three` and `pee
 - `trefl.js` — pictures of reflections from boat height beside sea cliffs, looking along the shore and turned.
 - `tpick.js` — the hero standing with the pickaxe out, from the side and from behind (FILE=... to compare builds).
 - `tstagepick.js` — the Locker pickaxe preview: the hero rests the pickaxe over the shoulder.
+- `tpickclip.js` — every outfit with two pickaxes in the shoulder-rest preview: no point of the pick inside the body (SEARCH=1 searches poses).

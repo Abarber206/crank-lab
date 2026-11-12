@@ -3969,15 +3969,15 @@ function saluteHand(H,S){ const r=H.rig, E=EMOTES.salute, t=S.emote.t, cl=x=>Mat
   handQuat(_slW,fwd,upv); const s0=r.armR.sh.quaternion.clone(), e0=r.armR.el.quaternion.clone(), w0=r.armR.wr.quaternion.clone();
   ikArm(r.armR,tgt,pole,_slW); if(up<0.999){ r.armR.sh.quaternion.copy(s0.slerp(r.armR.sh.quaternion,up)); r.armR.el.quaternion.copy(e0.slerp(r.armR.el.quaternion,up)); r.armR.wr.quaternion.copy(w0.slerp(r.armR.wr.quaternion,up)); } }
 // the Locker's pickaxe preview: held low at the side, the head forward by the shins
-const PICK_GRIP=0.36; // how far up the handle (towards its end) the hand holds it on the shoulder
+var PICK_SHOW={hand:[0.19,1.13,-0.32],dir:[-0.2,-0.6,-0.75],grip:0.36}; // the hand in front of the chest; the handle's way down from the shoulder; how far up the handle the hand holds it
 function showPickPose(H,S){ const r=H.rig; if(!r.pick) return; r.pick.visible=true; H.group.updateMatrixWorld(true);
-  const tgt=bodyPt(H,0.17,1.13,-0.2,_slB), pole=bodyPt(H,0.65,0.85,0.3,_slF);
+  const tgt=bodyPt(H,PICK_SHOW.hand[0],PICK_SHOW.hand[1],PICK_SHOW.hand[2],_slB), pole=bodyPt(H,0.65,0.85,0.3,_slF);
   const hf=bodyDir(H,-0.35,-0.25,-1,_slU), hu=bodyDir(H,0,1,-0.2,_slA);
   handQuat(_slW,hf,hu); ikArm(r.armR,tgt,pole,_slW); r.armR.fing.rotation.x=1.25;
   // the pick itself: the handle runs up from the fist and back over the shoulder, the head resting behind it
-  r.armR.hand.updateMatrixWorld(true); const hy=bodyDir(H,-0.05,-0.6,-0.8,_slA), hx=bodyDir(H,1,0,0,_slU.clone()); hx.addScaledVector(hy,-hx.dot(hy)).normalize(); const hz=_slF.crossVectors(hx,hy).normalize();
+  r.armR.hand.updateMatrixWorld(true); const hy=bodyDir(H,PICK_SHOW.dir[0],PICK_SHOW.dir[1],PICK_SHOW.dir[2],_slA), hx=bodyDir(H,1,0,0,_slU.clone()); hx.addScaledVector(hy,-hx.dot(hy)).normalize(); const hz=_slF.crossVectors(hx,hy).normalize();
   _slM.makeBasis(hx,hy,hz); _slQ.setFromRotationMatrix(_slM); r.armR.hand.getWorldQuaternion(_slQ2); r.pick.quaternion.copy(_slQ2.invert().multiply(_slQ));
-  r.pick.position.set(0,-PICK_GRIP,0).applyQuaternion(r.pick.quaternion);
+  r.pick.position.set(0,-PICK_SHOW.grip,0).applyQuaternion(r.pick.quaternion);
   r.armL.sh.rotation.set(0.05,0,-0.12); r.armL.el.rotation.set(0.15,0,0); }
 const _fpM0=new THREE.Matrix4(), _fpMi=new THREE.Matrix4(), _fpG=[new THREE.Vector3(),new THREE.Vector3()], _fpT=new THREE.Vector3(), _fpJ=new THREE.Vector3(), _fpQ=[new THREE.Quaternion(),new THREE.Quaternion()], _fpQa=new THREE.Quaternion(), _fpQb=new THREE.Quaternion(), _fpW=[0,0];
 // the solved legs are put back to their animated angles before the next frame, so the animation's own smoothing never sees them
