@@ -4,11 +4,11 @@ const {sleep,page,launch,open}=require('./h.js');
  await pg.waitForFunction(()=>window.T&&T.renderer,null,{timeout:180000}); await sleep(3000);
  const r=await pg.evaluate(async()=>{ const out={}; const vis=()=>[...document.querySelectorAll('#emotesBox .ofit')].filter(b=>!b.hidden).map(b=>b.dataset.id);
    out.start=vis(); out.shopDances=T.shopRotation().filter(x=>x[0]==='e').map(x=>x[1].id);
-   T.wallet.pts=3000; window._locker.offerBuy('e',T.EMOTE_LIST.find(e=>e.id==='floss')); document.getElementById('buyOk').click(); await new Promise(r=>setTimeout(r,200));
+   T.wallet.cb=3000; window._locker.offerBuy('e',T.EMOTE_LIST.find(e=>e.id==='floss')); document.getElementById('buyOk').click(); await new Promise(r=>setTimeout(r,200));
    out.after=vis(); out.equipped=T.settings.emote; return out; });
- await pg.click('[data-tab=locker]'); await sleep(400); await pg.evaluate(()=>document.getElementById('emotesBox').scrollIntoView()); await sleep(300); await pg.screenshot({path:'em_locker.png'});
- await pg.click('[data-tab=shop]'); await sleep(600); await pg.screenshot({path:'em_shop.png'});
- await pg.click('[data-tab=play]'); await pg.evaluate(()=>{ window._stagePrev={id:'disco',t0:performance.now()}; }); await sleep(1800); await pg.screenshot({path:'em_stage.png'});
+ await pg.evaluate(()=>document.querySelector('button[data-tab=locker]').click()); await sleep(400); await pg.evaluate(()=>document.getElementById('emotesBox').scrollIntoView()); await sleep(300); await pg.screenshot({path:'em_locker.png',timeout:200000});
+ await pg.evaluate(()=>document.querySelector('button[data-tab=shop]').click()); await sleep(600); await pg.screenshot({path:'em_shop.png',timeout:200000});
+ await pg.evaluate(()=>document.querySelector('button[data-tab=play]').click()); await pg.evaluate(()=>{ window._stagePrev={id:'disco',t0:performance.now()}; }); await sleep(1800); await pg.screenshot({path:'em_stage.png',timeout:200000});
  // in game
  await pg.evaluate(()=>{ T.settings.skyDrop=false; const s=document.querySelector('#botSel'); s.value='off'; s.dispatchEvent(new Event('change')); document.getElementById('play').click(); });
  await pg.waitForFunction(()=>T.renderer.info.render.frame>5,null,{timeout:120000}); await sleep(1500);

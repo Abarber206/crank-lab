@@ -39,3 +39,6 @@ Run with Node and Playwright (Chromium), from a folder that has `three` and `pee
 - `tdraw.js` — drawing work per frame (calls, triangles, far-shadow redraws, terrain meshes built) standing, skydiving and gliding.
 - `twater.js` — pictures of every river mouth and stream join from the bank (NOREFL=1 without reflections).
 - `tswimt.js` — walk into deep water and back out: the swim pose switches once each way and no limb jumps between frames.
+- `tcbux.js` — Crank Bux: wallet shows Crank Bux, the Get Crank Bux window shows points and pack costs, converting, buying, and "Get Crank Bux" when short (VP=844x390 for a phone).
+- `tmouth.js` — river mouths: no shoals standing up in the channel out to sea; a boat drives from the sea up each river without running aground.
+- `trefl.js` — pictures of reflections from boat height beside sea cliffs, looking along the shore and turned.

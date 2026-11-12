@@ -376,7 +376,7 @@ body.touch #stickHint{width:100px;height:100px;opacity:.6}
 .shopgrid .ofit img{object-fit:contain} .ofit svg.emo{position:absolute;left:16%;top:8%;width:68%;height:62%;pointer-events:none;filter:drop-shadow(0 2px 3px rgba(0,0,0,.35))} .picks.emotes .ofit svg.emo{top:4%;height:66%}
 .shopgrid .ofit span{font-size:16px;padding:22px 6px 8px}
 .shopgrid .cost{position:absolute;top:8px;right:8px;display:flex;align-items:center;gap:4px;font:800 italic 15px/1 var(--font-hud);color:#ffe08a;background:rgba(5,14,40,.78);border-radius:999px;padding:4px 9px 4px 5px}
-.shopgrid .cost::before{content:"";width:14px;height:14px;border-radius:50%;background:#ffcf4a;box-shadow:inset 0 0 0 2px #b07a16}
+
 .shopgrid .own{position:absolute;top:8px;left:8px;font:800 12px/1 var(--font-hud);letter-spacing:.12em;text-transform:uppercase;color:#0f2a0f;background:#9ff59a;border-radius:4px;padding:4px 7px}
 .shopgrid .kind{display:block;font:700 10px/1.2 var(--font-hud);letter-spacing:.12em;opacity:.75;font-style:normal}
 .shopgrid .ofit.afford{border-color:rgba(255,225,77,.7)}
@@ -572,6 +572,26 @@ body.touch #pdFs{display:none}
 #friendsCard .addrow{display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-top:8px}
 #friendsCard .addrow input{font:800 18px/1 var(--font-hud);letter-spacing:.12em;width:11em}
 #fStatus{min-height:1.2em}
+button.wallet{cursor:pointer;-webkit-appearance:none;appearance:none;font:800 italic 18px/1 var(--font-hud);color:#bff0ff;border-color:rgba(80,200,255,.45)} button.wallet:hover{filter:brightness(1.12)} button.wallet:active{transform:scale(.97)}
+#menu.lobby .wallet{border-color:rgba(90,205,255,.6)}
+.cbx{width:1.25em;height:1.25em;flex:none;vertical-align:-.25em} .wallet .cbx{width:24px;height:24px}
+.cbplus{font:900 15px/1 system-ui,sans-serif;font-style:normal;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;background:#27b4ee;color:#fff;margin-left:2px}
+.shopgrid .cost .cbx{width:16px;height:16px} .shopgrid .cost{color:#bff0ff}
+.cbget{margin-top:10px;display:inline-flex;align-items:center;gap:8px}
+#buyBox{position:fixed;left:50%;bottom:max(18px,env(safe-area-inset-bottom,0px));transform:translateX(-50%);width:min(560px,calc(100vw - 24px));z-index:58;background:rgba(8,20,56,.96);border:2px solid rgba(90,205,255,.6);border-radius:12px;padding:12px 14px;box-shadow:0 12px 34px rgba(0,0,0,.5);color:#fff}
+#buyBox[hidden]{display:none} #buyBox small{color:rgba(225,236,255,.8)}
+#cbBox{position:fixed;inset:0;z-index:62;display:grid;place-items:center;background:rgba(2,8,24,.72);padding:16px;backdrop-filter:blur(4px)} #cbBox[hidden]{display:none}
+.cbcard{width:min(620px,100%);max-height:calc(100vh - 32px);overflow-y:auto;background:linear-gradient(180deg,#0d2a66,#071638);border:2px solid rgba(90,205,255,.6);border-radius:14px;padding:18px;color:#fff;box-shadow:0 18px 50px rgba(0,0,0,.55);position:relative}
+.cbcard h3{margin:0 0 6px;display:flex;align-items:center;gap:10px;font:800 italic 26px/1.1 var(--font-hud);text-transform:uppercase;letter-spacing:.03em} .cbcard h3 .cbx{width:32px;height:32px}
+.cbhave{margin:0 0 14px;color:rgba(225,236,255,.85)} .cbhave b{color:#ffe08a;font:800 italic 18px/1 var(--font-hud)}
+.cbpacks{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
+.cbpack{position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;padding:16px 8px 12px;border-radius:10px;border:2px solid rgba(90,205,255,.35);background:radial-gradient(circle at 50% 30%,rgba(60,180,255,.35),rgba(10,30,80,.6) 70%);color:#fff;cursor:pointer;font:inherit}
+.cbpack:hover:not(:disabled){border-color:#7fe3ff;filter:brightness(1.1)} .cbpack:disabled{opacity:.5;cursor:default}
+.cbpack .cbx{width:40px;height:40px} .cbpack b{font:800 italic 24px/1 var(--font-hud)} .cbpack small{font:700 11px/1 var(--font-hud);letter-spacing:.12em;text-transform:uppercase;color:#bff0ff}
+.cbpack em{font-style:normal;margin-top:4px;padding:5px 10px;border-radius:999px;background:#ffd21a;color:#1a1400;font:800 13px/1 var(--font-hud)} .cbpack:disabled em{background:rgba(255,255,255,.18);color:#fff}
+.cbpack i{position:absolute;top:-9px;left:50%;transform:translateX(-50%);white-space:nowrap;font:800 10px/1 var(--font-hud);letter-spacing:.1em;text-transform:uppercase;font-style:normal;background:#ff6a3d;color:#fff;border-radius:4px;padding:3px 6px}
+.cbconf{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px;padding:12px;border-radius:10px;background:rgba(255,255,255,.08)} .cbconf[hidden]{display:none} .cbconf p{margin:0;flex:1;min-width:180px}
+.cbnote{margin:14px 0 0;font-size:13px;color:rgba(225,236,255,.7)} .cbclose{margin-top:12px}
 #invitePop{position:fixed;left:50%;top:max(14px,env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:60;display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;background:rgba(6,14,40,.92);border:2px solid #ffd21a;color:#fff;box-shadow:0 10px 30px rgba(0,0,0,.45);font:700 15px/1.3 var(--font-ui,system-ui);max-width:94vw}
 #invitePop b{color:#ffd21a}
 #invitePop .btn{padding:8px 14px}
@@ -688,12 +708,20 @@ body.touch #kartHud{bottom:auto;top:calc(env(safe-area-inset-top,0px) + 58px)}
 
 <div id="emoWheel" hidden><div class="ring" id="emoRing"><div class="mid" id="emoMid">Emotes</div></div></div>
 <div id="vanMark" hidden><i></i><span id="vanMarkD"></span></div>
+<div id="cbBox" hidden role="dialog" aria-modal="true" aria-labelledby="cbTitle"><div class="cbcard">
+  <h3 id="cbTitle"><svg class="cbx" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10.4" fill="#27b4ee" stroke="#0a5a88" stroke-width="1.5"/><circle cx="12" cy="12" r="7.6" fill="none" stroke="#c8f3ff" stroke-width="1" opacity=".75"/><path d="M15.3 8.7a4.7 4.7 0 1 0 0 6.6" fill="none" stroke="#fff" stroke-width="2.7" stroke-linecap="round"/><path d="M15.4 15.3l2.2 2.2" stroke="#fff" stroke-width="1.9" stroke-linecap="round"/><circle cx="18.1" cy="18" r="1.45" fill="#ffd84a" stroke="#0a5a88" stroke-width=".6"/></svg>Get Crank Bux</h3>
+  <p class="cbhave">You have <b id="cbPts">0</b> points</p>
+  <div class="cbpacks" id="cbPacks"></div>
+  <div class="cbconf" id="cbConf" hidden><p></p><button class="btn primary" id="cbYes" type="button">Convert</button><button class="btn" id="cbBack" type="button">Back</button></div>
+  <p class="cbnote">Earn points by taking down zombies in <b>Zombie horde</b>. Converting can't be undone.</p>
+  <button class="btn cbclose" id="cbClose" type="button">Close</button>
+</div></div>
 <div id="invitePop" hidden><span id="invText"></span><button class="btn primary" id="invJoin" type="button">Join</button><button class="btn" id="invNo" type="button">No thanks</button></div>
 <div id="menu" class="lobby">
   <div class="panel">
     <header class="mhead">
       <h1>Crank Lab</h1>
-      <div class="wallet" title="Points: earned by taking down zombies. Spend them in the Locker."><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="#ffcf4a"/><circle cx="12" cy="12" r="7" fill="none" stroke="#b07a16" stroke-width="2"/><path d="M12 7v10M9 9.5h4.5a1.8 1.8 0 0 1 0 3.6h-3a1.8 1.8 0 0 0 0 3.6H15" fill="none" stroke="#7a520c" stroke-width="1.8" stroke-linecap="round"/></svg><b id="ptsV">0</b><span>pts</span></div>
+      <button class="wallet" id="cbWallet" type="button" title="Crank Bux: spend them in the Item Shop. Tap to get more."><svg class="cbx" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10.4" fill="#27b4ee" stroke="#0a5a88" stroke-width="1.5"/><circle cx="12" cy="12" r="7.6" fill="none" stroke="#c8f3ff" stroke-width="1" opacity=".75"/><path d="M15.3 8.7a4.7 4.7 0 1 0 0 6.6" fill="none" stroke="#fff" stroke-width="2.7" stroke-linecap="round"/><path d="M15.4 15.3l2.2 2.2" stroke="#fff" stroke-width="1.9" stroke-linecap="round"/><circle cx="18.1" cy="18" r="1.45" fill="#ffd84a" stroke="#0a5a88" stroke-width=".6"/></svg><b id="cbV">0</b><span>Crank Bux</span><i class="cbplus" aria-hidden="true">+</i></button>
     </header>
     <nav class="mtabs" role="tablist" aria-label="Menu">
       <button type="button" role="tab" data-tab="play" class="on" id="tabPlay">Lobby</button>
@@ -769,7 +797,7 @@ body.touch #kartHud{bottom:auto;top:calc(env(safe-area-inset-top,0px) + 58px)}
     </section>
     </section>
     <section class="mtab" data-tab="shop" hidden>
-      <div class="shophead"><h2>Item Shop</h2><p>Spend the points you earn in <b>Zombie horde</b>. Bought items go straight to your Locker.</p><p class="shoptimer">New items in <b id="shopTimer">20:00</b></p></div>
+      <div class="shophead"><h2>Item Shop</h2><p>Spend Crank Bux here. Turn the points you earn in <b>Zombie horde</b> into Crank Bux. Bought items go straight to your Locker.</p><button class="btn primary cbget" id="cbGet" type="button"><svg class="cbx" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10.4" fill="#27b4ee" stroke="#0a5a88" stroke-width="1.5"/><circle cx="12" cy="12" r="7.6" fill="none" stroke="#c8f3ff" stroke-width="1" opacity=".75"/><path d="M15.3 8.7a4.7 4.7 0 1 0 0 6.6" fill="none" stroke="#fff" stroke-width="2.7" stroke-linecap="round"/><path d="M15.4 15.3l2.2 2.2" stroke="#fff" stroke-width="1.9" stroke-linecap="round"/><circle cx="18.1" cy="18" r="1.45" fill="#ffd84a" stroke="#0a5a88" stroke-width=".6"/></svg>Get Crank Bux</button><p class="shoptimer">New items in <b id="shopTimer">20:00</b></p></div>
       <div id="shopGrid" class="shopgrid"></div>
     </section>
     <section class="mtab" data-tab="settings" hidden>
@@ -1545,11 +1573,12 @@ function routeRivers(){
 /* The rivers, cut into the land as it now stands (roads and towns done): a rounded bed under the water, a low bank
    at each side, and the ground sloping back up to where it was (farther where the cut is deeper). Roads keep their
    own ground, except where a river runs under them: there the land is cut away and the road is a bridge. */
-{ const {RVD,RVY,RVW,RVB,RVP,WS,SAND,GRASS,ROCK}=WORLD, NN=WN*WN;
+{ const {RVD,RVY,RVW,RVB,RVP,WS,SAND,GRASS,ROCK}=WORLD, NN=WN*WN, _rvS=WGEN.sea(), _rvSeaY=_rvS?_rvS.Y:-1e4;
   for(let c=0;c<NN;c++){ const dd=RVD[c]; if(dd>=1e4) continue; const hw=RVW[c]; if(WRD[c]<5&&dd>=hw+3) continue;
     const ys=RVY[c], h0=WH[c]; let h;
     if(dd<=hw){ const a=dd/hw; h=ys-RVP[c]*(1-a*a); }
     else { const t=(dd-hw)/RVB[c]; if(t>=1) continue; const lip=ys+0.3*Math.min(1,(dd-hw)/1.2); h=lip+(h0-lip)*t*t*(3-2*t); }
+    if(h0<_rvSeaY+0.6||dd<=hw) h=Math.min(h,h0); // (never raised: not under the river, and not on the sea floor)
     WH[c]=h; if(dd<hw-0.15&&h<ys-0.04&&WS[c]<-999) WS[c]=ys;
     if(dd<hw+1.5) GRASS[c]=0; const sd=Math.round(215*(1-sstep(hw*0.55,hw+1.8,dd))); if(sd>SAND[c]) SAND[c]=sd; if(dd<hw) ROCK[c]=Math.round(ROCK[c]*0.3); } }
 function townAt(x,z,pad){ for(const t of TOWNS) if(Math.hypot(x-t.x,z-t.z)<t.R+(pad||0)) return t; return null; }
@@ -1699,9 +1728,12 @@ function shoreAt(x,z){ const c=worldCell(x,z); return c>=0&&(WORLD.WS[c]>-999||W
         float fg=min(1.0-exp(-dist*0.0011),0.92);
         vec3 mir=TM(mix(mix(hor,zen,pow(R.y,0.55)),fogCol,fg));                                              // with no mirror image: the sky, by angle
         vec2 wob=a*vec2(0.022,0.05)/(1.0+dist*0.03); float d1=vW.y-reflY, d2=vW.y-reflY2;                  // the mirror images, wobbled by the ripples
-        float w1=reflK*(d1>0.0?1.0-smoothstep(0.6,2.2,d1):1.0-smoothstep(1.5,5.0,-d1)), w2=reflK2*(d2>0.0?1.0-smoothstep(0.6,2.2,d2):1.0-smoothstep(1.5,5.0,-d2)); // (water at a mirror's level, or a little below it)
-        if(w1>0.004&&w1>=w2){ vec4 rc=reflM*vec4(vW,1.0); mir=mix(mir,texture2D(reflT,clamp(rc.xy/rc.w+wob,0.003,0.997)).rgb,w1); }
-        else if(w2>0.004){ vec4 rc=reflM2*vec4(vW,1.0); mir=mix(mir,texture2D(reflT2,clamp(rc.xy/rc.w+wob,0.003,0.997)).rgb,w2); }
+        float w1=reflK*(d1>0.0?1.0-smoothstep(0.6,2.2,d1):1.0-smoothstep(1.0,2.6,-d1)), w2=reflK2*(d2>0.0?1.0-smoothstep(0.6,2.2,d2):1.0-smoothstep(1.0,2.6,-d2)); // (water at a mirror's level, or a little below it)
+        const vec2 ro=vec2(0.0011,0.0017);                                                                    // four taps a pixel apart: soft edges, no stair-steps
+        if(w1>0.004&&w1>=w2){ vec4 rc=reflM*vec4(vW,1.0); vec2 u=clamp(rc.xy/rc.w+wob,0.004,0.996);
+          mir=mix(mir,(texture2D(reflT,u+ro).rgb+texture2D(reflT,u-ro).rgb+texture2D(reflT,u+vec2(ro.x,-ro.y)).rgb+texture2D(reflT,u+vec2(-ro.x,ro.y)).rgb)*0.25,w1); }
+        else if(w2>0.004){ vec4 rc=reflM2*vec4(vW,1.0); vec2 u=clamp(rc.xy/rc.w+wob,0.004,0.996);
+          mir=mix(mir,(texture2D(reflT2,u+ro).rgb+texture2D(reflT2,u-ro).rgb+texture2D(reflT2,u+vec2(ro.x,-ro.y)).rgb+texture2D(reflT2,u+vec2(-ro.x,ro.y)).rgb)*0.25,w2); }
         vec3 body=TM(mix(mix(vec3(0.20,0.62,0.66),vec3(0.03,0.22,0.36),smoothstep(0.0,4.5,D))*lum,fogCol,fg));
         vec3 col=mix(body,mir,F);
         float sr=max(dot(R,sunDir),0.0); col+=sunCol*(pow(sr,220.0)*2.2+pow(sr,28.0)*0.1)*(1.0-fg);          // glitter
@@ -1788,14 +1820,16 @@ function renderMain(){ if(!AO.ok||settings.ao===false||!PERF.ao||!scene.visible)
   renderer.setRenderTarget(AO.ao); renderer.render(AO.sA,AO.cam); renderer.setRenderTarget(null); renderer.render(AO.sC,AO.cam);
   if(AO.n<3&&++AO.n===3){ const gl=renderer.getContext(); if(gl.getError()!==gl.NO_ERROR){ console.warn('ambient occlusion switched off: the graphics driver refused it'); AO.ok=false; } } } // (checked once, after the first few frames)
 const REFL={cam:new THREE.PerspectiveCamera(),plane:new THREE.Plane(),clip:new THREE.Vector4(),q:new THREE.Vector4(),sz:new THREE.Vector2(),t:new THREE.Vector3(),hid:[],
-  s:[0,1].map(()=>({rt:null,m:new THREE.Matrix4(),lvl:-1e4,rl:-1e4,K:0,k:0,ok:false,want:false,age:9})),t0:0,c:[],flip:0};
+  s:[0,1].map(()=>({rt:null,m:new THREE.Matrix4(),pose:new THREE.Matrix4(),lvl:-1e4,rl:-1e4,K:0,k:0,ok:false,want:false,age:9,o:0})),t0:0,c:[],flip:0};
+const reflStale=sl=>{ const a=sl.pose.elements, b=camera.matrixWorld.elements; for(let i=0;i<15;i++) if(Math.abs(a[i]-b[i])>(i>=12?0.01:0.0008)) return true; return false; };
 function reflDraw(sl,lvl){ const u=WATER.mat.uniforms, cp=camera.position;
   renderer.getDrawingBufferSize(REFL.sz); const w=Math.max(64,Math.round(REFL.sz.x*0.5)), h=Math.max(64,Math.round(REFL.sz.y*0.5));
   if(!sl.rt) sl.rt=new THREE.WebGLRenderTarget(w,h,{minFilter:THREE.LinearFilter,magFilter:THREE.LinearFilter,format:THREE.RGBAFormat}); else if(sl.rt.width!==w||sl.rt.height!==h) sl.rt.setSize(w,h);
   // the camera's mirror image below the surface
   const vc=REFL.cam; camera.updateMatrixWorld(); vc.position.set(cp.x,2*lvl-cp.y,cp.z);
   REFL.t.set(0,0,-1).applyQuaternion(camera.quaternion).add(cp); REFL.t.y=2*lvl-REFL.t.y;
-  vc.up.set(0,1,0).applyQuaternion(camera.quaternion); vc.up.y=-vc.up.y; vc.lookAt(REFL.t); vc.updateMatrixWorld(); vc.projectionMatrix.copy(camera.projectionMatrix);
+  vc.up.set(0,1,0).applyQuaternion(camera.quaternion); vc.up.y=-vc.up.y; vc.lookAt(REFL.t); vc.updateMatrixWorld();
+  vc.fov=camera.fov; vc.aspect=camera.aspect; vc.zoom=camera.zoom; vc.near=camera.near; vc.far=camera.far*40; vc.updateProjectionMatrix(); // (a far plane well out: the oblique cut below tilts it in)
   sl.m.set(0.5,0,0,0.5, 0,0.5,0,0.5, 0,0,0.5,0.5, 0,0,0,1).multiply(vc.projectionMatrix).multiply(vc.matrixWorldInverse);
   // its near plane is tilted onto the water surface, so nothing below the surface is drawn (Lengyel's oblique clipping)
   REFL.plane.normal.set(0,1,0); REFL.plane.constant=-lvl; REFL.plane.applyMatrix4(vc.matrixWorldInverse);
@@ -1807,7 +1841,7 @@ function reflDraw(sl,lvl){ const u=WATER.mat.uniforms, cp=camera.position;
   const prev=renderer.getRenderTarget(), au=renderer.shadowMap.autoUpdate; renderer.shadowMap.autoUpdate=false; // the shadow maps from the last frame serve
   renderer.setRenderTarget(sl.rt); renderer.clear(); renderer.render(scene,vc); renderer.setRenderTarget(prev); renderer.shadowMap.autoUpdate=au;
   for(const o of hid) o.visible=true;
-  sl.rl=lvl; sl.ok=true; sl.age=0; }
+  sl.rl=lvl; sl.ok=true; sl.age=0; sl.pose.copy(camera.matrixWorld); }
 function renderReflection(){ if(!WATER.mat) return; const u=WATER.mat.uniforms, now=performance.now(), dt=Math.min(0.1,Math.max(0,(now-(REFL.t0||now))/1000)); REFL.t0=now;
   const off_=()=>{ u.reflK.value=0; u.reflK2.value=0; for(const sl of REFL.s){ sl.k=0; sl.ok=false; sl.lvl=-1e4; } };
   if(settings.reflect===false||!PERF.reflect||!WATER.lv||!scene.visible){ off_(); return; }
@@ -1824,13 +1858,15 @@ function renderReflection(){ if(!WATER.mat) return; const u=WATER.mat.uniforms, 
   // each wanted level keeps the mirror it already has; a new one takes over a mirror that is no longer wanted
   const S2=REFL.s; for(const sl of S2) sl.want=false; const free=[];
   for(const c of C){ if(c.K<0.01) continue; let best=null; for(const sl of S2) if(!sl.want&&Math.abs(sl.lvl-c.l)<0.6&&(!best||Math.abs(sl.lvl-c.l)<Math.abs(best.lvl-c.l))) best=sl;
-    if(best){ best.want=true; best.lvl=c.l; best.K=c.K; } else free.push(c); }
-  for(const c of free){ const sl=S2.filter(t=>!t.want).sort((a,b)=>a.k-b.k)[0]; if(!sl) break; sl.want=true; sl.lvl=c.l; sl.K=c.K; sl.k=0; sl.ok=false; }
+    if(best){ best.want=true; best.lvl=c.l; best.K=c.K; best.o=c.o; } else free.push(c); }
+  for(const c of free){ const sl=S2.filter(t=>!t.want).sort((a,b)=>a.k-b.k)[0]; if(!sl) break; sl.want=true; sl.lvl=c.l; sl.K=c.K; sl.o=c.o; sl.k=0; sl.ok=false; }
   for(const sl of S2){ sl.k=sl.want?Math.min(sl.K,sl.k+dt*3):Math.max(0,sl.k-dt*3); sl.age++; if(sl.k<=0&&!sl.want){ sl.ok=false; } }
   // draw one mirror a frame: a new one at once, otherwise whichever is oldest; with just one in use, every other frame (as before)
-  const act=S2.filter(sl=>sl.want), fresh=act.find(sl=>!sl.ok||Math.abs(sl.rl-sl.lvl)>0.25);
-  let pick=fresh||null; if(!pick&&act.length){ const old=act.reduce((a,b)=>a.age>=b.age?a:b); if(act.length>1||old.age>=2) pick=old; }
-  if(pick) reflDraw(pick,pick.lvl);
+  // the nearer water's mirror is redrawn every frame while the view moves; the other one every other frame; standing
+  // still, each now and then (for things moving in it)
+  const act=S2.filter(sl=>sl.want).sort((a,b)=>a.o-b.o); REFL.flip^=1;
+  for(let n=0;n<act.length;n++){ const sl=act[n], need=!sl.ok||Math.abs(sl.rl-sl.lvl)>0.25||sl.age>=(act.length>1?6:3)||(reflStale(sl)&&(n===0||REFL.flip));
+    if(need) reflDraw(sl,sl.lvl); }
   const [A,B]=S2;
   u.reflK.value=A.ok?A.k:0; if(A.ok){ u.reflT.value=A.rt.texture; u.reflM.value.copy(A.m); u.reflY.value=A.rl; }
   u.reflK2.value=B.ok?B.k:0; if(B.ok){ u.reflT2.value=B.rt.texture; u.reflM2.value.copy(B.m); u.reflY2.value=B.rl; }
@@ -5802,15 +5838,15 @@ function animateRig0(H,S,dt){
     if(!S.swimRaw) A.swEx=0.5; const mvK=A.swimMv=lerp(A.swimMv||0,S.swimRaw?Math.min(1,sp/(S.down?0.8:1.6)):0,Math.min(1,dt*(S.swimRaw?4:9))), bob=Math.sin(A.t*2.1)*0.035*(1-0.5*mvK);
     A.swC=((A.swC||0)+dt*(0.55+0.45*mvK)*(S.down?0.6:1))%1; const c=A.swC, TAU=Math.PI*2, reach=0.5+0.5*Math.cos(TAU*c), out=Math.max(0,Math.sin(TAU*c)), legB=Math.max(0,-Math.sin(TAU*c)), surge=0.06*out*mvK;
     // the body: upright treading water, nearly flat swimming; the hips just under the surface, so the head is always out
-    A.swX=lerp(A.swX||0,-(0.1+1.05*mvK)*e,Math.min(1,dt*5)); const th=A.swX, hipW=lerp(W-0.44,W-0.2,mvK)+bob+surge, hY=0.94;
+    A.swX=lerp(A.swX||0,-(0.1+1.05*mvK)*e,Math.min(1,dt*5)); const th=A.swX, hipW=lerp(W-0.44,W-0.33,mvK)+bob+surge, hY=0.94;
     r.hips.position.y=hY; r.hips.position.x=0; G.rotation.x=th; G.rotation.z=0;
     const fx=-Math.sin(S.yaw), fz=-Math.cos(S.yaw), hipStand=S.pos.y+hY; G.position.x=S.pos.x+hY*Math.sin(th)*fx; G.position.z=S.pos.z+hY*Math.sin(th)*fz; G.position.y=lerp(hipStand,hipW,e)-hY*Math.cos(th);
     set(r.hips,'x',0); set(r.hips,'y',0); set(r.hips,'z',0);
     set(r.spine,'x',lerp(-0.02,0.12+0.06*out,mvK)); set(r.spine,'y',0); set(r.spine,'z',0); set(r.chest,'x',lerp(0.04,0.1+0.08*out,mvK)); set(r.chest,'y',0); set(r.chest,'z',0);
-    set(r.neck,'x',lerp(0.05,0.55,mvK)); set(r.neck,'y',lerp(0.15*Math.sin(A.t*0.7),0,mvK)); set(r.neck,'z',0);                                   // the chin up out of the water
+    set(r.neck,'x',lerp(0.05,0.7,mvK)); set(r.neck,'y',lerp(0.15*Math.sin(A.t*0.7),0,mvK)); set(r.neck,'z',0);                                   // the chin up out of the water
     // arms: sculling out to the sides when treading; a breaststroke pull (out, round and in) then shooting forward when swimming
     const sc=Math.sin(A.t*3.2);
-    for(const [a,sx] of [[r.armL,-1],[r.armR,1]]){ set(a.sh,'x',lerp(0.78+0.06*sc,1.75+1.15*reach,mvK)); set(a.sh,'z',sx*lerp(0.42+0.16*sc,0.22+0.95*out,mvK)); set(a.sh,'y',sx*lerp(0.35*sc,-0.2*out,mvK));
+    for(const [a,sx] of [[r.armL,-1],[r.armR,1]]){ set(a.sh,'x',lerp(0.78+0.06*sc,1.4+0.75*reach-0.85*out,mvK)); set(a.sh,'z',sx*lerp(0.42+0.16*sc,0.22+0.9*out,mvK)); set(a.sh,'y',sx*lerp(0.35*sc,-0.2*out,mvK));
       set(a.el,'x',lerp(1.0-0.12*sc,0.2+1.35*(1-reach),mvK)); set(a.wr,'x',lerp(0.15,0.25,mvK)); set(a.wr,'z',sx*lerp(0.45*sc,0,mvK)); }
     // legs: an eggbeater kick treading water; the frog kick (knees up and out, then a snap back together) swimming
     let q=0; for(const [L,sx] of [[r.legL,-1],[r.legR,1]]){ const eg=Math.sin(A.t*4.2+q*Math.PI); q++;
@@ -6770,11 +6806,30 @@ $('readyBtn').addEventListener('click',()=>{ party.readyMe=!party.readyMe; if(ne
 
 /* ---------- points: earned by taking down zombies, spent in the Locker ---------- */
 const WALLET_KEY='cranklab.wallet';
-const wallet={pts:0,owned:[]};
-try{ const w=JSON.parse(localStorage.getItem(WALLET_KEY)||'{}'); if(typeof w.pts==='number'&&isFinite(w.pts)) wallet.pts=Math.max(0,Math.floor(w.pts)); if(Array.isArray(w.owned)) wallet.owned=w.owned.filter(x=>typeof x==='string'); }catch(e){}
+const wallet={pts:0,cb:0,owned:[]};
+const CB_PACKS=[{cb:200,pts:800},{cb:600,pts:2200},{cb:1200,pts:4000,tag:'Popular'},{cb:2500,pts:7800,tag:'Best value'}];
+try{ const w=JSON.parse(localStorage.getItem(WALLET_KEY)||'{}'); if(typeof w.pts==='number'&&isFinite(w.pts)) wallet.pts=Math.max(0,Math.floor(w.pts)); if(typeof w.cb==='number'&&isFinite(w.cb)) wallet.cb=Math.max(0,Math.floor(w.cb)); if(Array.isArray(w.owned)) wallet.owned=w.owned.filter(x=>typeof x==='string'); }catch(e){}
 function saveWallet(){ try{ localStorage.setItem(WALLET_KEY,JSON.stringify(wallet)); }catch(e){} }
-function renderWallet(bump){ const v=$('ptsV'); if(v) v.textContent=wallet.pts.toLocaleString(); const w=v&&v.parentNode; if(bump&&w){ w.classList.remove('bump'); void w.offsetWidth; w.classList.add('bump'); }
-  const hv=$('hudPts'); if(hv) hv.textContent=wallet.pts.toLocaleString(); if(typeof renderShop==='function') renderShop(); }
+function renderWallet(bump){ const v=$('cbV'); if(v) v.textContent=wallet.cb.toLocaleString(); const w=v&&v.parentNode; if(bump&&w){ w.classList.remove('bump'); void w.offsetWidth; w.classList.add('bump'); }
+  if(!$('cbBox').hidden) renderCbBox(); if(typeof renderShop==='function') renderShop(); }
+// "Get Crank Bux": the one place points are shown, and what each pack costs in them
+let cbPick=null, cbAfter=null;
+function renderCbBox(){ $('cbPts').textContent=wallet.pts.toLocaleString(); const box=$('cbPacks'); box.innerHTML='';
+  CB_PACKS.forEach((p,i)=>{ const b=document.createElement('button'); b.type='button'; b.className='cbpack'; const can=wallet.pts>=p.pts; b.disabled=!can;
+    b.innerHTML=(p.tag?`<i>${p.tag}</i>`:'')+`<svg class="cbx" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10.4" fill="#27b4ee" stroke="#0a5a88" stroke-width="1.5"/><circle cx="12" cy="12" r="7.6" fill="none" stroke="#c8f3ff" stroke-width="1" opacity=".75"/><path d="M15.3 8.7a4.7 4.7 0 1 0 0 6.6" fill="none" stroke="#fff" stroke-width="2.7" stroke-linecap="round"/><path d="M15.4 15.3l2.2 2.2" stroke="#fff" stroke-width="1.9" stroke-linecap="round"/><circle cx="18.1" cy="18" r="1.45" fill="#ffd84a" stroke="#0a5a88" stroke-width=".6"/></svg><b>${p.cb.toLocaleString()}</b><small>Crank Bux</small><em>${p.pts.toLocaleString()} points</em>`+(can?'':`<small>${(p.pts-wallet.pts).toLocaleString()} more points</small>`);
+    b.addEventListener('click',()=>{ audioInit(); cbPick=i; const c=$('cbConf'); c.hidden=false; c.querySelector('p').innerHTML=`Turn <b>${p.pts.toLocaleString()} points</b> into <b>${p.cb.toLocaleString()} Crank Bux</b>? You'll have ${(wallet.pts-p.pts).toLocaleString()} points left.`; $('cbYes').focus(); });
+    box.appendChild(b); });
+  if(cbPick!==null&&wallet.pts<CB_PACKS[cbPick].pts){ cbPick=null; $('cbConf').hidden=true; } }
+function openCbBox(after){ cbAfter=after||null; cbPick=null; $('cbConf').hidden=true; $('cbBox').hidden=false; renderCbBox(); }
+function closeCbBox(){ $('cbBox').hidden=true; cbPick=null; const f=cbAfter; cbAfter=null; if(f) f(); }
+$('cbWallet').addEventListener('click',()=>{ audioInit(); openCbBox(); });
+$('cbGet').addEventListener('click',()=>{ audioInit(); openCbBox(); });
+$('cbClose').addEventListener('click',closeCbBox);
+$('cbBox').addEventListener('click',e=>{ if(e.target.id==='cbBox') closeCbBox(); });
+$('cbBack').addEventListener('click',()=>{ cbPick=null; $('cbConf').hidden=true; });
+$('cbYes').addEventListener('click',()=>{ if(cbPick===null) return; const p=CB_PACKS[cbPick]; if(wallet.pts<p.pts) return;
+  wallet.pts-=p.pts; wallet.cb+=p.cb; saveWallet(); cbPick=null; $('cbConf').hidden=true; sfx('win'); toast('+'+p.cb.toLocaleString()+' Crank Bux'); renderWallet(true); });
+addEventListener('keydown',e=>{ if(e.code==='Escape'&&!$('cbBox').hidden){ e.stopPropagation(); closeCbBox(); } },true);
 const ZPTS={husk:10,runner:15,brute:60}, WAVE_PTS=w=>20+10*w;
 function addPoints(n,pos){ n=Math.round(n); if(!(n>0)) return; wallet.pts+=n; saveWallet(); renderWallet(true); if(pos) dmgNum(pos,'+'+n+' pts','pts'); }
 // who gets the points for a kill: you, or (as host) the player who landed it
@@ -9319,17 +9374,18 @@ syncBot();
   const mark=(el,id)=>el.querySelectorAll('.ofit').forEach(b=>{ const on=b.dataset.id===id; b.classList.toggle('on',on); b.setAttribute('aria-selected',on); });
   const wear=()=>reskin(localHero,OUTFITS[outfitIdx(settings.outfit)],PICKAXES[pickIdx(settings.pickaxe)].id);
   // shop: items marked `shop` cost points; everything else is yours from the start
-  const PRICE={o:{common:150,uncommon:300,rare:600,epic:1000,legendary:1600},p:{common:100,uncommon:200,rare:400,epic:700,legendary:1100},e:{common:100,uncommon:250,rare:450,epic:700,legendary:1000}};
-  const FREE={o:'rook',p:'steel'}, owned=(k,it)=>(k==='e'?!it.shop:it.id===FREE[k])||wallet.owned.includes(k+':'+it.id), price=(k,it)=>PRICE[k][it.rarity]||500;
+  const PRICE={o:{common:800,uncommon:1200,rare:1500,epic:2000,legendary:2500},p:{common:200,uncommon:200,rare:400,epic:400,legendary:800},e:{common:200,uncommon:200,rare:400,epic:400,legendary:800}}; // in Crank Bux
+  const FREE={o:'rook',p:'steel'}, owned=(k,it)=>(k==='e'?!it.shop:it.id===FREE[k])||wallet.owned.includes(k+':'+it.id), price=(k,it)=>PRICE[k][it.rarity]||800;
   if(!owned('o',OUTFITS[outfitIdx(settings.outfit)])){ settings.outfit='rook'; saveSettings(); }
   if(!owned('p',PICKAXES[pickIdx(settings.pickaxe)])){ settings.pickaxe='steel'; saveSettings(); }
   const buy=$('buyBox');
   let offer=null;
-  const offerBuy=(k,it)=>{ offer={k,it}; const c=price(k,it), can=wallet.pts>=c;
-    buy.hidden=false; buy.querySelector('p').innerHTML=`<b>${it.name}</b> · ${RNAME[it.rarity]} ${k==='o'?'outfit':k==='e'?'dance':'pickaxe'} · <b>${c.toLocaleString()} pts</b>`+(can?'':`<br><small>You need ${(c-wallet.pts).toLocaleString()} more. Take down zombies in Zombie horde to earn points.</small>`);
-    $('buyOk').disabled=!can; $('buyOk').textContent=can?'Buy for '+c.toLocaleString():'Not enough points'; };
-  $('buyOk').addEventListener('click',()=>{ if(!offer) return; const {k,it}=offer, c=price(k,it); if(owned(k,it)||wallet.pts<c) return;
-    wallet.pts-=c; wallet.owned.push(k+':'+it.id); saveWallet(); renderWallet(); renderShop(); buy.hidden=true; offer=null; sfx('win'); toast('Unlocked '+it.name);
+  const offerBuy=(k,it)=>{ offer={k,it}; const c=price(k,it), can=wallet.cb>=c;
+    buy.hidden=false; buy.querySelector('p').innerHTML=`<b>${it.name}</b> · ${RNAME[it.rarity]} ${k==='o'?'outfit':k==='e'?'dance':'pickaxe'} · <b><svg class="cbx" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10.4" fill="#27b4ee" stroke="#0a5a88" stroke-width="1.5"/><circle cx="12" cy="12" r="7.6" fill="none" stroke="#c8f3ff" stroke-width="1" opacity=".75"/><path d="M15.3 8.7a4.7 4.7 0 1 0 0 6.6" fill="none" stroke="#fff" stroke-width="2.7" stroke-linecap="round"/><path d="M15.4 15.3l2.2 2.2" stroke="#fff" stroke-width="1.9" stroke-linecap="round"/><circle cx="18.1" cy="18" r="1.45" fill="#ffd84a" stroke="#0a5a88" stroke-width=".6"/></svg> ${c.toLocaleString()}</b>`+(can?'':`<br><small>You need ${(c-wallet.cb).toLocaleString()} more Crank Bux.</small>`);
+    $('buyOk').disabled=false; $('buyOk').textContent=can?'Buy for '+c.toLocaleString():'Get Crank Bux'; };
+  $('buyOk').addEventListener('click',()=>{ if(!offer) return; const {k,it}=offer, c=price(k,it); if(owned(k,it)) return;
+    if(wallet.cb<c){ const o=offer; openCbBox(()=>{ if(offer===o&&!owned(o.k,o.it)) offerBuy(o.k,o.it); }); return; }
+    wallet.cb-=c; wallet.owned.push(k+':'+it.id); saveWallet(); renderWallet(); renderShop(); buy.hidden=true; offer=null; sfx('win'); toast('Unlocked '+it.name);
     if(k==='o') pick(it.id); else if(k==='e') pickEm(it.id); else pickPk(it.id); });
   $('buyNo').addEventListener('click',()=>{ buy.hidden=true; offer=null; });
   window.renderShop=()=>{ [['o',box,OUTFITS],['p',pbox,PICKAXES],['e',$('emotesBox'),EMOTE_LIST]].forEach(([k,el,list])=>list.forEach(it=>{ const b=el.querySelector(`[data-id="${it.id}"]`); if(!b) return;
@@ -9594,9 +9650,9 @@ function renderItemShop(){ const g=$('shopGrid'), L=window._locker; if(!g||!L) r
   const items=shopRotation();
   const R=['legendary','epic','rare','uncommon','common']; items.sort((a,b)=>R.indexOf(a[1].rarity)-R.indexOf(b[1].rarity)||(a[0]<b[0]?-1:1));
   if(!items.length){ g.innerHTML='<p class="empty">Nothing in the shop right now.</p>'; return; }
-  items.forEach(([k,it])=>{ const own=L.owned(k,it), c=L.price(k,it), b=document.createElement('button'); b.type='button'; b.className='ofit '+it.rarity+(k==='p'?' tool':'')+(!own&&wallet.pts>=c?' afford':'');
+  items.forEach(([k,it])=>{ const own=L.owned(k,it), c=L.price(k,it), b=document.createElement('button'); b.type='button'; b.className='ofit '+it.rarity+(k==='p'?' tool':'')+(!own&&wallet.cb>=c?' afford':'');
     const src=k==='e'?null:document.querySelector(`#${k==='o'?'outfits':'picks'} [data-id="${it.id}"] img`);
-    b.innerHTML=(k==='e'?emoteIcon(it.id):src?`<img alt="" src="${src.src}">`:'')+(own?'<b class="own">Owned</b>':`<b class="cost">${c.toLocaleString()}</b>`)+`<span></span>`;
+    b.innerHTML=(k==='e'?emoteIcon(it.id):src?`<img alt="" src="${src.src}">`:'')+(own?'<b class="own">Owned</b>':`<b class="cost"><svg class="cbx" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10.4" fill="#27b4ee" stroke="#0a5a88" stroke-width="1.5"/><circle cx="12" cy="12" r="7.6" fill="none" stroke="#c8f3ff" stroke-width="1" opacity=".75"/><path d="M15.3 8.7a4.7 4.7 0 1 0 0 6.6" fill="none" stroke="#fff" stroke-width="2.7" stroke-linecap="round"/><path d="M15.4 15.3l2.2 2.2" stroke="#fff" stroke-width="1.9" stroke-linecap="round"/><circle cx="18.1" cy="18" r="1.45" fill="#ffd84a" stroke="#0a5a88" stroke-width=".6"/></svg>${c.toLocaleString()}</b>`)+`<span></span>`;
     const sp=b.querySelector('span'); sp.textContent=it.name; sp.insertAdjacentHTML('beforeend',`<small class="kind">${RNAME[it.rarity]} ${k==='o'?'outfit':k==='e'?'dance':'pickaxe'}</small>`);
     b.addEventListener('click',()=>{ audioInit(); if(k==='o'){ window._stageLook={o:outfitIdx(it.id)}; window._stagePrev=null; } else if(k==='p'){ window._stageLook={pk:it.id}; window._stagePrev=null; window._stagePickT=performance.now()+12000; } else { window._stageLook=null; window._stagePrev={id:it.id,t0:performance.now()}; }
       if(own){ if(k==='o') L.pick(it.id); else if(k==='e') L.pickEm(it.id); else L.pickPk(it.id); toast('Equipped '+it.name); renderItemShop(); } else L.offerBuy(k,it); });
