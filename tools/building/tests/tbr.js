@@ -2,13 +2,13 @@
 // and hurts anyone outside it; your shots hit bots; the HUD shows who's alive and the storm timer. Fast-forwards the
 // storm.  node tbr.js [shots-prefix]
 const {sleep,page,launch,open}=require('./h.js');
-(async()=>{ const b=await launch(); const shots=process.argv[2]; const {pg,errs}=await open(b,page('/home/claude/crank-lab/index.html','scene,P,renderer,settings,camera,BR,drops,brUpdate,brFoes,WEAPONS,selectGun,playerShoot,isDead,MAP_R,SPAWN'),shots?{vp:{width:1000,height:640}}:{fast:true,norender:true});
+(async()=>{ const b=await launch(); const shots=process.argv[2]; const {pg,errs}=await open(b,page('/home/claude/crank-lab/index.html','scene,P,renderer,settings,camera,BR,BRBUS,drops,brUpdate,brFoes,WEAPONS,selectGun,playerShoot,isDead,MAP_R,SPAWN'),shots?{vp:{width:1000,height:640}}:{fast:true,norender:true});
  await pg.waitForFunction(()=>window.T&&T.renderer,null,{timeout:180000});
- await pg.evaluate(()=>{ T.settings.skyDrop=true; document.querySelector('.mode[data-mode=br]').click(); document.getElementById('play').click(); }); await sleep(2500);
- const s0=await pg.evaluate(()=>({on:T.BR.on,bots:T.BR.bots.length,sky:T.BR.bots.filter(b=>b.sky).length,hud:!document.getElementById('brHud').hidden,alive:document.getElementById('brAlive').textContent,psky:!!T.P.sky}));
+ await pg.evaluate(()=>{ T.settings.skyDrop=true; document.querySelector('.mode[data-mode=br]').click(); document.getElementById('play').click(); }); await pg.waitForFunction(()=>T.BR.on,null,{timeout:90000}); await sleep(500);
+ const s0=await pg.evaluate(()=>({on:T.BR.on,bots:T.BR.bots.length,sky:T.BR.bots.filter(b=>b.bus).length,bus:T.BRBUS.on,hud:!document.getElementById('brHud').hidden,alive:document.getElementById('brAlive').textContent,psky:!!T.P.sky}));
  console.log('start',JSON.stringify(s0));
  // let them land and loot for a while (skip your own drop: put you on the ground, out of the way)
- await pg.evaluate(()=>{ T.P.sky=null; T.P.pos.set(T.SPAWN[0],T.P.pos.y,T.SPAWN[2]); T.P.hp=1e6; T.P.sh=0; });
+ await pg.evaluate(()=>{ T.BRBUS.t=T.BRBUS.T; }); await sleep(800); await pg.evaluate(()=>{ T.P.sky=null; T.P.bus=false; T.P.pos.set(T.SPAWN[0],T.P.pos.y,T.SPAWN[2]); T.P.hp=1e6; T.P.sh=0; });
  let landed=0, armed=0; let after=0; for(let i=0;i<130;i++){ await sleep(1000); const r=await pg.evaluate(()=>({l:T.BR.bots.filter(b=>b.alive&&!b.sky).length,a:T.BR.bots.filter(b=>b.alive&&b.wpn).length,k:T.BR.bots.reduce((s,b)=>s+b.kills,0),al:T.BR.bots.filter(b=>b.alive).length})); landed=r.l; armed=r.a; if(i%10===9) console.log('t',i+1,JSON.stringify(r)); if(r.l>=15) after++; if(r.a>=8||after>60) break; }
  // a bot in front of you: shoot it
  const hit=await pg.evaluate(async()=>{ const b=T.BR.bots.find(b=>b.alive&&!b.sky); if(!b) return null; b.thinkT=99; const p=T.P.pos.clone(); b.pos.set(p.x,p.y,p.z-6); b.vel.set(0,0,0); b.hp=100; b.sh=0;

@@ -54,3 +54,5 @@ Run with Node and Playwright (Chromium), from a folder that has `three` and `pee
 - `tbrfight.js` — Battle royale bots: two armed bots fight each other; a bot notices you standing in the open sooner than crouched, and shoots.
 - `tbrteam.js` — Battle royale squads: your three teammates drop with you, are marked, and never count as foes; other teams of four.
 - `tbrshot.js` — pictures of the storm wall with the HUD and the big map with the circles.
+- `tbus.js` — the battle bus: everyone aboard high over the island, you jump when you press Jump, teammates follow, nobody left aboard at the end.
+- `tbrend.js` — Battle royale: a 10 s loading screen before the match; eliminated, you are back in the lobby.
