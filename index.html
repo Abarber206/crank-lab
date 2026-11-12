@@ -3661,15 +3661,19 @@ function boatHull(){ const N=26, half=t=>t<0.55?0.95*Math.pow(Math.sin(Math.min(
   for(let n=0;n<=N;n++){ const t=n/N, O=sec(t,0), I=sec(Math.max(t,0.07),0.055); if(prevO){ strip(prevO,O,false,outer); strip(prevI,I,true,inner); top.push(prevO[0],O[0],prevI[0], O[0],I[0],prevI[0], prevO[prevO.length-1],prevI[prevI.length-1],O[O.length-1], O[O.length-1],prevI[prevI.length-1],I[I.length-1]); } prevO=O; prevI=I; }
   const S=sec(1,0); for(let i=1;i<S.length-1;i++) tr.push(S[0],S[i+1],S[i]); // the transom
   const mk=list=>{ const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(list.flat(),3)); g.computeVertexNormals(); return g; };
-  return {outer:mk(outer.concat(tr)),inner:mk(inner),top:mk(top),half,sheer,keel,zOf}; }
+  return {outer:mk(outer.concat(tr)),inner:mk(inner),top:mk(top),half,sheer,keel,zOf,sec}; }
 function buildBoatGeo(){ const h=boatHull(), V=(x,y,z)=>new THREE.Vector3(x,y,z), bins={}; const put=(slot,geo,x=0,y=0,z=0,rx=0,ry=0,rz=0)=>{ const q=geo.clone(); q.applyMatrix4(new THREE.Matrix4().compose(V(x,y,z),new THREE.Quaternion().setFromEuler(new THREE.Euler(rx,ry,rz)),V(1,1,1))); (bins[slot]||(bins[slot]=[])).push(q); };
   // a painted stripe and a dark boot-top line along both sides, just proud of the hull
   for(const [slot,y0,y1] of [['paint',0.36,0.47],['dark',0.02,0.1]]){ const pos=[]; const N=40;
     for(let s=-1;s<=1;s+=2) for(let n=0;n<N;n++){ const t0=0.04+0.96*n/N, t1=0.04+0.96*(n+1)/N, p=(t,y)=>{ const B=h.half(t), K=h.keel(t), H=h.sheer(t), f=Math.max(0,Math.min(1,(y-K)/(H-K))); const w=f>0.2?0.96+0.04*(f-0.2)/0.8:0.74+0.22*f/0.2; return [s*(B*w+0.012),y,h.zOf(t)]; };
-      const a=p(t0,y0), b=p(t1,y0), c=p(t0,y1), d=p(t1,y1); if(s>0) pos.push(a,c,b, b,c,d); else pos.push(a,b,c, b,d,c); }
+      if(h.keel(t0)>y0-0.015) continue; const a=p(t0,y0), b=p(t1,y0), c=p(t0,y1), d=p(t1,y1); if(s>0) pos.push(a,c,b, b,c,d); else pos.push(a,b,c, b,d,c); }
     const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(pos.flat(),3)); g.setAttribute('uv',new THREE.Float32BufferAttribute(new Array(pos.length*2).fill(0),2)); g.computeVertexNormals(); (bins[slot]||(bins[slot]=[])).push(g); }
   // the deck: a flat floor inside, and the transom cap
-  put('deck',new THREE.BoxGeometry(1.5,0.05,3.7),0,0.06,0.45);
+  { const Yd=0.085, rows=[]; for(let n=0;n<=40;n++){ const t=0.07+0.93*n/40, S=h.sec(t,0.055).filter(p=>p[0]>=0).sort((a,b)=>a[1]-b[1]); if(S[0][1]>Yd-0.005) continue;
+      let w=0; for(let i=0;i<S.length-1;i++){ const a=S[i], b=S[i+1]; if(a[1]<=Yd&&b[1]>=Yd){ w=a[0]+(b[0]-a[0])*(Yd-a[1])/Math.max(1e-6,b[1]-a[1]); break; } }
+      if(w>0.02) rows.push([w-0.004,S[0][2]]); }
+    const pos=[]; for(let i=0;i<rows.length-1;i++){ const [w0,z0]=rows[i], [w1,z1]=rows[i+1]; pos.push([-w0,Yd,z0],[-w1,Yd,z1],[w0,Yd,z0], [w0,Yd,z0],[-w1,Yd,z1],[w1,Yd,z1]); }
+    const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(pos.flat(),3)); g.setAttribute('uv',new THREE.Float32BufferAttribute(new Array(pos.length*2).fill(0),2)); g.computeVertexNormals(); (bins.deck||(bins.deck=[])).push(g); } // the floor, as wide as the hull is inside
   // the console: a box with a dash, a windscreen, the wheel on its back
   put('white',rbox(0.72,0.86,0.56,0.06),0,0.49,0.28); put('dark',new THREE.BoxGeometry(0.62,0.06,0.3),0,0.9,0.36,-0.5);
   put('glass',new THREE.BoxGeometry(0.76,0.36,0.03),0,1.08,0.08,-0.42); put('chrome',new THREE.BoxGeometry(0.8,0.03,0.05),0,1.25,0.0,-0.42);
@@ -3969,7 +3973,7 @@ function saluteHand(H,S){ const r=H.rig, E=EMOTES.salute, t=S.emote.t, cl=x=>Mat
   handQuat(_slW,fwd,upv); const s0=r.armR.sh.quaternion.clone(), e0=r.armR.el.quaternion.clone(), w0=r.armR.wr.quaternion.clone();
   ikArm(r.armR,tgt,pole,_slW); if(up<0.999){ r.armR.sh.quaternion.copy(s0.slerp(r.armR.sh.quaternion,up)); r.armR.el.quaternion.copy(e0.slerp(r.armR.el.quaternion,up)); r.armR.wr.quaternion.copy(w0.slerp(r.armR.wr.quaternion,up)); } }
 // the Locker's pickaxe preview: held low at the side, the head forward by the shins
-var PICK_SHOW={hand:[0.19,1.13,-0.32],dir:[-0.2,-0.6,-0.75],grip:0.36}; // the hand in front of the chest; the handle's way down from the shoulder; how far up the handle the hand holds it
+var PICK_SHOW={hand:[0.19,1.13,-0.32],dir:[-0.2,-0.6,-0.75],grip:0.14}; // the hand in front of the chest; the handle's way down from the shoulder; how far up the handle the hand holds it
 function showPickPose(H,S){ const r=H.rig; if(!r.pick) return; r.pick.visible=true; H.group.updateMatrixWorld(true);
   const tgt=bodyPt(H,PICK_SHOW.hand[0],PICK_SHOW.hand[1],PICK_SHOW.hand[2],_slB), pole=bodyPt(H,0.65,0.85,0.3,_slF);
   const hf=bodyDir(H,-0.35,-0.25,-1,_slU), hu=bodyDir(H,0,1,-0.2,_slA);
@@ -3977,7 +3981,7 @@ function showPickPose(H,S){ const r=H.rig; if(!r.pick) return; r.pick.visible=tr
   // the pick itself: the handle runs up from the fist and back over the shoulder, the head resting behind it
   r.armR.hand.updateMatrixWorld(true); const hy=bodyDir(H,PICK_SHOW.dir[0],PICK_SHOW.dir[1],PICK_SHOW.dir[2],_slA), hx=bodyDir(H,1,0,0,_slU.clone()); hx.addScaledVector(hy,-hx.dot(hy)).normalize(); const hz=_slF.crossVectors(hx,hy).normalize();
   _slM.makeBasis(hx,hy,hz); _slQ.setFromRotationMatrix(_slM); r.armR.hand.getWorldQuaternion(_slQ2); r.pick.quaternion.copy(_slQ2.invert().multiply(_slQ));
-  r.pick.position.set(0,-PICK_SHOW.grip,0).applyQuaternion(r.pick.quaternion);
+  r.pick.position.set(0,-Math.min(PICK_SHOW.grip,(r.pickTop||0.12)-0.05),0).applyQuaternion(r.pick.quaternion);
   r.armL.sh.rotation.set(0.05,0,-0.12); r.armL.el.rotation.set(0.15,0,0); }
 const _fpM0=new THREE.Matrix4(), _fpMi=new THREE.Matrix4(), _fpG=[new THREE.Vector3(),new THREE.Vector3()], _fpT=new THREE.Vector3(), _fpJ=new THREE.Vector3(), _fpQ=[new THREE.Quaternion(),new THREE.Quaternion()], _fpQa=new THREE.Quaternion(), _fpQb=new THREE.Quaternion(), _fpW=[0,0];
 // the solved legs are put back to their animated angles before the next frame, so the animation's own smoothing never sees them
@@ -4942,6 +4946,19 @@ function headGeo(){ if(skullGeo) return skullGeo; const g=new THREE.SphereGeomet
     z*=z>0?0.125*(1-0.45*lo):0.118*(1-0.12*lo*lo);              // the back of the skull tucks in under it, the face stays forward
     y*=y<0?0.15:0.138; p.setXYZ(i,x,y,z); }
   g.computeVertexNormals(); return skullGeo=g; }
+// a blade swept along points in the y-z plane: width w (across, x) and a height that runs from h0 at the root to h1 at the tip
+function bladeGeo(pts,w,h0,h1){ const C=new THREE.CatmullRomCurve3(pts), n=24, P=[], I=[], X=new THREE.Vector3(1,0,0), T=new THREE.Vector3(), N=new THREE.Vector3();
+  for(let i=0;i<=n;i++){ const t=i/n, p=C.getPoint(t); C.getTangent(t,T); N.crossVectors(X,T).normalize(); const h=(h0+(h1-h0)*t)/2, ww=w/2*(1-0.5*t*t);
+    for(const [u,v] of [[-1,-1],[1,-1],[1,1],[-1,1]]){ P.push(p.x+u*ww,p.y+N.y*v*h,p.z+N.z*v*h); } }
+  for(let i=0;i<n;i++) for(let k=0;k<4;k++){ const a=i*4+k, b=i*4+(k+1)%4; I.push(a,a+4,b, b,a+4,b+4); }
+  I.push(0,2,1, 0,3,2); const e=n*4; I.push(e,e+1,e+2, e,e+2,e+3);
+  const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(P,3)); g.setIndex(I); g.computeVertexNormals(); return g; }
+// a long coat's tails: round the back and sides from the waist to mid-thigh, open in front, drawn on both faces
+let _coatTails=null;
+function coatTails(){ if(_coatTails) return _coatTails; const prof=[[.17,.0],[.178,-.1],[.188,-.2],[.198,-.31]].map(([r,y])=>new THREE.Vector2(r,y));
+  const o=new THREE.LatheGeometry(prof,20,-0.78*Math.PI,1.56*Math.PI); o.scale(1,1,.8); o.computeVertexNormals();
+  const i=o.clone(); i.scale(0.985,1,0.985); const ix=i.index.array; for(let k=0;k<ix.length;k+=3){ const t=ix[k]; ix[k]=ix[k+1]; ix[k+1]=t; } i.computeVertexNormals();
+  return _coatTails=mergeGeos([o,i]); }
 // a flat strap following points on the body: width w, thickness th, raised off the surface by lift (outwards from the spine)
 function strapGeo(pts,w,th,lift){ const P=[], I=[], n=pts.length, T=new THREE.Vector3(), N=new THREE.Vector3(), B=new THREE.Vector3(), c=new THREE.Vector3();
   for(let i=0;i<n;i++){ const a=pts[Math.max(0,i-1)], b=pts[Math.min(n-1,i+1)]; T.subVectors(b,a).normalize(); c.set(pts[i].x*0.35,Math.min(pts[i].y,.2),0); N.subVectors(pts[i],c); N.addScaledVector(T,-N.dot(T)).normalize(); B.crossVectors(T,N).normalize();
@@ -5012,7 +5029,7 @@ function createHero(jacketHex,opts){
     part(rbox(.12,.04,.02,.008),0xd8d8d8,rig.chest,0,.16,-.122,null,null,0); // name tape
   } else if(top==='coat'){ // long coat: high collar and tails to mid-thigh
     part(new THREE.CylinderGeometry(.1,.12,.08,18,1,true),C.jacketD,rig.chest,0,.27,0,null,[1,1,.8]);
-    part(bodyLathe([[.176,.0],[.186,-.12],[.198,-.3]],.72),C.jacket,rig.hips,0,.04,0,null,null,0); // tails (open lathe)
+    part(coatTails(),C.jacket,rig.hips,0,.04,0,null,null,0); // tails, open at the front
     part(rbox(.012,.38,.008,.004),C.jacketD,rig.chest,0,.08,-.108,null,null,0); [0,1,2].forEach(q=>part(sph(.01),0xd4af37,rig.chest,.025,.18-q*.07,-.112,null,null,0));
   } else if(top==='flannel'){ // checked shirt: darker bands around the body
     [.03,.11,.19].forEach(y=>part(bodyLathe([[.162+y*.1,y],[.164+y*.1,y+.025]],.67),C.jacketD,rig.chest,0,0,0,null,null,0));
@@ -5247,7 +5264,7 @@ function createHero(jacketHex,opts){
     part(rbox(.026,.22,.025,.008),glow(0x00e5ff),ph,0,0,-.235,null,null,0);
     part(rbox(.026,.025,.16,.006),glow(0x00e5ff),ph,0,.105,-.13,null,null,0); part(rbox(.026,.025,.16,.006),glow(0x00e5ff),ph,0,-.105,-.13,null,null,0);
     part(rbox(.02,.12,.1,.02),0x3a4150,ph,0,0,.09,null,null,0.006); part(rbox(.024,.12,.02,.006),glow(0xff3df2),ph,0,0,.145,null,null,0);
-    part(sph(.025),glow(0x00e5ff),rig.pick,0,.5,0,null,null,0);
+    part(sph(.025),glow(0x00e5ff),rig.pick,0,.14,0,null,null,0);
   } else if(pk==='crystal'){
     part(limbGeo(.02,.022,.72),0x3a2850,rig.pick,0,.12,0,null,null,0.006);
     part(limbGeo(.026,.026,.05),0xd4af37,rig.pick,0,-.48,0,null,null,0.004);
@@ -5273,8 +5290,8 @@ function createHero(jacketHex,opts){
     part(limbGeo(.018,.02,.8),0xdfeaf2,rig.pick,0,.18,0,null,null,0.006);
     part(limbGeo(.024,.024,.05),0x2fc7ff,rig.pick,0,-.02,0,null,null,0.004);
     part(rbox(.05,.07,.07,.02),0x5d8fb8,ph,0,0,0);
-    for(let q=0;q<5;q++){ const a=-.12-q*.2; part(rbox(.02,.07-q*.008,.1,.01),0x9fe3ff,ph,0,.02+.012*q*q,-.07-.085*q,[a,0,0],null,0.005);
-      part(rbox(.022,.012,.1,.004),glow(0xeaffff),ph,0,-.012-q*.006+.012*q*q,-.07-.085*q,[a,0,0],null,0); }
+    part(bladeGeo([-.3,0,1,2,3,4,4.7].map(q=>new THREE.Vector3(0,.02+.012*q*q,-.07-.085*q)),.02,.075,.02),0x9fe3ff,ph); // the blade, one curved piece
+    part(bladeGeo([-.3,0,1,2,3,4,4.7].map(q=>new THREE.Vector3(0,-.016-q*.006+.012*q*q,-.07-.085*q)),.022,.012,.006),glow(0xeaffff),ph,0,0,0,null,null,0); // its glowing edge
   } else if(pk==='hatchet'){ // Ranger Hatchet: hickory handle, leather wrap, broad steel bit
     part(limbGeo(.019,.023,.7),0x8a5a34,rig.pick,0,.12,0,null,null,0.006);
     for(let q=0;q<6;q++) part(limbGeo(.025,.025,.022),q%2?0x3a2516:0x52341f,rig.pick,0,.08-q*.03,0,null,null,0);
@@ -5332,7 +5349,7 @@ function createHero(jacketHex,opts){
     part(limbGeo(.017,.021,.7),0x2b6fd6,rig.pick,0,.12,0,null,null,0.006); part(limbGeo(.022,.022,.18),0x15181d,rig.pick,0,.08,0,null,null,0);
     part(new THREE.ConeGeometry(.02,.06,8),0x9aa3ad,rig.pick,0,.155,0,null,null,0); // spike at the butt
     part(rbox(.04,.07,.07,.012),0x9aa3ad,ph,0,0,0);
-    for(let q=0;q<5;q++) part(rbox(.016,.035-q*.003,.07,.006),0xc9d2dc,ph,0,.015*q*q-.005,-.06-.06*q,[-.12-q*.17,0,0]);
+    part(bladeGeo([0,1,2,3,4,4.6].map(q=>new THREE.Vector3(0,.015*q*q-.005,-.03-.06*q)),.016,.04,.01),0xc9d2dc,ph); // the tooth, one curved piece
     part(rbox(.012,.06,.09,.004),0xc9d2dc,ph,0,.01,.07,[.3,0,0]); part(rbox(.014,.01,.06,.003),0xff6a3d,ph,0,.04,0,null,null,0);
   } else if(pk==='shovel'){ // Trench Shovel: D-grip, ash shaft, steel spade in line with the handle
     part(new THREE.TorusGeometry(.045,.011,8,16,Math.PI),0x2a2f38,rig.pick,0,.215,0,[Math.PI,Math.PI/2,0],null,0); part(limbGeo(.012,.012,.112),0x2a2f38,rig.pick,0,.215,.056,[Math.PI/2,0,0],null,0);
@@ -5354,6 +5371,10 @@ function createHero(jacketHex,opts){
     part(sph(.06),0xffffff,ph,0,0,0); for(let q=0;q<4;q++) part(new THREE.TorusGeometry(.061,.008,6,20),0xd62839,ph,0,0,0,[q*.8,q*.5,0],null,0);
     [[-1,.28],[1,.16]].forEach(([d,len])=>{ for(let q=0;q<3;q++){ const c=new THREE.CylinderGeometry(.03-q*.008,.034-q*.008,len/3,10); c.rotateX(Math.PI/2); part(c,q%2?0xffffff:0xd62839,ph,0,0,d*(.05+len/6+q*len/3)); } });
   }
+  { let top=0.1; rig.pick.updateMatrixWorld(true); const im=new THREE.Matrix4().copy(rig.pick.matrixWorld).invert(), bb=new THREE.Box3();
+    rig.pick.traverse(m=>{ if(!m.isMesh||!m.geometry||m.material===inkMat) return; m.geometry.computeBoundingBox(); bb.copy(m.geometry.boundingBox).applyMatrix4(new THREE.Matrix4().multiplyMatrices(im,m.matrixWorld));
+      if(Math.abs(bb.min.x+bb.max.x)<0.05&&Math.abs(bb.min.z+bb.max.z)<0.05&&bb.max.y<0.4) top=Math.max(top,bb.max.y); });
+    rig.pickTop=top; } // how far the handle runs past the hand
   // hammer + blueprint (build mode)
   rig.hammer=grp(rig.armR.hand,0,0,0);
   part(limbGeo(.017,.019,.42),C.wood,rig.hammer,0,.06,0,null,null,0.005);
@@ -7535,9 +7556,16 @@ function stepGoo(dt){
     g.m.position.copy(g.pos); g.m.rotation.x+=dt*9; g.m.scale.set(.26+.04*Math.sin(g.t*30),.26-.04*Math.sin(g.t*30),.26);
     g.trailT-=dt; if(g.trailT<=0){ g.trailT=0.035; puff(g.pos,0.12,0.3,gooGlow,new THREE.Vector3(0,0.2,0)); } } }
 function clearGoo(){ gooL.forEach(g=>scene.remove(g.m)); gooL.length=0; }
-function hordeSpawnPoint(){
-  const tg=hordeTargets(); const c=new THREE.Vector3(); if(tg.length){ tg.forEach(t=>c.add(t.pos)); c.multiplyScalar(1/tg.length); } else c.set(SPAWN[0],0,SPAWN[2]);
-  const a=Math.random()*Math.PI*2, r=46+Math.random()*16; let x=c.x+Math.cos(a)*r, z=c.z+Math.sin(a)*r; const d=Math.hypot(x-SPAWN[0],z-SPAWN[2]); if(d>MAP_R-8){ x=SPAWN[0]+(x-SPAWN[0])*(MAP_R-8)/d; z=SPAWN[2]+(z-SPAWN[2])*(MAP_R-8)/d; } return [x,z];
+const _hsF=new THREE.Vector3();
+function hordeSpawnPoint(near){
+  const tg=hordeTargets(), t=near||(tg.length?tg[Math.floor(Math.random()*tg.length)]:null), cx=t?t.pos.x:SPAWN[0], cz=t?t.pos.z:SPAWN[2];
+  camera.getWorldDirection(_hsF); let best=null, bs=-1e9;
+  for(let k=0;k<14;k++){ const a=Math.random()*Math.PI*2, r=42+Math.random()*20; let x=cx+Math.cos(a)*r, z=cz+Math.sin(a)*r; const d=Math.hypot(x-SPAWN[0],z-SPAWN[2]); if(d>MAP_R-8){ x=SPAWN[0]+(x-SPAWN[0])*(MAP_R-8)/d; z=SPAWN[2]+(z-SPAWN[2])*(MAP_R-8)/d; }
+    let s=Math.random(); if(waterAt(x,z)>-999) s-=10;                                                   // not in the water
+    const vx=x-camera.position.x, vz=z-camera.position.z, vl=Math.hypot(vx,vz)||1; if((vx*_hsF.x+vz*_hsF.z)/vl>0.35) s-=2; // not where you're looking
+    for(const o of tg) if(Math.hypot(o.pos.x-x,o.pos.z-z)<35) s-=5;                                     // not on top of anyone else
+    if(s>bs){ bs=s; best=[x,z]; } }
+  return best;
 }
 function hordeWaveSize(w){ return Math.round((6+w*3.2)*(1+0.6*net.players.size)); }
 function startWave(){
@@ -7579,6 +7607,9 @@ function hordeUpdate(dt){
   horde.zs.forEach(z=>{
     if(!z.alive){ z.deadT+=dt; if(z.deadT>1.6) dropZombie(z); return; }
     zombieThink(z,dt,tg);
+    { let nd=Infinity, nt=null; for(const o of tg){ const d=Math.hypot(o.pos.x-z.pos.x,o.pos.z-z.pos.z); if(d<nd){ nd=d; nt=o; } } // left far behind: come back from nearer
+      z.farT=nt&&nd>110?(z.farT||0)+dt:0;
+      if(z.farT>3){ const [x,zz]=hordeSpawnPoint(nt); z.pos.set(x,terrainUnder(x,zz),zz); z.vel.set(0,0,0); z.farT=0; z.stuckT=0; z.goal=null; z.target=null; z.tT=0; } }
     const n=Math.max(1,Math.ceil(dt/0.017)); for(let k=0;k<n;k++) physStep(dt/n,z);
     if(z.pos.y<-20){ const [x,zz]=hordeSpawnPoint(); z.pos.set(x,terrainUnder(x,zz),zz); }
   });

@@ -46,3 +46,7 @@ Run with Node and Playwright (Chromium), from a folder that has `three` and `pee
 - `tstagepick.js` — the Locker pickaxe preview: the hero rests the pickaxe over the shoulder.
 - `tpickclip.js` — every outfit with two pickaxes in the shoulder-rest preview: no point of the pick inside the body (SEARCH=1 searches poses).
 - `thero.js` — close-ups of the Locker stage hero (front, side, back, three-quarter, face) to judge the body, clothes and lighting (VIEWS=..., OUTFIT=...).
+- `tpickparts.js` — every pickaxe in one piece (no part off on its own) and, in the Locker pose, held by its handle.
+- `tpickgal.js` — every pickaxe in the Locker preview, one picture each (IDS=..., D=camera distance).
+- `tboatview.js` — a moored boat close up from the front, side, back, three-quarter and above.
+- `tzfar.js` — Zombie horde: a zombie left 300 m away comes back to 30-70 m from you, on dry ground.
