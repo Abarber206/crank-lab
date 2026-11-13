@@ -785,7 +785,7 @@ body.touch #kartHud{bottom:auto;top:calc(env(safe-area-inset-top,0px) + 58px)}
       <div class="modes" id="modeCards" role="radiogroup" aria-label="Mode">
         <button type="button" class="mode" data-mode="fight" role="radio"><b>Build fight</b><small>Fight the bot or your friends: box up, edit, crank 90s.</small></button>
         <button type="button" class="mode" data-mode="horde" role="radio"><b>Zombie horde</b><small>Build a fort, survive the waves and earn points for the Locker.</small></button>
-        <button type="button" class="mode" data-mode="br" role="radio"><b>Battle royale</b><small>Drop in with 19 bots, loot up, stay ahead of the storm, be the last one standing.</small></button>
+        <button type="button" class="mode" data-mode="br" role="radio"><b>Battle royale</b><small>Drop in with 29 bots, loot up, stay ahead of the storm, be the last one standing.</small></button>
       </div>
       <label class="allyopt" id="brTeamOpt" hidden><span><b>Team size</b><small>Bot teammates drop in with you</small></span><select id="brTeamSel"><option value="1">Solo</option><option value="2">Duos</option><option value="3">Trios</option><option value="4">Squads</option></select></label>
       <label class="allyopt" id="allyOpt" hidden><input type="checkbox" id="hordeBot"><span><b>Bot teammate</b><small>Plays horde with you · revives and reboots you, and you can do the same for it</small></span></label>
@@ -1066,7 +1066,7 @@ const skyDome=(()=>{ const g=new THREE.SphereGeometry(950,40,20), p=g.attributes
         gl_FragColor=vec4(c,1.0);
         #include <tonemapping_fragment>
       }` })); m.renderOrder=-10; scene.add(m); return m; })();
-const camera=new THREE.PerspectiveCamera(settings.fov, innerWidth/innerHeight, 0.08, 3200);
+const camera=new THREE.PerspectiveCamera(settings.fov, innerWidth/innerHeight, 0.08, 5600); // (far enough for the mountains across the sea)
 camera.rotation.order='YXZ';
 
 const hemi=new THREE.HemisphereLight(0xbddaff, 0x4f6b35, 0.6); scene.add(hemi);
@@ -1314,19 +1314,26 @@ function makeWorldGen(o){
     const hb=h; let rid=0.42;
     const de=d+70*fbm(u*0.002,v*0.002,2,20), oR=sstep(MAP_R-130,MAP_R+300,de);
     if(oR>0){ const wu=u+90*fbm(u*0.0012,v*0.0012,2,22), wv=v+90*fbm(u*0.0012+3.3,v*0.0012,2,23);
-      rid=ridged(wu*0.0016,wv*0.0016,6,21,0.44); h+=oR*(50+(170+230*oR)*rid); }
+      rid=ridged(wu*0.0016,wv*0.0016,6,21,0.44); h+=Math.min(1,oR*3.2)*(6+18*rid); } // (just a rim of low hills now: the island ends at a cliff)
     h*=s;
     seaLast=0;
     if(SEA){ const al=u*SEA.nx+v*SEA.nz; if(al>SEA.C0-130){ const lat=v*SEA.nx-u*SEA.nz, ang=Math.atan2(Math.abs(lat),al);
       if(ang<0.85){ // the sides of the bay follow the mountains: crests run out to sea as headlands, valleys drown as coves, and neither side is straight
         const out=sstep(SEA.C0+20,SEA.C0+260,al), rng=Math.min(1,oR*4);
         const aE=ang+0.34*(rid-0.42)*out*rng+0.085*fbm(u*0.0042+9.1,v*0.0042,2,93)*(0.4+0.6*out)+0.03*fbm(u*0.013,v*0.013+4.4,2,94)*out, A=lat<0?0.21:0.27, w=1-sstep(A,A+0.15,aE);
-        if(w>0){ seaLast=w; const c=seaC=al-SEA.C0-0.0005*lat*lat-18*fbm(lat*0.006+3.1,al*0.006,2,91), bed=c<0?SEA.Y+0.25-c*0.05:SEA.Y-0.15-Math.min(9,c*0.05), b=sstep(-75,-18,c), g0=Math.max(0,hb*s), h0=h<0?0:h; return h0+((g0+(bed-g0)*b)-h0)*w; } } } } // (inland stays at or above 0, as everywhere else: only the bay floods)
-    return h<0?0:h; }
+        if(w>0){ seaLast=w; const c=seaC=al-SEA.C0-0.0005*lat*lat-18*fbm(lat*0.006+3.1,al*0.006,2,91), bed0=c<0?SEA.Y+0.25-c*0.05:SEA.Y-0.15-Math.min(9,c*0.05), lip=d>MAP_R-60?sstep(edgeR(u,v)-45,edgeR(u,v)-6,d):0, bed=bed0+(Math.max(bed0,Math.min(bed0+6,SEA.Y-1.1))-bed0)*lip, b=sstep(-75,-18,c), g0=Math.max(0,hb*s), h0=h<0?0:h; return cliff(u,v,d,h0+((g0+(bed-g0)*b)-h0)*w); } } } } // (inland stays at or above 0, as everywhere else: only the bay floods)
+    return cliff(u,v,d,h<0?0:h); }
+  // the island's edge (a wavy line a little past the map's rim), the cliff down to the sea, and the far mountains
+  const OCEAN_Y=-70, edgeR=(u,v)=>MAP_R+3+9*fbm(u*0.0045+3.7,v*0.0045-1.9,2,301)+3*fbm(u*0.017,v*0.017,2,302);
+  function cliff(u,v,d,h){ if(d<MAP_R-30) return h; const er=edgeR(u,v), ec=er-(SEA?9*Math.max(0,Math.min(1,(SEA.Y-0.2-h)/0.6)):0); if(d<=ec) return h; // (under the lagoon the face is cut back under the water's lip, so the falls hang clear of the rock)
+    const k=sstep(ec,ec+5,d), floor=OCEAN_Y-22-30*sstep(er+40,er+500,d); let y=h+(floor-h)*k;
+    if(k>0&&k<1) y=Math.min(h-0.3*k,y+2.2*fbm(u*0.07,v*0.07,2,303)*Math.sin(k*Math.PI)); // a sheer face, a little rough
+    const fm=sstep(2300,2950,d+260*fbm(u*0.0007,v*0.0007,2,304)); if(fm>0) y+=fm*(140+520*ridged(u*0.0011+7,v*0.0011-3,6,305,0.46)); // the mountains, far across the water
+    return y; }
   // the sea: a sector of the rim (toward one town) where the outer range gives way to a beach and open water
   let SEA=null, seaLast=0, seaC=0;
-  const seaW=(u,v)=>{ if(!SEA) return 0; const al=u*SEA.nx+v*SEA.nz; if(al<=SEA.C0-130||Math.atan2(Math.abs(v*SEA.nx-u*SEA.nz),al)>=0.85) return 0; genH(u,v); return seaLast; };
-  return {genH,MASSIFS,setSea:s=>{ SEA=s; },sea:()=>SEA,seaW,seaTop:()=>SEA?SEA.Y+1.4:-1e9,sandAt:(u,v,h)=>{ if(!SEA||h>SEA.Y+2.6) return 0; const w=seaW(u,v); return w>0?sstep(SEA.Y+2.6,SEA.Y+1.3,h)*w*sstep(-125,-75,seaC):0; }}; // sand only along the shore
+  const seaW=(u,v)=>{ if(!SEA) return 0; if(Math.sqrt(u*u+v*v)>edgeR(u,v)-1.5) return 0; const al=u*SEA.nx+v*SEA.nz; if(al<=SEA.C0-130||Math.atan2(Math.abs(v*SEA.nx-u*SEA.nz),al)>=0.85) return 0; genH(u,v); return seaLast; };
+  return {genH,MASSIFS,edgeR,OCEAN_Y,setSea:s=>{ SEA=s; },sea:()=>SEA,seaW,seaTop:()=>SEA?SEA.Y+1.4:-1e9,sandAt:(u,v,h)=>{ if(!SEA||h>SEA.Y+2.6) return 0; const w=seaW(u,v); return w>0?sstep(SEA.Y+2.6,SEA.Y+1.3,h)*w*sstep(-125,-75,seaC):0; }}; // sand only along the shore
 }
 
 /* ---------- baking the playable area into a heightfield, with towns and roads ----------
@@ -1354,7 +1361,7 @@ function bakeWorld(o){
   // ---- level the towns
   for(const t of towns){ if(o.snap){ const q=o.snap(t.u,t.v); t.u=q[0]; t.v=q[1]; } t.h=Math.max(o.LVL,Math.round(t.avg/o.LVL)*o.LVL); const k_=towns.indexOf(t); t.R=typeof o.townR==='function'?o.townR(k_):o.townR; t.sh=o.townShape?o.townShape(k_):null; }
   if(o.gen.setSea&&towns.length){ const t=towns[0], d=Math.sqrt(t.u*t.u+t.v*t.v); o.gen.setSea({nx:t.u/d,nz:t.v/d,C0:d+115,Y:t.h-5.5}); // below any natural ground, so only the bay floods // the first town is the coastal one
-    for(let j=0;j<N;j++){ const v=-HALF+j*HS; for(let i=0;i<N;i++){ const u=-HALF+i*HS; if(o.gen.seaW(u,v)>0) H0[j*N+i]=genH(u,v); } } }
+    for(let j=0;j<N;j++){ const v=-HALF+j*HS; for(let i=0;i<N;i++){ const u=-HALF+i*HS; if(o.gen.seaW(u,v)>0||u*u+v*v>(MAP_R-45)*(MAP_R-45)) H0[j*N+i]=genH(u,v); } } }
   for(const t of towns){ const E=t.R+26, i0=Math.max(0,Math.floor((t.u-E+HALF)/HS)), i1=Math.min(N-1,Math.ceil((t.u+E+HALF)/HS)), j0=Math.max(0,Math.floor((t.v-E+HALF)/HS)), j1=Math.min(N-1,Math.ceil((t.v+E+HALF)/HS));
     for(let j=j0;j<=j1;j++) for(let i=i0;i<=i1;i++){ const du=-HALF+i*HS-t.u, dv=-HALF+j*HS-t.v, d=Math.sqrt(du*du+dv*dv); if(d>=E) continue;
       const rr=townRadAt(t,du,dv), k=d<=rr?1:Math.max(0,1-(d-rr)/26), s=k*k*(3-2*k), q=j*N+i; H0[q]+=(t.h-H0[q])*s; } }
@@ -1828,10 +1835,10 @@ TERR.chunks.forEach(c=>{ c.m[2]=chunkMesh(c,2); c.m[2].visible=false; });
 stepTerrain(SPAWN[0],SPAWN[2],true);
 // the outer range: 16 tiles out to ±2.4 km at 16 m steps, straight from the generator
 (function outerRange(){
-  const E=2400, S=16, xs=[-E,-WHALF,WHALF,E], tiles=[];
-  for(let b=0;b<3;b++) for(let a=0;a<3;a++){ if(a===1&&b===1) continue; const u0=xs[a], u1=xs[a+1], v0=xs[b], v1=xs[b+1];
-    if(u1-u0>=v1-v0){ const um=u0+Math.round((u1-u0)/2/S)*S; tiles.push([u0,um,v0,v1],[um,u1,v0,v1]); } else { const vm=v0+Math.round((v1-v0)/2/S)*S; tiles.push([u0,u1,v0,vm],[u0,u1,vm,v1]); } }
-  for(const [u0,u1,v0,v1] of tiles){ const nu=(u1-u0)/S, nvv=(v1-v0)/S, W=nu+3, hg=new Float32Array(W*(nvv+3));
+  const E=3616, xs=[-E,-1184,-WHALF,WHALF,1184,E], tiles=[]; // (every edge a whole number of steps)
+  for(let b=0;b<5;b++) for(let a=0;a<5;a++){ if(a===2&&b===2) continue; const u0=xs[a], u1=xs[a+1], v0=xs[b], v1=xs[b+1], S=(a>=1&&a<=3&&b>=1&&b<=3)?8:32;
+    tiles.push([u0,u1,v0,v1,S]); }
+  for(const [u0,u1,v0,v1,S] of tiles){ const nu=(u1-u0)/S, nvv=(v1-v0)/S, W=nu+3, hg=new Float32Array(W*(nvv+3));
     for(let j=-1;j<=nvv+1;j++) for(let i=-1;i<=nu+1;i++) hg[(j+1)*W+i+1]=genH(u0+i*S,v0+j*S);
     const m=gridMesh(nu+1,nvv+1,(k,a,b,dy,pos,nor,uv,col,cov)=>{ const i=a, j=b, h=hg[(j+1)*W+i+1], u=u0+i*S, v=v0+j*S;
       const gx=(hg[(j+1)*W+i+2]-hg[(j+1)*W+i])/(2*S), gz=(hg[(j+2)*W+i+1]-hg[j*W+i+1])/(2*S), ny=1/Math.sqrt(1+gx*gx+gz*gz);
@@ -1841,6 +1848,55 @@ stepTerrain(SPAWN[0],SPAWN[2],true);
       const line=168+26*gnoise(u*0.011,v*0.011,77); cov[k*3]=Math.min(1,sstep(0.87,0.7,ny)+0.7*sstep(175,240,h)); cov[k*3+1]=sstep(line,line+24,h)*sstep(0.58,0.78,ny); cov[k*3+2]=-WGEN.sandAt(u,v,h); },30);
     TERR.outer.push(m); }
 })();
+/* ---------- the ocean round the island, and the waterfall off the lagoon ---------- */
+const OCEAN={};
+(function buildOcean(){ const Y=WGEN.OCEAN_Y, C=SPAWN;
+  const wt=(()=>{ const c=document.createElement('canvas'); c.width=c.height=256; const g=c.getContext('2d'), R=seeded(7070); g.fillStyle='#1d5f8c'; g.fillRect(0,0,256,256);
+    for(let i=0;i<900;i++){ const x=R()*256, y=R()*256, l=6+R()*22; g.strokeStyle=R()<0.5?'rgba(255,255,255,.10)':'rgba(10,40,70,.22)'; g.lineWidth=1+R()*1.5; g.beginPath(); g.moveTo(x,y); g.quadraticCurveTo(x+l/2,y-2-R()*2,x+l,y); g.stroke(); }
+    const t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(220,220); t.anisotropy=8; return t; })();
+  const sea=new THREE.Mesh(new THREE.PlaneGeometry(13000,13000,1,1).rotateX(-Math.PI/2),new THREE.MeshPhongMaterial({color:0x8fb8d4,map:wt,specular:0x9cc4e0,shininess:70}));
+  sea.position.set(C[0],Y,C[2]); sea.receiveShadow=false; sea.renderOrder=-2; scene.add(sea); OCEAN.sea=sea; OCEAN.tex=wt;
+  // the waterfall: wherever the lagoon's water reaches the island's edge, a curtain of falling water down to the sea
+  const S=WGEN.sea(); if(!S) return; const segs=[]; let cur=null; const a0=Math.atan2(S.nz,S.nx);
+  for(let a=a0-1.0;a<=a0+1.0;a+=0.0025){ const ca=Math.cos(a), sa=Math.sin(a), er=WGEN.edgeR(ca*820,sa*820), r=er-2.2, c=worldCell(C[0]+ca*r,C[2]+sa*r), wet=c>=0&&WORLD.WS[c]>-999;
+    if(wet){ if(!cur){ cur=[]; segs.push(cur); } cur.push([ca,sa,WGEN.edgeR(ca*er,sa*er)]); } else cur=null; }
+  const streak=(()=>{ const c=document.createElement('canvas'); c.width=128; c.height=512; const g=c.getContext('2d'), R=seeded(9090); g.clearRect(0,0,128,512);
+    g.fillStyle='rgba(200,225,240,0.32)'; g.fillRect(0,0,128,512); // a thin sheet everywhere, streaks on top (wrapping both ways: no seams)
+    for(let i=0;i<340;i++){ const x=R()*128, w=1+R()*3.5, y=R()*512, l=80+R()*300, a=0.2+R()*0.6; for(const dx of [0,-128,128]) for(const dy of [0,-512]){ const gr=g.createLinearGradient(0,y+dy,0,y+dy+l); gr.addColorStop(0,'rgba(255,255,255,0)'); gr.addColorStop(0.5,`rgba(240,249,255,${a})`); gr.addColorStop(1,'rgba(255,255,255,0)'); g.fillStyle=gr; g.fillRect(x+dx,y+dy,w,l); } }
+    const t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; return t; })();
+  const mist=(()=>{ const c=document.createElement('canvas'); c.width=c.height=64; const g=c.getContext('2d'), gr=g.createRadialGradient(32,32,0,32,32,32); gr.addColorStop(0,'rgba(255,255,255,.9)'); gr.addColorStop(0.5,'rgba(255,255,255,.35)'); gr.addColorStop(1,'rgba(255,255,255,0)'); g.fillStyle=gr; g.fillRect(0,0,64,64); return new THREE.CanvasTexture(c); })();
+  OCEAN.falls=[]; OCEAN.mists=[];
+  for(const sg of segs){ if(sg.length<6) continue; const pos=[], uv=[], col=[], idx=[], ROWS=22, top=S.Y, H_=top-Y; let arc=0;
+    sg.forEach((p,i)=>{ if(i) arc+=Math.hypot((p[0]*p[2]-sg[i-1][0]*sg[i-1][2]),(p[1]*p[2]-sg[i-1][1]*sg[i-1][2]));
+      const side=Math.min(1,Math.min(i,sg.length-1-i)/4); // thinner at its two ends
+      for(let r=0;r<=ROWS;r++){ const t=r/ROWS, out=10*Math.sqrt(t)*(0.6+0.4*side)+t*5, R=p[2]-1.6+out, y=top+0.05-t*(H_+0.5);
+        pos.push(C[0]+p[0]*R,y,C[2]+p[1]*R); uv.push(arc/9,t*H_/36); col.push(side,side,side); } });
+    for(let i=0;i<sg.length-1;i++) for(let r=0;r<ROWS;r++){ const a=i*(ROWS+1)+r, b=a+ROWS+1; idx.push(a,b,a+1,b,b+1,a+1); }
+    const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3)); g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2)); g.setAttribute('color',new THREE.Float32BufferAttribute(col,3)); g.setIndex(idx); g.computeVertexNormals();
+    for(const [sp,op,tint,ox] of [[1,0.78,0xcfe6f6,0],[1.7,0.5,0xffffff,0.37]]){ const tex=streak.clone(); tex.needsUpdate=true; tex.repeat.set(ox?1.3:1,1); tex.offset.x=ox;
+      const m=new THREE.Mesh(g,new THREE.MeshBasicMaterial({map:tex,color:tint,transparent:true,opacity:op,depthWrite:false,side:THREE.DoubleSide,fog:true})); m.renderOrder=3; m.userData.sp=sp; scene.add(m); OCEAN.falls.push(m); }
+    { const under=new THREE.Mesh(g,new THREE.MeshLambertMaterial({color:0x7fb2cf,emissive:0x2a4a5e,transparent:true,opacity:0.86,depthWrite:false,side:THREE.DoubleSide})); under.renderOrder=2; scene.add(under); }
+    // spray where it lands, and white water spreading on the sea
+    for(let i=0;i<sg.length;i+=3){ const p=sg[i], R=p[2]+12; for(let k=0;k<2;k++){ const s=new THREE.Sprite(new THREE.SpriteMaterial({map:mist,color:0xffffff,transparent:true,opacity:0.5,depthWrite:false}));
+        const sc=10+Math.random()*12; s.scale.set(sc,sc,1); s.position.set(C[0]+p[0]*(R+Math.random()*6),Y+3+Math.random()*8+k*7,C[2]+p[1]*(R+Math.random()*6)); s.userData={y0:s.position.y,ph:Math.random()*6.28,sc}; scene.add(s); OCEAN.mists.push(s); } }
+    { const fg=new THREE.CircleGeometry(1,24).rotateX(-Math.PI/2); for(let i=0;i<sg.length;i+=6){ const p=sg[i], R=p[2]+14, f=new THREE.Mesh(fg,new THREE.MeshBasicMaterial({map:mist,color:0xf2fbff,transparent:true,opacity:0.7,depthWrite:false}));
+        f.scale.setScalar(16+Math.random()*10); f.position.set(C[0]+p[0]*R,Y+0.15,C[2]+p[1]*R); f.renderOrder=1; scene.add(f); } } }
+})();
+function stepOcean(dt){ const t=performance.now()/1000; if(OCEAN.tex){ OCEAN.tex.offset.x=t*0.004; OCEAN.tex.offset.y=t*0.0025; }
+  if(OCEAN.falls) for(const m of OCEAN.falls) m.material.map.offset.y=t*0.55*m.userData.sp;
+  if(OCEAN.mists) for(const s of OCEAN.mists){ const u=s.userData; s.position.y=u.y0+Math.sin(t*0.6+u.ph)*1.5; const k=1+0.12*Math.sin(t*0.9+u.ph); s.scale.set(u.sc*k,u.sc*k,1); s.material.opacity=0.38+0.14*Math.sin(t*1.1+u.ph); } }
+// nobody goes over the edge: walking, gliding, driving or sailing, you stop at the cliff top
+function keepOnIsland(E,dt){ const u=E.pos.x-SPAWN[0], v=E.pos.z-SPAWN[2], d=Math.hypot(u,v); if(E===P&&P.overFalls&&d<MAP_R-60) P.overFalls=false; if(d<MAP_R-40) return; const er=WGEN.edgeR(u,v)-1.2;
+  if(E===P&&!P.sky&&!P.kart){ const S=WGEN.sea();
+    if(P.overFalls){ if(P.pos.y<WGEN.OCEAN_Y+0.4&&!isDead()){ burst(P.pos.clone().setY(WGEN.OCEAN_Y+0.1),26,6,0.1,splashMat); sfx('step_water'); fallHurt(9999); } return; } // over the falls: nothing holds you, the sea below ends it
+    if(S&&d>er-34&&WGEN.seaW(u*(er-4)/d,v*(er-4)/d)>0&&P.pos.y<S.Y+0.8&&waterAt(P.pos.x,P.pos.z)>-999){ // in the lagoon near its mouth: the current takes you
+      const nx=u/d, nz=v/d, k=Math.max(0,1-(er-d)/34), sp=0.6+5.4*k*k; if(dt){ P.pos.x+=nx*sp*dt; P.pos.z+=nz*sp*dt; }
+      if(d>er-0.6){ P.overFalls=true; if(P.vel){ P.vel.x+=nx*3; P.vel.z+=nz*3; } return; } }
+    if(S&&d>er-12&&P.pos.y<S.Y-2.5&&WGEN.seaW(u*(er-14)/d,v*(er-14)/d)>0){ P.overFalls=true; return; } } // (already dropping past the lip)
+  if(d<=er) return;
+  const nx=u/d, nz=v/d; E.pos.x=SPAWN[0]+nx*er; E.pos.z=SPAWN[2]+nz*er; if(E.vel){ const vn=E.vel.x*nx+E.vel.z*nz; if(vn>0){ E.vel.x-=vn*nx; E.vel.z-=vn*nz; } } }
+function keepKartOnIsland(k){ const u=k.x-SPAWN[0], v=k.z-SPAWN[2], d=Math.hypot(u,v); if(d<MAP_R-40) return; const er=WGEN.edgeR(u,v)-(k.boat?3:2); if(d<=er) return;
+  const nx=u/d, nz=v/d; k.x=SPAWN[0]+nx*er; k.z=SPAWN[2]+nz*er; const vn=k.vx*nx+k.vz*nz; if(vn>0){ k.vx-=vn*nx*1.6; k.vz-=vn*nz*1.6; } }
 /* ---------- water ----------
    One material for all of it: ripples from three layers of a small tiling normal map, the sky mirrored by angle
    (Fresnel), the sun or moon glittering off it, the bed showing through in the shallows and foam at the edge. */
@@ -1906,7 +1962,7 @@ function shoreAt(x,z){ const c=worldCell(x,z); return c>=0&&(WORLD.WS[c]>-999||W
   const S=WGEN.sea(); if(!S) return;
   // the sea: a fine sheet along the shore (it knows how deep it is at every point) and one big sheet out to the horizon
   const px=-S.nz, pz=S.nx, A0=S.C0-80, A1=S.C0+260, LW=470, ST=4, na=Math.round((A1-A0)/ST), nl=Math.round(2*LW/ST), pos=[], dep=[], fl=[], idx=[];
-  for(let b=0;b<=nl;b++) for(let a=0;a<=na;a++){ const al=A0+a*ST, lat=-LW+b*ST, u=S.nx*al+px*lat, v=S.nz*al+pz*lat; pos.push(SPAWN[0]+u,S.Y,SPAWN[2]+v); dep.push(Math.max(0,Math.min(9,S.Y-terrainH(SPAWN[0]+u,SPAWN[2]+v)))); fl.push(0,0); }
+  for(let b=0;b<=nl;b++) for(let a=0;a<=na;a++){ const al=A0+a*ST, lat=-LW+b*ST; let u=S.nx*al+px*lat, v=S.nz*al+pz*lat; for(let it=0;it<4;it++){ const d=Math.hypot(u,v), e=WGEN.edgeR(u,v)-1.6; if(d>e){ u*=e/d; v*=e/d; } else break; } pos.push(SPAWN[0]+u,S.Y,SPAWN[2]+v); dep.push(Math.max(0,Math.min(9,S.Y-terrainH(SPAWN[0]+u,SPAWN[2]+v)))); fl.push(0,0); }
   { const hw=Math.round((A1-A0)/2)+1, hh=Math.round(LW)+1, hd=new Uint8Array(hw*hh); // the ground along the shore, every 2 m, from 3 m under the sea to 2 m over it
     for(let j=0;j<hh;j++) for(let i=0;i<hw;i++){ const al=A0+i*2, lat=-LW+j*2; hd[j*hw+i]=Math.max(0,Math.min(255,Math.round((terrainH(SPAWN[0]+S.nx*al+px*lat,SPAWN[2]+S.nz*al+pz*lat)-S.Y+3)/5*255))); }
     const hT=new THREE.DataTexture(hd,hw,hh,THREE.LuminanceFormat); hT.magFilter=hT.minFilter=THREE.LinearFilter; hT.needsUpdate=true; const wu=WATER.mat.uniforms; wu.hT.value=hT; wu.seaA.value.set(S.nx,S.nz,A0,A1-A0); wu.seaB.value.set(LW,S.Y,hw,hh); }
@@ -1915,7 +1971,7 @@ function shoreAt(x,z){ const c=worldCell(x,z); return c>=0&&(WORLD.WS[c]>-999||W
   const P4=(al,lat)=>[SPAWN[0]+S.nx*al+px*lat,S.Y,SPAWN[2]+S.nz*al+pz*lat], far=[[A1,-LW,3600,LW],[A0,-2600,3600,-LW],[A0,LW,3600,2600]], fp=[], fd=[], ff=[], fi=[];
   far.forEach(([a0,l0,a1,l1],q)=>{ fp.push(...P4(a0,l0),...P4(a1,l0),...P4(a0,l1),...P4(a1,l1)); fd.push(9,9,9,9); ff.push(0,0,0,0,0,0,0,0); fi.push(q*4,q*4+2,q*4+1, q*4+1,q*4+2,q*4+3); });
   const g2=new THREE.BufferGeometry(); g2.setAttribute('position',new THREE.Float32BufferAttribute(fp,3)); g2.setAttribute('depth',new THREE.Float32BufferAttribute(fd,1)); g2.setAttribute('flow',new THREE.Float32BufferAttribute(ff,2)); g2.setIndex(fi); g2.computeBoundingSphere();
-  for(const gg of [g,g2]){ const m=new THREE.Mesh(gg,WATER.mat); m.matrixAutoUpdate=false; m.renderOrder=2; scene.add(m); WATER.meshes.push(m); }
+  for(const gg of [g]){ const m=new THREE.Mesh(gg,WATER.mat); m.matrixAutoUpdate=false; m.renderOrder=2; scene.add(m); WATER.meshes.push(m); }
   // the rivers: a ribbon of water down each one, level across, carrying its current
   for(const rv of WORLD.rivers||[]){ const p=rv.pts, n=p.length, AC=[-1.2,-0.85,-0.45,0,0.45,0.85,1.2], NC=AC.length, rp=[], rd=[], rf=[], ri=[]; let endQ=n-1;
     if(rv.into>=0){ const J=p[n-1], iw=WORLD.rivers[rv.into].pts[rv.jq][3]; while(endQ>2&&Math.hypot(p[endQ-1][0]-J[0],p[endQ-1][1]-J[1])<iw*0.5) endQ--; } // it stops well inside the water it joins
@@ -4303,7 +4359,7 @@ function animateSky(H,S,dt){ const G=H.group, r=H.rig, A=H.anim, gl=S.sky==='gli
   gd.visible=A.glK>0.01;
   if(gd.visible){ G.updateMatrixWorld(true); r.armL.hand.getWorldPosition(_skA); r.armR.hand.getWorldPosition(_skB); _skA.add(_skB).multiplyScalar(0.5); G.worldToLocal(_skA);
     gd.position.copy(_skA); gd.scale.set(Math.max(0.05,e),Math.max(0.25,e),Math.max(0.35,e)); A.glP=lerp(A.glP||0,gl?Math.max(-0.95,Math.min(0.45,0.1+gam*0.95)):0,Math.min(1,dt*4)); gd.rotation.set(A.glP-th-0.02-(1-e)*0.5+Math.sin(t*1.3)*0.025*e,0,-A.skyZ*0.25); } }
-function moveBody(E,fw,st,jump,dt){ E.swim=!E.kart&&!E.sky&&swimSurface(E.pos)!==null; if(E.kart){ if(E.kart.seat===0) E.kart.k.inp={fw,st,hb:!!jump}; return; } if(E.sky){ skyMove(E,fw,st,jump,dt); return; } moveBody0(E,fw,st,jump,dt); }
+function moveBody(E,fw,st,jump,dt){ E.swim=!E.kart&&!E.sky&&swimSurface(E.pos)!==null; if(E.kart){ if(E.kart.seat===0) E.kart.k.inp={fw,st,hb:!!jump}; return; } if(E.sky){ skyMove(E,fw,st,jump,dt); keepOnIsland(E,dt); return; } moveBody0(E,fw,st,jump,dt); keepOnIsland(E,dt); }
 
 /* ---------- the dune buggy ----------
    A small two-seat buggy, found in some garages. Walk up to it and press Interact to drive (left seat) or ride
@@ -4778,7 +4834,7 @@ function peopleNear(k,x,z){ const out=[], add=(p,id)=>{ if(!p||Math.abs(p.x-x)>4
   if(typeof B!=='undefined'&&B&&B.active&&!B.down) add(B.pos,'bot'); if(typeof AB!=='undefined'&&AB&&AB.active&&!AB.dead) add(AB.pos,'ally');
   if(typeof BR!=='undefined'&&BR.on) for(const b of BR.bots) if(b.alive&&!b.sky&&!b.bus) add(b.pos,null);
   return out; }
-function stepKarts(dt){ if(!karts) return; const me=ME();
+function stepKarts(dt){ if(!karts) return; const me=ME(); for(const k of karts) if(!k.dead) keepKartOnIsland(k);
   if(!P.kart&&!isDead()) for(const k of karts){ if(k.dead||Math.abs(k.x-P.pos.x)>4||Math.abs(k.z-P.pos.z)>4) continue; if(k.solid.boxes.some(b=>P.pos.y+1.6>b[1]&&P.pos.y<b[4]&&circBox(b,P.pos.x,P.pos.z,0.38))) depen(new Set([k.solid]),P); } // rolled into you: step aside
   if(P.kart&&(isDead()||!karts.includes(P.kart.k))) kartForget();
   for(const k of karts){ if(k.dead>0){ k.dead-=dt; if(k.dead<=0){ k.dead=0; Object.assign(k,{x:k.home.x,y:k.home.y,z:k.home.z,yaw:k.home.yaw,pitch:0,roll:0,vx:0,vz:0,vy:0,hp:KART_HP,seats:[null,null],driver:null,local:false,tgt:null,skew:null}); if(k.dmgMat) k.dmgMat.color.copy(k.paintCol); k.g.visible=true; kartPose(k); } continue; }
@@ -10607,6 +10663,7 @@ function updateCombatHUD(){
   }
   miniT=Math.min(miniT,1/15)-lastDt; if(miniT<=0){ miniT=1/15; drawMini(); }
   if(mapOpen){ stepMapView(lastDt); drawBigMap(); }
+  stepOcean(lastDt);
   stepMarks();
 }
 /* ---------- compass strip: north = facing -z ---------- */
@@ -10634,7 +10691,7 @@ function drawMini(){
   const dpr=Math.min(2,devicePixelRatio||1), css=mini.clientWidth||132; if(mini.width!==Math.round(css*dpr)){ mini.width=mini.height=Math.round(css*dpr); }
   const S=mini.width, c=S/2, R=40, sc=c/R, g=mctx;
   g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,S,S);
-  g.fillStyle='#3d6b3a'; g.fillRect(0,0,S,S);
+  g.fillStyle='#1d5f8c'; g.fillRect(0,0,S,S);
   const ox=P.pos.x, oz=P.pos.z, tx=x=>c+(x-ox)*sc, tz=z=>c+(z-oz)*sc;
   if(!bigMapImg) try{ bigMapImg=renderBigMapImage(); }catch(e){}
   if(bigMapImg){ const k=bigMapImg.width/(2*WHALF), x0=SPAWN[0]-WHALF, z0=SPAWN[2]-WHALF; g.imageSmoothingEnabled=true; g.imageSmoothingQuality='high'; g.drawImage(bigMapImg,(ox-R-x0)*k,(oz-R-z0)*k,2*R*k,2*R*k,0,0,S,S); }
@@ -11468,15 +11525,15 @@ function brJumpOut(E){ if(!E.bus) return; E.bus=false; const p=brBusPos(BRBUS.t,
   if(E===P){ sfx('bus_jump'); $('busTip').hidden=true; for(const b of BR.bots) if(b.bus&&b.team===0) b.jumpAt=BRBUS.t+0.3+Math.random()*0.9; }
   else { E.h.group.visible=true; } }
 var BR={on:false,bots:[],out:false,over:false,overT:0,kills:0,storm:null,wall:null,tick:0,hudT:0,place:0,frame:0};
-const BR_N=19, BR_SHRINK=[[150,0.62,90],[120,0.4,75],[100,0.24,65],[90,0.13,55],[75,0.06,45],[60,0,40]], BR_DPS=[1,2,4,6,8,10]; // [wait, radius after (of the island), shrink time]
-const BR_NAMES=['Rook2','Pixel','Nova','Talon','Bramble','Vex','Juno','Moss','Static','Kestrel','Cinder','Wisp','Dune','Echo','Sable','Quill','Rift','Ember','Glint','Hollow','Fable','Brick'];
+const BR_N=29, BR_SHRINK=[[150,0.62,90],[120,0.4,75],[100,0.24,65],[90,0.13,55],[75,0.06,45],[60,0,40]], BR_DPS=[1,2,4,6,8,10]; // [wait, radius after (of the island), shrink time]
+const BR_NAMES=['Onyx','Pike','Marlow','Zephyr','Grit','Lark','Tundra','Fennel','Cobalt','Rook2','Pixel','Nova','Talon','Bramble','Vex','Juno','Moss','Static','Kestrel','Cinder','Wisp','Dune','Echo','Sable','Quill','Rift','Ember','Glint','Hollow','Fable','Brick'];
 function brMine(){ return settings.mode==='br'&&!net.role; }
 function brSpot(){ const T0=Math.random()<0.75&&TOWNS.length?TOWNS[Math.floor(Math.random()*TOWNS.length)]:null; // most drop near a town, some out in the wild
   for(let k=0;k<200;k++){ const a=Math.random()*Math.PI*2, r=T0&&k<120?Math.random()*(T0.R+35):Math.sqrt(Math.random())*MAP_R*0.82, x=(T0&&k<120?T0.x:SPAWN[0])+Math.cos(a)*r, z=(T0&&k<120?T0.z:SPAWN[2])+Math.sin(a)*r, c=worldCell(x,z);
     if(c<0||waterAt(x,z)>-999||WORLD.SNOW[c]>40||terrainH(x,z)>60) continue; return [x,z]; } return [SPAWN[0],SPAWN[2]]; }
-function brMakeBot(i){ const o=OUTFITS[Math.floor(Math.random()*OUTFITS.length)], pk=PICKAXES[Math.floor(Math.random()*PICKAXES.length)].id, h=heroFor(o,pk); h.outfit=o.id; h.pickaxe=pk; h.group.visible=false; scene.add(h.group);
+function brMakeBot(i){ const sk=0.25+Math.random()*0.6, o=OUTFITS[Math.floor(Math.random()*OUTFITS.length)], pk=PICKAXES[Math.floor(Math.random()*PICKAXES.length)].id, h=heroFor(o,pk); h.outfit=o.id; h.pickaxe=pk; h.group.visible=false; scene.add(h.group);
   return {isBR:true,id:'br'+i,name:BR_NAMES[i%BR_NAMES.length],h,pos:new THREE.Vector3(),vel:new THREE.Vector3(),onGround:true,groundSlab:null,crouch:false,yaw:0,pitch:0,rot:0,sc:1,
-    hp:100,sh:0,alive:true,wpn:null,ammo:0,reloadT:0,fireT:0,swingT:0,thinkT:Math.random()*0.4,stuckT:0,sideT:0,sideDir:1,skill:0.25+Math.random()*0.6,aw:new Map(),tgt:null,los:false,react:0,
+    hp:100,sh:0,alive:true,wpn:null,ammo:0,reloadT:0,fireT:0,swingT:0,thinkT:Math.random()*0.4,stuckT:0,sideT:0,sideDir:1,skill:sk,brave:Math.random()<(sk-0.4)*1.8,flee:false,aw:new Map(),tgt:null,los:false,react:0,
     route:null,goal:null,loot:null,dest:null,heals:0,healT:0,shotAt:0,strafe:1,strafeT:0,lastSeen:null,kills:0}; }
 function brStormWall(){ if(BR.wall) return BR.wall; const g=new THREE.CylinderGeometry(1,1,1,120,1,true);
   const m=new THREE.ShaderMaterial({transparent:true,depthWrite:false,side:THREE.DoubleSide,uniforms:{time:{value:0}},
@@ -11500,7 +11557,7 @@ function brStart(){
   P.bus=true; P.sky=null; P.vel.set(0,0,0); $('busTip').hidden=false;
   if(false) cloudDrop(sp[0],sp[1],SKY_MATCH); else P.pos.set(sp[0],terrainH(sp[0],sp[1]),sp[1]);
   BR.storm={cx:SPAWN[0],cz:SPAWN[2],r:MAP_R*1.08,ph:0,state:'wait',t:BR_SHRINK[0][0]+BRBUS.T}; brNextCircle(); brStormWall().visible=true;
-  $('brHud').hidden=false; syncBot(); banner('Battle royale',TS===1?'20 drop in · one walks out':['','','Duos','Trios','Squads'][TS]+' · '+Math.ceil(20/TS)+' teams · one walks out',3);
+  $('brHud').hidden=false; syncBot(); banner('Battle royale',TS===1?(BR_N+1)+' drop in · one walks out':['','','Duos','Trios','Squads'][TS]+' · '+Math.ceil((BR_N+1)/TS)+' teams · one walks out',3);
 }
 function brStop(){ BR.on=false; BRBUS.on=false; if(BRBUS.g) BRBUS.g.visible=false; if(BRBUS.snd) BRBUS.snd.set(0); P.bus=false; $('busTip').hidden=true; for(const b of BR.bots){ b.h.group.visible=false; b.alive=false; } if(BR.wall) BR.wall.visible=false; $('brHud').hidden=true; $('stormFx').hidden=true; syncBot(); }
 function brNextCircle(){ const S=BR.storm, ph=BR_SHRINK[Math.min(S.ph,BR_SHRINK.length-1)], nr=MAP_R*ph[1], room=Math.max(0,S.r-nr)*0.85; let x=S.cx, z=S.cz;
@@ -11510,7 +11567,7 @@ function brAliveCount(){ let n=BR.out?0:1; for(const b of BR.bots) if(b.alive) n
 function brTeamsLeft(){ const t=new Set(); if(!BR.out) t.add(0); for(const b of BR.bots) if(b.alive) t.add(b.team); return t; }
 const brOut=(E,S)=>Math.hypot(E.pos.x-S.cx,E.pos.z-S.cz)>S.r;
 function brUpdate(dt){
-  if(brMine()&&playing&&!BR.on&&!BR.loading){ BR.loading=true; const ts=settings.brTeam||1; showLoading('Battle royale',ts===1?'Solo · 20 players':['','','Duos','Trios','Squads'][ts]+' · '+Math.ceil(20/ts)+' teams',10,[net.name||$('pname').value.trim()||'You'],()=>{ BR.loading=false; if(brMine()&&playing) brStart(); }); }
+  if(brMine()&&playing&&!BR.on&&!BR.loading){ BR.loading=true; const ts=settings.brTeam||1; showLoading('Battle royale',ts===1?'Solo · '+(BR_N+1)+' players':['','','Duos','Trios','Squads'][ts]+' · '+Math.ceil((BR_N+1)/ts)+' teams',10,[net.name||$('pname').value.trim()||'You'],()=>{ BR.loading=false; if(brMine()&&playing) brStart(); }); }
   if(BR.loading){ P.vel.x=0; P.vel.z=0; fireHeld=false; }
   if(!brMine()&&BR.on) brStop();
   if(!BR.on) return;
@@ -11654,6 +11711,11 @@ function brStepBot(b,dt,now){
     else if(d>want*1.3) goal={x:T.pos.x,z:T.pos.z,r:want};
     else if(d<want*0.5&&!(WEAPONS[b.wpn].pellets>1)) goal={x:b.pos.x*2-T.pos.x,z:b.pos.z*2-T.pos.z,r:0.5};
     b.strafeT-=dt; if(b.strafeT<=0){ b.strafe=-b.strafe; b.strafeT=0.5+Math.random()*1.2; } strafe=b.strafe*(0.5+0.5*b.skill);
+    { const eh=b.hp+b.sh, th=(T.hp||0)+(T.sh||0), hurtAgo=now-(b.hurtAt||0);
+      if(b.flee&&(eh>=70||hurtAgo>14000&&!b.los)) b.flee=false;                                  // patched up (or long since shot at): back in
+      if(!b.flee&&!b.brave&&eh<40&&hurtAgo<1200&&th>eh+15) b.flee=true;                            // nearly finished, by someone healthier: run
+      if(b.flee){ const dx=b.pos.x-T.pos.x, dz=b.pos.z-T.pos.z, dd=Math.hypot(dx,dz)||1; goal={x:b.pos.x+dx/dd*40,z:b.pos.z+dz/dd*40,r:0.5}; face=null; run=true; strafe=b.los?b.strafe*0.7:0; }
+      else if(b.brave&&eh<45&&b.los) goal={x:T.pos.x,z:T.pos.z,r:Math.min(want*0.6,5)}; }        // brave: keep pushing
     if(b.hp<45&&b.heals>0&&!b.los&&now-(b.hurtAt||0)>2500){ b.healT+=dt; goal=null; strafe=0; crouch=true; if(b.healT>3.2){ b.healT=0; b.heals--; b.hp=Math.min(100,b.hp+35); } } else b.healT=0; }
   else if(T&&!b.wpn){ const d=T.pos.distanceTo(b.pos); face=Math.atan2(-(T.pos.x-b.pos.x),-(T.pos.z-b.pos.z));
     if(d<4) goal={x:T.pos.x,z:T.pos.z,r:1.6};                                      // cornered: swing
@@ -11867,7 +11929,7 @@ function frame(now){
     if(B&&B.active) botUpdate(dt);
     const n=Math.max(1,Math.ceil(dt/0.008)); stepFall(); for(let k=0;k<n;k++){ physStep(dt/n,P); if(B&&B.active) physStep(dt/n,B); }
     combatTick(dt);
-    if(P.pos.y<-20) respawn();
+    if(P.pos.y<(P.overFalls?WGEN.OCEAN_Y-30:-20)) respawn(); // (going over the falls is a long way down: the sea ends it, not this)
     if(edit){
       const hv=tileAtNDC(0,0); if(hv!==edit.hover){ edit.hover=hv; refreshTiles(); }
       if(edit.mouse) paintTile(hv);
