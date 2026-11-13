@@ -1,21 +1,17 @@
+// far skydivers: baked in the freefall pose and under a glider (not a tilted A-pose), baked ahead, and pictured
 const {sleep,page,launch,open}=require('./h.js');
-(async()=>{ const b=await launch(); const {pg,errs}=await open(b,page('/home/claude/crank-lab/index.html','P,scene,renderer,physStep,moveBody,stepFall,skyDrop,terrainH,settings,fireDown,tryPlace,SPAWN,get mode(){return mode}'),{fast:true,norender:true});
- await pg.waitForFunction(()=>window.T&&T.renderer,null,{timeout:120000});
- await pg.evaluate(()=>{ const s=document.querySelector('#botSel'); s.value='off'; s.dispatchEvent(new Event('change')); });
- await pg.evaluate(()=>document.getElementById('play').click()); await sleep(1500);
- const r=await pg.evaluate(()=>{ const P=T.P, out={}; out.start=P.sky&&P.sky.phase; out.h0=P.pos.y-T.terrainH(P.pos.x,P.pos.z);
-   const hp0=P.hp; out.fire=(T.fireDown('mouse'),P.sky!=null); out.place=T.tryPlace('wall');
-   let t=0, deployAt=null, maxV=0, landT=null; const dt=1/60; P.pitch=-0.8;
-   while(t<120){ T.moveBody(P,1,0,false,dt); T.physStep(dt); T.stepFall(); maxV=Math.max(maxV,-P.vel.y);
-     if(P.sky&&P.sky.phase==='glide'&&deployAt==null) deployAt=P.pos.y-T.terrainH(P.pos.x,P.pos.z);
-     if(!P.sky){ landT=t; break; } t+=dt; }
-   // a few ground steps
-   for(let i=0;i<60;i++){ T.moveBody(P,0,0,false,dt); T.physStep(dt); T.stepFall(); }
-   out.deployAt=deployAt; out.maxV=maxV; out.landT=landT; out.hp=P.hp+'/'+hp0; out.onGround=P.onGround; out.dist=Math.hypot(P.pos.x-T.SPAWN[0],P.pos.z-T.SPAWN[2]);
-   // second drop: no dive, jump to deploy early
-   T.skyDrop(T.SPAWN[0],T.SPAWN[2],300); P.pitch=0; let t2=0; for(;t2<2;t2+=dt){ T.moveBody(P,0,0,t2>1.5,dt); T.physStep(dt);} out.earlyDeploy=P.sky&&P.sky.phase; 
-   P.pitch=-0.8; for(let i=0;i<60*120&&P.sky;i++){ T.moveBody(P,0,0,false,dt); T.physStep(dt); T.stepFall(); } out.hp2=P.hp; out.sky2=P.sky;
-   return out; });
- console.log(JSON.stringify(r));
- const ok=r.start==='fall'&&r.h0>550&&r.place===false&&r.deployAt>60&&r.deployAt<90&&r.maxV>50&&r.landT&&r.hp.startsWith('100')&&r.onGround&&r.earlyDeploy==='glide'&&r.hp2===100&&r.sky2===null;
- console.log(ok?'PASS':'FAIL'); console.log(errs.join('\n')||'no errors'); await b.close(); })();
+(async()=>{ const b=await launch(); const {pg,errs}=await open(b,page('/home/claude/crank-lab/index.html','scene,P,settings,BR,BRBUS,renderer,TOWNS,terrainH,camera,BOT_SKY,BOT_SKYQ,localHero,TOD'),{vp:{width:900,height:560},log:false});
+ pg.on('console',m=>{ if(m.type()==='warning') console.log('  [warn]',m.text().slice(0,200)); });
+ await pg.waitForFunction(()=>window.T&&T.renderer,null,{timeout:180000});
+ await pg.evaluate(()=>{ T.settings.skyDrop=true; document.querySelector('.mode[data-mode=br]').click(); document.getElementById('play').click(); }); await pg.waitForFunction(()=>T.BR.on,null,{timeout:90000}); await sleep(3000);
+ const q0=await pg.evaluate(()=>({baked:T.BOT_SKY.size,q:T.BOT_SKYQ.length,outfits:new Set(T.BR.bots.map(b=>b.h&&b.h.outfit)).size}));
+ await pg.evaluate(()=>{ T.BRBUS.t=T.BRBUS.T*0.55; T.scene.visible=false; }); await sleep(1500);
+ await pg.evaluate(()=>{ const t=T.TOWNS.find(t=>t.name==='Gearworks'); T.P.sky=null; T.P.bus=false; T.P.pos.set(t.x,T.terrainH(t.x,t.z)+0.1,t.z); T.P.hp=1e6; }); await sleep(6000); await pg.evaluate(()=>{ T.scene.visible=true; });
+ const r=await pg.evaluate(()=>{ const k={}; T.BR.bots.forEach(b=>{ const s=(b.sky?b.sky.phase:'-')+'/'+(b.far&&b.far.visible?b.farK:'near-or-hidden'); k[s]=(k[s]||0)+1; }); return {baked:T.BOT_SKY.size,q:T.BOT_SKYQ.length,k,keys:[...T.BOT_SKY.keys()].slice(0,4)}; });
+ await pg.evaluate(()=>{ const bb=T.BR.bots.filter(b=>b.sky&&b.sky.phase==='fall'&&b.far&&b.far.visible)[3]; if(bb){ bb.sky.phase='glide'; bb._forced=1; } }); await sleep(2500);
+ // a picture: one falling and one gliding bot, from close behind and below
+ for(const ph of ['fall','glide']){ const u=await pg.evaluate(ph=>{ const bb=T.BR.bots.find(b=>b.sky&&b.sky.phase===ph&&b.far&&b.far.visible&&b.farK===ph); if(!bb) return null; T.TOD.fix=0.3; const cam=new THREE.PerspectiveCamera(40,900/560,0.1,3000), p=bb.far.position;
+     cam.position.set(p.x+5,p.y-2.5,p.z+5); cam.lookAt(p.x,p.y+0.6,p.z); T.localHero.group.visible=false; T.renderer.render(T.scene,cam); return T.renderer.domElement.toDataURL('image/jpeg',0.85); },ph);
+   if(u) require('fs').writeFileSync(`/home/claude/work/sky_${ph}.jpg`,Buffer.from(u.split(',')[1],'base64')); else console.log('no',ph,'bot drawn far'); }
+ console.log(JSON.stringify(q0),JSON.stringify(r)); const ok=r.baked>=2&&r.q===0&&!Object.keys(r.k).some(s=>/^(fall|glide)\/stand/.test(s));
+ console.log(ok?'PASS':'FAIL'); console.log(errs.slice(0,4).join('\n')||'no errors'); await b.close(); })();

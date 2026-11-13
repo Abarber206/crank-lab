@@ -931,6 +931,24 @@ body.touch #kartHud{bottom:auto;top:calc(env(safe-area-inset-top,0px) + 58px)}
 <script>
 (function(){
 "use strict";
+// hidden things keep their matrices: skip a hidden object's subtree once it has been brought up to date, until it moves
+// (its position, rotation or scale change), something is added to or taken from it, or it shows again
+(()=>{ const O=THREE.Object3D.prototype, add0=O.add, rem0=O.remove, dirty=o=>{ for(;o;o=o.parent) o._mwOk=false; };
+  O.add=function(){ dirty(this); return add0.apply(this,arguments); };
+  O.remove=function(){ dirty(this); return rem0.apply(this,arguments); };
+  const T16=new Float64Array(16);
+  O.updateMatrixWorld=function(force){
+    if(this.matrixAutoUpdate) this.updateMatrix();
+    if(this.matrixWorldNeedsUpdate||force){ const e=this.matrixWorld.elements; for(let i=0;i<16;i++) T16[i]=e[i];
+      if(this.parent===null) this.matrixWorld.copy(this.matrix); else this.matrixWorld.multiplyMatrices(this.parent.matrixWorld,this.matrix); this.matrixWorldNeedsUpdate=false; force=true;
+      for(let i=0;i<16;i++) if(T16[i]!==e[i]){ this._mwV=(this._mwV||0)+1; break; } }   // (counts real changes, so a hidden child knows when its parent moved)
+    const ch=this.children, V=this._mwV||0;
+    for(let i=0,l=ch.length;i<l;i++){ const c=ch[i];
+      if(c.visible){ c.updateMatrixWorld(force); c._mwOk=false; continue; }
+      const p=c.position, q=c.quaternion, s=c.scale; let k=c._mwK;
+      if(c._mwOk&&c._mwP===V&&k[0]===p.x&&k[1]===p.y&&k[2]===p.z&&k[3]===q.x&&k[4]===q.y&&k[5]===q.z&&k[6]===q.w&&k[7]===s.x&&k[8]===s.y&&k[9]===s.z&&!c.matrixWorldNeedsUpdate) continue;
+      c.updateMatrixWorld(true); if(!k) k=c._mwK=new Float64Array(10);
+      k[0]=p.x; k[1]=p.y; k[2]=p.z; k[3]=q.x; k[4]=q.y; k[5]=q.z; k[6]=q.w; k[7]=s.x; k[8]=s.y; k[9]=s.z; c._mwP=V; c._mwOk=true; } }; })();
 const isTouch = matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
 const $ = id => document.getElementById(id);
 
@@ -974,7 +992,12 @@ function saveSettings(){ try{ localStorage.setItem('cranklab.settings', JSON.str
 
 /* ---------- renderer / scene ---------- */
 const canvas=$('c');
-const renderer=new THREE.WebGLRenderer({canvas, antialias:!isTouch || devicePixelRatio<2});
+const renderer=new THREE.WebGLRenderer({canvas, antialias:!isTouch || devicePixelRatio<2, powerPreference:isTouch?'default':'high-performance'});
+// which graphics chip the browser is drawing with (a laptop with a gaming card can still be on its built-in one)
+const GPU=(()=>{ let n=''; try{ const gl=renderer.getContext(), e=gl.getExtension('WEBGL_debug_renderer_info'); n=String(e?gl.getParameter(e.UNMASKED_RENDERER_WEBGL):gl.getParameter(gl.RENDERER)); }catch(e){}
+  const m=n.match(/(GeForce |NVIDIA )?(RTX|GTX|Quadro|Radeon|Intel|Iris|UHD|Arc|Apple|Mali|Adreno|SwiftShader|llvmpipe|Microsoft Basic)[^,()]*/i), short=(m?m[0]:n).replace(/\s*Direct3D.*$/i,'').replace(/\s+/g,' ').trim().slice(0,28);
+  const weak=/SwiftShader|llvmpipe|Basic Render|Microsoft Basic/i.test(n)||(/Intel|Radeon\(TM\) Graphics|Radeon Graphics|Vega \d|Radeon \d{3}M/i.test(n)&&!/RTX|GTX|Radeon RX|Arc A|Radeon Pro/i.test(n));
+  return {name:n,short,weak,told:false,slowN:0}; })();
 THREE.ShaderChunk.tonemapping_pars_fragment=THREE.ShaderChunk.tonemapping_pars_fragment.replace('vec3 CustomToneMapping( vec3 color ) { return color; }',`vec3 CustomToneMapping( vec3 color ) {
 	color *= toneMappingExposure;
 	float l = dot( color, vec3( 0.2126, 0.7152, 0.0722 ) );
@@ -1007,8 +1030,9 @@ function perfShed(){ const say=m=>{ try{ toast(m); }catch(e){} };
   if(PERF.far&&sunFar.castShadow){ PERF.far=false; sunFar.castShadow=false; say('Far shadows off to keep the game smooth'); return true; } PERF.far=false; return false; }
 const FPS={acc:0,n:0,worst:0,t:0};
 function fpsTick(raw,now){ if(raw>1500) return; FPS.acc+=raw; FPS.n++; if(raw>FPS.worst) FPS.worst=raw; if(now-FPS.t<500) return; FPS.t=now;
+  if(GPU.weak&&!GPU.told&&!isTouch&&typeof playing!=='undefined'&&playing&&FPS.n){ GPU.slowN=FPS.acc/FPS.n>22?GPU.slowN+1:0; if(GPU.slowN>=8){ GPU.told=true; try{ banner('Running on built-in graphics','Your browser is drawing with '+(GPU.short||'the built-in chip')+', not your graphics card. Windows: Settings › Display › Graphics › your browser › High performance, then restart the browser.',12); }catch(e){} } }
   const el=document.getElementById('fpsHud'); if(!el) return; const on=settings.showFps!==false&&typeof playing!=='undefined'&&(playing||(typeof LOBBY!=='undefined'&&LOBBY.on)); el.hidden=!on;
-  if(on&&FPS.n){ const ms=FPS.acc/FPS.n, f=Math.round(1000/ms); el.textContent=f+' FPS · '+ms.toFixed(1)+' ms · worst '+FPS.worst.toFixed(0)+' ms'; el.classList.toggle('slow',f<(PERF.target||60)*0.8); el.classList.toggle('bad',f<50); }
+  if(on&&FPS.n){ const ms=FPS.acc/FPS.n, f=Math.round(1000/ms); el.textContent=f+' FPS · '+ms.toFixed(1)+' ms · worst '+FPS.worst.toFixed(0)+' ms'+(GPU.short?' · '+GPU.short:''); el.title=GPU.name; el.classList.toggle('slow',f<(PERF.target||60)*0.8); el.classList.toggle('bad',f<50); }
   FPS.acc=0; FPS.n=0; FPS.worst=0; }
 function stepDynRes(raw,now){ fpsTick(raw,now);
   if(raw>250){ dynRes.acc=0; dynRes.n=0; return; } // tab was hidden
@@ -3599,7 +3623,7 @@ function poiDecor(){ const patches=new Map(), glows=new Map(), col=new THREE.Col
       for(let a=0;a<nx;a++) for(let b=0;b<nz;b++){ const xa=x0+(x1-x0)*a/nx, xb=x0+(x1-x0)*(a+1)/nx, za=z0+(z1-z0)*b/nz, zb=z0+(z1-z0)*(b+1)/nz;
         const st={x:(xa+xb)/2,z:(za+zb)/2,solid:{boxes:[[xa,y0,za,xb,y1,zb]],key:(kp||'poi')+STATICS.length,mat:'metal',deco:1}}; STATICS.push(st); claim(st); } },
     sbox(w,h,d,x,y,z,c,glow){ D.box(w,h,d,x,y,z,c,null,glow); D.solid(x-w/2,y,z-d/2,x+w/2,y+h,z+d/2); },          // drawn and solid
-    scyl(r,h,x,y,z,c,seg){ D.cyl(r,r,h,x,y,z,c,seg); const n=Math.max(2,Math.ceil(r*2/1.2)); for(let q=0;q<n;q++){ const xa=-r+2*r*q/n, xb=-r+2*r*(q+1)/n, xm=(xa+xb)/2, hd=Math.sqrt(Math.max(0.01,r*r-xm*xm)); D.solid(x+xa,y,z-hd,x+xb,y+h,z+hd); } },
+    scyl(r,h,x,y,z,c,seg){ D.cyl(r,r,h,x,y,z,c,seg); const n=r<1?Math.max(2,Math.ceil(r*2/1.2)):Math.ceil(r*2/0.6); for(let q=0;q<n;q++){ const xa=-r+2*r*q/n, xb=-r+2*r*(q+1)/n, xe=r<1?Math.abs((xa+xb)/2):Math.max(0,Math.max(Math.abs(xa),Math.abs(xb))-0.12*(xb-xa)), hd=Math.sqrt(Math.max(0.01,r*r-xe*xe)); D.solid(x+xa,y,z-hd,x+xb,y+h,z+hd); } }, // (strips that keep inside the round, so no corner stands off it)
     flush(){ cur=null;
       decoGroup(loose,looseS);
       const out=[]; const merge=list=>{ let n=0; for(const g of list) n+=g.attributes.position.count; const P=new Float32Array(n*3), N=new Float32Array(n*3), Cc=new Float32Array(n*3); let o=0;
@@ -3749,6 +3773,10 @@ function poiRig(D,x,y,z,yaw,o){ o=o||{}; const PI=Math.PI, cy=Math.cos(yaw), sy=
       solid(-1.25,1.25,0.6,1.58+2.1,bk,fr); }
     D.end(); }
   return [W2(0,front),W2(0,back)]; }
+// a solid for a box turned by yaw (half sizes hw across, hl along, from y0 to y1): short pieces along its length, each
+// only as big as its own corner-to-corner span, so a turned thing has no invisible corners standing off it
+function solidTurned(D,x,z,yaw,hw,hl,y0,y1){ const s=Math.sin(yaw), c=Math.cos(yaw), n=Math.max(1,Math.ceil(hl*2/(Math.abs(s*c)>0.05?0.9:2.4)));
+  for(let k=0;k<n;k++){ const f=-hl+hl*2*(k+0.5)/n, cx=x+s*f, cz=z+c*f, h=hl/n, ex=Math.abs(c)*hw+Math.abs(s)*h, ez=Math.abs(s)*hw+Math.abs(c)*h; D.solid(cx-ex,y0,cz-ez,cx+ex,y1,cz+ez); } }
 // is a point within m metres of the line between two ends (a lorry's footprint, for keeping clutter off it)
 const nearSeg=(px,pz,[[ax,az],[bx,bz]],m)=>{ const dx=bx-ax, dz=bz-az, t=Math.max(0,Math.min(1,((px-ax)*dx+(pz-az)*dz)/(dx*dx+dz*dz||1))); return Math.hypot(px-ax-dx*t,pz-az-dz*t)<m; };
 
@@ -3813,7 +3841,7 @@ POI_BUILD.factory=(t,D)=>{ const K=poiKit(t), L=K.L, X_=poiCtx(t), {i,j,X,Z,y0,j
       for(let q=-2.7;q<=2.71;q+=0.45){ const gg=new THREE.BoxGeometry(0.12,2.3,2.5); gg.translate(q,0,0); D.geo(gg,c,xx,y+1.3,zz,[0,yaw,0]); }
       for(const dy of [0.06,2.54]){ const gg=new THREE.BoxGeometry(6.14,0.12,2.48); D.geo(gg,0x2a2d31,xx,y+dy,zz,[0,yaw,0]); }
       const dg=new THREE.BoxGeometry(0.08,2.3,2.2); dg.translate(3.06,0,0); D.geo(dg,0x3a3d42,xx,y+1.3,zz,[0,yaw,0]);
-      const ex=Math.abs(co)*3.05+Math.abs(s)*1.22, ez=Math.abs(s)*3.05+Math.abs(co)*1.22; D.solid(xx-ex,y,zz-ez,xx+ex,y+2.6,zz+ez); };
+      solidTurned(D,xx,zz,yaw+Math.PI/2,1.22,3.05,y,y+2.6); };
     [[17,15,0,0.02],[17,15,1,-0.03],[24.6,15.4,0,0.05],[17.4,18.6,0,0],[24,18.8,0,-0.04],[24,18.8,1,0.03],[24,18.8,2,0],[18.2,24.5,0,0.12],[25.2,24,0,-0.08],[31,13,0,1.57],[30.8,20.6,0,1.62]].forEach(([x,z,lv,yw])=>cont(x,z,lv,yw));
     for(const z of [11,28]) for(const x of [14,29]){ D.sbox(0.6,11,0.6,X(x),y0,Z(z),0xe0a326); } for(const z of [11,28]) D.sbox(15.6,0.9,0.9,X(21.5),y0+11,Z(z),0xe0a326); for(const x of [14,29]) D.box(0.7,0.7,17.6,X(x),y0+11.2,Z(19.5),0xe0a326);
     D.box(15,1.4,2.6,X(21.5),y0+11.9,Z(21),0xd4991c); D.box(2.4,2,2.4,X(22),y0+12.4,Z(21),0x3a3d42); D.tube(0.04,6,X(21.6),y0+9,Z(21),0x222222); D.tube(0.04,6,X(22.4),y0+9,Z(21),0x222222); D.box(1.4,0.5,0.5,X(22),y0+5.8,Z(21),0xe0a326);
@@ -3828,7 +3856,7 @@ POI_BUILD.factory=(t,D)=>{ const K=poiKit(t), L=K.L, X_=poiCtx(t), {i,j,X,Z,y0,j
     for(let k=0;k<9;k++){ const x=-20+r()*36, z=-6+r()*12; if(onRig(x,z,2.4)||Math.hypot(x+3,z-4)<1.8||Math.hypot(x+3,z+5)<1.8) continue; const h=r()<0.4?2:1;
       for(let q=0;q<h;q++) D.sbox(1.2,0.15,1.2,X(x),y0+q*0.9,Z(z),0x8c6a3f), D.sbox(1.1,0.75,1.1,X(x),y0+0.15+q*0.9,Z(z),[0xa9814e,0x6f8a9b,0xd7dadc][Math.floor(r()*3)]); }
     for(let k=0;k<7;k++){ const x=6+r()*5, z=-26+r()*6; D.scyl(0.32,0.9,X(x),y0,Z(z),[0x2e86c1,0xc0392b,0x3c8d3c][k%3],10); }
-    for(const [x,z,yw] of [[-30,-4,0.1],[-30,2.4,-0.15],[36,-6,1.5],[-3,33,0.2]]){ const g=new THREE.BoxGeometry(3,0.9,0.6); D.geo(g,0xd8d4cc,X(x),y0+0.45,Z(z),[0,yw,0]); D.solid(X(x)-1.5,y0,Z(z)-0.6,X(x)+1.5,y0+0.9,Z(z)+0.6); }
+    for(const [x,z,yw] of [[-30,-4,0.1],[-30,2.4,-0.15],[36,-6,1.5],[-3,33,0.2]]){ const g=new THREE.BoxGeometry(3,0.9,0.6); D.geo(g,0xd8d4cc,X(x),y0+0.45,Z(z),[0,yw,0]); solidTurned(D,X(x),Z(z),yw+Math.PI/2,0.3,1.5,y0,y0+0.9); }
     for(const [x,z] of [[-8,-6],[8,-30],[10,6],[-27,-6],[-20,15],[32,8]]){ D.box(0.25,9,0.25,X(x),y0,Z(z),0x55606a); D.box(1.6,0.6,0.5,X(x),y0+9,Z(z),0x2c3036); D.box(1.4,0.08,0.4,X(x),y0+8.95,Z(z),0xfff3cf,null,true); D.solid(X(x)-0.15,y0,Z(z)-0.15,X(x)+0.15,y0+9,Z(z)+0.15); }
     // a pipe run on stands from the boiler house to the hall
     const run=[[1,11],[-3,4],[-3,-5],[-3,-9.7]]; for(let k=0;k<run.length-1;k++){ const [xa,za]=run[k], [xb,zb]=run[k+1], len=Math.hypot(xb-xa,zb-za), yaw=Math.atan2(xb-xa,zb-za); D.tube(0.3,len,X((xa+xb)/2),y0+6.4,Z((za+zb)/2),0x2f7f6b,[Math.PI/2,yaw,0]); }
@@ -3922,7 +3950,7 @@ POI_BUILD.castle=(t,D)=>{ const K=poiKit(t), L=K.L, X_=poiCtx(t), {i,j,X,Z,y0,C,
   // the well, the training yard, a cart, stalls by the east gate, dirt worn into the cobbles
   { const wx=X(-9), wz=Z(-7.5); D.scyl(1.1,0.9,wx,y0,wz,0x8f877a,14); D.cyl(0.95,0.95,0.05,wx,y0+0.85,wz,0x2a4a6a,14); for(const dx of [-0.95,0.95]) D.box(0.15,2.2,0.15,wx+dx,y0+0.9,wz,0x5a3d26); D.box(2.3,0.12,0.12,wx,y0+3.05,wz,0x5a3d26); D.box(2.6,0.1,1.6,wx,y0+3.2,wz,0x8a3a2e);
     for(const [x,z] of [[6.2,12.4],[8.6,14.6],[6.4,17.2]]){ D.scyl(0.12,1.9,X(x),y0,Z(z),0x6b4a2e,6); D.box(1,0.12,0.12,X(x),y0+1.4,Z(z),0x6b4a2e,[0,r(),0]); D.sph(0.3,X(x),y0+1.9,Z(z),0xd9b24a); D.cyl(0.35,0.3,0.7,X(x),y0+0.8,Z(z),0xd9b24a,8); }
-    for(const [x,z,yw] of [[5.4,19.6,0.3],[-6,21.2,-0.2]]){ const g=new THREE.BoxGeometry(1.6,1.6,0.2); D.geo(g,0xd9b24a,X(x),y0+1.4,Z(z),[0.25,yw,0]); D.cyl(0.6,0.6,0.22,X(x),y0+1.4,Z(z),0xf2efe6,16,[Math.PI/2+0.25,yw,0]); D.cyl(0.35,0.35,0.24,X(x),y0+1.4,Z(z),0xc8443c,16,[Math.PI/2+0.25,yw,0]); D.solid(X(x)-0.8,y0,Z(z)-0.3,X(x)+0.8,y0+2.2,Z(z)+0.3); }
+    for(const [x,z,yw] of [[5.4,19.6,0.3],[-6,21.2,-0.2]]){ const g=new THREE.BoxGeometry(1.6,1.6,0.2); D.geo(g,0xd9b24a,X(x),y0+1.4,Z(z),[0.25,yw,0]); D.cyl(0.6,0.6,0.22,X(x),y0+1.4,Z(z),0xf2efe6,16,[Math.PI/2+0.25,yw,0]); D.cyl(0.35,0.35,0.24,X(x),y0+1.4,Z(z),0xc8443c,16,[Math.PI/2+0.25,yw,0]); for(const sx of [-0.55,0.55]){ const lg=new THREE.BoxGeometry(0.1,1.5,0.1); lg.translate(sx,0.75,0.12); D.geo(lg,0x6b4a2e,X(x),y0,Z(z),[-0.12,yw,0]); } { const bl=new THREE.BoxGeometry(0.1,1.3,0.1); bl.translate(0,0.65,-0.55); D.geo(bl,0x6b4a2e,X(x),y0,Z(z),[0.35,yw,0]); } solidTurned(D,X(x),Z(z),yw+Math.PI/2,0.3,0.8,y0,y0+2.2); }
     { const g=new THREE.BoxGeometry(1.6,0.5,2.8); D.geo(g,0x6b4a2e,X(11),y0+0.75,Z(-7),[0,0.4,0]); for(const s of [-0.85,0.85]){ const w=new THREE.CylinderGeometry(0.55,0.55,0.12,12); w.rotateZ(Math.PI/2); w.translate(s,0,0.4); D.geo(w,0x4a3424,X(11),y0+0.55,Z(-7),[0,0.4,0]); } D.solid(X(11)-1.1,y0,Z(-7)-1.4,X(11)+1.1,y0+1,Z(-7)+1.4); }
     for(const [x,z,c] of [[9.2,6.6,0xb3262e],[17.6,6.2,0x2a5ea8]]){ D.sbox(3,0.9,1.2,X(x),y0,Z(z),0x6b4a2e); for(const dx of [-1.4,1.4]) for(const dz of [-0.5,0.9]) D.box(0.1,2.3,0.1,X(x+dx),y0,Z(z+dz),0x5a3d26);
       D.box(3.4,0.08,2,X(x),y0+2.3,Z(z+0.2),c,[0.25,0,0]); for(let k=0;k<4;k++) D.sph(0.16,X(x-1+k*0.66),y0+1.05,Z(z),[0xe23a3a,0xf2c014,0x7cbf3a,0xff8a3d][k]); } }
@@ -4053,10 +4081,10 @@ POI_BUILD.timber=(t,D)=>{ const K=poiKit(t), L=K.L, X_=poiCtx(t), {i,j,X,Z,y0,C,
   // --- log piles, plank stacks, the log loader, a loaded flatbed, the water tower, stumps
   { const pile=(x,z,yw,n)=>{ const s=Math.sin(yw), co=Math.cos(yw); let h=0; for(let row=n;row>0;row--){ for(let k=0;k<row;k++){ const off=(k-(row-1)/2)*0.95, rr=0.44+r()*0.06, g=new THREE.CylinderGeometry(rr,rr*1.05,7+r()*0.8,12); g.rotateX(Math.PI/2);
           D.geo(g,[0x8a5a32,0x7a4e2c,0x94643a][Math.floor(r()*3)],X(x+co*off),y0+0.45+h,Z(z-s*off),[0,yw,0]); } h+=0.8; }
-        const ex=Math.abs(co)*n*0.48+Math.abs(s)*3.6, ez=Math.abs(s)*n*0.48+Math.abs(co)*3.6; D.solid(X(x)-ex*0.85,y0,Z(z)-ez*0.85,X(x)+ex*0.85,y0+h*0.75,Z(z)+ez*0.85); };
+        solidTurned(D,X(x),Z(z),yw,n*0.42,3.5,y0,y0+h*0.8); };
     pile(-25,-12,0.3,5); pile(12,9,1.3,4); pile(24,22,-0.4,5); pile(-8,24,2.0,3); pile(-27,-25,0.9,3);
     for(const [x,z,yw,n] of [[10,-6,0.1,4],[16,-4,0.2,3],[6,16,-0.5,5]]){ for(let q=0;q<n;q++){ const g=new THREE.BoxGeometry(2.4,0.38,4.8); D.geo(g,q%2?0xd9b077:0xc89a62,X(x),y0+0.12+q*0.4+0.19,Z(z),[0,yw+(q%2?0.03:0),0]); }
-      D.solid(X(x)-1.6,y0,Z(z)-2.6,X(x)+1.6,y0+0.12+n*0.4,Z(z)+2.6); D.box(2.6,0.12,5,X(x),y0,Z(z),0x8c6a3f,[0,yw,0]); }
+      solidTurned(D,X(x),Z(z),yw,1.25,2.45,y0,y0+0.12+n*0.4); D.box(2.6,0.12,5,X(x),y0,Z(z),0x8c6a3f,[0,yw,0]); }
     // the log loader: four big tyres, an engine house at the back, a glazed cab, a boom with its ram and a grapple
     { const lx=X(-18), lz=Z(-3), Y=0xe0a326, DKk=0x1d1f22, GL=0x4f6f86; D.obj('metal',650);
       D.box(2.6,0.8,4.6,lx,y0+0.5,lz,Y); D.box(2.7,0.1,4.7,lx,y0+1.3,lz,0x3a3d42);
@@ -9238,8 +9266,10 @@ const FURN_SZ=[[2.0,0.9],[1.6,1.7],[1.2,0.4],[2.4,0.66],[1.5,2.16],[1.6,0.5],[0.
 function furnFoot(ft,x,z,yaw){ const E=FURN_E[ft], q=Math.abs(Math.sin(yaw))>0.7, ex=q?E[2]:E[0], ez=q?E[0]:E[2], o=ft===3?0.1:0, ox=q?0:o*Math.cos(yaw), oz=q?-o*Math.sin(yaw):0; return [x-ex+ox,z-ez+oz,x+ex+ox,z+ez+oz]; }
 function propBoxes0(p){
   const s=p.s, x=p.x, z=p.z;
-  if(p.kind==='tree'||p.kind==='pine'){ const t=(p.kind==='tree'?.42:.34)*s+0.05; return [[x-t,0,z-t,x+t,3.2*s*(p.hs||1),z+t]]; }
-  if(p.kind==='rock'){ const a=1.05*s, c=.9*s; return [[x-a,0,z-c,x+a,1.35*s,z+c]]; }
+  if(p.kind==='tree'||p.kind==='pine'){ const t=(p.kind==='tree'?.37:.32)*s+0.04, H=3.2*s*(p.hs||1); // the trunk's thickness at body height, as a cross (round, near enough)
+    return [[x-t*0.95,0,z-t*0.42,x+t*0.95,H,z+t*0.42],[x-t*0.42,0,z-t*0.95,x+t*0.42,H,z+t*0.95],[x-t*0.72,0,z-t*0.72,x+t*0.72,H,z+t*0.72]]; }
+  if(p.kind==='rock'){ const m=p.g&&p.g.children.find(c=>c.isMesh), th=m?m.rotation.y:0, A=1.25*s*0.97, C=1.05*s*0.97, ex=Math.hypot(A*Math.cos(th),C*Math.sin(th)), ez=Math.hypot(A*Math.sin(th),C*Math.cos(th)), H=1.32*s;
+    return [[x-ex*0.97,0,z-ez*0.45,x+ex*0.97,H*0.7,z+ez*0.45],[x-ex*0.45,0,z-ez*0.97,x+ex*0.45,H*0.7,z+ez*0.97],[x-ex*0.72,0,z-ez*0.72,x+ex*0.72,H,z+ez*0.72]]; }
   if(p.kind==='furn'){ const E=FURN_E[p.ft||0], q=Math.abs(Math.sin(p.g.rotation.y))>0.7, ex=q?E[2]:E[0], ez=q?E[0]:E[2], o=p.ft===3?0.1:0; // (the kitchen is off-centre: the fridge end)
     const ox=q?0:o*Math.cos(p.g.rotation.y), oz=q?-o*Math.sin(p.g.rotation.y):0; return [[x-ex+ox,0,z-ez+oz,x+ex+ox,E[1],z+ez+oz]]; }
   // car: a row of small boxes down its middle along its real angle (lower at the bonnet and the boot)
@@ -9586,7 +9616,8 @@ function buildWorldDecor(){ const D=poiDecor(), r=seeded(60613), S=SPAWN, PI=Mat
   const WOOD=0x7a5a3c, DARKWOOD=0x5a4030, BARK=0x6b4e34, STONE=0x8d8a84;
   // a lying log: length along local z (turned by a)
   const log=(x,y,z,a,len,rad,c,solid,pitch)=>{ if(solid) D.obj('wood',Math.round(60+len*rad*90)); const p=pitch||0, rise=Math.sin(p)*len/2; D.geo(new THREE.CylinderGeometry(rad,rad*1.05,len,10),c||BARK,x,y+rad,z,[PI/2-p,a,0]); D.geo(new THREE.CircleGeometry(rad*0.92,10),0xc8a878,...at(x,z,a,0,len/2+0.005).reduce((o,v,i)=>(o[i*2]=v,o),[0,y+rad+rise,0]),[-p,a,0]);
-    if(solid){ const [ex,ez]=rot(0,len/2,a), hx=Math.abs(ex)+rad, hz=Math.abs(ez)+rad; D.solid(x-hx,y-Math.abs(rise),z-hz,x+hx,y+rad*2*0.9+Math.abs(rise),z+hz,'log'); D.end(); } };
+    if(solid){ const n=Math.max(1,Math.ceil(len/0.7)); for(let k=0;k<n;k++){ const f=(k+0.5)/n-0.5, [cx,cz]=rot(0,f*len,a), cy=y+Math.sin(p)*f*len, s=len/n/2, [ex,ez]=rot(0,s,a), hx=Math.abs(ex)+rad*0.85, hz=Math.abs(ez)+rad*0.85, dy=Math.abs(Math.sin(p))*s; // (in short pieces along its length and slope)
+        D.solid(x+cx-hx,cy-dy,z+cz-hz,x+cx+hx,cy+rad*1.8+dy,z+cz+hz,'log'); } D.end(); } };
   // an A-frame tent, ridge along local z: w wide, h high, L long
   const tentGeo=(w,h,L)=>{ const g=new THREE.BufferGeometry(), a=w/2, b=L/2, P=[ -a,0,-b, 0,h,-b, 0,h,b,  -a,0,-b, 0,h,b, -a,0,b,   a,0,-b, a,0,b, 0,h,b,  a,0,-b, 0,h,b, 0,h,-b,   -a,0,-b, a,0,-b, 0,h,-b ];
     for(let i=P.length-9;i>=0;i-=9) P.push(P[i+6],P[i+7],P[i+8],P[i+3],P[i+4],P[i+5],P[i],P[i+1],P[i+2]); // both sides (the faces are one-sided)
@@ -9605,7 +9636,9 @@ function buildWorldDecor(){ const D=poiDecor(), r=seeded(60613), S=SPAWN, PI=Mat
     for(let q=0;q<n;q++){ const f0=q/n, f1=(q+1)/n; if(G(f0)||G(f1)||G((f0+f1)/2)) continue; const x0=ax+(bx-ax)*f0, z0=az+(bz-az)*f0, x1=ax+(bx-ax)*f1, z1=az+(bz-az)*f1, y0=H(x0,z0), y1=H(x1,z1), l=Math.hypot(x1-x0,z1-z0), tilt=Math.atan2(y1-y0,l);
       D.obj('wood',90); D.box(0.14,1.25,0.14,x0,y0-0.1,z0,DARKWOOD,[0,a,0]); if(q===n-1||G((q+1.5)/n)) D.box(0.14,1.25,0.14,x1,y1-0.1,z1,DARKWOOD,[0,a,0]);
       for(const h of [0.5,1.0]) D.geo(new THREE.BoxGeometry(0.06,0.12,l+0.14),WOOD,(x0+x1)/2,(y0+y1)/2+h,(z0+z1)/2,[-tilt,a,0]);
-      const st={x:(x0+x1)/2,z:(z0+z1)/2,solid:{boxes:[[Math.min(x0,x1)-0.1,Math.min(y0,y1),Math.min(z0,z1)-0.1,Math.max(x0,x1)+0.1,Math.max(y0,y1)+1.15,Math.max(z0,z1)+0.1]],key:'fencerail'+STATICS.length,mat:'wood',deco:1}}; STATICS.push(st); D.claim(st); D.end(); } };
+      const nb=Math.max(1,Math.ceil(l/0.6)), fbx=[]; for(let k=0;k<nb;k++){ const fa=k/nb, fb=(k+1)/nb, xa=x0+(x1-x0)*fa, xb=x0+(x1-x0)*fb, za=z0+(z1-z0)*fa, zb=z0+(z1-z0)*fb, ya=y0+(y1-y0)*fa, yb=y0+(y1-y0)*fb; // (in short pieces along the slant: no box standing off a diagonal fence)
+        fbx.push([Math.min(xa,xb)-0.1,Math.min(ya,yb),Math.min(za,zb)-0.1,Math.max(xa,xb)+0.1,Math.max(ya,yb)+1.15,Math.max(za,zb)+0.1]); }
+      const st={x:(x0+x1)/2,z:(z0+z1)/2,r:l/2,solid:{boxes:fbx,key:'fencerail'+STATICS.length,mat:'wood',deco:1}}; STATICS.push(st); D.claim(st); D.end(); } };
 
   // ---- campsites: a clearing in the trees with two tents round a fire
   { let made=0; for(let tr=0;tr<900&&made<7;tr++){ const x=S[0]+(r()*2-1)*(MAP_R-80), z=S[2]+(r()*2-1)*(MAP_R-80); if(!open(x,z,11)) continue; if(treesNear(x,z,22)<6) continue; // (only out in the woods)
@@ -9721,7 +9754,7 @@ function buildWorldDecor(){ const D=poiDecor(), r=seeded(60613), S=SPAWN, PI=Mat
         else { D.cyl(0.06,0.06,4.2,x,y,z,DARKWOOD,6); D.box(0.9,1.5,0.04,x+0.48,y+2.5,z,[0x8a2a2a,0x2a4a8a,0x2f6a3a][Math.floor(pr()*3)]); D.solid(x-0.15,y,z-0.15,x+0.15,y+4.2,z+0.15); } } // a banner
       else if(t.kind==='labs'){ if(pr()<0.45){ crate(x,y,z,0.9,ya,0x8a8f96); D.box(0.92,0.12,0.06,...at(x,z,ya,0,0.46).reduce((o,v,i)=>(o[i*2]=v,o),[0,y+0.4,0]),0xf2c418,[0,ya,0]); } else drum(x,y,z,0xe0b020); }
       else { if(pr()<0.6){ D.obj('wood',260); for(let k=0;k<3;k++) log(...at(x,z,ya,(k-1)*0.62,0).reduce((o,v,i)=>(o[i*2]=v,o),[0,y,0]),ya,3.6,0.3,BARK,false); log(...at(x,z,ya,-0.31,0).reduce((o,v,i)=>(o[i*2]=v,o),[0,y+0.52,0]),ya,3.6,0.3,BARK); log(...at(x,z,ya,0.31,0).reduce((o,v,i)=>(o[i*2]=v,o),[0,y+0.52,0]),ya,3.6,0.3,BARK);
-          const [hx,hz]=[Math.abs(Math.sin(ya))*1.9+Math.abs(Math.cos(ya))*1,Math.abs(Math.cos(ya))*1.9+Math.abs(Math.sin(ya))*1]; D.solid(x-hx,y,z-hz,x+hx,y+1.1,z+hz); D.end(); }
+          for(let k=0;k<5;k++){ const f=-1.8+3.6*(k+0.5)/5, [cx,cz]=at(x,z,ya,0,f), ex=Math.abs(Math.cos(ya))*0.95+Math.abs(Math.sin(ya))*0.36, ez=Math.abs(Math.sin(ya))*0.95+Math.abs(Math.cos(ya))*0.36; D.solid(cx-ex,y,cz-ez,cx+ex,y+1.1,cz+ez); } D.end(); }
         else { D.cyl(0.42,0.5,0.55,x,y,z,0x5e4630,10); D.box(0.12,0.75,0.12,x,y+0.55,z,0x8a8a8a,[0.3,ya,0]); D.solid(x-0.5,y,z-0.5,x+0.5,y+0.6,z+0.5); } } } } // log piles; a stump with an axe
 
   const meshes=D.flush(); DECOR.items=meshes.length; DECOR.s1=STATICS.length; return meshes; }
@@ -9767,7 +9800,7 @@ function buildRails(){ const parts=[], roads=WORLD.roads, OFF=ROAD_HW+1.15;
           const post=new THREE.BoxGeometry(0.13,0.82,0.13); post.translate(x,y+0.41,z); parts.push(post);
           if(j<e){ const [x2,z2]=at[j+1], y2=terrainH(x2,z2), dx=x2-x, dz=z2-z, dy=y2-y, L=Math.hypot(dx,dz), L3=Math.hypot(L,dy);
             for(const [th,hh,yy] of [[0.07,0.3,0.6],[0.11,0.07,0.6]]){ const beam=new THREE.BoxGeometry(th,hh,L3+0.02); beam.rotateX(-Math.asin(dy/L3)); beam.rotateY(Math.atan2(dx,dz)); beam.translate((x+x2)/2,(y+y2)/2+yy,(z+z2)/2); parts.push(beam); }
-            const boxes=[]; for(let s=0;s<3;s++){ const f0=s/3, f1=(s+1)/3, xa=x+dx*f0, xb=x+dx*f1, za=z+dz*f0, zb=z+dz*f1, yb=Math.min(y,y2); boxes.push([Math.min(xa,xb)-0.08,yb-0.3,Math.min(za,zb)-0.08,Math.max(xa,xb)+0.08,Math.max(y,y2)+0.82,Math.max(za,zb)+0.08]); }
+            const boxes=[], NS=Math.max(3,Math.ceil(Math.hypot(dx,dz)/0.6)); for(let s=0;s<NS;s++){ const f0=s/NS, f1=(s+1)/NS, xa=x+dx*f0, xb=x+dx*f1, za=z+dz*f0, zb=z+dz*f1, ya=y+(y2-y)*f0, yb2=y+(y2-y)*f1; boxes.push([Math.min(xa,xb)-0.08,Math.min(ya,yb2)-0.3,Math.min(za,zb)-0.08,Math.max(xa,xb)+0.08,Math.max(ya,yb2)+0.82,Math.max(za,zb)+0.08]); }
             STATICS.push({x:(x+x2)/2,z:(z+z2)/2,solid:{boxes,key:'rail'+STATICS.length}}); } }
         q=e+1; } } });
   if(!parts.length) return; const g=mergeGeos(parts); g.computeBoundingSphere();
@@ -11995,7 +12028,7 @@ function brStormWall(){ if(BR.wall) return BR.wall; const g=new THREE.CylinderGe
       vec3 c=mix(vec3(0.42,0.12,0.78),vec3(0.75,0.45,1.0),s*0.6+f*0.25); float a=0.28+0.12*s+0.08*f; a*=1.0-smoothstep(160.0,320.0,vY); gl_FragColor=vec4(c,a); }`});
   const w=new THREE.Mesh(g,m); w.frustumCulled=false; w.renderOrder=3; scene.add(w); return BR.wall=w; }
 function brStart(){
-  BR.on=true; try{ weatherRoll(); }catch(e){} BR.claimed=new Set(); BR.matsGot=0; BR.dmg=0; BR.t0=performance.now(); BR.tOut=0; BR.mats0=null; BR.spec=null; BR.leave=false; BR.endUp=false; BR.killer=null; $('brEnd').hidden=true; $('specTag').hidden=true; BR.out=false; BR.over=false; BR.overT=0; BR.kills=0; BR.place=0; P.shotAt=0;
+  BR.on=true; try{ weatherRoll(); }catch(e){} BR.skyWarm=false; BR.claimed=new Set(); BR.matsGot=0; BR.dmg=0; BR.t0=performance.now(); BR.tOut=0; BR.mats0=null; BR.spec=null; BR.leave=false; BR.endUp=false; BR.killer=null; $('brEnd').hidden=true; $('specTag').hidden=true; BR.out=false; BR.over=false; BR.overT=0; BR.kills=0; BR.place=0; P.shotAt=0;
   clearBuilds(); respawn(); emptyLoadout(); P.sh=0;
   if(B&&B.active){ B.active=false; B.h.group.visible=false; }
   while(BR.bots.length<BR_N) BR.bots.push(brMakeBot(BR.bots.length));
@@ -12048,7 +12081,7 @@ function brNextCircle(){ const S=BR.storm, ph=BR_SHRINK[Math.min(S.ph,BR_SHRINK.
 function brAliveCount(){ let n=BR.out?0:1; for(const b of BR.bots) if(b.alive) n++; return n; }
 function brTeamsLeft(){ const t=new Set(); if(!BR.out) t.add(0); for(const b of BR.bots) if(b.alive) t.add(b.team); return t; }
 const brOut=(E,S)=>Math.hypot(E.pos.x-S.cx,E.pos.z-S.cz)>S.r;
-function brUpdate(dt){
+function brUpdate(dt){ if(!BR.skyWarm&&BR.bots&&BR.bots.length){ BR.skyWarm=true; try{ botSkyWarm(); }catch(e){} } if(BOT_SKYQ.length) botSkyStep();
   if(brMine()&&playing&&!BR.on&&!BR.loading){ BR.loading=true; const ts=settings.brTeam||1; showLoading('Battle royale',ts===1?'Solo · '+(BR_N+1)+' players':['','','Duos','Trios','Squads'][ts]+' · '+Math.ceil((BR_N+1)/ts)+' teams',10,[net.name||$('pname').value.trim()||'You'],()=>{ BR.loading=false; if(brMine()&&playing) brStart(); }); }
   if(BR.loading){ P.vel.x=0; P.vel.z=0; fireHeld=false; }
   if(!brMine()&&BR.on) brStop();
@@ -12270,8 +12303,27 @@ const BOT_FAR=new Map();
 function botFarGeo(id){ let g=BOT_FAR.get(id); if(g) return g; const o=OUTFITS.find(x=>x.id===id)||OUTFITS[0], h=heroFor(o), z=new THREE.Vector3();
   for(let k=0;k<12;k++) animateRig(h,{bare:true,pos:z,vel:z,yaw:0,pitch:0,onGround:true,crouch:false,building:false,editing:false,gun:false,ads:0,swingT:0},1/30);
   if(h.rig.pick) h.rig.pick.visible=false; if(h.lod) heroLod(h,500); g=flattenModel(h.group); BOT_FAR.set(id,g); return g; }
-function brFar(b,on){ if(!on){ if(b.far) b.far.visible=false; return; } if(!b.far){ b.far=new THREE.Mesh(botFarGeo(b.h.outfit),bakedMat(false)); b.far.userData.noCull=true; b.far.castShadow=false; b.far.receiveShadow=false; scene.add(b.far); }
-  const f=b.far; f.visible=true; f.position.copy(b.pos); f.rotation.set(b.sky&&b.sky.phase==='fall'?-1.2:0,b.yaw,0,'YXZ'); }
+const BOT_SKY=new Map(), BOT_SKYQ=[];
+// a figure in the air, baked once per outfit: run the skydive animation until it settles, keep its tilt, bake it (the
+// glider's sail is doubled so it shows from below as well as above)
+function botSkyGeo(id,kind){ const key=id+':'+kind; let g=BOT_SKY.get(key); if(g) return g;
+  const o=OUTFITS.find(x=>x.id===id)||OUTFITS[0], h=heroFor(o), S={sky:kind,vel:new THREE.Vector3(0,kind==='glide'?-5:-23,kind==='glide'?-14:-4),yaw:0,pos:new THREE.Vector3()};
+  for(let k=0;k<45;k++){ h.anim.t=(h.anim.t||0)+1/30; animateSky(h,S,1/30); }
+  const th=h.group.rotation.x; h.group.position.set(0,0,0); h.group.rotation.set(0,0,0,'YXZ'); if(h.rig.pick) h.rig.pick.visible=false; if(h.lod) heroLod(h,500);
+  g=flattenModel(h.group);
+  if(kind==='glide'){ const P=g.attributes.position.array, N=g.attributes.normal.array, C=g.attributes.color.array, n=P.length/3, P2=new Float32Array(n*6), N2=new Float32Array(n*6), C2=new Float32Array(n*6);
+    P2.set(P); N2.set(N); C2.set(C); for(let t=0;t<n;t+=3) for(let v=0;v<3;v++){ const s=t+[0,2,1][v], d=n+t+v; for(let a=0;a<3;a++){ P2[d*3+a]=P[s*3+a]; N2[d*3+a]=-N[s*3+a]; C2[d*3+a]=C[s*3+a]; } }
+    const g2=new THREE.BufferGeometry(); g2.setAttribute('position',new THREE.BufferAttribute(P2,3)); g2.setAttribute('normal',new THREE.BufferAttribute(N2,3)); g2.setAttribute('color',new THREE.BufferAttribute(C2,3)); g2.computeBoundingSphere(); g.dispose(); g=g2; }
+  g.userData.th=th; BOT_SKY.set(key,g); return g; }
+// bake them ahead (one a frame, from the moment the match starts) so nobody waits on it mid-drop
+function botSkyWarm(){ for(const b of BR.bots) if(b.h) for(const k of ['fall','glide']){ const key=b.h.outfit+':'+k; if(!BOT_SKY.has(key)&&!BOT_SKYQ.includes(key)) BOT_SKYQ.push(key); } }
+function botSkyStep(){ const key=BOT_SKYQ.shift(); if(!key) return; const i=key.lastIndexOf(':'); try{ botSkyGeo(key.slice(0,i),key.slice(i+1)); }catch(e){ console.warn('sky figure',e); } }
+function brFar(b,on){ if(!on){ if(b.far) b.far.visible=false; return; }
+  if(!b.far){ b.far=new THREE.Mesh(botFarGeo(b.h.outfit),bakedMat(false)); b.far.userData.noCull=true; b.far.castShadow=false; b.far.receiveShadow=false; scene.add(b.far); b.farK='stand'; }
+  let kind=b.sky&&b.sky.phase==='glide'?'glide':b.sky&&b.sky.phase==='fall'?'fall':'stand'; if(kind!=='stand'){ const key=b.h.outfit+':'+kind; if(!BOT_SKY.has(key)){ if(!BOT_SKYQ.includes(key)) BOT_SKYQ.push(key); kind='stand'; } }
+  const f=b.far; if(b.farK!==kind){ b.farK=kind; f.geometry=kind==='stand'?botFarGeo(b.h.outfit):botSkyGeo(b.h.outfit,kind); }
+  f.visible=true; const th=kind==='stand'?(b.sky&&b.sky.phase==='fall'?-1.2:0):(f.geometry.userData.th||0), hu=kind==='stand'?0:0.94;
+  f.position.set(b.pos.x-hu*Math.sin(th)*Math.sin(b.yaw),b.pos.y+hu*(1-Math.cos(th)),b.pos.z-hu*Math.sin(th)*Math.cos(b.yaw)); f.rotation.set(th,b.yaw,0,'YXZ'); }
 function brAnim(b,dt,now){ const d=b.pos.distanceTo(camera.position), near=(d<32||b===BR.spec)&&b.alive; brFar(b,!near&&(d<900||!!b.sky)); b.h.group.visible=near;
   b.animAcc=(b.animAcc||0)+dt; if(!b.h.group.visible) return;
   camera.getWorldDirection(_baF); const behind=(b.pos.x-camera.position.x)*_baF.x+(b.pos.z-camera.position.z)*_baF.z<-4;

@@ -20,7 +20,8 @@ function buildWorldDecor(){ const D=poiDecor(), r=seeded(60613), S=SPAWN, PI=Mat
   const WOOD=0x7a5a3c, DARKWOOD=0x5a4030, BARK=0x6b4e34, STONE=0x8d8a84;
   // a lying log: length along local z (turned by a)
   const log=(x,y,z,a,len,rad,c,solid,pitch)=>{ if(solid) D.obj('wood',Math.round(60+len*rad*90)); const p=pitch||0, rise=Math.sin(p)*len/2; D.geo(new THREE.CylinderGeometry(rad,rad*1.05,len,10),c||BARK,x,y+rad,z,[PI/2-p,a,0]); D.geo(new THREE.CircleGeometry(rad*0.92,10),0xc8a878,...at(x,z,a,0,len/2+0.005).reduce((o,v,i)=>(o[i*2]=v,o),[0,y+rad+rise,0]),[-p,a,0]);
-    if(solid){ const [ex,ez]=rot(0,len/2,a), hx=Math.abs(ex)+rad, hz=Math.abs(ez)+rad; D.solid(x-hx,y-Math.abs(rise),z-hz,x+hx,y+rad*2*0.9+Math.abs(rise),z+hz,'log'); D.end(); } };
+    if(solid){ const n=Math.max(1,Math.ceil(len/0.7)); for(let k=0;k<n;k++){ const f=(k+0.5)/n-0.5, [cx,cz]=rot(0,f*len,a), cy=y+Math.sin(p)*f*len, s=len/n/2, [ex,ez]=rot(0,s,a), hx=Math.abs(ex)+rad*0.85, hz=Math.abs(ez)+rad*0.85, dy=Math.abs(Math.sin(p))*s; // (in short pieces along its length and slope)
+        D.solid(x+cx-hx,cy-dy,z+cz-hz,x+cx+hx,cy+rad*1.8+dy,z+cz+hz,'log'); } D.end(); } };
   // an A-frame tent, ridge along local z: w wide, h high, L long
   const tentGeo=(w,h,L)=>{ const g=new THREE.BufferGeometry(), a=w/2, b=L/2, P=[ -a,0,-b, 0,h,-b, 0,h,b,  -a,0,-b, 0,h,b, -a,0,b,   a,0,-b, a,0,b, 0,h,b,  a,0,-b, 0,h,b, 0,h,-b,   -a,0,-b, a,0,-b, 0,h,-b ];
     for(let i=P.length-9;i>=0;i-=9) P.push(P[i+6],P[i+7],P[i+8],P[i+3],P[i+4],P[i+5],P[i],P[i+1],P[i+2]); // both sides (the faces are one-sided)
@@ -39,7 +40,9 @@ function buildWorldDecor(){ const D=poiDecor(), r=seeded(60613), S=SPAWN, PI=Mat
     for(let q=0;q<n;q++){ const f0=q/n, f1=(q+1)/n; if(G(f0)||G(f1)||G((f0+f1)/2)) continue; const x0=ax+(bx-ax)*f0, z0=az+(bz-az)*f0, x1=ax+(bx-ax)*f1, z1=az+(bz-az)*f1, y0=H(x0,z0), y1=H(x1,z1), l=Math.hypot(x1-x0,z1-z0), tilt=Math.atan2(y1-y0,l);
       D.obj('wood',90); D.box(0.14,1.25,0.14,x0,y0-0.1,z0,DARKWOOD,[0,a,0]); if(q===n-1||G((q+1.5)/n)) D.box(0.14,1.25,0.14,x1,y1-0.1,z1,DARKWOOD,[0,a,0]);
       for(const h of [0.5,1.0]) D.geo(new THREE.BoxGeometry(0.06,0.12,l+0.14),WOOD,(x0+x1)/2,(y0+y1)/2+h,(z0+z1)/2,[-tilt,a,0]);
-      const st={x:(x0+x1)/2,z:(z0+z1)/2,solid:{boxes:[[Math.min(x0,x1)-0.1,Math.min(y0,y1),Math.min(z0,z1)-0.1,Math.max(x0,x1)+0.1,Math.max(y0,y1)+1.15,Math.max(z0,z1)+0.1]],key:'fencerail'+STATICS.length,mat:'wood',deco:1}}; STATICS.push(st); D.claim(st); D.end(); } };
+      const nb=Math.max(1,Math.ceil(l/0.6)), fbx=[]; for(let k=0;k<nb;k++){ const fa=k/nb, fb=(k+1)/nb, xa=x0+(x1-x0)*fa, xb=x0+(x1-x0)*fb, za=z0+(z1-z0)*fa, zb=z0+(z1-z0)*fb, ya=y0+(y1-y0)*fa, yb=y0+(y1-y0)*fb; // (in short pieces along the slant: no box standing off a diagonal fence)
+        fbx.push([Math.min(xa,xb)-0.1,Math.min(ya,yb),Math.min(za,zb)-0.1,Math.max(xa,xb)+0.1,Math.max(ya,yb)+1.15,Math.max(za,zb)+0.1]); }
+      const st={x:(x0+x1)/2,z:(z0+z1)/2,r:l/2,solid:{boxes:fbx,key:'fencerail'+STATICS.length,mat:'wood',deco:1}}; STATICS.push(st); D.claim(st); D.end(); } };
 
   // ---- campsites: a clearing in the trees with two tents round a fire
   { let made=0; for(let tr=0;tr<900&&made<7;tr++){ const x=S[0]+(r()*2-1)*(MAP_R-80), z=S[2]+(r()*2-1)*(MAP_R-80); if(!open(x,z,11)) continue; if(treesNear(x,z,22)<6) continue; // (only out in the woods)
@@ -155,7 +158,7 @@ function buildWorldDecor(){ const D=poiDecor(), r=seeded(60613), S=SPAWN, PI=Mat
         else { D.cyl(0.06,0.06,4.2,x,y,z,DARKWOOD,6); D.box(0.9,1.5,0.04,x+0.48,y+2.5,z,[0x8a2a2a,0x2a4a8a,0x2f6a3a][Math.floor(pr()*3)]); D.solid(x-0.15,y,z-0.15,x+0.15,y+4.2,z+0.15); } } // a banner
       else if(t.kind==='labs'){ if(pr()<0.45){ crate(x,y,z,0.9,ya,0x8a8f96); D.box(0.92,0.12,0.06,...at(x,z,ya,0,0.46).reduce((o,v,i)=>(o[i*2]=v,o),[0,y+0.4,0]),0xf2c418,[0,ya,0]); } else drum(x,y,z,0xe0b020); }
       else { if(pr()<0.6){ D.obj('wood',260); for(let k=0;k<3;k++) log(...at(x,z,ya,(k-1)*0.62,0).reduce((o,v,i)=>(o[i*2]=v,o),[0,y,0]),ya,3.6,0.3,BARK,false); log(...at(x,z,ya,-0.31,0).reduce((o,v,i)=>(o[i*2]=v,o),[0,y+0.52,0]),ya,3.6,0.3,BARK); log(...at(x,z,ya,0.31,0).reduce((o,v,i)=>(o[i*2]=v,o),[0,y+0.52,0]),ya,3.6,0.3,BARK);
-          const [hx,hz]=[Math.abs(Math.sin(ya))*1.9+Math.abs(Math.cos(ya))*1,Math.abs(Math.cos(ya))*1.9+Math.abs(Math.sin(ya))*1]; D.solid(x-hx,y,z-hz,x+hx,y+1.1,z+hz); D.end(); }
+          for(let k=0;k<5;k++){ const f=-1.8+3.6*(k+0.5)/5, [cx,cz]=at(x,z,ya,0,f), ex=Math.abs(Math.cos(ya))*0.95+Math.abs(Math.sin(ya))*0.36, ez=Math.abs(Math.sin(ya))*0.95+Math.abs(Math.cos(ya))*0.36; D.solid(cx-ex,y,cz-ez,cx+ex,y+1.1,cz+ez); } D.end(); }
         else { D.cyl(0.42,0.5,0.55,x,y,z,0x5e4630,10); D.box(0.12,0.75,0.12,x,y+0.55,z,0x8a8a8a,[0.3,ya,0]); D.solid(x-0.5,y,z-0.5,x+0.5,y+0.6,z+0.5); } } } } // log piles; a stump with an axe
 
   const meshes=D.flush(); DECOR.items=meshes.length; DECOR.s1=STATICS.length; return meshes; }

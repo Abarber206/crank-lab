@@ -25,3 +25,7 @@ patch204.py + harvest.js — Fortnite-style weak point on whatever you pickaxe (
 trees.js — new pine shape (solid drooping tiers), rounder oak crowns with fewer cards poking out
 poi_*.js / decor.js — open sheds and bays stand on posts; detailed lorries (poiRig) at Gearworks, Timber Yard, Crater Labs; trebuchet + supplies in Fort Granite; drying shed, chipper, loader at Timber Yard; Gearworks gatehouse and boiler house detail; clipping fixed (ruin rubble, cabin porch/chimney, office barrier, log piles one object)
 tests/tpoiclip.js — lists every solid/visible overlap at the points of interest; tpoieye/tpoitop/tpoishot — pictures of them
+patch205.py — frame rate: hidden objects (~50k of 52k) no longer recompute their matrices every frame (game CPU per frame ~42 ms -> ~11 ms in the test match); asks for the fast GPU, names it in the FPS meter, tells you once if a desktop is on built-in graphics; far skydivers baked in a proper skydive pose and under an open glider
+patch206.py — no invisible walls: tree trunks solid as a round-ish cross their real thickness, rocks follow their turned boulder, bridge rails in short pieces
+decor.js / poi_*.js — fences, fallen logs, log piles, plank stacks, tilted containers, barriers and round tanks solid along their real shape; archery targets on stands
+tests/tbarrier.js — finds collision boxes standing off anything drawn; tprof/tnodes — where frame time goes; tsky — skydiver figures

@@ -142,7 +142,7 @@ function poiDecor(){ const patches=new Map(), glows=new Map(), col=new THREE.Col
       for(let a=0;a<nx;a++) for(let b=0;b<nz;b++){ const xa=x0+(x1-x0)*a/nx, xb=x0+(x1-x0)*(a+1)/nx, za=z0+(z1-z0)*b/nz, zb=z0+(z1-z0)*(b+1)/nz;
         const st={x:(xa+xb)/2,z:(za+zb)/2,solid:{boxes:[[xa,y0,za,xb,y1,zb]],key:(kp||'poi')+STATICS.length,mat:'metal',deco:1}}; STATICS.push(st); claim(st); } },
     sbox(w,h,d,x,y,z,c,glow){ D.box(w,h,d,x,y,z,c,null,glow); D.solid(x-w/2,y,z-d/2,x+w/2,y+h,z+d/2); },          // drawn and solid
-    scyl(r,h,x,y,z,c,seg){ D.cyl(r,r,h,x,y,z,c,seg); const n=Math.max(2,Math.ceil(r*2/1.2)); for(let q=0;q<n;q++){ const xa=-r+2*r*q/n, xb=-r+2*r*(q+1)/n, xm=(xa+xb)/2, hd=Math.sqrt(Math.max(0.01,r*r-xm*xm)); D.solid(x+xa,y,z-hd,x+xb,y+h,z+hd); } },
+    scyl(r,h,x,y,z,c,seg){ D.cyl(r,r,h,x,y,z,c,seg); const n=r<1?Math.max(2,Math.ceil(r*2/1.2)):Math.ceil(r*2/0.6); for(let q=0;q<n;q++){ const xa=-r+2*r*q/n, xb=-r+2*r*(q+1)/n, xe=r<1?Math.abs((xa+xb)/2):Math.max(0,Math.max(Math.abs(xa),Math.abs(xb))-0.12*(xb-xa)), hd=Math.sqrt(Math.max(0.01,r*r-xe*xe)); D.solid(x+xa,y,z-hd,x+xb,y+h,z+hd); } }, // (strips that keep inside the round, so no corner stands off it)
     flush(){ cur=null;
       decoGroup(loose,looseS);
       const out=[]; const merge=list=>{ let n=0; for(const g of list) n+=g.attributes.position.count; const P=new Float32Array(n*3), N=new Float32Array(n*3), Cc=new Float32Array(n*3); let o=0;
