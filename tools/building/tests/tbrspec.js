@@ -12,7 +12,7 @@ const {sleep,page,launch,open}=require('./h.js');
  r.stK=await pg.evaluate(()=>+(T.BR.stK||0).toFixed(2)); r.rain=await pg.evaluate(()=>+T.WEATHER.k.toFixed(2));
  // a kill by you, then you get eliminated
  await pg.evaluate(()=>{ const S=T.BR.storm; S.r=5000; T.P.hp=100; const v=T.BR.bots.find(b=>b.alive); v.sky=null; v.bus=false; T.WEAPONS; T.P.wpn=T.P.wpn||'ar'; T.brHurtBot(v,500,null,null); const k=T.BR.bots.find(b=>b.alive); k.sky=null; k.bus=false; k.pos.set(T.P.pos.x+20,T.P.pos.y,T.P.pos.z); k.wpn=k.wpn||'ar'; T.brHurtMe(500,k); });
- await sleep(2500);
+ await pg.waitForFunction(()=>!document.getElementById('brEnd').hidden,null,{timeout:20000,polling:250}).catch(()=>{}); await sleep(300);
  r.feed=await pg.evaluate(()=>document.getElementById('feed')?document.getElementById('feed').innerText.slice(0,300):'');
  r.end=await pg.evaluate(()=>({shown:!document.getElementById('brEnd').hidden,place:document.getElementById('brEndP').textContent,by:document.getElementById('brEndBy').textContent,k:document.getElementById('brEndK').textContent,d:document.getElementById('brEndD').textContent,t:document.getElementById('brEndT').textContent}));
  { const u=await pg.evaluate(()=>T.renderer.domElement.toDataURL('image/jpeg',0.85)); }

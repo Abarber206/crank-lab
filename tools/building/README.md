@@ -20,3 +20,8 @@ patch200.py — Fortnite-style hotbar: big diagonal guns on rarity-coloured slot
 patch201.py — 100 players; far bots drawn as one merged figure and updated less often; spectator camera behind the shoulder (never in the ground or walls) with the player's health and gun; more floor loot
 patch202.py — small far objects skipped when drawing (never pieces, never for shots); house decor drawn only near its town
 weather.js — rain only inside the storm, dark and purple
+patch203.py — the storm forms ~90 s after the bus (land anywhere); HUD counts down to it
+patch204.py + harvest.js — Fortnite-style weak point on whatever you pickaxe (moves after each hit, crits for double), health bar for the thing you're breaking
+trees.js — new pine shape (solid drooping tiers), rounder oak crowns with fewer cards poking out
+poi_*.js / decor.js — open sheds and bays stand on posts; detailed lorries (poiRig) at Gearworks, Timber Yard, Crater Labs; trebuchet + supplies in Fort Granite; drying shed, chipper, loader at Timber Yard; Gearworks gatehouse and boiler house detail; clipping fixed (ruin rubble, cabin porch/chimney, office barrier, log piles one object)
+tests/tpoiclip.js — lists every solid/visible overlap at the points of interest; tpoieye/tpoitop/tpoishot — pictures of them

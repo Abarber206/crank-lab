@@ -235,6 +235,65 @@ const rectIn=(x0,z0,x1,z1,pad)=>(x,z)=>x>x0-pad&&x<x1+pad&&z>z0-pad&&z<z1+pad;
 const discIn=(cx,cz,r)=>(x,z)=>Math.hypot(x-cx,z-cz)<r;
 const anyIn=list=>(x,z)=>list.some(f=>f(x,z));
 function poiFind(K,i,j,l){ return K.P.find(q=>q.type==='floor'&&q.i===i&&q.j===j&&q.l===l); }
+/* a lorry, in its own frame (x across, z forward, y up) turned by yaw and set down at x,y,z: a conventional tractor
+   (hood, grille, lights, a cab with glass and a sleeper, steps, tanks, stacks, mirrors) and/or a trailer (a ribbed
+   box with doors and lights, or a flatbed with stakes and a load of logs), on proper wheels. o.cab: the paint, or
+   null for a trailer left on its landing legs; o.trailer: 'box', 'logs' or null; o.tcol: the trailer's colour. Solid
+   in pieces along its length, so it can be climbed and stood on. Returns the far ends (for keeping clutter off it). */
+function poiRig(D,x,y,z,yaw,o){ o=o||{}; const PI=Math.PI, cy=Math.cos(yaw), sy=Math.sin(yaw);
+  const put=(g,c,lx,ly,lz,glow)=>{ g.translate(lx,ly,lz); D.geo(g,c,x,y,z,[0,yaw,0],glow); };
+  const B=(w,h,d,lx,ly,lz,c,glow)=>put(new THREE.BoxGeometry(w,h,d),c,lx,ly+h/2,lz,glow);
+  const Cx=(r,len,lx,ly,lz,c,seg)=>{ const g=new THREE.CylinderGeometry(r,r,len,seg||14); g.rotateZ(PI/2); put(g,c,lx,ly,lz); };
+  const Cz=(r,len,lx,ly,lz,c,seg)=>{ const g=new THREE.CylinderGeometry(r,r*1.04,len,seg||12); g.rotateX(PI/2); put(g,c,lx,ly,lz); };
+  const Cy=(r,h,lx,ly,lz,c,seg)=>put(new THREE.CylinderGeometry(r,r,h,seg||10),c,lx,ly+h/2,lz);
+  const W2=(lx,lz)=>[x+lx*cy+lz*sy,z-lx*sy+lz*cy];
+  const solid=(x0,x1,y0_,y1,z0,z1)=>{ const n=Math.max(1,Math.ceil((z1-z0)/2)); for(let k=0;k<n;k++){ const za=z0+(z1-z0)*k/n, zb=z0+(z1-z0)*(k+1)/n; let a=1e9,b=1e9,c=-1e9,d=-1e9;
+      for(const [lx,lz] of [[x0,za],[x1,za],[x0,zb],[x1,zb]]){ const [wx,wz]=W2(lx,lz); a=Math.min(a,wx); b=Math.min(b,wz); c=Math.max(c,wx); d=Math.max(d,wz); }
+      const sh=Math.abs(sy*cy)>0.2?0.35:0; D.solid(a+sh,y+y0_,b+sh,c-sh,y+y1,d-sh); } }; // (a diagonal one is trimmed a little so its boxes don't reach far past the body)
+  const DK=0x1d1f22, CHROME=0xc4cad1, GLASS=0x2c3e50, FRAME=0x2a2d31;
+  const wheel=(lz,dual)=>{ for(const s of [-1,1]) for(const xw of dual?[1.06,0.74]:[1.06]){ Cx(0.52,0.3,s*xw,0.52,lz,DK,16); Cx(0.3,0.32,s*xw,0.52,lz,0xb5bcc2,12); Cx(0.1,0.34,s*xw,0.52,lz,0x55585c,8); } Cx(0.09,1.9,0,0.52,lz,FRAME,6); };
+  let front=-1.4, back=-1.4;
+  if(o.cab!=null){ const c=o.cab, dk=new THREE.Color(c).multiplyScalar(0.6).getHex(); front=4.6; back=-3.6; D.obj('metal',o.trailer?1500:700); // (a lorry and its trailer are one thing to break)
+    B(0.14,0.28,7.6,-0.48,0.72,0.4,FRAME); B(0.14,0.28,7.6,0.48,0.72,0.4,FRAME);                             // frame rails
+    B(2.5,0.38,0.26,0,0.42,4.47,CHROME); B(0.5,0.12,0.3,0,0.3,4.5,DK);                                        // bumper
+    B(2.2,1.0,1.75,0,1.0,3.47,c); B(2.0,0.16,1.6,0,2.0,3.42,c); B(2.24,0.08,1.78,0,1.95,3.47,dk);              // the hood, with a crease
+    B(1.3,0.92,0.06,0,1.05,4.36,CHROME); for(let k=0;k<6;k++) B(1.18,0.05,0.08,0,1.12+k*0.14,4.38,0x2a2d33);    // the grille
+    for(const s of [-1,1]){ B(0.34,0.2,0.06,s*0.9,1.4,4.36,0xfff3cf,true); B(0.12,0.08,0.06,s*1.0,1.2,4.36,0xffa53a,true);
+      B(0.42,0.1,1.5,s*1.08,1.36,3.45,dk); B(0.36,0.42,0.1,s*1.08,0.95,2.72,DK); }                              // lights, front fenders and splash guards
+    B(2.4,2.15,2.0,0,1.05,1.6,c);                                                                          // the cab
+    B(2.1,0.82,0.06,0,2.2,2.62,GLASS); B(0.06,0.82,0.08,0,2.2,2.63,c); B(2.3,0.08,0.34,0,3.06,2.72,DK);        // windscreen, centre post, sun visor
+    for(let k=0;k<5;k++) B(0.1,0.06,0.06,-0.6+k*0.3,3.22,2.56,0xffa53a,true);                                 // roof marker lights
+    for(const s of [-1,1]){ B(0.06,0.72,0.95,s*1.21,2.24,1.95,GLASS); B(0.05,1.5,0.05,s*1.215,1.2,1.42,DK); B(0.04,0.06,0.22,s*1.23,1.95,1.62,CHROME);
+      B(0.36,0.07,0.7,s*1.2,0.72,2.05,CHROME); B(0.36,0.07,0.7,s*1.2,1.08,2.05,CHROME);                     // door window, seam, handle, steps
+      B(0.4,0.04,0.04,s*1.4,2.45,2.45,DK); B(0.06,0.5,0.24,s*1.6,2.15,2.45,DK); B(0.04,0.42,0.18,s*1.63,2.19,2.45,0x8fb6d0); // mirror
+      Cz(0.32,1.4,s*1.0,0.98,0.6,CHROME,14); Cz(0.33,0.05,s*1.0,0.98,0.2,0x8a8f96,14); Cz(0.33,0.05,s*1.0,0.98,1.0,0x8a8f96,14); // fuel tanks with straps
+      Cy(0.09,3.2,s*1.12,1.0,-1.02,CHROME,8); Cy(0.11,0.3,s*1.12,3.9,-1.02,DK,8);                          // exhaust stacks
+      B(0.5,0.42,0.6,s*0.95,0.62,-1.55,DK); B(0.5,0.62,0.05,s*1.0,0.22,-3.55,DK); }                        // battery box, mud flaps
+    B(2.4,2.4,1.5,0,1.05,-0.15,c); B(2.42,0.1,1.52,0,1.6,-0.15,dk); B(2.3,0.45,1.9,0,3.2,0.75,dk);            // the sleeper, a stripe, the roof fairing
+    B(1.6,0.12,1.2,0,1.12,-2.45,FRAME); B(0.5,0.06,0.5,0,1.24,-2.45,0x55585c);                                // fifth wheel
+    wheel(3.47,false); wheel(-2.0,true); wheel(-3.1,true);
+    solid(-1.25,1.25,0,3.45,-0.9,4.6); solid(-1.25,1.25,0,1.25,-3.6,-1.4); if(!o.trailer) D.end(); }
+  if(o.trailer){ const TL=o.len||10.4, tz=o.cab!=null?-1.4-TL/2:0, tc=o.tcol||0xe9e7df, bk=tz-TL/2, fr=tz+TL/2; back=bk; if(o.cab==null){ front=fr; D.obj('metal',900); }
+    B(1.0,0.26,TL-0.6,0,0.92,tz,FRAME); wheel(bk+1.6,true); wheel(bk+2.85,true);
+    for(const s of [-1,1]){ B(0.5,0.6,0.05,s*1.0,0.2,bk+0.9,DK); }
+    if(o.cab==null||o.legs){ const lg=fr-2.2; for(const s of [-1,1]){ B(0.13,1.1,0.13,s*0.8,0.12,lg,FRAME); B(0.32,0.06,0.32,s*0.8,0,lg,FRAME); } B(1.6,0.08,0.08,0,0.6,lg,FRAME); B(0.08,0.08,0.3,0.9,0.75,lg+0.15,CHROME); }
+    if(o.trailer==='box'){ const rib=new THREE.Color(tc).multiplyScalar(0.86).getHex();
+      B(2.5,2.85,TL,0,1.18,tz,tc); B(2.56,0.12,TL+0.04,0,4.0,tz,0x8e9aa3); B(2.56,0.2,TL+0.04,0,1.08,tz,FRAME);
+      for(let zz=bk+0.6;zz<fr-0.3;zz+=1.15) for(const s of [-1,1]) B(0.04,2.7,0.07,s*1.27,1.25,zz,rib);
+      for(const s of [-1,1]){ B(0.03,0.38,TL*0.72,s*1.27,2.6,tz+0.3,o.stripe||0xc0392b); B(0.04,0.5,TL*0.5,s*1.25,0.48,tz+0.6,0x8e9aa3);   // a stripe, the side skirts
+        B(0.26,0.13,0.05,s*1.0,1.0,bk-0.03,0xd21f1f,true); B(0.08,0.08,0.05,s*1.2,3.85,bk-0.03,0xd21f1f,true); B(0.08,0.08,0.05,s*1.2,3.85,fr+0.03,0xffa53a,true);
+        for(const xx of [0.35,0.85]) B(0.05,2.55,0.05,s*xx,1.3,bk-0.06,CHROME); for(const yy of [1.6,3.4]) B(0.14,0.18,0.06,s*1.2,yy,bk-0.04,DK); } // lock bars, hinges
+      B(0.06,2.7,0.08,0,1.25,bk-0.05,rib); B(2.3,0.14,0.14,0,0.55,bk+0.25,DK); for(const s of [-1,1]) B(0.12,0.5,0.12,s*0.9,0.6,bk+0.3,DK);    // door seam, under-run bar
+      solid(-1.25,1.25,0.6,4.05,bk,fr); }
+    else { const deck=0x3a3d42; B(2.5,0.22,TL,0,1.18,tz,deck); B(2.4,0.04,TL-0.1,0,1.4,tz,0x6b4a2e); for(const s of [-1,1]) B(0.26,0.13,0.05,s*1.0,1.0,bk-0.03,0xd21f1f,true);
+      for(let zz=bk+0.7;zz<fr;zz+=2.3){ B(2.5,0.16,0.22,0,1.42,zz,DK); for(const s of [-1,1]) B(0.12,1.5,0.12,s*1.22,1.42,zz,DK); }
+      const LG=[[-0.8,0],[0,0],[0.8,0],[-0.4,0.68],[0.4,0.68],[0,1.36]], LC=[0x8a5a32,0x7a4e2c,0x94643a];
+      LG.forEach(([lx,ly],k)=>{ const r=0.38+((k*37)%5)*0.012, len=TL-0.4-(k%3)*0.25; Cz(r,len,lx,1.58+0.38+ly,tz,LC[k%3],12); for(const e of [-1,1]) Cz(r*0.9,0.03,lx,1.96+ly,tz+e*(len/2+0.01),0xd9b077,12); });
+      solid(-1.25,1.25,0.6,1.58+2.1,bk,fr); }
+    D.end(); }
+  return [W2(0,front),W2(0,back)]; }
+// is a point within m metres of the line between two ends (a lorry's footprint, for keeping clutter off it)
+const nearSeg=(px,pz,[[ax,az],[bx,bz]],m)=>{ const dx=bx-ax, dz=bz-az, t=Math.max(0,Math.min(1,((px-ax)*dx+(pz-az)*dz)/(dx*dx+dz*dz||1))); return Math.hypot(px-ax-dx*t,pz-az-dz*t)<m; };
 
 /* Gearworks: a long factory hall with a mezzanine and stairs to the roof, a high-bay warehouse with a loading dock,
    an office block, a boiler house and smokestack, storage tanks, a container yard under a gantry crane, trailers and
@@ -280,7 +339,10 @@ POI_BUILD.factory=(t,D)=>{ const K=poiKit(t), L=K.L, X_=poiCtx(t), {i,j,X,Z,y0,j
     sp.chest.push(poiSpot(i0,j0+2,L+1,0,1.3),poiSpot(i0,j0+2,L)); sp.floor.push(poiSpot(i0,j0+1,L+1)); blds.push({pieces:K.P.slice(n0),spots:sp,kind:'office'}); pad.push(rectIn(-35,5,-25,20,4));
     for(let k=0;k<5;k++){ const x=-22+k*2.7+jit(0.2); D.box(2.3,0.12,4.6,X(x),y0+0.01,Z(10),0xe9e7df); } } // parking bays by the office
   // --- the boiler house and smokestack, and two storage tanks
-  { D.sbox(8,5,6,X(2),y0,Z(14),0x7a4a3a); D.sbox(8.4,0.35,6.4,X(2),y0+5,Z(14),0x35302e); D.box(1.6,2.4,0.15,X(2),y0,Z(10.93),0x2e2a28); for(const x of [-0.5,4.5]) D.box(1.2,1.1,0.15,X(x),y0+2.6,Z(10.93),0xffd98a,null,true);
+  { D.sbox(8,5,6,X(2),y0,Z(14),0x7a4a3a); D.sbox(8.4,0.35,6.4,X(2),y0+5,Z(14),0x35302e); D.box(1.6,2.4,0.15,X(2),y0,Z(10.93),0x2e2a28); D.box(2.0,0.2,0.2,X(2),y0+2.4,Z(10.92),0x5a3428); for(const dx of [-0.9,0.9]) D.box(0.2,2.6,0.2,X(2+dx),y0,Z(10.92),0x5a3428);
+    D.box(8.1,0.28,6.1,X(2),y0+3.3,Z(14),0x5a3428); D.box(8.1,0.4,6.1,X(2),y0,Z(14),0x4a4440); for(const [dx,dz] of [[-4,-3],[4,-3],[-4,3],[4,3]]) D.box(0.5,5,0.5,X(2+dx),y0,Z(14+dz),0x6a3e30);
+    for(const dz of [-1.2,1.2]){ D.box(0.12,1.0,1.6,X(-2.04),y0+2.0,Z(14+dz),0x3a3d42); for(let k=0;k<5;k++) D.box(0.16,0.05,1.5,X(-2.06),y0+2.1+k*0.18,Z(14+dz),0x55585c); }
+    for(const dx of [-2,1.5]){ D.box(1.2,0.8,1.2,X(2+dx),y0+5.35,Z(14.5),0x6b737a); D.box(1.5,0.1,1.5,X(2+dx),y0+6.15,Z(14.5),0x4a4f55); D.box(0.2,0.35,0.2,X(2+dx),y0+6.25,Z(14.5),0x4a4f55); } D.box(0.6,0.3,0.4,X(-0.5),y0+2.2,Z(10.88),0xd23a2a); D.box(0.5,0.5,0.3,X(5),y0+1.0,Z(10.9),0x2e86c1); for(const x of [-0.5,4.5]) D.box(1.2,1.1,0.15,X(x),y0+2.6,Z(10.93),0xffd98a,null,true);
     const sx=X(8.5), sz=Z(19); D.scyl(2.1,26,sx,y0,sz,0x8a4a3a,16); D.cyl(1.4,2.1,0.1,sx,y0+26,sz,0x2e2a28,16); for(const h of [8,15,22]) D.cyl(2.18,2.18,0.7,sx,y0+h,sz,0xe9e4d8,16);
     for(let h=0.5;h<25;h+=0.6) D.box(0.6,0.06,0.06,sx,y0+h,sz-2.15,0x2b2f35); for(const dx of [-0.28,0.28]) D.box(0.06,25,0.06,sx+dx,y0,sz-2.15,0x2b2f35);
     D.tube(0.45,3.4,X(7.3),y0+3.2,Z(16.4),0x55585c,[0,0.9,Math.PI/2]);
@@ -300,19 +362,25 @@ POI_BUILD.factory=(t,D)=>{ const K=poiKit(t), L=K.L, X_=poiCtx(t), {i,j,X,Z,y0,j
     D.box(15,1.4,2.6,X(21.5),y0+11.9,Z(21),0xd4991c); D.box(2.4,2,2.4,X(22),y0+12.4,Z(21),0x3a3d42); D.tube(0.04,6,X(21.6),y0+9,Z(21),0x222222); D.tube(0.04,6,X(22.4),y0+9,Z(21),0x222222); D.box(1.4,0.5,0.5,X(22),y0+5.8,Z(21),0xe0a326);
     pad.push(rectIn(13,10,33,29,3)); }
   // --- trailers, pallets, barrels and barriers left about the yard; floodlights
-  { const trailer=(x,z,yaw,c)=>{ const g=new THREE.BoxGeometry(2.5,2.8,9); D.geo(g,c,X(x),y0+2.5,Z(z),[0,yaw,0]); const ch=new THREE.BoxGeometry(2.2,0.4,9); D.geo(ch,0x2a2d31,X(x),y0+0.95,Z(z),[0,yaw,0]);
-      for(const s of [-3.2,-2.2]){ const w=new THREE.CylinderGeometry(0.5,0.5,2.3,12); w.rotateZ(Math.PI/2); w.translate(0,0,s); D.geo(w,0x1d1f22,X(x),y0+0.5,Z(z),[0,yaw,0]); }
-      const s=Math.abs(Math.sin(yaw)), co=Math.abs(Math.cos(yaw)), ex=co*1.25+s*4.5, ez=s*1.25+co*4.5; D.solid(X(x)-ex,y0+0.7,Z(z)-ez,X(x)+ex,y0+3.9,Z(z)+ez); };
-    trailer(-14,-3.5,1.42,0xe9e7df); trailer(-6,1.2,1.66,0x2e86c1); trailer(-1,26,0.35,0xc0392b);
-    for(let k=0;k<9;k++){ const x=-20+r()*36, z=-6+r()*12; if(Math.abs(x+14)<5.5&&Math.abs(z+3.5)<2.5||Math.abs(x+6)<5.5&&Math.abs(z-1.2)<2.5||Math.hypot(x+3,z-4)<1.8||Math.hypot(x+3,z+5)<1.8) continue; const h=r()<0.4?2:1;
+  { const rigs=[];
+    rigs.push(poiRig(D,X(-14),y0,Z(-3.5),1.42,{trailer:'box',tcol:0xe9e7df,stripe:0x2e86c1,len:9.6}));                   // a trailer left on its legs
+    { const yw=1.66, fx=Math.sin(yw), fz=Math.cos(yw); rigs.push(poiRig(D,X(-6+fx*6.2),y0,Z(1.2+fz*6.2),yw,{cab:0xc0392b,trailer:'box',tcol:0x2e86c1,stripe:0xf2c418,len:9.6})); } // backed up, ready to go
+    rigs.push(poiRig(D,X(-1),y0,Z(26),0.35,{trailer:'box',tcol:0xc0392b,stripe:0xe9e7df,len:9.6}));
+    rigs.push(poiRig(D,X(-33),y0,Z(-17),Math.PI,{cab:0x2f6fb0,trailer:'box',tcol:0xd7dadc,stripe:0xc0392b,len:9.6}));      // another along the west side
+    const onRig=(x,z,m)=>rigs.some(e=>nearSeg(X(x),Z(z),e,m));
+    for(let k=0;k<9;k++){ const x=-20+r()*36, z=-6+r()*12; if(onRig(x,z,2.4)||Math.hypot(x+3,z-4)<1.8||Math.hypot(x+3,z+5)<1.8) continue; const h=r()<0.4?2:1;
       for(let q=0;q<h;q++) D.sbox(1.2,0.15,1.2,X(x),y0+q*0.9,Z(z),0x8c6a3f), D.sbox(1.1,0.75,1.1,X(x),y0+0.15+q*0.9,Z(z),[0xa9814e,0x6f8a9b,0xd7dadc][Math.floor(r()*3)]); }
     for(let k=0;k<7;k++){ const x=6+r()*5, z=-26+r()*6; D.scyl(0.32,0.9,X(x),y0,Z(z),[0x2e86c1,0xc0392b,0x3c8d3c][k%3],10); }
-    for(const [x,z,yw] of [[-30,-4,0.1],[-30,4.5,-0.15],[36,-6,1.5],[-3,33,0.2]]){ const g=new THREE.BoxGeometry(3,0.9,0.6); D.geo(g,0xd8d4cc,X(x),y0+0.45,Z(z),[0,yw,0]); D.solid(X(x)-1.5,y0,Z(z)-0.6,X(x)+1.5,y0+0.9,Z(z)+0.6); }
+    for(const [x,z,yw] of [[-30,-4,0.1],[-30,2.4,-0.15],[36,-6,1.5],[-3,33,0.2]]){ const g=new THREE.BoxGeometry(3,0.9,0.6); D.geo(g,0xd8d4cc,X(x),y0+0.45,Z(z),[0,yw,0]); D.solid(X(x)-1.5,y0,Z(z)-0.6,X(x)+1.5,y0+0.9,Z(z)+0.6); }
     for(const [x,z] of [[-8,-6],[8,-30],[10,6],[-27,-6],[-20,15],[32,8]]){ D.box(0.25,9,0.25,X(x),y0,Z(z),0x55606a); D.box(1.6,0.6,0.5,X(x),y0+9,Z(z),0x2c3036); D.box(1.4,0.08,0.4,X(x),y0+8.95,Z(z),0xfff3cf,null,true); D.solid(X(x)-0.15,y0,Z(z)-0.15,X(x)+0.15,y0+9,Z(z)+0.15); }
     // a pipe run on stands from the boiler house to the hall
     const run=[[1,11],[-3,4],[-3,-5],[-3,-9.7]]; for(let k=0;k<run.length-1;k++){ const [xa,za]=run[k], [xb,zb]=run[k+1], len=Math.hypot(xb-xa,zb-za), yaw=Math.atan2(xb-xa,zb-za); D.tube(0.3,len,X((xa+xb)/2),y0+6.4,Z((za+zb)/2),0x2f7f6b,[Math.PI/2,yaw,0]); }
     for(const [x,z] of run.slice(1,3)){ D.sbox(0.4,6.2,0.4,X(x),y0,Z(z),0x6b737a); D.box(1.2,0.2,1.2,X(x),y0+6.1,Z(z),0x55606a); }
-    pad.push(rectIn(-22,-8,20,8,4),rectIn(-38,-5,-30,5,2),rectIn(-4,30,4,40,2),rectIn(30,-5,40,5,2),rectIn(-4,-40,4,-30,2)); }
+    // a gatehouse where the north road comes in: a booth with windows all round and a striped barrier arm, raised
+    { const bx=X(8), bz=Z(-34); D.obj('metal',420); D.box(2.4,0.2,2.4,bx,y0,bz,0x8f8c86); D.box(2.2,1.1,2.2,bx,y0+0.2,bz,0xd7dadc); D.box(2.2,1.0,2.2,bx,y0+1.3,bz,0x2c3e50); for(const [dx,dz] of [[-1.05,-1.05],[1.05,-1.05],[-1.05,1.05],[1.05,1.05]]) D.box(0.12,1.0,0.12,bx+dx,y0+1.3,bz+dz,0xd7dadc);
+      D.box(2.8,0.22,2.8,bx,y0+2.3,bz,0x3a3d42); D.box(0.8,0.3,0.06,bx,y0+2.0,bz-1.13,0xf2c418); D.box(0.9,1.9,0.06,bx+0.5,y0+0.2,bz+1.12,0x8e9aa3); D.solid(bx-1.2,y0,bz-1.2,bx+1.2,y0+2.5,bz+1.2); D.end();
+      D.obj('metal',150); D.box(0.5,1.1,0.5,bx-1.6,y0,bz-0.6,0x3a3d42); for(let k=0;k<8;k++){ const g=new THREE.BoxGeometry(0.14,0.14,0.75); g.translate(0,0,-0.38-k*0.75); D.geo(g,k%2?0xe9e7df:0xc0392b,bx-1.6,y0+1.0,bz-0.6,[1.05,Math.PI/2,0]); } D.solid(bx-1.85,y0,bz-0.85,bx-1.35,y0+1.1,bz-0.35); D.end(); }
+    pad.push(rectIn(-36,-23,-30,-4,2),rectIn(5,-37,11,-31,1),rectIn(-4,30,4,40,2),rectIn(30,-5,40,5,2),rectIn(-4,-40,4,-30,2)); }
   poiGround(t,'asphalt',anyIn(pad),2.5);
   return blds; };
 
@@ -354,7 +422,7 @@ POI_BUILD.castle=(t,D)=>{ const K=poiKit(t), L=K.L, X_=poiCtx(t), {i,j,X,Z,y0,C,
   // the fallen tower: the ground storey and broken stumps of the next, rubble in and around it
   { const {i0,j0}=ruin; K.slab(i0,j0,2,2,L,stone3); const JAG=[511&~(64|128),511&~(256),511&~(128|256),511&~64];
     K.shell(i0,j0,2,2,L,2,stone3,(f,k,s)=>s===0?(f==='e'&&k===0?POI_DOOR:511):JAG[(k+(f==='n'?1:f==='e'?2:0))%4]&~(f==='s'||f==='w'?(k?32|256:8|64):0));
-    for(let q=0;q<26;q++){ const x=(i0-X_.ci)*C+r()*14-2, z=(j0-X_.cj)*C+r()*14-2; if(!X_.inR(x,z,1)) continue; const sz=0.25+r()*0.75, g=new THREE.DodecahedronGeometry(sz,1); g.scale(1,0.6,1);
+    for(let q=0;q<26;q++){ const x=(i0-X_.ci)*C+r()*14-2, z=(j0-X_.cj)*C+r()*14-2; if(!X_.inR(x,z,1)) continue; const sz=0.25+r()*0.75, x0=(i0-X_.ci)*C, z0=(j0-X_.cj)*C, m=sz+0.2; if(Math.abs(x-x0)<m||Math.abs(z-(z0+2*C))<m||Math.abs(x-x0-2*C)<m&&z>z0-m&&z<z0+2*C+m||Math.abs(z-z0)<m&&x>x0-m&&x<x0+2*C+m) continue; const g=new THREE.DodecahedronGeometry(sz,1); g.scale(1,0.6,1);
       D.geo(g,[0x8f897d,0x7d776c,0x9a9488][q%3],X(x),y0+sz*0.35,Z(z),[r(),r()*6,r()]); if(sz>0.8) D.solid(X(x)-sz*0.6,y0,Z(z)-sz*0.6,X(x)+sz*0.6,y0+sz*0.6,Z(z)+sz*0.6); } }
   // portcullises raised in the gateways
   for(const [side,on] of [['w',gW],['e',gE],['n',gN],['s',gS]]){ if(!on) continue; const X0=side==='w'?W*C:side==='e'?E*C:null, Z0=side==='n'?N*C:side==='s'?S*C:null;
@@ -401,6 +469,19 @@ POI_BUILD.castle=(t,D)=>{ const K=poiKit(t), L=K.L, X_=poiCtx(t), {i,j,X,Z,y0,C,
     { const g=new THREE.BoxGeometry(1.6,0.5,2.8); D.geo(g,0x6b4a2e,X(11),y0+0.75,Z(-7),[0,0.4,0]); for(const s of [-0.85,0.85]){ const w=new THREE.CylinderGeometry(0.55,0.55,0.12,12); w.rotateZ(Math.PI/2); w.translate(s,0,0.4); D.geo(w,0x4a3424,X(11),y0+0.55,Z(-7),[0,0.4,0]); } D.solid(X(11)-1.1,y0,Z(-7)-1.4,X(11)+1.1,y0+1,Z(-7)+1.4); }
     for(const [x,z,c] of [[9.2,6.6,0xb3262e],[17.6,6.2,0x2a5ea8]]){ D.sbox(3,0.9,1.2,X(x),y0,Z(z),0x6b4a2e); for(const dx of [-1.4,1.4]) for(const dz of [-0.5,0.9]) D.box(0.1,2.3,0.1,X(x+dx),y0,Z(z+dz),0x5a3d26);
       D.box(3.4,0.08,2,X(x),y0+2.3,Z(z+0.2),c,[0.25,0,0]); for(let k=0;k<4;k++) D.sph(0.16,X(x-1+k*0.66),y0+1.05,Z(z),[0xe23a3a,0xf2c014,0x7cbf3a,0xff8a3d][k]); } }
+  // a trebuchet in the middle of the yard, its arm down and its sling laid out; supply crates and barrels by the
+  // barracks and the smithy; a rack of spears by the training yard
+  { const tx=X(-1), tz=Z(-1), WD=0x6b4a2e, WD2=0x5a3d26; D.obj('wood',800);
+    for(const sx of [-1.3,1.3]){ D.box(0.36,0.36,6.2,tx+sx,y0,tz,WD); for(const [zc,a] of [[-1.0,0.38],[1.0,-0.38]]) D.box(0.3,5.4,0.3,tx+sx,y0+2.5-2.7+0.05,tz+zc,WD,[a,0,0]); D.box(0.2,0.2,3.2,tx+sx,y0+1.6,tz,WD2); }
+    for(const zc of [-2.9,2.9,0]) D.box(2.96,0.3,0.3,tx,y0+(zc?0:0.36),tz+zc,WD2); D.tube(0.16,3.1,tx,y0+5,tz,0x3a3530,[0,0,Math.PI/2]);
+    { const g=new THREE.BoxGeometry(0.3,0.3,8); g.translate(0,0,-1.5); D.geo(g,WD,tx,y0+5,tz,[-0.55,0,0]); const ez=2.5*Math.cos(0.55), ey=5+2.5*Math.sin(0.55);
+      D.box(0.08,1.0,0.08,tx-0.3,y0+ey-1.0,tz+ez,0x2a2a2e); D.box(0.08,1.0,0.08,tx+0.3,y0+ey-1.0,tz+ez,0x2a2a2e); D.box(1.4,1.3,1.4,tx,y0+ey-2.3,tz+ez,0x7a6a58); for(const dy of [0.15,1.1]) D.box(1.46,0.1,1.46,tx,y0+ey-2.3+dy,tz+ez,0x2a2a2e);
+      const lz=-5.5*Math.cos(0.55), ly=5-5.5*Math.sin(0.55); D.box(0.05,0.05,Math.hypot(ly,1.2),tx,y0+ly/2,tz+lz-0.6,0x8a7a5a,[-Math.atan2(ly,1.2),0,0]); D.sph(0.45,tx,y0+0.45,tz+lz-1.4,0x8f897d); D.box(0.7,0.06,0.5,tx,y0,tz+lz-1.4,0x8a7a5a); }
+    D.solid(tx-1.5,y0,tz-3.1,tx+1.5,y0+0.4,tz+3.1); for(const sx of [-1.3,1.3]) D.solid(tx+sx-0.2,y0+0.4,tz-2.2,tx+sx+0.2,y0+5.2,tz+2.2); { const cz=tz+2.5*Math.cos(0.55), cy=y0+5+2.5*Math.sin(0.55)-2.3; D.solid(tx-0.7,cy,cz-0.7,tx+0.7,cy+1.3,cz+0.7); } D.end(); }
+  for(const [x,z,h,c] of [[-3.6,-8.6,0,0x9c7a4c],[-2.4,-8.4,0,0x8a6a40],[-3.0,-8.5,1.0,0x9c7a4c],[-1.6,-9.4,0,0xa9814e]]){ D.obj('wood',110); D.sbox(1,1,1,X(x),y0+h,Z(z),c); D.box(1.02,0.1,1.02,X(x),y0+h+0.45,Z(z),0x6e5233); D.end(); }
+  for(const [x,z] of [[3.6,-8.4],[3.0,-7.6],[4.2,-7.5]]){ D.obj('wood',120); D.scyl(0.36,0.9,X(x),y0,Z(z),0x7a5230,12); D.cyl(0.38,0.38,0.05,X(x),y0+0.25,Z(z),0x3a3a3a,12); D.cyl(0.38,0.38,0.05,X(x),y0+0.65,Z(z),0x3a3a3a,12); D.end(); }
+  { const rx=X(7.5), rz=Z(10.8); D.obj('wood',140); for(const dx of [-1,1]) D.box(0.12,1.6,0.12,rx+dx,y0,rz,0x5a3d26); D.box(2.2,0.1,0.12,rx,y0+1.2,rz,0x5a3d26); D.box(2.2,0.1,0.4,rx,y0+0.25,rz,0x5a3d26);
+    for(let k=0;k<5;k++){ D.box(0.05,2.4,0.05,rx-0.8+k*0.4,y0+0.3,rz+0.05,0x8a6a40,[0.12,0,0]); D.cyl(0.0,0.06,0.25,rx-0.8+k*0.4,y0+2.64,rz+0.2,0x9aa3ab,6,[0.12,0,0]); } D.solid(rx-1.1,y0,rz-0.25,rx+1.1,y0+1.6,rz+0.35); D.end(); }
   // a worn dirt apron outside the walls, out to each gate's road and round the ruin; cobbles inside (drawn over it)
   { const out=[rectIn(-34,-34,29,29,0)]; if(gW) out.push(rectIn(-42,-6,-30,6,0)); if(gE) out.push(rectIn(25,-6,41,6,0)); if(gN) out.push(rectIn(-6,-42,6,-30,0)); if(gS) out.push(rectIn(-6,25,6,41,0)); out.push(discIn(-27,22,9));
     poiGround(t,'dirt',anyIn(out),2.2); }
@@ -480,6 +561,7 @@ POI_BUILD.labs=(t,D)=>{ const K=poiKit(t), L=K.L, X_=poiCtx(t), {i,j,X,Z,y0,C,ji
     D.box(5,0.12,0.12,X(35),y0+1.0,Z(3.2),0xc0392b,[0,0,0.35]); D.box(0.25,1.1,0.25,X(32.6),y0,Z(3.2),0x55606a);
     for(const [x,z] of [[-8,-4],[8,-8],[-20,4],[30,-4],[6,26],[-34,-14]]){ if(!X_.inR(x,z,1)) continue; D.box(0.2,7,0.2,X(x),y0,Z(z),0xc9d2dc); D.box(1.2,0.3,0.4,X(x),y0+7,Z(z),0x3e454c); D.box(1.0,0.06,0.3,X(x),y0+6.96,Z(z),0xfff3cf,null,true); D.solid(X(x)-0.1,y0,Z(z)-0.1,X(x)+0.1,y0+7,Z(z)+0.1); }
     pad.push(rectIn(-40,-12,-26,12,2),rectIn(-14,-10,40,8,3),rectIn(-4,26,4,40,2),rectIn(30,-5,40,5,2),discIn(-30,15,8)); }
+  poiRig(D,X(-8.2),y0,Z(4),Math.PI/2,{cab:0xe6e6df,trailer:'box',tcol:0xf5f7f9,stripe:0x22b3c4,len:9.6}); pad.push(rectIn(-21,2,-2,6,1)); // a supply lorry in from the launch contractor
   poiGround(t,'concrete',anyIn(pad),2.4);
   return blds; };
 
@@ -498,8 +580,8 @@ POI_BUILD.timber=(t,D)=>{ const K=poiKit(t), L=K.L, X_=poiCtx(t), {i,j,X,Z,y0,C,
     sp.chest.push(poiSpot(i0+3,j0,L,0,0.8),poiSpot(i0,j0+2,L)); sp.floor.push(poiSpot(i0+2,j0+2,L)); blds.push({pieces:K.P.slice(n0),spots:sp,kind:'sawmill'}); pad.push(rectIn(-15,-30,5,-15,5)); }
   // --- a log cabin, north-east, one room with a porch
   { const n0=K.P.length, sp={chest:[],floor:[]}, i0=i(3), j0=j(-5); K.slab(i0,j0,2,2,L,logS); K.shell(i0,j0,2,2,L,1,logS,(f,k)=>f==='s'&&k===0?POI_DOOR:f==='n'?511:POI_WIN); K.roof(i0,j0,2,2,L+1,logS);
-    D.sbox(10,0.3,2.4,X(20),y0,Z(-13.8),0x8a5a32); for(const x of [15.4,24.6]) D.box(0.2,2.6,0.2,X(x),y0+0.3,Z(-12.8),0x6b4a2e); D.box(10.2,0.15,2.8,X(20),y0+2.9,Z(-13.8),0x4a2e16,[0.12,0,0]);
-    D.sbox(1.2,0.5,0.5,X(22),y0+0.3,Z(-13.4),0x6b4a2e); D.box(0.6,2.2,0.6,X(23.4),y0,Z(-21.6),0x6e6458); D.box(0.9,6.6,0.9,X(24.6),y0,Z(-20),0x8f877a); D.solid(X(24.15),y0,Z(-20.45),X(25.05),y0+6.6,Z(-19.55)); // bench, stove, chimney
+    D.sbox(10,0.3,2.3,X(20),y0,Z(-13.7),0x8a5a32); for(const x of [15.4,24.6]) D.box(0.2,2.48,0.2,X(x),y0+0.3,Z(-12.8),0x6b4a2e); D.box(10.2,0.15,2.6,X(20),y0+2.82,Z(-13.55),0x4a2e16,[0.12,0,0]);
+    D.sbox(1.2,0.5,0.5,X(22),y0+0.3,Z(-13.4),0x6b4a2e); D.box(0.6,2.2,0.6,X(23.4),y0,Z(-21.6),0x6e6458); D.box(0.9,6.6,0.9,X(25.6),y0,Z(-20),0x8f877a); D.box(1.1,0.2,1.1,X(25.6),y0+6.6,Z(-20),0x6e6458); D.tube(0.12,1.4,X(24.45),y0+1.9,Z(-21.6),0x3a3530,[0,0,Math.PI/2]); D.solid(X(25.15),y0,Z(-20.45),X(26.05),y0+6.6,Z(-19.55)); // bench, stove, chimney
     sp.chest.push(poiSpot(i0+1,j0,L)); sp.floor.push(poiSpot(i0,j0,L)); blds.push({pieces:K.P.slice(n0),spots:sp,kind:'cabin'}); pad.push(rectIn(15,-25,25,-12,3)); }
   // --- the foreman's house, south-west: 2x3 with an upstairs
   { const n0=K.P.length, sp={chest:[],floor:[]}, i0=i(-7), j0=j(1); K.slab(i0,j0,2,3,L,logS2); K.slab(i0,j0,2,3,L+1,logS2,(a,b)=>a===i0+1&&b===j0+1);
@@ -518,22 +600,52 @@ POI_BUILD.timber=(t,D)=>{ const K=poiKit(t), L=K.L, X_=poiCtx(t), {i,j,X,Z,y0,C,
     pile(-25,-12,0.3,5); pile(12,9,1.3,4); pile(24,22,-0.4,5); pile(-8,24,2.0,3); pile(-27,-25,0.9,3);
     for(const [x,z,yw,n] of [[10,-6,0.1,4],[16,-4,0.2,3],[6,16,-0.5,5]]){ for(let q=0;q<n;q++){ const g=new THREE.BoxGeometry(2.4,0.38,4.8); D.geo(g,q%2?0xd9b077:0xc89a62,X(x),y0+0.12+q*0.4+0.19,Z(z),[0,yw+(q%2?0.03:0),0]); }
       D.solid(X(x)-1.6,y0,Z(z)-2.6,X(x)+1.6,y0+0.12+n*0.4,Z(z)+2.6); D.box(2.6,0.12,5,X(x),y0,Z(z),0x8c6a3f,[0,yw,0]); }
-    { const lx=X(-18), lz=Z(-3); D.sbox(2.6,1.4,4.4,lx,y0+0.5,lz,0xe0a326); D.sbox(2.0,1.4,1.8,lx,y0+1.9,lz+1.1,0xe0a326); D.box(1.8,1.0,0.05,lx,y0+2.2,lz+0.18,0x5ec8ff); for(const dz of [-1.4,1.4]) for(const dx of [-1.4,1.4]){ const w=new THREE.CylinderGeometry(0.55,0.55,0.4,12); w.rotateZ(Math.PI/2); D.geo(w,0x1d1f22,lx+dx,y0+0.55,lz+dz); }
-      const arm=new THREE.BoxGeometry(0.4,0.4,7); arm.translate(0,0,-3.2); D.geo(arm,0xd4991c,lx,y0+3.2,lz-1,[-0.5,0,0]); const cl=new THREE.TorusGeometry(0.7,0.12,6,12,Math.PI); D.geo(cl,0x3a3d42,lx,y0+3.6,lz-7.4,[Math.PI/2,0,0]); }
-    { const tx=X(-3), tz=Z(9), yw=0.6, g=new THREE.BoxGeometry(2.4,0.5,9); D.geo(g,0x3a3d42,tx,y0+1.05,tz,[0,yw,0]); const cab=new THREE.BoxGeometry(2.4,1.9,2.2); cab.translate(0,0,5.4); D.geo(cab,0x2e86c1,tx,y0+2.15,tz,[0,yw,0]);
-      for(const s of [-3.2,-1.8,4.6]){ const w=new THREE.CylinderGeometry(0.55,0.55,2.5,12); w.rotateZ(Math.PI/2); w.translate(0,0,s); D.geo(w,0x1d1f22,tx,y0+0.55,tz,[0,yw,0]); }
-      for(let k=0;k<5;k++){ const lg=new THREE.CylinderGeometry(0.38,0.4,8.4,10); lg.rotateX(Math.PI/2); lg.translate((k%3-1)*0.75,k<3?0:0.7,-0.2); D.geo(lg,0x8a5a32,tx,y0+1.7,tz,[0,yw,0]); }
-      D.solid(tx-3.5,y0+0.6,tz-3.5,tx+3.5,y0+2.7,tz+3.5); }
+    // the log loader: four big tyres, an engine house at the back, a glazed cab, a boom with its ram and a grapple
+    { const lx=X(-18), lz=Z(-3), Y=0xe0a326, DKk=0x1d1f22, GL=0x4f6f86; D.obj('metal',650);
+      D.box(2.6,0.8,4.6,lx,y0+0.5,lz,Y); D.box(2.7,0.1,4.7,lx,y0+1.3,lz,0x3a3d42);
+      for(const sx of [-1,1]) for(const sz of [-1.45,1.45]){ const w=new THREE.CylinderGeometry(0.62,0.62,0.55,16); w.rotateZ(Math.PI/2); D.geo(w,DKk,lx+sx*1.35,y0+0.62,lz+sz); const h=new THREE.CylinderGeometry(0.32,0.32,0.57,10); h.rotateZ(Math.PI/2); D.geo(h,Y,lx+sx*1.35,y0+0.62,lz+sz); }
+      D.box(2.2,1.2,1.5,lx,y0+1.4,lz+1.5,Y); for(let k=0;k<4;k++) D.box(1.6,0.06,0.05,lx,y0+1.65+k*0.22,lz+2.26,DKk); D.cyl(0.08,0.08,1.2,lx+0.7,y0+2.6,lz+1.2,0x3a3d42,8); D.box(2.3,0.12,1.6,lx,y0+2.6,lz+1.5,0x3a3d42);
+      D.box(1.7,1.8,1.7,lx,y0+1.4,lz-0.5,GL); for(const [dx,dz] of [[-0.88,-1.38],[0.88,-1.38],[-0.88,0.38],[0.88,0.38]]) D.box(0.1,1.8,0.1,lx+dx,y0+1.4,lz+dz,Y); D.box(2.0,0.15,2.0,lx,y0+3.2,lz-0.5,Y); D.box(0.7,0.5,0.6,lx,y0+1.4,lz-0.3,0x3a3d42);
+      { const g=new THREE.BoxGeometry(0.45,0.5,5.5); g.translate(0,0,-2.75); D.geo(g,Y,lx,y0+2.0,lz-1.6,[0.45,0,0]); const tipZ=lz-1.6-5.5*Math.cos(0.45), tipY=y0+2.0+5.5*Math.sin(0.45);
+        const c=new THREE.BoxGeometry(0.16,0.16,3.83); c.translate(0,0,-1.92); D.geo(c,0xc4cad1,lx+0.32,y0+1.25,lz-0.8,[0.549,0,0]); D.box(0.22,0.22,1.6,lx+0.32,y0+1.25+0.4,lz-1.4,0x3a3d42,[0.549,0,0]);
+        D.box(0.15,0.7,0.15,lx,tipY-0.75,tipZ,0x3a3d42); D.box(0.5,0.3,0.5,lx,tipY-1.05,tipZ,0x3a3d42); for(const dz of [-0.22,0.22]){ const t=new THREE.TorusGeometry(0.62,0.1,6,12,Math.PI); D.geo(t,DKk,lx,tipY-1.2,tipZ+dz,[0,0,Math.PI]); } }
+      D.solid(lx-1.45,y0,lz-2.3,lx+1.45,y0+3.35,lz+2.3); D.end(); }
+    // a lumber drying shed: open all round on posts, racks of stickered boards inside
+    { const n0=K.P.length, sp={chest:[],floor:[]}, i0=i(-2), j0=j(0); K.slab(i0,j0,3,2,L,shed); K.shell(i0,j0,3,2,L,1,shed,()=>POI_OPEN); K.roof(i0,j0,3,2,L+1,shed);
+      for(const x of [-7.6,-2.5,2.6]) for(const z of [1.5,8.5]){ D.obj('wood',300); for(const dx of [-2,2]) for(const dz of [-0.6,0.6]) D.box(0.14,2.25,0.14,X(x+dx),y0+0.1,Z(z+dz),0x5a3d26);
+        for(let q=0;q<4;q++){ const h=y0+0.2+q*0.55, n=2+((q+Math.round(x))%2+2)%2; for(let b=0;b<n;b++) D.box(4.1,0.1,1.15,X(x),h+b*0.11,Z(z),b%2?0xd9b077:0xc89a62); for(const dx of [-1.6,0,1.6]) D.box(0.08,0.06,1.2,X(x+dx),h-0.06,Z(z),0x8a5a32); }
+        D.solid(X(x)-2.1,y0,Z(z)-0.7,X(x)+2.1,y0+2.35,Z(z)+0.7); D.end(); }
+      sp.chest.push(poiSpot(i0+1,j0,L,0,2.4)); sp.floor.push(poiSpot(i0+2,j0+1,L,0,-2.3),poiSpot(i0,j0+1,L,0,-2.3)); blds.push({pieces:K.P.slice(n0),spots:sp,kind:'shed'}); }
+    // the wood chipper on its trailer, and the heap of chips it throws
+    { const cx=X(-3), cz=Z(-7.5); D.obj('metal',380); D.box(1.5,1.1,2.2,cx,y0+0.55,cz,0xd8702f); D.box(1.5,0.12,2.3,cx,y0+1.65,cz,0x3a3d42);
+      for(const s of [-1,1]){ const w=new THREE.CylinderGeometry(0.42,0.42,0.3,12); w.rotateZ(Math.PI/2); D.geo(w,0x1d1f22,cx+s*0.92,y0+0.42,cz+0.3); } D.box(0.12,0.12,1.6,cx,y0+0.45,cz+1.8,0x3a3d42); D.box(0.3,0.5,0.3,cx,y0,cz+2.5,0x3a3d42);
+      { const hp=new THREE.BoxGeometry(1.3,0.9,1.0); D.geo(hp,0xd8702f,cx,y0+1.15,cz-1.5,[-0.35,0,0]); const mo=new THREE.BoxGeometry(1.0,0.62,0.04); mo.translate(0,0.06,-0.51); D.geo(mo,0x1d1f22,cx,y0+1.15,cz-1.5,[-0.35,0,0]); const lip=new THREE.BoxGeometry(1.36,0.08,0.5); lip.translate(0,-0.3,-0.7); D.geo(lip,0x3a3d42,cx,y0+1.15,cz-1.5,[-0.35,0,0]); }
+      D.tube(0.22,1.8,cx+0.3,y0+2.4,cz+0.4,0xd8702f,[0,0,-0.6]); D.box(0.5,0.35,0.5,cx+0.9,y0+3.1,cz+0.4,0xd8702f); D.solid(cx-0.8,y0,cz-2.4,cx+0.8,y0+1.8,cz+2.6); D.end();
+      D.obj('wood',200); const pg=new THREE.ConeGeometry(2.1,1.3,14); D.geo(pg,0xc8a060,X(2.2),y0+0.65,Z(-7.2)); D.solid(X(2.2)-1.3,y0,Z(-7.2)-1.3,X(2.2)+1.3,y0+0.7,Z(-7.2)+1.3); D.end(); }
+    // a lorry with a full load of logs, parked by the south road
+    const rig=poiRig(D,X(-13),y0,Z(30.5),Math.PI/2,{cab:0x2f8f86,trailer:'logs',len:10});
     { const wx=X(22), wz=Z(12); for(const [dx,dz] of [[-2,-2],[2,-2],[-2,2],[2,2]]){ D.box(0.35,8,0.35,wx+dx,y0,wz+dz,0x6b4a2e); D.solid(wx+dx-0.18,y0,wz+dz-0.18,wx+dx+0.18,y0+8,wz+dz+0.18); }
       for(const h of [2.6,5.2]){ D.box(4.4,0.15,0.15,wx,y0+h,wz-2,0x5a3d26); D.box(4.4,0.15,0.15,wx,y0+h,wz+2,0x5a3d26); D.box(0.15,0.15,4.4,wx-2,y0+h,wz,0x5a3d26); D.box(0.15,0.15,4.4,wx+2,y0+h,wz,0x5a3d26); }
       D.sbox(5.4,0.3,5.4,wx,y0+8,wz,0x5a3d26); D.scyl(2.5,3.6,wx,y0+8.3,wz,0x9a6a3d,18); for(const h of [0.6,1.8,3]) D.cyl(2.55,2.55,0.12,wx,y0+8.3+h,wz,0x2a2a2e,18); D.cyl(0.2,2.8,1.4,wx,y0+11.9,wz,0x4a2e16,18); }
-    for(let k=0;k<14;k++){ const x=-38+r()*76, z=-38+r()*76; if(!X_.inR(x,z,1)) continue; if(Math.abs(x+6)<14&&z<-12&&z>-32) continue; if(Math.hypot(x-22,z-12)<5||Math.hypot(x+19,z-15)<4||Math.hypot(x+3,z-9)<6) continue;
+    for(let k=0;k<14;k++){ const x=-38+r()*76, z=-38+r()*76; if(!X_.inR(x,z,1)) continue; if(Math.abs(x+6)<14&&z<-12&&z>-32) continue; if(Math.hypot(x-22,z-12)<5||Math.hypot(x+19,z-15)<4||x>-12&&x<7&&z>-11&&z<12||x>13&&x<27&&z>-26&&z<-10||x>-37&&x<-23&&z>3&&z<22||nearSeg(X(x),Z(z),rig,2.4)) continue;
       const rr=0.35+r()*0.3; D.cyl(rr,rr*1.15,0.5+r()*0.4,X(x),y0,Z(z),0x8a5a32,10); D.cyl(rr*0.95,rr*0.95,0.03,X(x),y0+0.52,Z(z),0xd9b077,10); if(k%4===0){ D.box(0.06,0.7,0.06,X(x)+0.1,y0+0.6,Z(z),0x6b4a2e,[0,0,0.3]); D.box(0.04,0.2,0.32,X(x)+0.28,y0+0.95,Z(z),0x9aa3ab,[0,0,0.3]); } }
-    pad.push(rectIn(-30,-15,30,26,1),rectIn(-40,-5,-28,5,2),rectIn(28,-5,40,5,2),rectIn(-4,26,4,40,2)); }
+    pad.push(rectIn(-30,-15,30,26,1),rectIn(-27,27,-6,34,1.5),rectIn(-40,-5,-28,5,2),rectIn(28,-5,40,5,2),rectIn(-4,26,4,40,2)); }
   poiGround(t,'dirt',anyIn(pad),2.8);
   return blds; };
 // build a site once: its pieces (put up by buildWorld like the houses) and its decoration
-function planPOI(t){ if(t.blds) return t.blds; const D=poiDecor(); t.blds=POI_BUILD[t.kind](t,D); t.decor=D.flush(); return t.blds; }
+function planPOI(t){ if(t.blds) return t.blds; const D=poiDecor(); t.blds=POI_BUILD[t.kind](t,D); poiPosts(t.blds,D); t.decor=D.flush(); return t.blds; }
+// an open side (only the lintel of the wall left) stands on posts: one at each end of the opening that no full wall
+// holds up, in the building's beam colour, so a shed or a loading bay never looks like a roof floating on nothing
+function poiPosts(blds,D){ const W=[], full=new Set(), done=new Set(), K=(a,b,l)=>a+','+b+','+l, ends=p=>p.axis==='x'?[[p.i,p.j],[p.i,p.j+1]]:[[p.i,p.j],[p.i+1,p.j]];
+  for(const b of blds) for(const p of b.pieces) if(p.type==='wall') W.push(p);
+  const OP=new Set(W.filter(p=>p.mask===POI_OPEN).map(p=>p.axis+','+p.i+','+p.j+','+p.l));
+  for(const p of W){ const m=p.mask==null?511:p.mask; if(m===POI_OPEN||m===POI_LOW||m===POI_MERLON) continue; for(const [a,b] of ends(p)) full.add(K(a,b,p.l)); }
+  for(const p of W){ if(p.mask!==POI_OPEN) continue; for(const [a,b] of ends(p)){ const k=K(a,b,p.l); if(full.has(k)||done.has(k)) continue; done.add(k);
+      const x=a*CELL, z=b*CELL, y=p.l*LVL+FT/2, h=LVL*2/3-FT/2+0.04, c=(p.skin&&p.skin.beam!=null)?p.skin.beam:0x5a3a1e, cap=new THREE.Color(c).multiplyScalar(0.8).getHex();
+      D.obj(p.mat==='metal'?'metal':p.mat==='brick'?'brick':'wood',p.mat==='metal'?320:240);
+      D.box(0.3,h,0.3,x,y,z,c); D.box(0.42,0.12,0.42,x,y,z,cap); D.box(0.38,0.1,0.38,x,y+h-0.1,z,cap);
+      if(p.mat!=='metal') for(const [dx,dz] of [[1,0],[-1,0],[0,1],[0,-1]]) if(dx?OP.has('z,'+(dx>0?a:a-1)+','+b+','+p.l):OP.has('x,'+a+','+(dz>0?b:b-1)+','+p.l)){ const g=new THREE.BoxGeometry(0.12,0.9,0.12); g.rotateZ(dx?-dx*0.7:0); g.rotateX(dz?dz*0.7:0); D.geo(g,c,x+dx*0.3,y+h-0.38,z+dz*0.3); } // knee braces up to the lintel
+      D.solid(x-0.15,y,z-0.15,x+0.15,y+h,z+0.15); D.end(); } } }
 // shots stop on solid decoration (containers, machines, the rocket...): a stand-in piece takes the hit
 const POI_SOLID={key:'_deco',mat:'metal',type:'wall',deco:1,group:{position:new THREE.Vector3()}};
 function decoShot(o,d,range,nearT){ let best=null, bs=null; const ps=new Set(), n=Math.min(90,Math.ceil(range/4)); for(let k=0;k<=n;k++){ const t=k*4; staticsInto(ps,o.x+d.x*t,o.z+d.z*t,2.5); }

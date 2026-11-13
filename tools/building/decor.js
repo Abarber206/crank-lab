@@ -154,8 +154,8 @@ function buildWorldDecor(){ const D=poiDecor(), r=seeded(60613), S=SPAWN, PI=Mat
       else if(t.kind==='castle'){ const k=pr(); if(k<0.4) bale(x,z,ya,pr()<0.4); else if(k<0.75){ D.scyl(0.36,0.9,x,y,z,0x7a5230,12); D.cyl(0.38,0.38,0.05,x,y+0.25,z,0x3a3a3a,12); D.cyl(0.38,0.38,0.05,x,y+0.65,z,0x3a3a3a,12); } // a barrel
         else { D.cyl(0.06,0.06,4.2,x,y,z,DARKWOOD,6); D.box(0.9,1.5,0.04,x+0.48,y+2.5,z,[0x8a2a2a,0x2a4a8a,0x2f6a3a][Math.floor(pr()*3)]); D.solid(x-0.15,y,z-0.15,x+0.15,y+4.2,z+0.15); } } // a banner
       else if(t.kind==='labs'){ if(pr()<0.45){ crate(x,y,z,0.9,ya,0x8a8f96); D.box(0.92,0.12,0.06,...at(x,z,ya,0,0.46).reduce((o,v,i)=>(o[i*2]=v,o),[0,y+0.4,0]),0xf2c418,[0,ya,0]); } else drum(x,y,z,0xe0b020); }
-      else { if(pr()<0.6){ for(let k=0;k<3;k++) log(...at(x,z,ya,(k-1)*0.62,0).reduce((o,v,i)=>(o[i*2]=v,o),[0,y,0]),ya,3.6,0.3,BARK,k===1); log(...at(x,z,ya,-0.31,0).reduce((o,v,i)=>(o[i*2]=v,o),[0,y+0.52,0]),ya,3.6,0.3,BARK); log(...at(x,z,ya,0.31,0).reduce((o,v,i)=>(o[i*2]=v,o),[0,y+0.52,0]),ya,3.6,0.3,BARK);
-          const [hx,hz]=[Math.abs(Math.sin(ya))*1.9+Math.abs(Math.cos(ya))*1,Math.abs(Math.cos(ya))*1.9+Math.abs(Math.sin(ya))*1]; D.solid(x-hx,y,z-hz,x+hx,y+1.1,z+hz); }
+      else { if(pr()<0.6){ D.obj('wood',260); for(let k=0;k<3;k++) log(...at(x,z,ya,(k-1)*0.62,0).reduce((o,v,i)=>(o[i*2]=v,o),[0,y,0]),ya,3.6,0.3,BARK,false); log(...at(x,z,ya,-0.31,0).reduce((o,v,i)=>(o[i*2]=v,o),[0,y+0.52,0]),ya,3.6,0.3,BARK); log(...at(x,z,ya,0.31,0).reduce((o,v,i)=>(o[i*2]=v,o),[0,y+0.52,0]),ya,3.6,0.3,BARK);
+          const [hx,hz]=[Math.abs(Math.sin(ya))*1.9+Math.abs(Math.cos(ya))*1,Math.abs(Math.cos(ya))*1.9+Math.abs(Math.sin(ya))*1]; D.solid(x-hx,y,z-hz,x+hx,y+1.1,z+hz); D.end(); }
         else { D.cyl(0.42,0.5,0.55,x,y,z,0x5e4630,10); D.box(0.12,0.75,0.12,x,y+0.55,z,0x8a8a8a,[0.3,ya,0]); D.solid(x-0.5,y,z-0.5,x+0.5,y+0.6,z+0.5); } } } } // log piles; a stump with an axe
 
   const meshes=D.flush(); DECOR.items=meshes.length; DECOR.s1=STATICS.length; return meshes; }
