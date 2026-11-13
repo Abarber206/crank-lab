@@ -15,3 +15,8 @@ patch195.py — bots land on loot, loot further, edit windows in their walls, he
 patch196.py — BR kill feed with weapon/distance, end-of-life summary, spectating, Victory Royale summary, storm murk + lightning
 patch197.py — shots/line of sight only test pieces in grid cells along the ray (8x faster)
 patch198.py + weather.js — rain in some matches
+patch199.py — phones: one WebGL context (icons/portraits drawn offscreen by the game's renderer), locker portraits on demand, no island photo in the lobby, shorter draw distances and smaller light map, reload on context loss
+patch200.py — Fortnite-style hotbar: big diagonal guns on rarity-coloured slots, ammo count with its mark
+patch201.py — 100 players; far bots drawn as one merged figure and updated less often; spectator camera behind the shoulder (never in the ground or walls) with the player's health and gun; more floor loot
+patch202.py — small far objects skipped when drawing (never pieces, never for shots); house decor drawn only near its town
+weather.js — rain only inside the storm, dark and purple

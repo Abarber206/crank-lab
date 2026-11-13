@@ -1,0 +1,11 @@
+// the hotbar: guns of each rarity, Fortnite style (big diagonal guns on rarity-coloured slots, ammo with its mark)
+const {sleep,page,launch,open}=require('./h.js');
+(async()=>{ const b=await launch(); const {pg,errs}=await open(b,page('/home/claude/crank-lab/index.html','P,renderer,settings,WEAPONS,renderSlots,ICON_IMG,iconKey,queueIcons'),{vp:{width:1280,height:720}});
+ await pg.waitForFunction(()=>window.T&&T.renderer&&T.renderer.info.render.frame>5,null,{timeout:180000});
+ await pg.evaluate(()=>{ T.settings.skyDrop=false; const s=document.querySelector('#botSel'); if(s){ s.value='off'; s.dispatchEvent(new Event('change')); } document.querySelector('#play').click(); }); await sleep(5000);
+ const ids=await pg.evaluate(()=>{ const W=T.WEAPONS, pick=(b,r)=>Object.keys(W).find(k=>W[k].base===b&&W[k].rarity===r); const ids=[pick('pistol','common'),pick('smg','uncommon'),pick('sniper','rare'),pick('pump','epic'),pick('ar','legendary')].map((x,i)=>x||Object.keys(W)[i]);
+   T.P.inv=ids.slice(); ids.forEach(id=>{ T.P.ammo[id]=T.WEAPONS[id].mag||5; }); T.queueIcons(ids); return ids; });
+ await pg.waitForFunction(ids=>ids.every(id=>T.ICON_IMG.has(T.iconKey(id))),ids,{timeout:90000}).catch(()=>{}); await pg.evaluate(()=>T.renderSlots()); await sleep(800);
+ const bb=await pg.evaluate(()=>{ const r=document.getElementById('wbar').getBoundingClientRect(); return {x:r.x,y:r.y,w:r.width,h:r.height}; });
+ await pg.screenshot({path:'/home/claude/work/hotbar.png',clip:{x:Math.max(0,bb.x-260),y:Math.max(0,bb.y-150),width:Math.min(1280,bb.w+280),height:bb.h+160},timeout:150000});
+ console.log(JSON.stringify(ids),JSON.stringify(bb)); console.log(await pg.evaluate(()=>{ const s=document.querySelectorAll('#wbar .slot .am')[1]; const i=s&&s.querySelector('i'); return (s?s.outerHTML.slice(0,160):'none')+' | '+(i?getComputedStyle(i).backgroundImage.slice(0,40)+' '+getComputedStyle(i).width+' '+getComputedStyle(i).display:''); })); console.log(await pg.evaluate(()=>{ const s=document.querySelectorAll('#wbar .slot .am')[1]; const i=s&&s.querySelector('i'); return (s?s.outerHTML.slice(0,200):'none')+' | '+(i?getComputedStyle(i).backgroundImage.slice(0,60)+' '+getComputedStyle(i).width:''); })); console.log(errs.slice(0,4).join('\n')||'no errors'); await b.close(); })();

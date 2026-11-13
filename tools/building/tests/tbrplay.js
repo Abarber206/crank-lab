@@ -7,5 +7,5 @@ const {sleep,page,launch,open}=require('./h.js');
  const st=()=>pg.evaluate(()=>{ const bs=T.BR.bots, al=bs.filter(b=>b.alive); let bp=0; T.pieces.forEach(p=>{ if(p.owner==='bot') bp++; });
    return {alive:al.length,armed:al.filter(b=>b.wpn).length,two:al.filter(b=>b.wpn&&b.wpn2).length,sg:al.filter(b=>[b.wpn,b.wpn2].some(w=>w&&T.WEAPONS[w].pellets>1)).length,mats:Math.round(al.reduce((s,b)=>s+(b.mats||0),0)/Math.max(1,al.length)),built:bp,flee:al.filter(b=>b.flee).length}; });
  let last=null, maxBuilt=0; for(let t=0;t<18;t++){ await sleep(10000); last=await st(); maxBuilt=Math.max(maxBuilt,last.built); console.log('t',(t+1)*10,JSON.stringify(last)); }
- const ok=last.two>=1&&maxBuilt>=4&&last.alive<29&&last.mats>0;
+ const ok=last.two>=1&&maxBuilt>=4&&last.alive<90&&last.mats>0;
  console.log(ok?'PASS':'FAIL'); console.log(errs.slice(0,6).join('\n')||'no errors'); await b.close(); })();

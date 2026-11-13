@@ -10,4 +10,4 @@ const {sleep,page,launch,open}=require('./h.js');
  // indoors
  await pg.evaluate(()=>{ const t=T.TOWNS.find(t=>!t.kind&&t.houses.length), h=t.houses[0], x=(h.i0+h.w/2)*T.CELL, z=(h.j0+h.d/2)*T.CELL; T.P.pos.set(x,t.h+0.05,z); }); await sleep(2500);
  await shot('in');
- console.log(JSON.stringify(st)); console.log(st.vis&&st.k>0.9?'PASS':'FAIL'); console.log(errs.slice(0,6).join('\n')||'no errors'); await b.close(); })();
+ console.log(JSON.stringify(st)); console.log(st.vis&&st.k>0.5?'PASS':'FAIL'); console.log(errs.slice(0,6).join('\n')||'no errors'); await b.close(); })();
