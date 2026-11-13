@@ -2664,6 +2664,9 @@ function makeBoxes(p){
     if(p.mask===15) out.push([x0,y0-FT,z0,x0+CELL,y0,z0+CELL]);
     else for(let r=0;r<2;r++)for(let c=0;c<2;c++) if(p.mask>>(r*2+c)&1) out.push([x0+c*CELL/2,y0-FT,z0+r*CELL/2,x0+(c+1)*CELL/2,y0,z0+(r+1)*CELL/2]);
   }
+  if(p.type==='cone'&&p.skin&&p.gable) for(const [side] of p.gable){ const m=p.mask||0, bit=b=>(m>>b&1)?1:0, ed={w:[0,2,'z',0],e:[1,3,'z',CELL],n:[0,1,'x',0],s:[2,3,'x',CELL]}[side], h0=bit(ed[0]), h1=bit(ed[1]); if(h0===h1) continue;
+    const x0=p.i*CELL, z0=p.j*CELL, N=10; for(let k=0;k<N;k++){ const a=k/N, b=(k+1)/N, hh=LVL*(h0?1-b:a); if(hh<0.05) continue; // (each slice as tall as the triangle at its lower end)
+      if(ed[2]==='z'){ const X=x0+ed[3]; out.push([X-WT/2,y0,z0+a*CELL,X+WT/2,y0+hh,z0+b*CELL]); } else { const Z=z0+ed[3]; out.push([x0+a*CELL,y0,Z-WT/2,x0+b*CELL,y0+hh,Z+WT/2]); } } }
   if(p.fix) out.push(...p.fix.boxes); // a house's staircase or stairwell railing
   if(p.doors) p.doors.forEach((d,c)=>{ if(!d||d.open) return; const tw=CELL/3, th=LVL/3; if(p.axis==='x'){ const X=p.i*CELL, z0=p.j*CELL+c*tw; out.push([X-WT/2,y0,z0,X+WT/2,y0+2*th,z0+tw]); } else { const Z=p.j*CELL, x0=p.i*CELL+c*tw; out.push([x0,y0,Z-WT/2,x0+tw,y0+2*th,Z+WT/2]); } }); // a closed door
   return out;

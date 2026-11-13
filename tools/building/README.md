@@ -29,3 +29,4 @@ patch205.py — frame rate: hidden objects (~50k of 52k) no longer recompute the
 patch206.py — no invisible walls: tree trunks solid as a round-ish cross their real thickness, rocks follow their turned boulder, bridge rails in short pieces
 decor.js / poi_*.js — fences, fallen logs, log piles, plank stacks, tilted containers, barriers and round tanks solid along their real shape; archery targets on stands
 tests/tbarrier.js — finds collision boxes standing off anything drawn; tprof/tnodes — where frame time goes; tsky — skydiver figures
+patch207.py — gable ends (the triangle under each end of a pitched roof) are solid; tests/tgable.js walks into 300 of them
