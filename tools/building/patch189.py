@@ -1,4 +1,5 @@
 # patch189: sound upgrades
+#  - (rarity sound variants, since retired: rarity only changes damage)
 #  - each rarity of a gun sounds different: a common one is thinner and rattlier, an epic one (muzzle brake) louder and
 #    harsher with more slap off the surroundings, a legendary one (compensator) deeper with a longer, heavier tail
 #  - far gunfire and explosions arrive late, at the speed of sound (you see the flash, then hear it)
@@ -8,7 +9,8 @@
 rep("""const gunTakes={};""","""const gunTakes={};
 const GUN_RAR={common:{boom:0.85,sub:0.75,f1:1.18,mech:1.4,rate:1.04},uncommon:{},rare:{boom:1.05,sub:1.1,rate:0.99},
   epic:{blast:1.12,crack:1.12,boom:1.1,sub:1.15,blastT:1.1,slap:1.2,drive:0.2,rate:0.97},legendary:{boom:1.22,sub:1.35,subF:0.9,f1:0.85,boomT:1.18,blastT:1.15,slap:1.28,len:1.15,drive:0.3,rate:0.94}};
-function gunSndKey(W){ const base=(W&&W.snd)||'shot'; if(!W||!GUN_SND[base]||!GUN_RAR[W.rarity]) return base; const vk=base+'|'+W.rarity;
+function gunSndKey(W){ const base=(W&&W.snd)||'shot'; return base; // (a gun sounds the same at every rarity)
+  if(!W||!GUN_SND[base]||!GUN_RAR[W.rarity]) return base; const vk=base+'|'+W.rarity;
   if(!GUN_SND[vk]){ const o=Object.assign({},GUN_SND[base]), m=GUN_RAR[W.rarity]; for(const f of ['boom','sub','f1','blast','crack','blastT','boomT','slap','len','subF']) if(m[f]) o[f]*=m[f];
     if(m.drive) o.drive+=m.drive; if(m.mech) o.mech=o.mech.map(([t,v,b])=>[t,v*m.mech,b]).concat(o.mech.length?[[o.mech[0][0]+0.012,0.12]]:[]); o.rate=m.rate||1; GUN_SND[vk]=o; }
   return vk; }""")

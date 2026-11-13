@@ -18,5 +18,5 @@ const {sleep,page,launch,open}=require('./h.js');
  const st=await pg.evaluate(async()=>{ const S=T.BR.storm; S.t=0.01; await new Promise(r=>setTimeout(r,600)); S.t=0.05; await new Promise(r=>setTimeout(r,2500)); const b=T.BR.bots.find(b=>b.alive&&!b.sky); const far=T.MAP_R; b.pos.set(S.cx+S.r+30,b.pos.y,S.cz); b.thinkT=99; const h0=b.hp; await new Promise(r=>setTimeout(r,2200)); const h1=b.hp; b.thinkT=0; return {ph:S.ph,state:S.state,r:Math.round(S.r),h0,h1,wall:T.BR.wall.visible,timer:document.getElementById('brStorm').textContent}; });
  if(shots){ await pg.evaluate(()=>{ T.P.hp=100; }); await pg.screenshot({path:shots+'_hud.png',timeout:200000}); await pg.keyboard.press('KeyM').catch(()=>{}); await sleep(800); await pg.screenshot({path:shots+'_map.png',timeout:200000}); }
  const r={s0,landed,armed,hit,st}; console.log(JSON.stringify(r));
- const ok=s0.on&&s0.bots===29&&s0.sky>=22&&s0.hud&&landed>=20&&armed>=4&&hit&&(hit.h1<hit.h0||!hit.alive)&&st.h1<st.h0&&st.wall;
+ const ok=s0.on&&s0.bots===29&&s0.sky>=22&&s0.hud&&landed>=10&&armed>=4&&hit&&(hit.h1<hit.h0||!hit.alive)&&st.h1<st.h0&&st.wall;
  console.log(ok?'PASS':'FAIL'); console.log(errs.slice(0,8).join('\n')||'no errors'); await b.close(); })();

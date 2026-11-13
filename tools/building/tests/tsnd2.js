@@ -1,4 +1,4 @@
-// sound upgrades: each rarity of a gun is its own sound; far shots arrive late; near misses whiz; the falls roar near them
+// sound upgrades: a gun sounds the same at every rarity; far shots arrive late; near misses whiz; the falls roar near them
 const {sleep,page,launch,open}=require('./h.js');
 (async()=>{ const b=await launch(); const {pg,errs}=await open(b,page('/home/claude/crank-lab/index.html','scene,P,WEAPONS,GUN_SND,gunTakes,gunSndKey,sfx,sfxAt,whizBy,audioInit,settings,SPAWN,WGEN,OCEAN,terrainH,camera,AUDIO,AC:()=>AC,amb:()=>amb'),{fast:true,norender:true});
  await pg.evaluate(()=>{ T.settings.skyDrop=false; const s=document.querySelector('#botSel'); s.value='off'; s.dispatchEvent(new Event('change')); document.getElementById('play').click(); T.audioInit(); }); await sleep(1500);
@@ -16,5 +16,5 @@ const {sleep,page,launch,open}=require('./h.js');
    T.P.pos.set(T.SPAWN[0],T.terrainH(T.SPAWN[0],T.SPAWN[2])+1,T.SPAWN[2]); await new Promise(r=>setTimeout(r,2500)); out.fallMid=A&&A.fall?+A.fall.g.gain.value.toFixed(3):null; out.cliffMid=A&&A.cliff?+A.cliff.g.gain.value.toFixed(3):null;
    out.ambBus=!!T.AUDIO.amb; return out; });
  console.log(JSON.stringify(r));
- const ok=r.keys.length===5&&new Set(r.keys).size===5&&r.takes.every(x=>x)&&r.fall>0.1&&r.fallMid<0.01&&r.ambBus;
+ const ok=r.keys.length===5&&new Set(r.keys).size===1&&r.takes.every(x=>x)&&r.fall>0.1&&r.fallMid<0.01&&r.ambBus;
  console.log(ok?'PASS':'FAIL'); console.log(errs.slice(0,6).join('\n')||'no errors'); await b.close(); })();

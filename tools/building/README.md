@@ -8,3 +8,10 @@ patch189.py — sound: per-rarity gun sounds, speed-of-sound delay, bullet whiz,
 patch190.py + indoor.js — dim interiors and shade under tree canopies
 patch191.py — river banks: wet earth, sand patches, grass thinning out, damp tint
 patch192.py — BR bots: two guns and swapping, materials, building (walls, ramps, rushes, boxes), aim settle/spray, shoot through walls
+(patch188 + gunkit.js retired: rarity changes damage only)
+patch193.py — rarity changes damage only (not reload)
+patch194.py + housedecor.js — paintings, lamps, rugs and curtains in houses; panelled lighter doors; indoor light tuned
+patch195.py — bots land on loot, loot further, edit windows in their walls, hear you through walls, remember fights
+patch196.py — BR kill feed with weapon/distance, end-of-life summary, spectating, Victory Royale summary, storm murk + lightning
+patch197.py — shots/line of sight only test pieces in grid cells along the ray (8x faster)
+patch198.py + weather.js — rain in some matches

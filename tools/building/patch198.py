@@ -1,0 +1,5 @@
+# patch198: weather (weather.js): some matches it rains (streaks, grey light, closer horizon, rain sound, thunder)
+rep("const _fc=new THREE.Color(), _fm=new THREE.Matrix4();\nfunction stepForest(",open('/home/claude/mg/weather.js').read().rstrip()+"\nconst _fc=new THREE.Color(), _fm=new THREE.Matrix4();\nfunction stepForest(")
+rep("  stepOcean(lastDt); stepIndoor(lastDt);","  stepOcean(lastDt); stepIndoor(lastDt); if(WEATHER.want==null||WEATHER.rolled!==true){ WEATHER.rolled=true; weatherRoll(); } try{ stepWeather(lastDt); }catch(e){ if(!WEATHER.err){ WEATHER.err=1; console.warn('weather',e); } }")
+rep("""function renderMain(){ let sv_=null; try{ sv_=brStormTint(); }catch(e){} try{ renderMain0(); } finally{ if(sv_) sv_(); } }""","""function renderMain(){ let sv_=null, sw_=null; try{ sv_=brStormTint(); }catch(e){} try{ sw_=weatherTint(); }catch(e){} try{ renderMain0(); } finally{ if(sw_) sw_(); if(sv_) sv_(); } }""")
+rep("""  BR.on=true; BR.claimed=new Set();""","""  BR.on=true; try{ weatherRoll(); }catch(e){} BR.claimed=new Set();""")
